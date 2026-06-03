@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EXIT-Prototyp · Das vergessene Arbeitszimmer</title>
+<style>
+  :root{
+    --bg:#1a1410; --panel:#241b14; --ink:#e8dcc8; --gold:#c9a24b;
+    --gold-dim:#8a6f33; --line:#3a2c1f; --bad:#b4533a; --good:#6f9b54;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{
+    background:radial-gradient(120% 90% at 50% 0%, #2a2017 0%, #140f0a 70%, #0c0805 100%);
+    color:var(--ink); font-family:"Iowan Old Style","Palatino Linotype",Georgia,serif;
+    display:flex; flex-direction:column; min-height:100%;
+  }
+  header{
+    display:flex; align-items:center; justify-content:space-between; gap:1rem;
+    padding:.7rem 1.1rem; border-bottom:1px solid var(--line);
+    background:linear-gradient(#241b14,#1a130d);
+  }
+  header h1{font-size:1.05rem;margin:0;letter-spacing:.06em;color:var(--gold);font-weight:600}
+  header h1 small{display:block;font-size:.66rem;color:var(--gold-dim);letter-spacing:.18em;text-transform:uppercase}
+  .hud{display:flex;align-items:center;gap:.8rem}
+  .timer{font-variant-numeric:tabular-nums;font-size:1.1rem;color:var(--ink);min-width:4.2rem;text-align:right}
+  button{
+    font-family:inherit;cursor:pointer;border:1px solid var(--gold-dim);
+    background:#2c2118;color:var(--gold);padding:.4rem .8rem;border-radius:5px;
+    letter-spacing:.04em;transition:.15s;font-size:.85rem;
+  }
+  button:hover{background:#3a2c1f;border-color:var(--gold)}
+  button:disabled{opacity:.4;cursor:default}
+
+  main{flex:1;display:flex;flex-direction:column;align-items:center;padding:1rem}
+  .room{
+    position:relative;width:min(880px,96vw);aspect-ratio:16/10;border-radius:10px;
+    background:
+      linear-gradient(180deg,#3b2c1e 0%,#33261a 55%,#2a1f15 55%,#241a12 100%);
+    box-shadow:inset 0 0 120px rgba(0,0,0,.7),0 10px 40px rgba(0,0,0,.6);
+    border:1px solid #4a3724;overflow:hidden;
+  }
+  /* floor line */
+  .room::after{content:"";position:absolute;left:0;right:0;top:55%;height:1px;background:#0006}
+  /* vignette */
+  .room::before{content:"";position:absolute;inset:0;pointer-events:none;
+    background:radial-gradient(70% 60% at 50% 45%,transparent 40%,rgba(0,0,0,.55) 100%)}
+
+  .hot{
+    position:absolute;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    cursor:pointer;color:var(--ink);text-align:center;user-select:none;
+    border:1px dashed transparent;border-radius:8px;transition:.15s;padding:.2rem;
+  }
+  .hot:hover{border-color:var(--gold);background:rgba(201,162,75,.10);transform:translateY(-2px)}
+  .hot .ico{font-size:2.3rem;line-height:1;filter:drop-shadow(0 3px 4px #000a)}
+  .hot .lbl{font-size:.62rem;letter-spacing:.12em;text-transform:uppercase;color:#d9cbb2;margin-top:.25rem;opacity:0;transition:.15s}
+  .hot:hover .lbl{opacity:1}
+  .hot.done .ico{filter:drop-shadow(0 0 6px var(--good))}
+
+  /* inventory */
+  .inv{
+    width:min(880px,96vw);margin-top:.8rem;display:flex;align-items:center;gap:.6rem;
+    padding:.6rem .8rem;border:1px solid var(--line);border-radius:8px;background:var(--panel);min-height:62px;
+  }
+  .inv .tag{font-size:.6rem;letter-spacing:.18em;text-transform:uppercase;color:var(--gold-dim);margin-right:.2rem}
+  .slot{
+    width:44px;height:44px;border:1px solid var(--line);border-radius:6px;display:flex;
+    align-items:center;justify-content:center;font-size:1.5rem;background:#1d1610;cursor:pointer;transition:.15s;
+  }
+  .slot.filled:hover{border-color:var(--gold);background:#2c2118}
+  .slot.sel{border-color:var(--gold);box-shadow:0 0 0 2px rgba(201,162,75,.4)}
+
+  /* modal */
+  .veil{position:fixed;inset:0;background:rgba(5,4,2,.82);display:none;align-items:center;justify-content:center;padding:1rem;z-index:50}
+  .veil.on{display:flex}
+  .card{
+    width:min(440px,94vw);background:linear-gradient(#261d15,#1c150e);border:1px solid var(--gold-dim);
+    border-radius:12px;padding:1.3rem 1.4rem;box-shadow:0 20px 60px #000a;animation:pop .18s ease;
+  }
+  @keyframes pop{from{transform:scale(.95);opacity:0}to{transform:scale(1);opacity:1}}
+  .card h2{margin:.1rem 0 .5rem;color:var(--gold);font-size:1.2rem}
+  .card p{line-height:1.5;font-size:.95rem;color:#ddd0bb;margin:.4rem 0}
+  .card .act{display:flex;gap:.5rem;flex-wrap:wrap;margin-top:1rem;justify-content:flex-end}
+  .msg{font-size:.85rem;min-height:1.2em;margin-top:.5rem}
+  .msg.bad{color:var(--bad)} .msg.good{color:var(--good)}
+
+  /* keypad */
+  .pad{display:grid;grid-template-columns:repeat(3,1fr);gap:.4rem;margin:.6rem auto 0;max-width:200px}
+  .pad button{font-size:1.1rem;padding:.55rem 0}
+  .readout{
+    font-size:1.8rem;letter-spacing:.4rem;text-align:center;background:#0e0a06;border:1px solid var(--line);
+    border-radius:6px;padding:.5rem;margin:.4rem 0;color:var(--gold);min-height:2.6rem;font-variant-numeric:tabular-nums;
+  }
+
+  /* decoder */
+  .decoder{display:flex;flex-direction:column;align-items:center;gap:.5rem}
+  .calib{display:flex;align-items:center;gap:.6rem;font-size:1.1rem}
+  .calib .val{min-width:2.4rem;text-align:center;font-size:1.6rem;color:var(--gold);border:1px solid var(--line);border-radius:6px;padding:.1rem .4rem}
+  table.dec{border-collapse:collapse;margin-top:.3rem}
+  table.dec td{border:1px solid var(--line);padding:.25rem .55rem;text-align:center;font-size:1.05rem}
+  table.dec td.sym{color:#e8dcc8}
+  table.dec td.dig{color:var(--gold);font-variant-numeric:tabular-nums}
+  table.dec tr.hi td{background:rgba(201,162,75,.16)}
+  .cipher{font-size:2rem;letter-spacing:.5rem;text-align:center;margin:.3rem 0;color:#f0e6d2}
+
+  .clockface{width:130px;height:130px;border-radius:50%;border:4px solid var(--gold-dim);
+    margin:.4rem auto;position:relative;background:#15100a}
+  .clockface .num{position:absolute;font-size:.7rem;color:#cbb894;transform:translate(-50%,-50%)}
+  .hand{position:absolute;left:50%;bottom:50%;transform-origin:bottom center;background:var(--gold);border-radius:2px}
+
+  .hint{font-size:.85rem;color:#cbb894;font-style:italic}
+  /* win */
+  .win .card{text-align:center;border-color:var(--good)}
+  .win h2{color:var(--good);font-size:1.6rem}
+  .big{font-size:2.4rem;color:var(--gold);font-variant-numeric:tabular-nums;margin:.3rem 0}
+  footer{padding:.5rem;text-align:center;font-size:.66rem;color:#6b5a42;letter-spacing:.1em}
+</style>
+</head>
+<body>
+<header>
+  <h1>Das vergessene Arbeitszimmer<small>EXIT-Prototyp · Raum 1</small></h1>
+  <div class="hud">
+    <span class="timer" id="timer">00:00</span>
+    <button id="hintBtn">Hinweis</button>
+  </div>
+</header>
+
+<main>
+  <div class="room" id="room">
+    <!-- positions in % -->
+    <div class="hot" data-id="door"      style="left:6%;  top:20%; width:96px;height:140px">
+      <div class="ico">🚪</div><div class="lbl">Tür</div></div>
+    <div class="hot" data-id="clock"     style="left:44%; top:9%;  width:70px;height:70px">
+      <div class="ico">🕰️</div><div class="lbl">Wanduhr</div></div>
+    <div class="hot" data-id="painting"  style="left:70%; top:12%; width:96px;height:80px">
+      <div class="ico">🖼️</div><div class="lbl">Gemälde</div></div>
+    <div class="hot" data-id="safe"      style="left:71%; top:12%; width:90px;height:78px;display:none">
+      <div class="ico">🔒</div><div class="lbl">Wandsafe</div></div>
+    <div class="hot" data-id="shelf"     style="left:24%; top:30%; width:96px;height:120px">
+      <div class="ico">📚</div><div class="lbl">Bücherregal</div></div>
+    <div class="hot" data-id="desk"      style="left:46%; top:60%; width:120px;height:110px">
+      <div class="ico">🛋️</div><div class="lbl">Schreibtisch</div></div>
+    <div class="hot" data-id="drawer"    style="left:64%; top:66%; width:74px;height:70px">
+      <div class="ico">🗄️</div><div class="lbl">Schublade</div></div>
+  </div>
+
+  <div class="inv" id="inv"><span class="tag">Inventar</span></div>
+</main>
+
+<div class="veil" id="veil"><div class="card" id="card"></div></div>
+<div class="veil win" id="winVeil"><div class="card" id="winCard"></div></div>
+
+<footer>Prototyp · alle Rätsel laufen lokal im Browser · ein Klick auf Gegenstände untersucht sie</footer>
+
+<script>
+/* ---------- Rätsel-Definition ----------
+   Kette:  Bücherregal → Messingschlüssel → Schublade → Decoder + Symbolkarte
+           Wanduhr → Kalibrierung (7) → Decoder übersetzt Symbole → Safe-Code 9472
+           Gemälde beiseite → Safe → Türschlüssel → Tür → ENTKOMMEN
+*/
+const SYMBOLS = ['☀','☾','★','✦','❄','◆','■','●','▲','✚']; // Position 0..9 am äußeren Ring
+const CALIBRATION = 7;                  // von der Uhr
+const CIPHER = ['★','●','☀','◆'];        // Symbolkarte aus der Schublade
+const decode = (sym, off) => (SYMBOLS.indexOf(sym) + off) % 10;
+const SAFE_CODE = CIPHER.map(s=>decode(s,CALIBRATION)).join(''); // -> "9472"
+
+const ITEMS = {
+  brass_key : {icon:'🗝️', name:'Messingschlüssel', desc:'Ein kleiner, abgegriffener Messingschlüssel. Passt wohl zu einem Möbelschloss.'},
+  decoder   : {icon:'🧭', name:'Decoder-Scheibe', desc:'Eine drehbare Scheibe. Außen Symbole, innen Ziffern – sie lässt sich kalibrieren.'},
+  card      : {icon:'🃏', name:'Symbolkarte', desc:'Eine Karte mit vier Symbolen: '+CIPHER.join(' ')},
+  door_key  : {icon:'🔑', name:'Türschlüssel', desc:'Ein schwerer, alter Schlüssel. Der Weg nach draußen.'},
+};
+
+const S = {                  // Spielzustand
+  inv:[], sel:null,
+  paintingMoved:false, drawerOpen:false, safeOpen:false,
+  decoderOffset:0, t0:Date.now(), done:false,
+};
+
+/* ---------- Inventar ---------- */
+function renderInv(){
+  const inv = document.getElementById('inv');
+  inv.querySelectorAll('.slot').forEach(n=>n.remove());
+  for(let i=0;i<6;i++){
+    const it = S.inv[i];
+    const slot=document.createElement('div');
+    slot.className='slot'+(it?' filled':'')+(S.sel===it&&it?' sel':'');
+    if(it){slot.textContent=ITEMS[it].icon; slot.title=ITEMS[it].name;
+      slot.onclick=()=>{ S.sel = (S.sel===it?null:it); renderInv();
+        if(S.sel) flash(ITEMS[it].name+' ausgewählt – tippe auf ein Objekt, um es zu benutzen.'); };
+    }
+    inv.appendChild(slot);
+  }
+}
+function give(id){ if(!S.inv.includes(id)){ S.inv.push(id); renderInv(); } }
+function has(id){ return S.inv.includes(id); }
+let flashTimer;
+function flash(t){ clearTimeout(flashTimer); let b=document.getElementById('flashBar');
+  if(!b){b=document.createElement('div');b.id='flashBar';
+    b.style.cssText='position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:#2c2118;border:1px solid var(--gold-dim);color:var(--gold);padding:.5rem 1rem;border-radius:8px;z-index:80;font-size:.85rem;box-shadow:0 8px 24px #000a';
+    document.body.appendChild(b);}
+  b.textContent=t; b.style.opacity='1'; flashTimer=setTimeout(()=>b.style.opacity='0',2200);
+}
+
+/* ---------- Modal ---------- */
+const veil=document.getElementById('veil'), card=document.getElementById('card');
+function open(html){ card.innerHTML=html; veil.classList.add('on'); }
+function close(){ veil.classList.remove('on'); }
+veil.onclick=e=>{ if(e.target===veil) close(); };
+function closeBtn(){ return '<button onclick="close()">Schließen</button>'; }
+
+/* ---------- Hotspots ---------- */
+function setDone(id){ document.querySelector(`.hot[data-id="${id}"]`)?.classList.add('done'); }
+
+const handlers = {
+  door(){
+    if(S.sel==='door_key' || has('door_key')){
+      S.done=true; win(); return;
+    }
+    open(`<h2>🚪 Schwere Eichentür</h2>
+      <p>Verschlossen. Ein massives Schloss – kein Knauf, kein Spalt. Ohne den passenden Schlüssel bleibt sie zu.</p>
+      <div class="act">${closeBtn()}</div>`);
+  },
+  clock(){
+    open(`<h2>🕰️ Stehengebliebene Wanduhr</h2>
+      <p>Die Uhr ist vor langer Zeit stehengeblieben. Der <em>große</em> Zeiger fehlt – nur der kleine ist da
+         und zeigt unverrückbar auf die <strong>Sieben</strong>.</p>
+      <div class="clockface" id="cf"></div>
+      <p class="hint">„Die Zeit gibt die Zahl zur Scheibe."</p>
+      <div class="act">${closeBtn()}</div>`);
+    drawClock(7);
+  },
+  shelf(){
+    if(has('brass_key')){
+      open(`<h2>📚 Bücherregal</h2><p>Hinter dem hohlen Buch ist nur noch eine staubige Lücke.
+        Den Messingschlüssel hast du bereits.</p><div class="act">${closeBtn()}</div>`);
+      return;
+    }
+    open(`<h2>📚 Überladenes Bücherregal</h2>
+      <p>Dutzende Bände, alle gleichmäßig verstaubt – bis auf einen: ein <strong>rotes Buch</strong>,
+         dessen Rücken blank gewischt ist. Jemand hat es oft in der Hand.</p>
+      <div class="act">
+        <button onclick="pullRedBook()">Rotes Buch herausziehen</button>${closeBtn()}</div>
+      <div class="msg" id="m"></div>`);
+  },
+  desk(){
+    open(`<h2>🛋️ Wuchtiger Schreibtisch</h2>
+      <p>Auf der Lederplatte liegt ein aufgeschlagener Notizblock. In hektischer Schrift steht:</p>
+      <p style="border-left:2px solid var(--gold-dim);padding-left:.7rem;font-style:italic;color:#cbb894">
+        „Hinter dem <u>Wissen</u> verbirgt sich der Schlüssel.<br>
+         Die <u>Zeit</u> kalibriert die Scheibe.<br>
+         Was die Scheibe übersetzt, öffnet die <u>Wand</u>."</p>
+      <p>Unter dem Tisch: eine verschlossene Schublade.</p>
+      <div class="act">${closeBtn()}</div>`);
+  },
+  drawer(){
+    if(S.drawerOpen){
+      open(`<h2>🗄️ Offene Schublade</h2><p>Leer – du hast Decoder-Scheibe und Symbolkarte bereits entnommen.</p>
+        <div class="act">${closeBtn()}</div>`); return;
+    }
+    if(S.sel==='brass_key' || has('brass_key')){
+      open(`<h2>🗄️ Verschlossene Schublade</h2>
+        <p>Der Messingschlüssel dreht sich mit einem satten <em>Klick</em>. Die Schublade gleitet auf.</p>
+        <p>Darin: eine <strong>Decoder-Scheibe</strong> und eine kleine <strong>Symbolkarte</strong>.</p>
+        <div class="act"><button onclick="lootDrawer()">An mich nehmen</button></div>`);
+      return;
+    }
+    open(`<h2>🗄️ Verschlossene Schublade</h2>
+      <p>Abgeschlossen. Das Schloss ist klein – ein einfacher Möbelschlüssel würde genügen.</p>
+      <div class="act">${closeBtn()}</div>`);
+  },
+  painting(){
+    if(!S.paintingMoved){
+      open(`<h2>🖼️ Ölgemälde</h2>
+        <p>Das Porträt eines strengen alten Herrn. Es hängt einen Hauch zu weit von der Wand ab …</p>
+        <div class="act"><button onclick="movePainting()">Gemälde beiseiteschieben</button>${closeBtn()}</div>`);
+    } else { handlers.safe(); }
+  },
+  safe(){
+    if(S.safeOpen){
+      open(`<h2>🔓 Offener Safe</h2><p>Leer. Der Türschlüssel ist bereits in deiner Hand.</p>
+        <div class="act">${closeBtn()}</div>`); return;
+    }
+    openSafe();
+  },
+};
+
+document.querySelectorAll('.hot').forEach(h=>{
+  h.addEventListener('click',()=> handlers[h.dataset.id]?.());
+});
+
+/* ---------- Aktionen ---------- */
+function pullRedBook(){
+  give('brass_key'); setDone('shelf');
+  document.getElementById('m').className='msg good';
+  document.getElementById('m').textContent='Hinter dem hohlen Buch klemmt ein Messingschlüssel! (eingesammelt)';
+  flash('🗝️ Messingschlüssel erhalten');
+}
+function lootDrawer(){
+  S.drawerOpen=true; give('decoder'); give('card'); setDone('drawer'); S.sel=null; renderInv();
+  flash('🧭 Decoder-Scheibe & 🃏 Symbolkarte erhalten'); close();
+}
+function movePainting(){
+  S.paintingMoved=true;
+  document.querySelector('.hot[data-id="painting"]').style.display='none';
+  document.querySelector('.hot[data-id="safe"]').style.display='flex';
+  flash('Hinter dem Gemälde: ein Wandsafe!');
+  handlers.safe();
+}
+
+/* ---------- Inventar-Gegenstände untersuchen ---------- */
+document.getElementById('inv').addEventListener('dblclick',()=>{ if(S.sel) inspect(S.sel); });
+function inspect(id){
+  if(id==='decoder') return openDecoder();
+  if(id==='card')    return openCardView();
+  open(`<h2>${ITEMS[id].icon} ${ITEMS[id].name}</h2><p>${ITEMS[id].desc}</p><div class="act">${closeBtn()}</div>`);
+}
+function openCardView(){
+  open(`<h2>🃏 Symbolkarte</h2>
+    <p>Vier eingeprägte Symbole, in dieser Reihenfolge:</p>
+    <div class="cipher">${CIPHER.join(' ')}</div>
+    <p class="hint">Brauchst du die Decoder-Scheibe, um sie zu übersetzen.</p>
+    <div class="act">${closeBtn()}</div>`);
+}
+
+/* ---------- Decoder-Scheibe ---------- */
+function openDecoder(){
+  open(`<h2>🧭 Decoder-Scheibe</h2>
+    <p>Kalibriere die Scheibe und lies für jedes Symbol die Ziffer ab.</p>
+    <div class="decoder">
+      <div class="calib">
+        <button onclick="rot(-1)">◀</button>
+        <span>Kalibrierung</span>
+        <span class="val" id="dv">0</span>
+        <button onclick="rot(1)">▶</button>
+      </div>
+      <table class="dec" id="dtab"></table>
+    </div>
+    <p class="hint">Tipp vom Notizblock: „Die Zeit kalibriert die Scheibe."</p>
+    <div class="act">${closeBtn()}</div>`);
+  drawDecoder();
+}
+function rot(d){ S.decoderOffset=(S.decoderOffset+d+10)%10; drawDecoder(); }
+function drawDecoder(){
+  document.getElementById('dv').textContent=S.decoderOffset;
+  const onCard = new Set(CIPHER);
+  document.getElementById('dtab').innerHTML = SYMBOLS.map(sym=>{
+    const dig=(SYMBOLS.indexOf(sym)+S.decoderOffset)%10;
+    return `<tr class="${onCard.has(sym)?'hi':''}"><td class="sym">${sym}</td><td>→</td><td class="dig">${dig}</td></tr>`;
+  }).join('');
+}
+
+/* ---------- Safe ---------- */
+let entered='';
+function openSafe(){
+  entered='';
+  open(`<h2>🔒 Wandsafe</h2>
+    <p>Ein vierstelliges Zahlenschloss.</p>
+    <div class="readout" id="ro">— — — —</div>
+    <div class="pad" id="pad"></div>
+    <div class="msg" id="sm"></div>
+    <div class="act"><button onclick="clr()">Löschen</button>${closeBtn()}</div>`);
+  const pad=document.getElementById('pad');
+  ['1','2','3','4','5','6','7','8','9','0'].forEach(n=>{
+    const b=document.createElement('button'); b.textContent=n; b.onclick=()=>tap(n); pad.appendChild(b);
+  });
+}
+function tap(n){ if(entered.length>=4)return; entered+=n; showSafe(); if(entered.length===4) checkSafe(); }
+function clr(){ entered=''; showSafe(); document.getElementById('sm').textContent=''; }
+function showSafe(){ document.getElementById('ro').textContent=(entered.padEnd(4,'—')).split('').join(' '); }
+function checkSafe(){
+  const sm=document.getElementById('sm');
+  if(entered===SAFE_CODE){
+    S.safeOpen=true; give('door_key'); setDone('safe');
+    document.querySelector('.hot[data-id="safe"] .ico').textContent='🔓';
+    sm.className='msg good'; sm.textContent='Klack! Der Safe springt auf – ein Türschlüssel liegt darin.';
+    flash('🔑 Türschlüssel erhalten'); setTimeout(close,1200);
+  } else {
+    sm.className='msg bad'; sm.textContent='Nichts rührt sich. Falscher Code.';
+    setTimeout(()=>{entered='';showSafe();},700);
+  }
+}
+
+/* ---------- Uhr zeichnen ---------- */
+function drawClock(hour){
+  const cf=document.getElementById('cf'); if(!cf)return; const R=58;
+  for(let i=1;i<=12;i++){ const a=(i/12)*2*Math.PI - Math.PI/2;
+    const s=document.createElement('div'); s.className='num'; s.textContent=i;
+    s.style.left=(65+Math.cos(a)*R)+'px'; s.style.top=(65+Math.sin(a)*R)+'px'; cf.appendChild(s);
+  }
+  const h=document.createElement('div'); h.className='hand';
+  h.style.width='5px'; h.style.height='34px';
+  h.style.transform=`rotate(${hour/12*360}deg)`; cf.appendChild(h);
+  const dot=document.createElement('div');
+  dot.style.cssText='position:absolute;left:50%;top:50%;width:9px;height:9px;background:var(--gold);border-radius:50%;transform:translate(-50%,-50%)';
+  cf.appendChild(dot);
+}
+
+/* ---------- Hinweis-System ---------- */
+const hints=[
+  ()=>!has('brass_key') && 'Untersuche den Schreibtisch – der Notizblock sagt, wo der Schlüssel steckt („hinter dem Wissen"). Das Bücherregal lohnt einen Blick.',
+  ()=>(has('brass_key') && !S.drawerOpen) && 'Du hast einen Messingschlüssel. Wähle ihn im Inventar aus und benutze ihn an der Schublade.',
+  ()=>(S.drawerOpen && !S.paintingMoved) && 'Schau dir die Wanduhr an (Kalibrierungszahl) und die Symbolkarte. Das Gemälde verbirgt vielleicht etwas.',
+  ()=>(S.paintingMoved && !S.safeOpen) && 'Öffne die Decoder-Scheibe (im Inventar auswählen, dann Doppelklick aufs Inventar), stelle die Kalibrierung auf die Uhr-Zahl und lies die vier Symbole der Karte als Ziffern für den Safe.',
+  ()=>(S.safeOpen && !S.done) && 'Du hast den Türschlüssel – benutze ihn an der Tür!',
+];
+document.getElementById('hintBtn').onclick=()=>{
+  for(const h of hints){ const t=h(); if(t){ open(`<h2>💡 Hinweis</h2><p>${t}</p><div class="act">${closeBtn()}</div>`); return; } }
+  open(`<h2>💡 Hinweis</h2><p>Du bist auf dem richtigen Weg – probier die Tür!</p><div class="act">${closeBtn()}</div>`);
+};
+
+/* ---------- Timer & Sieg ---------- */
+setInterval(()=>{ if(S.done)return; const s=Math.floor((Date.now()-S.t0)/1000);
+  document.getElementById('timer').textContent=String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0');
+},250);
+function win(){
+  close(); S.done=true; setDone('door');
+  const s=Math.floor((Date.now()-S.t0)/1000);
+  const time=String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0');
+  document.getElementById('winCard').innerHTML=`
+    <h2>🎉 Entkommen!</h2>
+    <p>Der Schlüssel dreht sich, die Eichentür schwingt auf – frische Luft. Du hast das Arbeitszimmer verlassen.</p>
+    <div class="big">${time}</div>
+    <p class="hint">Das war Raum 1 des Prototyps.</p>
+    <div class="act" style="justify-content:center"><button onclick="location.reload()">Noch einmal</button></div>`;
+  document.getElementById('winVeil').classList.add('on');
+}
+
+renderInv();
+</script>
+</body>
+</html>
