@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Villa Nachtschatten</title>
+<style>
+  :root{
+    --ink:#e6dcc9; --gold:#caa85c; --gold-dim:#7e6533; --line:#2c2620;
+    --bad:#c2553a; --good:#7aa15a; --panel:#191512; --purple:#6d5a86;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{background:#070605;color:var(--ink);
+    font-family:"Iowan Old Style","Palatino Linotype",Georgia,serif;
+    display:flex;flex-direction:column;min-height:100%;overflow-x:hidden}
+  header{display:flex;align-items:center;justify-content:space-between;gap:1rem;
+    padding:.65rem 1.1rem;border-bottom:1px solid var(--line);
+    background:linear-gradient(#1a1512,#120e0b)}
+  header h1{font-size:.98rem;margin:0;letter-spacing:.06em;color:var(--gold);font-weight:600}
+  header h1 small{display:block;font-size:.62rem;color:var(--gold-dim);letter-spacing:.2em;text-transform:uppercase}
+  .hud{display:flex;align-items:center;gap:.7rem}
+  .timer{font-variant-numeric:tabular-nums;font-size:1.02rem;min-width:4.2rem;text-align:right}
+  button{font-family:inherit;cursor:pointer;border:1px solid var(--gold-dim);background:#241d16;
+    color:var(--gold);padding:.45rem .85rem;border-radius:5px;letter-spacing:.04em;transition:.15s;font-size:.85rem}
+  button:hover{background:#332a1f;border-color:var(--gold)}
+  button:disabled{opacity:.4;cursor:default}
+  main{flex:1;display:flex;flex-direction:column;align-items:center;padding:1rem;width:100%}
+
+  /* ---------------- TITELBILDSCHIRM ---------------- */
+  .title{position:relative;width:100%;max-width:760px;margin:auto;text-align:center;padding:2rem 1rem 3rem}
+  .title .frame{border:1px solid var(--gold-dim);border-radius:16px;padding:3rem 1.5rem 2.5rem;
+    background:
+      radial-gradient(60% 50% at 50% 0%, rgba(109,90,134,.18), transparent 70%),
+      linear-gradient(#15110d,#0c0907);
+    box-shadow:0 20px 80px #000a, inset 0 0 90px rgba(0,0,0,.6)}
+  .flame{font-size:2.6rem;animation:flick 2.6s infinite ease-in-out;display:inline-block;filter:drop-shadow(0 0 14px #caa85c88)}
+  @keyframes flick{0%,100%{transform:rotate(-2deg) scale(1);opacity:1}
+    25%{transform:rotate(3deg) scale(1.06);opacity:.9}50%{transform:rotate(-3deg) scale(.97);opacity:1}
+    75%{transform:rotate(2deg) scale(1.04);opacity:.92}}
+  .title h2{font-size:clamp(2.2rem,7vw,3.4rem);margin:.6rem 0 .2rem;color:var(--gold);
+    letter-spacing:.04em;text-shadow:0 0 30px rgba(202,168,92,.35)}
+  .title .tag{color:#b9a888;letter-spacing:.3em;text-transform:uppercase;font-size:.74rem;margin-bottom:2rem}
+  .title .menu-btns{display:flex;flex-direction:column;gap:.7rem;max-width:280px;margin:0 auto}
+  .title .menu-btns button{padding:.7rem 1rem;font-size:.95rem}
+  .title .credit{margin-top:2rem;font-size:.66rem;color:#5e5444;letter-spacing:.12em}
+
+  /* ---------------- STORY / INTRO ---------------- */
+  .story{max-width:620px;margin:auto;padding:2rem 1rem}
+  .story .panel{border:1px solid var(--line);border-radius:14px;padding:1.8rem;background:linear-gradient(#15110d,#0d0a08)}
+  .story h2{color:var(--gold);font-size:1.4rem;margin-top:0}
+  .story p{line-height:1.7;color:#d6cbb6;font-size:1rem}
+  .story .act{display:flex;justify-content:flex-end;margin-top:1.4rem}
+
+  /* ---------------- KAPITELAUSWAHL ---------------- */
+  .menu{width:min(880px,96vw)}
+  .menu .lead{color:#b9a888;font-style:italic;margin:.3rem 0 1.1rem;line-height:1.5}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:1rem}
+  .lvl{border:1px solid var(--line);border-radius:12px;padding:1.1rem;background:linear-gradient(#1a1512,#120e0b);
+    cursor:pointer;transition:.15s;position:relative;overflow:hidden}
+  .lvl:hover{border-color:var(--gold);transform:translateY(-3px)}
+  .lvl.locked{opacity:.5;cursor:default}.lvl.locked:hover{transform:none;border-color:var(--line)}
+  .lvl .em{font-size:2.3rem}
+  .lvl h3{margin:.5rem 0 .2rem;color:var(--gold);font-size:1.08rem}
+  .lvl .sub{font-size:.8rem;color:#b9a888}
+  .lvl .meta{margin-top:.7rem;font-size:.72rem;color:var(--gold-dim);letter-spacing:.06em;display:flex;justify-content:space-between}
+  .lvl .lockico{position:absolute;top:.8rem;right:.9rem;font-size:1.1rem}
+  .badge{display:inline-block;font-size:.62rem;letter-spacing:.14em;text-transform:uppercase;
+    border:1px solid var(--good);color:var(--good);border-radius:20px;padding:.1rem .5rem;margin-top:.5rem}
+
+  /* ---------------- RAUM ---------------- */
+  .room{position:relative;width:min(880px,96vw);aspect-ratio:16/10;border-radius:10px;overflow:hidden;
+    box-shadow:inset 0 0 130px rgba(0,0,0,.78),0 10px 40px rgba(0,0,0,.6);border:1px solid #2e2418}
+  .room.hall{background:linear-gradient(180deg,#2a2018 0%,#241a13 52%,#1c140e 52%,#150f0a 100%)}
+  .room.library{background:linear-gradient(180deg,#241a20 0%,#1e1620 52%,#181018 52%,#120c12 100%)}
+  .room::before{content:"";position:absolute;inset:0;pointer-events:none;
+    background:radial-gradient(72% 62% at 50% 42%,transparent 34%,rgba(0,0,0,.62) 100%)}
+  .hot{position:absolute;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    cursor:pointer;text-align:center;user-select:none;border:1px dashed transparent;border-radius:8px;transition:.15s;padding:.2rem}
+  .hot:hover{border-color:var(--gold);background:rgba(202,168,92,.10);transform:translateY(-2px)}
+  .hot .ico{font-size:2.3rem;line-height:1;filter:drop-shadow(0 3px 4px #000a)}
+  .hot .lbl{font-size:.6rem;letter-spacing:.12em;text-transform:uppercase;color:#cfc2a8;margin-top:.25rem;opacity:0;transition:.15s}
+  .hot:hover .lbl{opacity:1}
+  .hot.done .ico{filter:drop-shadow(0 0 6px var(--good))}
+
+  .inv{width:min(880px,96vw);margin-top:.8rem;display:flex;align-items:center;gap:.6rem;
+    padding:.6rem .8rem;border:1px solid var(--line);border-radius:8px;background:var(--panel);min-height:62px;flex-wrap:wrap}
+  .inv .tag{font-size:.58rem;letter-spacing:.18em;text-transform:uppercase;color:var(--gold-dim);margin-right:.2rem}
+  .slot{width:44px;height:44px;border:1px solid var(--line);border-radius:6px;display:flex;align-items:center;
+    justify-content:center;font-size:1.5rem;background:#13100c;cursor:pointer;transition:.15s}
+  .slot.filled:hover{border-color:var(--gold);background:#241d16}
+  .slot.sel{border-color:var(--gold);box-shadow:0 0 0 2px rgba(202,168,92,.4)}
+
+  .veil{position:fixed;inset:0;background:rgba(4,3,2,.84);display:none;align-items:center;justify-content:center;padding:1rem;z-index:50}
+  .veil.on{display:flex}
+  .card{width:min(440px,94vw);background:linear-gradient(#1d1712,#120d0a);border:1px solid var(--gold-dim);
+    border-radius:12px;padding:1.3rem 1.4rem;box-shadow:0 20px 60px #000a;animation:pop .18s ease}
+  @keyframes pop{from{transform:scale(.95);opacity:0}to{transform:scale(1);opacity:1}}
+  .card h2{margin:.1rem 0 .5rem;color:var(--gold);font-size:1.2rem}
+  .card p{line-height:1.55;font-size:.95rem;color:#d6cbb6;margin:.4rem 0}
+  .card .act{display:flex;gap:.5rem;flex-wrap:wrap;margin-top:1rem;justify-content:flex-end}
+  .quote{border-left:2px solid var(--gold-dim);padding-left:.7rem;font-style:italic;color:#b9a888}
+  .msg{font-size:.85rem;min-height:1.2em;margin-top:.5rem}
+  .msg.bad{color:var(--bad)}.msg.good{color:var(--good)}
+  .hint{font-size:.85rem;color:#b9a888;font-style:italic}
+
+  .pad{display:grid;grid-template-columns:repeat(3,1fr);gap:.4rem;margin:.6rem auto 0;max-width:200px}
+  .pad button{font-size:1.1rem;padding:.55rem 0}
+  .readout{font-size:1.7rem;letter-spacing:.4rem;text-align:center;background:#0c0907;border:1px solid var(--line);
+    border-radius:6px;padding:.5rem;margin:.4rem 0;color:var(--gold);min-height:2.6rem;font-variant-numeric:tabular-nums}
+
+  .decoder{display:flex;flex-direction:column;align-items:center;gap:.5rem}
+  .calib{display:flex;align-items:center;gap:.6rem;font-size:1.05rem}
+  .calib .val{min-width:2.4rem;text-align:center;font-size:1.5rem;color:var(--gold);border:1px solid var(--line);border-radius:6px;padding:.1rem .4rem}
+  table.dec{border-collapse:collapse;margin-top:.3rem}
+  table.dec td{border:1px solid var(--line);padding:.22rem .5rem;text-align:center;font-size:1rem}
+  table.dec td.dig{color:var(--gold);font-variant-numeric:tabular-nums}
+  table.dec tr.hi td{background:rgba(202,168,92,.16)}
+  .cipher{font-size:2rem;letter-spacing:.5rem;text-align:center;margin:.3rem 0;color:#efe4cd}
+
+  .clockface{width:140px;height:140px;border-radius:50%;border:4px solid var(--gold-dim);margin:.4rem auto;position:relative;background:#0f0b08}
+  .clockface .num{position:absolute;font-size:.72rem;color:#b9a888;transform:translate(-50%,-50%)}
+  .hand{position:absolute;left:50%;bottom:50%;transform-origin:bottom center;background:var(--gold);border-radius:2px}
+
+  .win .card{text-align:center;border-color:var(--good)}
+  .win h2{color:var(--good);font-size:1.55rem}
+  .big{font-size:2.3rem;color:var(--gold);font-variant-numeric:tabular-nums;margin:.3rem 0}
+  footer{padding:.5rem;text-align:center;font-size:.64rem;color:#564c3c;letter-spacing:.1em}
+</style>
+</head>
+<body>
+<header>
+  <h1 id="title">Villa Nachtschatten<small id="subtitle">Ein Escape-Spiel</small></h1>
+  <div class="hud">
+    <span class="timer" id="timer" style="display:none">00:00</span>
+    <button id="hintBtn" style="display:none">Hinweis</button>
+    <button id="menuBtn" style="display:none">Räume</button>
+  </div>
+</header>
+
+<main id="main"></main>
+
+<div class="veil" id="veil"><div class="card" id="card"></div></div>
+<div class="veil win" id="winVeil"><div class="card" id="winCard"></div></div>
+<footer>Villa Nachtschatten · ein Hobby-Projekt · läuft komplett im Browser</footer>
+
+<script>
+/* =====================================================================
+   VILLA NACHTSCHATTEN
+   Daten-getriebene Escape-Engine. Ein Raum = eine Daten-Definition.
+   Objekt-Typen: info · pickup · locked · keypad · reveal · goal
+   Werkzeuge im Inventar: kind:'decoder' | 'card'
+   ===================================================================== */
+
+const GAME = {
+  name:'Villa Nachtschatten',
+  intro:`Der Brief kam an einem regnerischen Donnerstag: Du hast die Villa deines
+    verschollenen Großonkels Cornelius geerbt. Niemand hat das Haus seit dreißig
+    Jahren betreten.<br><br>
+    Kaum stehst du in der Eingangshalle, fällt die schwere Tür hinter dir ins Schloss –
+    der Schlüssel ist verschwunden. Im Halbdunkel knackt das alte Holz, und irgendwo
+    tickt eine Uhr, die längst stehen müsste.<br><br>
+    Du bist nicht allein. Und der einzige Weg ist nach vorn – Raum für Raum.`,
+};
+
+const LEVELS = [
+{
+  id:'hall', theme:'hall', em:'🕯️',
+  title:'Die Eingangshalle', subtitle:'Kapitel 1',
+  intro:'Kalte Zugluft, verhängte Spiegel, eine erloschene Standuhr. Finde einen Weg tiefer ins Haus.',
+  symbols:[], cipher:[],
+  items:{
+    coat_key:{icon:'🗝️',name:'Garderobenschlüssel',desc:'Ein winziger Schlüssel aus einer Manteltasche.'},
+    candle  :{icon:'🕯️',name:'Kerze',desc:'Eine halb heruntergebrannte Kerze – sie brennt noch. Bringt Licht ins Dunkle.'},
+    iron_key:{icon:'🔑',name:'Eiserner Schlüssel',desc:'Schwer, kalt, verziert. Öffnet die Tür ins Haus.'},
+  },
+  objects:[
+    {id:'door', icon:'🚪', label:'Tür ins Haus', x:'5%', y:'20%', w:'100px', h:'150px',
+      type:'goal', requires:'iron_key',
+      examine:'Eine wuchtige Flügeltür ins Innere der Villa. Verschlossen – das Schloss verlangt einen schweren, alten Schlüssel.'},
+    {id:'clock', icon:'🕰️', label:'Standuhr', x:'42%', y:'8%', w:'74px', h:'80px',
+      type:'info', clock:{h:9,m:2},
+      examine:'Cornelius’ Standuhr ist stehengeblieben. Die verzierten Zeiger ruhen auf der <strong>9</strong> und der <strong>2</strong>.',
+      hint:'„Erst die Stunde der Ankunft …"'},
+    {id:'wardrobe', icon:'🧥', label:'Garderobe', x:'22%', y:'30%', w:'90px', h:'120px',
+      type:'pickup', gives:['coat_key'], take:'Manteltaschen durchsuchen',
+      examine:'Ein moderiger Wintermantel hängt an der Garderobe, als wäre sein Besitzer nie zurückgekehrt.',
+      pickupText:'In der Innentasche: ein winziger Schlüssel und ein Zettel — „Erst die Stunde der Ankunft, dann was das Feuer enthüllt."',
+      emptyText:'Nur noch der alte Mantel. Den Schlüssel hast du.'},
+    {id:'drawer', icon:'🗄️', label:'Konsolentisch', x:'45%', y:'60%', w:'110px', h:'100px',
+      type:'locked', requires:'coat_key', gives:['candle'],
+      lockedText:'Die Schublade des Konsolentischs ist abgeschlossen — ein winziges Schloss.',
+      openText:'Der kleine Schlüssel passt. In der Schublade liegt eine halb heruntergebrannte Kerze.',
+      emptyText:'Leer. Die Kerze hast du an dich genommen.'},
+    {id:'fireplace', icon:'🔥', label:'Kamin', x:'64%', y:'58%', w:'92px', h:'100px',
+      type:'locked', requires:'candle', gives:[],
+      lockedText:'Ein kalter, rußgeschwärzter Kamin. Im Dunkeln erkennst du nichts an der Rückwand.',
+      openText:'Du hältst die Kerze hinein — im warmen Licht treten Zahlen im Ruß hervor: <strong>4 0</strong>.',
+      emptyText:'Im Ruß, vom Kerzenlicht enthüllt: <strong>4 0</strong>.'},
+    {id:'portrait', icon:'🖼️', label:'Ahnenporträt', x:'70%', y:'12%', w:'92px', h:'80px',
+      type:'reveal', reveal:'safe', setFlag:'portrait',
+      examine:'Das strenge Porträt deines Großonkels. Sein Blick folgt dir — und das Bild hängt seltsam locker.',
+      revealText:'Porträt beiseiteschieben'},
+    {id:'safe', icon:'🔒', label:'Wandtresor', x:'71%', y:'12%', w:'88px', h:'78px', hidden:true,
+      type:'keypad', code:'9240', gives:['iron_key'],
+      prompt:'Hinter dem Porträt: ein Wandtresor mit vierstelligem Zahlenschloss.',
+      successText:'Mit einem dumpfen Klack öffnet sich der Tresor — darin der eiserne Schlüssel.'},
+    {id:'window', icon:'🪟', label:'Fenster', x:'8%', y:'62%', w:'80px', h:'80px',
+      type:'info',
+      examine:'Sturmgepeitschte Dunkelheit, Regen an den Scheiben. Verriegelt und vergittert — kein Weg hinaus.'},
+  ],
+  hints:[
+    L=>!has('coat_key') && 'Durchsuche den alten Mantel an der Garderobe.',
+    L=>(has('coat_key')&&!has('candle')) && 'Schließ mit dem kleinen Schlüssel die Schublade des Konsolentischs auf.',
+    L=>(has('candle')&&!flag('kaminRead')) && 'Halte die Kerze in den Kamin — und sieh dir die Standuhr genau an.',
+    L=>(!flag('portrait')) && 'Hinter dem Ahnenporträt verbirgt sich etwas.',
+    L=>!has('iron_key') && 'Tresor-Code: erst die Uhr-Zahlen (9, 2), dann die Kaminzahlen (4, 0).',
+    L=>has('iron_key') && 'Du hast den eisernen Schlüssel — öffne die Tür ins Haus!',
+  ],
+},
+{
+  id:'library', theme:'library', em:'📖',
+  title:'Die Bibliothek', subtitle:'Kapitel 2',
+  intro:'Deckenhohe Regale, eine Decoder-Scheibe unter Staub, ein zweites Porträt. Cornelius liebte Rätsel.',
+  symbols:['☀','☾','★','✦','❄','◆','■','●','▲','✚'],
+  cipher:['★','●','☀','◆'],
+  items:{
+    brass_key:{icon:'🗝️',name:'Messingschlüssel',desc:'Lag hinter einem hohlen Buch verborgen.'},
+    decoder  :{icon:'🧭',name:'Decoder-Scheibe',kind:'decoder',desc:'Außen Symbole, innen Ziffern — kalibrierbar.'},
+    card     :{icon:'🃏',name:'Symbolkarte',kind:'card',desc:'Vier eingeprägte Symbole.'},
+    cellar_key:{icon:'🔑',name:'Kellerschlüssel',desc:'Rostig und schwer. Führt hinab in den Keller.'},
+  },
+  objects:[
+    {id:'door', icon:'🚪', label:'Tür zum Keller', x:'5%', y:'20%', w:'100px', h:'150px',
+      type:'goal', requires:'cellar_key',
+      examine:'Eine niedrige Tür mit Eisenbeschlägen — dahinter führt eine Treppe in den Keller. Verschlossen.'},
+    {id:'clock', icon:'🕰️', label:'Kaminuhr', x:'42%', y:'8%', w:'72px', h:'76px',
+      type:'info', clock:{h:7,m:12},
+      examine:'Eine kleine Kaminuhr, stehengeblieben. Der Stundenzeiger ruht auf der <strong>7</strong>.',
+      hint:'„Die Zeit kalibriert die Scheibe."'},
+    {id:'shelf', icon:'📚', label:'Bücherregal', x:'23%', y:'30%', w:'94px', h:'120px',
+      type:'pickup', gives:['brass_key'], take:'Rotes Buch herausziehen',
+      examine:'Hunderte verstaubte Bände — bis auf ein <strong>rotes Buch</strong>, dessen Rücken blank gegriffen ist.',
+      pickupText:'Das Buch ist hohl! Darin klemmt ein Messingschlüssel.',
+      emptyText:'Nur die staubige Lücke hinter dem hohlen Buch.'},
+    {id:'desk', icon:'🛋️', label:'Lesepult', x:'46%', y:'60%', w:'116px', h:'104px',
+      type:'info',
+      examine:'Ein offenes Notizbuch von Cornelius:<br><span class="quote">„Hinter dem Wissen verbirgt sich der Schlüssel. Die Zeit kalibriert die Scheibe. Was sie übersetzt, öffnet die Wand."</span>'},
+    {id:'drawer', icon:'🗄️', label:'Pultschublade', x:'64%', y:'66%', w:'74px', h:'70px',
+      type:'locked', requires:'brass_key', gives:['decoder','card'],
+      lockedText:'Die Schublade des Lesepults ist verschlossen.',
+      openText:'Der Messingschlüssel öffnet sie: eine Decoder-Scheibe und eine Symbolkarte.',
+      emptyText:'Leer — Decoder und Karte hast du.'},
+    {id:'portrait', icon:'🖼️', label:'Damenporträt', x:'70%', y:'12%', w:'92px', h:'80px',
+      type:'reveal', reveal:'safe', setFlag:'portrait',
+      examine:'Das Porträt einer blassen Dame in Schwarz. Es hängt eine Spur zu weit von der Wand ab.',
+      revealText:'Porträt beiseiteschieben'},
+    {id:'safe', icon:'🔒', label:'Wandtresor', x:'71%', y:'12%', w:'88px', h:'78px', hidden:true,
+      type:'keypad', code:'9472', gives:['cellar_key'],
+      prompt:'Ein vierstelliges Zahlenschloss.',
+      successText:'Der Tresor springt auf — darin ein rostiger Kellerschlüssel.'},
+  ],
+  hints:[
+    L=>!has('brass_key') && 'Untersuche das Lesepult (Notizbuch) und das Bücherregal — „hinter dem Wissen".',
+    L=>(has('brass_key')&&!opened('drawer')) && 'Öffne die Pultschublade mit dem Messingschlüssel.',
+    L=>(opened('drawer')&&!flag('portrait')) && 'Sieh dir die Kaminuhr (Zahl) und die Symbolkarte an. Das Damenporträt verbirgt etwas.',
+    L=>(flag('portrait')&&!has('cellar_key')) && 'Decoder öffnen (Inventar auswählen → Doppelklick), auf die Uhr-Zahl 7 kalibrieren, die 4 Kartensymbole als Code ablesen.',
+    L=>has('cellar_key') && 'Du hast den Kellerschlüssel — hinab durch die Kellertür!',
+  ],
+},
+];
+
+/* =====================================================================
+   ENGINE
+   ===================================================================== */
+let L=null;
+const $=id=>document.getElementById(id);
+function loadProg(){ try{return JSON.parse(localStorage.getItem('villaProg'))||{}}catch(e){return{}} }
+function saveProg(p){ try{localStorage.setItem('villaProg',JSON.stringify(p))}catch(e){} }
+function has(id){ return L.inv.includes(id); }
+function flag(f){ return L.flags.has(f); }
+function opened(id){ return L.opened.has(id); }
+function hasSave(){ const p=loadProg(); return Object.values(p).some(v=>v&&v.done); }
+
+/* ----- TITELBILDSCHIRM ----- */
+function showTitle(){
+  L=null;
+  $('timer').style.display='none'; $('hintBtn').style.display='none'; $('menuBtn').style.display='none';
+  $('title').firstChild.textContent=GAME.name; $('subtitle').textContent='Ein Escape-Spiel';
+  $('main').innerHTML=`<div class="title"><div class="frame">
+    <div class="flame">🕯️</div>
+    <h2>${GAME.name}</h2>
+    <div class="tag">Ein Escape-Room-Spiel</div>
+    <div class="menu-btns">
+      <button onclick="showIntro()">Neues Spiel</button>
+      ${hasSave()?'<button onclick="showMenu()">Weiterspielen</button>':''}
+      <button onclick="showAbout()">Über das Spiel</button>
+    </div>
+    <div class="credit">Ein Hobby-Projekt · v0.1</div>
+  </div></div>`;
+}
+function showAbout(){
+  open(`<h2>🕯️ Über das Spiel</h2>
+    <p>Villa Nachtschatten ist ein Escape-Room-Spiel: Du löst in jedem Raum eine Kette von
+    Rätseln, um eine Tür tiefer ins Haus zu öffnen.</p>
+    <p><strong>Steuerung:</strong> Objekte anklicken = untersuchen. Gegenstände im Inventar
+    anklicken = auswählen, dann auf ein Objekt anwenden. Werkzeuge (Decoder, Karte): im Inventar
+    auswählen und <em>doppelklicken</em>. Steckst du fest, hilft der <em>Hinweis</em>-Knopf.</p>
+    <div class="act">${btnClose}</div>`);
+}
+function showIntro(){
+  L=null; $('timer').style.display='none'; $('hintBtn').style.display='none'; $('menuBtn').style.display='none';
+  $('main').innerHTML=`<div class="story"><div class="panel">
+    <h2>Das Erbe</h2><p>${GAME.intro}</p>
+    <div class="act"><button onclick="showMenu()">Die Halle betreten →</button></div>
+  </div></div>`;
+}
+
+/* ----- KAPITELAUSWAHL ----- */
+function showMenu(){
+  L=null;
+  $('timer').style.display='none'; $('hintBtn').style.display='none'; $('menuBtn').style.display='';
+  $('menuBtn').textContent='Titel'; $('menuBtn').onclick=showTitle;
+  $('title').firstChild.textContent=GAME.name; $('subtitle').textContent='Räume der Villa';
+  const prog=loadProg();
+  let cards=LEVELS.map((lv,i)=>{
+    const unlocked = i===0 || (prog[LEVELS[i-1].id]&&prog[LEVELS[i-1].id].done);
+    const rec=prog[lv.id];
+    return `<div class="lvl ${unlocked?'':'locked'}" ${unlocked?`onclick="startLevel(${i})"`:''}>
+      ${unlocked?'':'<div class="lockico">🔒</div>'}
+      <div class="em">${lv.em}</div><h3>${lv.title}</h3><div class="sub">${lv.subtitle}</div>
+      ${rec&&rec.done?`<div class="badge">✓ Gelöst · ${fmt(rec.best)}</div>`:''}
+      <div class="meta"><span>${lv.objects.length} Objekte</span><span>${unlocked?'Betreten ▶':'Verschlossen'}</span></div>
+    </div>`;
+  }).join('');
+  // Teaser für kommende Räume
+  cards += `<div class="lvl locked"><div class="lockico">🔒</div><div class="em">🕸️</div>
+    <h3>Der Keller</h3><div class="sub">Kapitel 3</div>
+    <div class="meta"><span>In Arbeit</span><span>Folgt bald</span></div></div>`;
+  $('main').innerHTML=`<div class="menu">
+    <p class="lead">Jeder Raum führt tiefer in die Villa. Löse die Rätsel, finde den Schlüssel zur nächsten Tür.</p>
+    <div class="grid">${cards}</div></div>`;
+}
+
+/* ----- LEVEL START ----- */
+function startLevel(idx){
+  const def=LEVELS[idx];
+  L={ idx,def,inv:[],flags:new Set(),taken:new Set(),opened:new Set(),revealed:new Set(),sel:null,offset:0,t0:Date.now(),done:false };
+  $('title').firstChild.textContent=def.title; $('subtitle').textContent=def.subtitle;
+  $('timer').style.display=''; $('hintBtn').style.display=''; $('menuBtn').style.display='';
+  $('menuBtn').textContent='Räume'; $('menuBtn').onclick=()=>{ if(confirm('Zurück zur Raumauswahl? Der Fortschritt in diesem Raum geht verloren.')) showMenu(); };
+  $('main').innerHTML=`<div class="room ${def.theme}" id="room"></div><div class="inv" id="inv"></div>`;
+  const room=$('room');
+  def.objects.forEach(o=>{
+    const el=document.createElement('div'); el.className='hot'; el.dataset.id=o.id;
+    el.style.cssText=`left:${o.x};top:${o.y};width:${o.w};height:${o.h};${o.hidden?'display:none':''}`;
+    el.innerHTML=`<div class="ico">${o.icon}</div><div class="lbl">${o.label}</div>`;
+    el.onclick=()=>interact(o); room.appendChild(el);
+  });
+  renderInv();
+  open(`<h2>${def.em} ${def.title}</h2><p>${def.intro}</p><div class="act"><button onclick="close()">Weiter</button></div>`);
+}
+
+/* ----- INVENTAR ----- */
+function renderInv(){
+  const inv=$('inv'); if(!inv)return; inv.innerHTML='<span class="tag">Inventar</span>';
+  for(let i=0;i<6;i++){
+    const it=L.inv[i]; const slot=document.createElement('div');
+    slot.className='slot'+(it?' filled':'')+(L.sel===it&&it?' sel':'');
+    if(it){ slot.textContent=L.def.items[it].icon; slot.title=L.def.items[it].name;
+      slot.onclick=()=>{ L.sel=(L.sel===it?null:it); renderInv();
+        if(L.sel) flash(L.def.items[it].name+' ausgewählt – auf ein Objekt anwenden, oder Doppelklick zum Untersuchen.'); };
+      slot.ondblclick=()=>inspect(it);
+    }
+    inv.appendChild(slot);
+  }
+}
+function give(ids){ (ids||[]).forEach(id=>{ if(!L.inv.includes(id)) L.inv.push(id); }); renderInv(); }
+function setDone(id){ document.querySelector(`.hot[data-id="${id}"]`)?.classList.add('done'); }
+let flashTimer;
+function flash(t){ clearTimeout(flashTimer); let b=$('flashBar');
+  if(!b){b=document.createElement('div');b.id='flashBar';
+    b.style.cssText='position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:#241d16;border:1px solid var(--gold-dim);color:var(--gold);padding:.5rem 1rem;border-radius:8px;z-index:80;font-size:.85rem;box-shadow:0 8px 24px #000a;transition:.3s';
+    document.body.appendChild(b);}
+  b.textContent=t; b.style.opacity='1'; flashTimer=setTimeout(()=>b.style.opacity='0',2300);
+}
+
+/* ----- MODAL ----- */
+function open(html){ $('card').innerHTML=html; $('veil').classList.add('on'); }
+function close(){ $('veil').classList.remove('on'); }
+$('veil').onclick=e=>{ if(e.target===$('veil')) close(); };
+const btnClose='<button onclick="close()">Schließen</button>';
+
+/* ----- INTERAKTION ----- */
+function interact(o){
+  switch(o.type){
+    case 'info':{
+      const dark=o.needFlag&&!flag(o.needFlag);
+      open(`<h2>${o.icon} ${o.label}</h2><p>${dark?o.offText:o.examine}</p>
+        ${(!dark&&o.hint)?`<p class="hint">${o.hint}</p>`:''}
+        ${o.clock?'<div class="clockface" id="cf"></div>':''}
+        <div class="act">${btnClose}</div>`);
+      if(o.clock) drawClock(o.clock); break;
+    }
+    case 'pickup':{
+      if(L.taken.has(o.id)){ open(`<h2>${o.icon} ${o.label}</h2><p>${o.emptyText}</p><div class="act">${btnClose}</div>`); break; }
+      open(`<h2>${o.icon} ${o.label}</h2><p>${o.examine}</p>
+        <div class="act"><button onclick="doPickup('${o.id}')">${o.take||'Nehmen'}</button>${btnClose}</div>
+        <div class="msg" id="m"></div>`); break;
+    }
+    case 'locked':{
+      if(L.opened.has(o.id)){ open(`<h2>${o.icon} ${o.label}</h2><p>${o.emptyText}</p><div class="act">${btnClose}</div>`); break; }
+      if(has(o.requires)){
+        L.opened.add(o.id); if(o.setFlag)L.flags.add(o.setFlag); give(o.gives); setDone(o.id); L.sel=null; renderInv();
+        if(o.id==='fireplace') L.flags.add('kaminRead');
+        if(o.reveal) doReveal(o.reveal);
+        open(`<h2>${o.icon} ${o.label}</h2><p>${o.openText}</p><div class="act">${btnClose}</div>`);
+        if(o.gives&&o.gives.length) flash(o.gives.map(g=>L.def.items[g].icon+' '+L.def.items[g].name).join(' · ')+' erhalten');
+      } else open(`<h2>${o.icon} ${o.label}</h2><p>${o.lockedText}</p><div class="act">${btnClose}</div>`);
+      break;
+    }
+    case 'reveal':{
+      if(L.revealed.has(o.id)){ interact(L.def.objects.find(x=>x.id===o.reveal)); break; }
+      open(`<h2>${o.icon} ${o.label}</h2><p>${o.examine}</p>
+        <div class="act"><button onclick="doReveal('${o.reveal}','${o.id}')">${o.revealText}</button>${btnClose}</div>`); break;
+    }
+    case 'keypad':{
+      if(L.opened.has(o.id)){ open(`<h2>${o.icon} ${o.label}</h2><p>${o.successText}</p><div class="act">${btnClose}</div>`); break; }
+      openKeypad(o); break;
+    }
+    case 'goal':{
+      if(has(o.requires)) winLevel();
+      else open(`<h2>${o.icon} ${o.label}</h2><p>${o.examine}</p><div class="act">${btnClose}</div>`); break;
+    }
+  }
+}
+function doPickup(id){
+  const o=L.def.objects.find(x=>x.id===id);
+  L.taken.add(id); if(o.setFlag)L.flags.add(o.setFlag); give(o.gives); setDone(id);
+  const m=$('m'); if(m){m.className='msg good';m.textContent=o.pickupText;}
+  flash(o.gives.map(g=>L.def.items[g].icon+' '+L.def.items[g].name).join(' · ')+' erhalten');
+}
+function doReveal(targetId,selfId){
+  if(selfId){ const self=L.def.objects.find(x=>x.id===selfId);
+    L.revealed.add(selfId); if(self.setFlag)L.flags.add(self.setFlag);
+    document.querySelector(`.hot[data-id="${selfId}"]`).style.display='none'; }
+  document.querySelector(`.hot[data-id="${targetId}"]`).style.display='flex';
+  const t=L.def.objects.find(x=>x.id===targetId);
+  if(selfId){ flash('Dahinter kommt etwas zum Vorschein …'); interact(t); }
+}
+
+/* ----- KEYPAD ----- */
+let entered='', currentKeypad=null;
+function openKeypad(o){
+  entered=''; currentKeypad=o;
+  open(`<h2>${o.icon} ${o.label}</h2><p>${o.prompt}</p>
+    <div class="readout" id="ro"></div><div class="pad" id="pad"></div>
+    <div class="msg" id="sm"></div>
+    <div class="act"><button onclick="clr()">Löschen</button>${btnClose}</div>`);
+  showPad(o.code.length);
+  const pad=$('pad');
+  '1234567890'.split('').forEach(n=>{ const b=document.createElement('button'); b.textContent=n; b.onclick=()=>tap(n,o); pad.appendChild(b); });
+}
+function showPad(len){ $('ro').textContent=entered.padEnd(len,'—').split('').join(' '); }
+function clr(){ entered=''; showPad(currentKeypad.code.length); $('sm').textContent=''; }
+function tap(n,o){ currentKeypad=o; if(entered.length>=o.code.length)return; entered+=n; showPad(o.code.length); if(entered.length===o.code.length) checkPad(o); }
+function checkPad(o){
+  const sm=$('sm');
+  if(entered===o.code){
+    L.opened.add(o.id); if(o.setFlag)L.flags.add(o.setFlag); give(o.gives); setDone(o.id);
+    sm.className='msg good'; sm.textContent=o.successText;
+    if(o.gives&&o.gives.length) flash(o.gives.map(g=>L.def.items[g].icon+' '+L.def.items[g].name).join(' · ')+' erhalten');
+    if(o.win) setTimeout(winLevel,1100); else setTimeout(close,1300);
+  } else { sm.className='msg bad'; sm.textContent='Nichts rührt sich. Falscher Code.'; setTimeout(()=>{entered='';showPad(o.code.length);},700); }
+}
+
+/* ----- Werkzeuge ----- */
+function inspect(id){
+  const it=L.def.items[id];
+  if(it.kind==='decoder') return openDecoder();
+  if(it.kind==='card') return openCard();
+  open(`<h2>${it.icon} ${it.name}</h2><p>${it.desc}</p><div class="act">${btnClose}</div>`);
+}
+function openCard(){
+  open(`<h2>🃏 Symbolkarte</h2><p>Vier eingeprägte Symbole:</p>
+    <div class="cipher">${L.def.cipher.join(' ')}</div>
+    <p class="hint">Mit der Decoder-Scheibe übersetzen.</p><div class="act">${btnClose}</div>`);
+}
+function openDecoder(){
+  open(`<h2>🧭 Decoder-Scheibe</h2><p>Kalibrieren und je Symbol die Ziffer ablesen.</p>
+    <div class="decoder"><div class="calib"><button onclick="rot(-1)">◀</button><span>Kalibrierung</span>
+      <span class="val" id="dv">0</span><button onclick="rot(1)">▶</button></div>
+      <table class="dec" id="dtab"></table></div>
+    <p class="hint">„Die Zeit kalibriert die Scheibe."</p><div class="act">${btnClose}</div>`);
+  drawDecoder();
+}
+function rot(d){ L.offset=(L.offset+d+10)%10; drawDecoder(); }
+function drawDecoder(){
+  $('dv').textContent=L.offset; const onCard=new Set(L.def.cipher); const S=L.def.symbols;
+  $('dtab').innerHTML=S.map(sym=>{ const dig=(S.indexOf(sym)+L.offset)%10;
+    return `<tr class="${onCard.has(sym)?'hi':''}"><td>${sym}</td><td>→</td><td class="dig">${dig}</td></tr>`; }).join('');
+}
+
+/* ----- Uhr (zwei Zeiger) ----- */
+function drawClock(t){
+  const cf=$('cf'); if(!cf)return; const R=60;
+  for(let i=1;i<=12;i++){ const a=(i/12)*2*Math.PI-Math.PI/2; const s=document.createElement('div');
+    s.className='num'; s.textContent=i; s.style.left=(70+Math.cos(a)*R)+'px'; s.style.top=(70+Math.sin(a)*R)+'px'; cf.appendChild(s); }
+  const mk=(len,wid,num)=>{ const h=document.createElement('div'); h.className='hand';
+    h.style.width=wid; h.style.height=len; h.style.transform=`rotate(${num/12*360}deg)`; cf.appendChild(h); };
+  mk('34px','5px',t.h); mk('48px','3px',t.m);
+  const dot=document.createElement('div');
+  dot.style.cssText='position:absolute;left:50%;top:50%;width:10px;height:10px;background:var(--gold);border-radius:50%;transform:translate(-50%,-50%)';
+  cf.appendChild(dot);
+}
+
+/* ----- Hinweise ----- */
+$('hintBtn').onclick=()=>{
+  for(const h of (L.def.hints||[])){ const t=h(L); if(t){ open(`<h2>💡 Hinweis</h2><p>${t}</p><div class="act">${btnClose}</div>`); return; } }
+  open(`<h2>💡 Hinweis</h2><p>Du bist auf dem richtigen Weg – probier die Tür!</p><div class="act">${btnClose}</div>`);
+};
+
+/* ----- Timer & Sieg ----- */
+function fmt(s){ return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0'); }
+setInterval(()=>{ if(!L||L.done)return; const s=Math.floor((Date.now()-L.t0)/1000); $('timer').textContent=fmt(s); },250);
+function winLevel(){
+  close(); L.done=true; setDone(L.def.objects.find(o=>o.type==='goal'||o.win)?.id);
+  const s=Math.floor((Date.now()-L.t0)/1000);
+  const prog=loadProg(); const rec=prog[L.def.id]||{}; const best=(rec.best&&rec.best<s)?rec.best:s;
+  prog[L.def.id]={done:true,best}; saveProg(prog);
+  const next=LEVELS[L.idx+1];
+  $('winCard').innerHTML=`<h2>🔓 Tür geöffnet!</h2>
+    <p>${L.def.title} gemeistert. Die nächste Tür der Villa steht offen …</p>
+    <div class="big">${fmt(s)}</div><p class="hint">Bestzeit: ${fmt(best)}</p>
+    <div class="act" style="justify-content:center">
+      ${next?`<button onclick="$('winVeil').classList.remove('on');startLevel(${L.idx+1})">Weiter ins Haus ▶</button>`:''}
+      <button onclick="$('winVeil').classList.remove('on');showMenu()">Zur Raumauswahl</button></div>`;
+  $('winVeil').classList.add('on');
+}
+
+showTitle();
+</script>
+</body>
+</html>
