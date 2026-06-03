@@ -205,8 +205,9 @@ kannst du es ausprobieren und Feedback geben.
 | **4. Ankündigungen** | Kanäle 🔴 rot & 🟠 orange | Mitteilungen posten/lesen |
 | **5. Events** | 🔵 blau: Event mit „+" erstellen, abstimmen, Frist, Teilnehmerliste | Abstimmungen durchführen |
 | **6. Benachrichtigungen** | Push (Android/iOS/Desktop) + einstellbare Töne | Hinweise auch bei geschlossener App |
-| **7. Moderation** | Time-out/Stummschalten durch Admins, Admin-Bereich | Admins moderieren |
-| **8. Feinschliff** | Sicherheit, Design, Deployment-Anleitung | Bereit für echten Betrieb |
+| **7. Moderation** | Time-out/Stummschalten, **Wort-/Beleidigungsfilter**, **Mitglied entfernen + IP-Sperre**, Admin-Bereich | Admins moderieren |
+| **8. Extras** | **Markierte Nachrichten**, **Sprachnachricht „einmal abspielbar"** | Komfort-Funktionen |
+| **9. Feinschliff** | Sicherheit, Design, Deployment-Anleitung | Bereit für echten Betrieb |
 
 ---
 
@@ -226,7 +227,68 @@ Diese kannst du **jetzt oder später** beantworten — sie blockieren den Start 
 
 ---
 
-## 10. Was du als Nächstes tust
+## 10. Ergänzungen (zweite Wunsch-Runde)
+
+Diese Punkte sind nach dem ersten Entwurf dazugekommen und fest eingeplant:
+
+### 10.1 Mitglied entfernen + komplette Sperre (IP-Sperre)
+- Ein Admin kann sagen: **„Du bist kein Mitglied der Agentur mehr."** → Konto wird
+  **vom Server gelöscht/deaktiviert** und die Person ist **komplett ausgesperrt**.
+- Zusätzlich **IP-Sperre**: Die Person kann die Seite dann **gar nicht mehr aufrufen**
+  (nicht nur „nicht einloggen", sondern die Seite lädt erst gar nicht).
+- Wird in einer **Sperrliste** auf dem Server hinterlegt.
+- Hinweis ehrlich gesagt: Eine IP-Sperre hält **technisch versierte** Leute nicht 100 %
+  ab (man kann die IP wechseln / VPN). Für den normalen Fall „ehemaliges Mitglied soll
+  weg" funktioniert sie aber sehr gut. Wir kombinieren sie deshalb mit Konto-Löschung
+  und (optional) Geräte-Sperre für **höchstmögliche** Sicherheit.
+
+### 10.2 Login-/Startseite (Landing Page)
+- Kurze, klare Startseite **„Nur für Forever One Mitglieder"**.
+- **Großes Forever-One-Logo mittig**, darunter ein großer **Einloggen**-Button.
+- Klick auf den Button → Login-Felder (Benutzername/Bigo-ID + Passwort) erscheinen.
+- Schlicht, hochwertig, auf **höchste Sicherheit** ausgelegt.
+
+### 10.3 Wort-/Beleidigungsfilter
+- Eingebauter **Wortfilter**: Beleidigungen/verbotene Wörter werden blockiert oder
+  zensiert (`****`).
+- Wortliste ist **anpassbar** durch Admins (Wörter hinzufügen/entfernen).
+- **Anti-Spam:** automatisches Erkennen von Spam (zu schnell, zu oft, gleiche
+  Nachricht mehrfach) → Hinweis / automatischer kurzer Time-out.
+
+> ❓ **Rückfrage „Fridolin":** Du hast „Fridolin kümmert sich um die Spams" gesagt.
+> Meinst du damit **a)** einen automatischen Helfer/Bot (den wir „Fridolin" nennen),
+> der Spam & verbotene Wörter überwacht — **oder b)** eine echte Person/Admin namens
+> Fridolin? Sag kurz Bescheid, dann baue ich es passend.
+
+### 10.4 Markierte / fixierte Nachrichten
+- Man kann eine Nachricht **markieren/fixieren** (wie „mit Stern versehen").
+- Diese sind später jederzeit abrufbar unter **Profil → Einstellungen → Markierte
+  Nachrichten** und werden **automatisch gespeichert**.
+
+### 10.5 Nur PWA zuerst (Apps später)
+- **Erst die PWA** für **iOS und Android** (und Desktop) — das ist jetzt das Wichtigste.
+- Echte Store-Apps (Apple/Google) kommen **später**, wenn die PWA steht.
+
+### 10.6 Echtzeit
+- Alles aktualisiert **sofort / live** (neue Nachrichten, Abstimmungen, Time-outs) —
+  kein Neuladen nötig.
+
+### 10.7 Sprachnachricht „einmal abspielbar"
+- Wie bei WhatsApp „einmal ansehen": Eine **Sprachnachricht**, die der Empfänger
+  **nur einmal** abspielen kann; danach ist sie für ihn verbraucht.
+- **Für Admins (uns) bleibt sie immer einsehbar** — sie wird auf dem Server
+  **hinterlegt/protokolliert**, sobald jemand sie als „einmal abspielbar" sendet.
+- Solche Nachrichten bekommen eine **orange Markierung** zur Kennzeichnung.
+
+### 10.8 Gelöschte Person → Nachrichten
+- Wird eine Person gelöscht, werden **ihre Nachrichten für normale Mitglieder
+  entfernt** (verschwinden automatisch).
+- **Admins können sie aber weiterhin sehen** (im Gruppen-Verlauf), für
+  Nachvollziehbarkeit/Moderation.
+
+---
+
+## 11. Was du als Nächstes tust
 
 ➡️ **Lies das Konzept durch und sag mir:**
 - Passt die Richtung so? 👍
