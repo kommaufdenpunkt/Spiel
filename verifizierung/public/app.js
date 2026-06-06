@@ -45,6 +45,7 @@
     ws: null,
     pc: null,
     dc: null,            // Datenkanal (Chat + Fragen-Sync)
+    inviteLink: '',
     localStream: null,
     remoteStream: null,
     currentQ: -1,
@@ -150,13 +151,12 @@
     renderQuestions();
     connectSignaling();
 
-    // Moderator: Beitritts-Link direkt anbieten.
+    // Moderator: Beitritts-Link + fertige Einladung anbieten.
     if (state.role === 'host') {
-      const link = `${location.origin}${location.pathname}?raum=${state.roomCode}`;
+      state.inviteLink = `${location.origin}${location.pathname}?raum=${state.roomCode}`;
       sysMsg(`Raum-Code: ${state.roomCode}`);
-      sysMsg('Beitritts-Link (an Bewerber schicken): ' + link);
-      copyToClipboard(link);
-      toast('Beitritts-Link kopiert – an den Bewerber schicken');
+      sysMsg('Beitritts-Link: ' + state.inviteLink);
+      copyInvitation();
     } else {
       sysMsg('Du bist dem Raum beigetreten. Warte auf den Moderator …');
     }
@@ -164,9 +164,10 @@
 
   function setupRoleUI() {
     const isHost = state.role === 'host';
-    // Aufnahme-Steuerung nur beim Moderator.
+    // Aufnahme-Steuerung + Einladung nur beim Moderator.
     $('recBtn').style.display = isHost ? '' : 'none';
     $('stopBtn').style.display = isHost ? '' : 'none';
+    $('inviteBtn').style.display = isHost ? '' : 'none';
     // Fragen-Navigation nur beim Moderator; Gast sieht die Fragen nur.
     qNav.style.display = isHost ? '' : 'none';
     if (!isHost) $('tabFragen').textContent = 'Aktuelle Frage';
@@ -401,6 +402,34 @@
     tr.enabled = !tr.enabled;
     $('camBtn').textContent = tr.enabled ? '📷 Kamera an' : '🚫 Kamera aus';
   });
+
+  // Fertige Einladungs-Nachricht (inkl. Link) in die Zwischenablage kopieren.
+  $('inviteBtn').addEventListener('click', copyInvitation);
+
+  function buildInvitation() {
+    const tpl = window.EINLADUNGS_TEXT || '{LINK}';
+    return tpl.replace(/\{LINK\}/g, state.inviteLink);
+  }
+
+  function copyInvitation() {
+    const text = buildInvitation();
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(
+        () => toast('Einladung kopiert – jetzt an die Bewerberin schicken'),
+        () => showInvitationFallback(text)
+      );
+    } else {
+      showInvitationFallback(text);
+    }
+  }
+
+  // Falls das automatische Kopieren nicht erlaubt ist (z. B. ohne HTTPS):
+  // Text im Chat anzeigen, damit man ihn manuell markieren/kopieren kann.
+  function showInvitationFallback(text) {
+    sysMsg('Einladung (bitte markieren & kopieren):');
+    sysMsg(text);
+    toast('Automatisches Kopieren blockiert – Text steht im Chat');
+  }
 
   // =======================================================================
   //  AUFNAHME (nur Moderator)

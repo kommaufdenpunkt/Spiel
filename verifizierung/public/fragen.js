@@ -62,3 +62,23 @@ window.VERIFIZIERUNGS_FRAGEN = [
 
 // Titel/Beschriftung, die oben im aufgenommenen Video erscheint:
 window.VERIFIZIERUNGS_TITEL = "Audition · Agentur 4ever1 · BIGO LIVE";
+
+/*
+ * ---------------------------------------------------------------------
+ *  EINLADUNGS-NACHRICHT
+ * ---------------------------------------------------------------------
+ *  Diesen Text kopiert der "Einladung kopieren"-Knopf in die Zwischen-
+ *  ablage – du fügst ihn dann in WhatsApp/E-Mail ein und schickst ihn der
+ *  Bewerberin. {LINK} wird automatisch durch den echten Beitritts-Link
+ *  ersetzt. Den Wortlaut kannst du frei ändern.
+ * ---------------------------------------------------------------------
+ */
+window.EINLADUNGS_TEXT =
+`Hallo 👋
+
+für deine BIGO-Audition bei der Agentur 4ever1 machen wir ein kurzes Video-Gespräch.
+Klick einfach auf den Link, gib deinen Namen ein und erlaube Kamera & Mikrofon:
+
+👉 {LINK}
+
+Bitte halte deinen Ausweis bereit. Ich stelle dir ein paar Fragen – du musst eigentlich nur bestätigen. Dauert nur ein paar Minuten. 🙂`;
