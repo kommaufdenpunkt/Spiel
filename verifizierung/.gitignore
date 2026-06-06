@@ -1,3 +1,9 @@
 node_modules/
 package-lock.json
 *.log
+
+# Geheimnisse / lokale Umgebungsdateien – niemals committen
+.env
+.env.*
+!.env.example
+coturn/.env

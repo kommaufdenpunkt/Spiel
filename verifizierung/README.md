@@ -65,32 +65,32 @@ einem Komma. (Die aktuell hinterlegten Fragen sind nur Platzhalter.)
 
 ## Hosten (damit der Bewerber von außen beitreten kann)
 
-Der Raum braucht einen **öffentlich erreichbaren Server mit HTTPS**. Einfache
-Optionen, die `package.json` direkt erkennen:
+Der Raum braucht einen **öffentlich erreichbaren Server mit HTTPS**.
 
-- **Render.com**, **Railway.app** oder **Fly.io**: Repo verbinden,
-  Start-Befehl `node server.js`, Port wird über die Umgebungsvariable `PORT`
-  vorgegeben (ist im Code schon berücksichtigt). HTTPS ist dort automatisch.
-- **Eigener VPS:** `npm install && npm start` hinter einem Reverse-Proxy
-  (z. B. Caddy oder nginx) mit TLS-Zertifikat.
+➡️ **Für die produktive Einrichtung unter `verify.4ever1.tv` (Hetzner + Coolify
++ TURN) gibt es eine eigene Schritt-für-Schritt-Anleitung: siehe
+[`DEPLOY.md`](DEPLOY.md).**
+
+Kurzform: Die App läuft als Docker-Container (`Dockerfile` ist enthalten) hinter
+Coolifys Proxy, der HTTPS automatisch übernimmt. Der Port kommt über die
+Umgebungsvariable `PORT`.
 
 ### TURN-Server (wichtig für zuverlässige Verbindungen)
 
-In vielen Heimnetzen reicht der eingebaute STUN-Server. In Mobilfunknetzen oder
-strengen Firmen-/WLAN-Netzen kommt die Direktverbindung aber oft **nicht**
-zustande – dann braucht ihr einen **TURN-Server**.
+In vielen Heimnetzen reicht STUN. In Mobilfunknetzen oder strengen
+Firmen-/WLAN-Netzen kommt die Direktverbindung aber oft **nicht** zustande –
+dann braucht ihr einen **TURN-Server**.
 
-Trage ihn in **`public/app.js`** ganz oben bei `ICE_SERVERS` ein:
+Das ist bereits vorbereitet: Ein fertiges **coturn**-Setup liegt unter
+[`coturn/`](coturn/). Die App holt sich die TURN-Zugangsdaten automatisch über
+ihren `/ice`-Endpunkt – du musst dafür **nichts** im Code ändern, sondern nur
+zwei Umgebungsvariablen setzen (siehe `.env.example` und `DEPLOY.md`):
 
-```js
-const ICE_SERVERS = [
-  { urls: 'stun:stun.l.google.com:19302' },
-  { urls: 'turn:DEIN_TURN_HOST:3478', username: 'user', credential: 'pass' },
-];
-```
+- `TURN_SECRET` – gemeinsames Geheimnis (gleich bei App und coturn)
+- `TURN_HOST` – z. B. `turn.4ever1.tv`
 
-Einen TURN-Server bekommst du z. B. über einen Anbieter (Metered, Twilio …)
-oder selbst gehostet mit **coturn**.
+Die Zugangsdaten sind **zeitlich begrenzt** (TURN-REST-Verfahren) – es stehen
+also keine festen Passwörter im Browser.
 
 ---
 
@@ -127,11 +127,17 @@ Video.
 
 ```
 verifizierung/
-├── server.js            Server: liefert die App aus + vermittelt die Verbindung
+├── server.js            Server: App ausliefern + Verbindung vermitteln + /ice
 ├── package.json
+├── Dockerfile           Container-Image (für Coolify/Docker)
+├── .env.example         Umgebungsvariablen der App (TURN_SECRET, TURN_HOST)
 ├── README.md            diese Anleitung
+├── DEPLOY.md            Schritt-für-Schritt: verify.4ever1.tv (Hetzner+Coolify)
+├── coturn/              TURN-Server (für zuverlässige Verbindungen)
+│   ├── docker-compose.yml
+│   └── .env.example
 └── public/
     ├── index.html       Oberfläche
-    ├── app.js           Logik (Video, Aufnahme, Chat, Fragen)
-    └── fragen.js        >>> HIER deine Fragen eintragen <<<
+    ├── app.js           Logik (Video, Aufnahme, Chat, Fragen, WebRTC)
+    └── fragen.js        >>> HIER deine Fragen + Einladungstext eintragen <<<
 ```

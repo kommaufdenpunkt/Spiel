@@ -1,0 +1,42 @@
+# TURN-Server (coturn) für den Verifizierungs-Video-Raum
+# -------------------------------------------------------
+# Sorgt dafür, dass die Video-Verbindung auch in Mobilfunknetzen und strengen
+# WLANs zustande kommt. Läuft als eigener Dienst NEBEN Coolify – belegt NICHT
+# die Ports 80/443, sondern 3478 (TURN) + einen UDP-Relay-Bereich.
+#
+# Start (auf dem Server):   docker compose up -d
+# In Coolify:               als "Docker Compose"-Resource einfügen.
+#
+# Wichtig: network_mode "host", damit coturn die UDP-Relay-Ports direkt auf
+# der öffentlichen IP des Servers nutzen kann.
+#
+# Werte (TURN_SECRET, TURN_REALM, EXTERNAL_IP) kommen aus der Datei .env
+# (siehe .env.example).
+
+services:
+  coturn:
+    image: coturn/coturn:4.6
+    container_name: verify-coturn
+    restart: unless-stopped
+    network_mode: host
+    command: >
+      -n
+      --use-auth-secret
+      --static-auth-secret=${TURN_SECRET}
+      --realm=${TURN_REALM}
+      --listening-port=3478
+      --fingerprint
+      --lt-cred-mech
+      --min-port=49160
+      --max-port=49200
+      --external-ip=${EXTERNAL_IP}
+      --no-cli
+      --no-multicast-peers
+      --no-tlsv1
+      --no-tlsv1_1
+      --denied-peer-ip=10.0.0.0-10.255.255.255
+      --denied-peer-ip=172.16.0.0-172.31.255.255
+      --denied-peer-ip=192.168.0.0-192.168.255.255
+      --denied-peer-ip=169.254.0.0-169.254.255.255
+      --user-quota=12
+      --total-quota=200

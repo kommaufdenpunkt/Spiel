@@ -17,10 +17,45 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const { WebSocketServer } = require('ws');
 
 const PORT = process.env.PORT || 3000;
 const PUBLIC_DIR = path.join(__dirname, 'public');
+
+// ---------------------------------------------------------------------------
+// ICE-/TURN-Konfiguration (für zuverlässige Verbindungen)
+// ---------------------------------------------------------------------------
+// STUN ist immer dabei. Ist zusätzlich ein TURN-Server konfiguriert
+// (Umgebungsvariablen TURN_SECRET + TURN_HOST), liefert der /ice-Endpunkt
+// zeitlich begrenzte Zugangsdaten (TURN-REST-Verfahren, passend zu coturns
+// "use-auth-secret"). So stehen keine festen Passwörter im Client.
+const TURN_SECRET = process.env.TURN_SECRET || '';
+const TURN_HOST = process.env.TURN_HOST || '';
+const TURN_TTL = parseInt(process.env.TURN_TTL || '3600', 10); // Sekunden
+const STUN_URLS = (process.env.STUN_URLS ||
+  'stun:stun.l.google.com:19302,stun:stun1.l.google.com:19302')
+  .split(',').map((s) => s.trim()).filter(Boolean);
+
+function buildIceServers() {
+  const servers = [{ urls: STUN_URLS }];
+  if (TURN_SECRET && TURN_HOST) {
+    // Nutzername = Ablaufzeitpunkt (Unix), Passwort = HMAC-SHA1 davon.
+    const expiry = Math.floor(Date.now() / 1000) + TURN_TTL;
+    const username = String(expiry);
+    const credential = crypto.createHmac('sha1', TURN_SECRET)
+      .update(username).digest('base64');
+    servers.push({
+      urls: [
+        `turn:${TURN_HOST}:3478?transport=udp`,
+        `turn:${TURN_HOST}:3478?transport=tcp`,
+      ],
+      username,
+      credential,
+    });
+  }
+  return servers;
+}
 
 // ---------------------------------------------------------------------------
 // 1) Statischer Datei-Server
@@ -38,6 +73,24 @@ const MIME = {
 const server = http.createServer((req, res) => {
   // Nur den Pfad-Teil verwenden, Query-Parameter ignorieren.
   let urlPath = decodeURIComponent(req.url.split('?')[0]);
+
+  // Health-Check (für Coolify/Reverse-Proxy).
+  if (urlPath === '/healthz') {
+    res.writeHead(200, { 'Content-Type': 'text/plain' });
+    res.end('ok');
+    return;
+  }
+
+  // ICE-/TURN-Konfiguration für den Client.
+  if (urlPath === '/ice') {
+    res.writeHead(200, {
+      'Content-Type': 'application/json; charset=utf-8',
+      'Cache-Control': 'no-store',
+    });
+    res.end(JSON.stringify({ iceServers: buildIceServers() }));
+    return;
+  }
+
   if (urlPath === '/') urlPath = '/index.html';
 
   // Pfad sicher auflösen (kein Ausbruch aus /public).
@@ -152,5 +205,6 @@ wss.on('connection', (ws) => {
 });
 
 server.listen(PORT, () => {
-  console.log(`Verifizierungs-Raum läuft auf http://localhost:${PORT}`);
+  console.log(`Verifizierungs-Raum läuft auf Port ${PORT}`);
+  console.log(`TURN: ${TURN_SECRET && TURN_HOST ? 'aktiv (' + TURN_HOST + ')' : 'nicht konfiguriert – nur STUN'}`);
 });

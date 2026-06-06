@@ -14,16 +14,20 @@
 (() => {
   'use strict';
 
-  // ---- ICE-Server (Verbindungsaufbau hinter Routern/Firewalls) -----------
-  // STUN reicht in vielen Heimnetzen. Für zuverlässige Verbindungen über
-  // schwierige Netze (Firmen-WLAN, mobiles Netz) trägst du hier zusätzlich
-  // deinen eigenen TURN-Server ein — siehe README.
-  const ICE_SERVERS = [
-    { urls: 'stun:stun.l.google.com:19302' },
-    { urls: 'stun:stun1.l.google.com:19302' },
-    // Beispiel TURN (auskommentiert):
-    // { urls: 'turn:DEIN_TURN_HOST:3478', username: 'user', credential: 'pass' },
-  ];
+  // ---- ICE-Server --------------------------------------------------------
+  // Werden zur Laufzeit vom Server (/ice) geholt: STUN + ggf. TURN mit
+  // zeitlich begrenzten Zugangsdaten. Fällt auf öffentliches STUN zurück,
+  // falls der Abruf fehlschlägt.
+  const FALLBACK_ICE = [{ urls: 'stun:stun.l.google.com:19302' }];
+
+  async function loadIceServers() {
+    try {
+      const r = await fetch('ice', { cache: 'no-store' });
+      const j = await r.json();
+      if (j && Array.isArray(j.iceServers) && j.iceServers.length) return j.iceServers;
+    } catch { /* ignorieren */ }
+    return FALLBACK_ICE;
+  }
 
   // ---- DOM-Kürzel --------------------------------------------------------
   const $ = (id) => document.getElementById(id);
@@ -46,6 +50,11 @@
     pc: null,
     dc: null,            // Datenkanal (Chat + Fragen-Sync)
     inviteLink: '',
+    iceServers: null,
+    // Perfect-Negotiation-Zustand
+    polite: false,
+    makingOffer: false,
+    ignoreOffer: false,
     localStream: null,
     remoteStream: null,
     currentQ: -1,
@@ -144,11 +153,12 @@
   // =======================================================================
   //  RAUM
   // =======================================================================
-  function startRoom() {
+  async function startRoom() {
     lobby.style.display = 'none';
     room.classList.add('active');
     setupRoleUI();
     renderQuestions();
+    state.iceServers = await loadIceServers();
     connectSignaling();
 
     // Moderator: Beitritts-Link + fertige Einladung anbieten.
@@ -200,9 +210,9 @@
           break;
         case 'peer-ready':
           remoteTag.textContent = msg.peerName || 'Gegenüber';
-          // Der Moderator baut die Verbindung auf (erstellt das Angebot).
-          if (state.role === 'host') await startCall(true);
-          else if (!state.pc) createPeer(); // Gast bereitet sich vor
+          // Beide Seiten richten die Verbindung ein; die Aushandlung läuft
+          // dann automatisch über onnegotiationneeded.
+          createPeer();
           break;
         case 'signal':
           await handleSignal(msg.data);
@@ -225,16 +235,33 @@
     }
   }
 
-  // ---- WebRTC ------------------------------------------------------------
+  // ---- WebRTC ("Perfect Negotiation") ------------------------------------
+  // Beide Seiten dürfen die Verbindung aushandeln; bei Kollisionen gibt die
+  // "höfliche" Seite (der Gast) nach. Das macht den Aufbau robust und erlaubt
+  // automatische Neu-Aushandlung / ICE-Neustart bei kurzen Störungen.
   function createPeer() {
-    const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+    if (state.pc) return state.pc;
+    state.polite = (state.role === 'guest');
+    const pc = new RTCPeerConnection({ iceServers: state.iceServers || FALLBACK_ICE });
     state.pc = pc;
 
     // Eigene Spuren (Kamera/Mikro) hinzufügen.
     state.localStream.getTracks().forEach((t) => pc.addTrack(t, state.localStream));
 
-    pc.onicecandidate = (e) => {
-      if (e.candidate) signal({ kind: 'candidate', candidate: e.candidate });
+    pc.onnegotiationneeded = async () => {
+      try {
+        state.makingOffer = true;
+        await pc.setLocalDescription();
+        signal({ description: pc.localDescription });
+      } catch (e) {
+        console.warn('Aushandlung:', e);
+      } finally {
+        state.makingOffer = false;
+      }
+    };
+
+    pc.onicecandidate = ({ candidate }) => {
+      if (candidate) signal({ candidate });
     };
 
     pc.ontrack = (e) => {
@@ -245,41 +272,44 @@
 
     pc.onconnectionstatechange = () => {
       if (pc.connectionState === 'connected') sysMsg('Verbunden ✓');
-      if (pc.connectionState === 'failed') sysMsg('Verbindung fehlgeschlagen – evtl. TURN-Server nötig (siehe README).');
+    };
+
+    pc.oniceconnectionstatechange = () => {
+      if (pc.iceConnectionState === 'failed') {
+        sysMsg('Verbindung gestört – versuche automatisch neu zu verbinden …');
+        try { pc.restartIce(); } catch {}
+      }
     };
 
     // Datenkanal: Moderator erstellt ihn, Gast empfängt ihn.
     if (state.role === 'host') {
-      const dc = pc.createDataChannel('verif');
-      setupDataChannel(dc);
+      setupDataChannel(pc.createDataChannel('verif'));
     } else {
       pc.ondatachannel = (e) => setupDataChannel(e.channel);
     }
     return pc;
   }
 
-  async function startCall(isOfferer) {
-    const pc = state.pc || createPeer();
-    if (isOfferer) {
-      const offer = await pc.createOffer();
-      await pc.setLocalDescription(offer);
-      signal({ kind: 'offer', sdp: pc.localDescription });
-    }
-  }
-
   async function handleSignal(data) {
     if (!data) return;
-    const pc = state.pc || createPeer();
-
-    if (data.kind === 'offer') {
-      await pc.setRemoteDescription(new RTCSessionDescription(data.sdp));
-      const answer = await pc.createAnswer();
-      await pc.setLocalDescription(answer);
-      signal({ kind: 'answer', sdp: pc.localDescription });
-    } else if (data.kind === 'answer') {
-      await pc.setRemoteDescription(new RTCSessionDescription(data.sdp));
-    } else if (data.kind === 'candidate') {
-      try { await pc.addIceCandidate(new RTCIceCandidate(data.candidate)); } catch {}
+    const pc = createPeer();
+    try {
+      if (data.description) {
+        const offerCollision = data.description.type === 'offer' &&
+          (state.makingOffer || pc.signalingState !== 'stable');
+        state.ignoreOffer = !state.polite && offerCollision;
+        if (state.ignoreOffer) return;
+        await pc.setRemoteDescription(data.description);
+        if (data.description.type === 'offer') {
+          await pc.setLocalDescription();
+          signal({ description: pc.localDescription });
+        }
+      } else if (data.candidate) {
+        try { await pc.addIceCandidate(data.candidate); }
+        catch (e) { if (!state.ignoreOffer) throw e; }
+      }
+    } catch (e) {
+      console.warn('Signal:', e);
     }
   }
 
