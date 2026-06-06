@@ -34,6 +34,7 @@ window.VERIFIZIERUNGS_FRAGEN = [
 
   // ---- 2.2 Einwilligung & Absichten  (Ja / Nein) --------------------
   "Ist dir bewusst, dass du dieses Video als Audition für eine Bewerbung bei BIGO LIVE aufnimmst?  — Bitte bestätige mit Ja.",
+  "Handelt es sich hierbei um eine erneute Audition – hast du dich schon einmal bei BIGO beworben bzw. auditioniert?  — Ja oder Nein?",
   "Möchtest du der Agentur 4ever1 auf BIGO LIVE beitreten?  — Ja?",
   "Möchtest du in das [SYSTEM] eintreten, dessen Regeln dir bekannt sind?  — Ja?",
   "Sind dir die Anforderungen und Regeln des Gehaltssystems sowie der Fan-Ränge bekannt?  — Ja?",
