@@ -1,0 +1,17 @@
+{
+  "name": "verifizierung-video-raum",
+  "version": "1.0.0",
+  "description": "Online-Video-Raum zur Verifizierung von Bewerbern (Agentur 4ever1 / BIGO LIVE). Aufnahme des Gesprächs inkl. Fragen als Video.",
+  "type": "commonjs",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "license": "UNLICENSED"
+}
