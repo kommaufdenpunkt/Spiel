@@ -87,7 +87,7 @@ ihren `/ice`-Endpunkt – du musst dafür **nichts** im Code ändern, sondern nu
 zwei Umgebungsvariablen setzen (siehe `.env.example` und `DEPLOY.md`):
 
 - `TURN_SECRET` – gemeinsames Geheimnis (gleich bei App und coturn)
-- `TURN_HOST` – z. B. `turn.4ever1.tv`
+- `TURN_HOST` – z. B. `verify.4ever1.tv`
 
 Die Zugangsdaten sind **zeitlich begrenzt** (TURN-REST-Verfahren) – es stehen
 also keine festen Passwörter im Browser.

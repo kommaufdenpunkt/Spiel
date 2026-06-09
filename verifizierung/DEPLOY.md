@@ -23,12 +23,13 @@ Console, dns.hetzner.com) → Zone **4ever1.tv** öffnen → **Record hinzufüge
 | Typ | Name     | Wert / Ziel       | TTL  |
 |-----|----------|-------------------|------|
 | A   | `verify` | `178.105.238.222` | auto |
-| A   | `turn`   | `178.105.238.222` | auto |
 
-Damit zeigen `verify.4ever1.tv` (App) und `turn.4ever1.tv` (TURN) auf den Server.
+✅ **Bereits erledigt** – `verify.4ever1.tv` zeigt schon auf den Server.
 
-> Prüfen (kann ein paar Minuten dauern):
-> `nslookup verify.4ever1.tv` sollte 178.105.238.222 liefern.
+> Den TURN-Server betreiben wir unter **demselben** Namen `verify.4ever1.tv`
+> (zeigt ja auf denselben Server). Ein extra `turn`-Eintrag ist **nicht nötig**.
+
+> Prüfen: `nslookup verify.4ever1.tv` sollte 178.105.238.222 liefern.
 
 ---
 
@@ -79,7 +80,7 @@ bestehenden für SSH 22 und HTTP/HTTPS 80/443):
    ein Let's-Encrypt-Zertifikat (HTTPS).
 7. **Environment Variables** setzen:
    - `TURN_SECRET` = (das Geheimnis aus Schritt 2)
-   - `TURN_HOST` = `turn.4ever1.tv`
+   - `TURN_HOST` = `verify.4ever1.tv`
 8. **Deploy** klicken.
 
 > WebSockets: Coolifys Proxy (Traefik) leitet die WebSocket-Verbindung
@@ -106,7 +107,7 @@ docker compose logs -f      # kurz prüfen, dann mit Strg+C beenden
 
 **Alternativ in Coolify:** + New → **Docker Compose** → Inhalt von
 `coturn/docker-compose.yml` einfügen → Environment Variables `TURN_SECRET`,
-`TURN_REALM=turn.4ever1.tv`, `EXTERNAL_IP=178.105.238.222` setzen → Deploy.
+`TURN_REALM=verify.4ever1.tv`, `EXTERNAL_IP=178.105.238.222` setzen → Deploy.
 
 > `.env` enthält das Geheimnis und gehört **nicht** ins Git (ist über
 > `.gitignore` ausgeschlossen).
@@ -120,7 +121,7 @@ docker compose logs -f      # kurz prüfen, dann mit Strg+C beenden
 2. **TURN:** Mit dem
    [WebRTC Trickle ICE Test](https://webrtc.github.io/samples/src/content/peerconnection/trickle-ice/)
    prüfen. Trage ein:
-   - `turn:turn.4ever1.tv:3478?transport=udp`
+   - `turn:verify.4ever1.tv:3478?transport=udp`
    - Username/Credential: einmal `https://verify.4ever1.tv/ice` im Browser
      aufrufen und die dort angezeigten `username`/`credential` kopieren.
    - „Gather candidates" → es sollten Einträge vom Typ **`relay`** erscheinen.
@@ -142,7 +143,7 @@ docker compose logs -f      # kurz prüfen, dann mit Strg+C beenden
 
 In sehr strengen Netzen ist nur Port 443 offen. Da Coolify bereits 443 belegt,
 bräuchte man dafür eine **zweite IP** (Hetzner „Primäre IPs"/Floating IP) und
-coturn mit `turns` auf 5349/443 plus Zertifikat für `turn.4ever1.tv`. Für die
+coturn mit `turns` auf 5349/443 plus Zertifikat für `verify.4ever1.tv`. Für die
 allermeisten Fälle reicht das obige UDP/TCP-3478-Setup. Sag Bescheid, wenn du
 das TLS-Upgrade brauchst.
 
