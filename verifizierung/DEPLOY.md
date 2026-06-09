@@ -4,9 +4,9 @@ Diese Anleitung bringt den Verifizierungs-Video-Raum produktiv auf deinen
 Hetzner-Server unter **https://verify.4ever1.tv** – inklusive eigenem
 **TURN-Server** für zuverlässige Verbindungen (auch im Mobilfunknetz).
 
-**Deine Eckdaten** (aus der Hetzner Console):
-- Server: `ubuntu-4gb-nbg1-1` (Ubuntu, CPX22, Nürnberg)
-- Öffentliche IP: **178.105.238.222**
+**Deine Eckdaten:**
+- Server: der Server, auf dem **Coolify** läuft (Ubuntu)
+- Öffentliche IP des Coolify-Servers: **178.104.82.169**
 - Auf dem Server läuft bereits **Coolify** (belegt Ports 80/443) → wir deployen
   die App über Coolify und stellen TURN als eigenen Dienst daneben.
 
@@ -22,14 +22,16 @@ Console, dns.hetzner.com) → Zone **4ever1.tv** öffnen → **Record hinzufüge
 
 | Typ | Name     | Wert / Ziel       | TTL  |
 |-----|----------|-------------------|------|
-| A   | `verify` | `178.105.238.222` | auto |
+| A   | `verify` | `178.104.82.169` | auto |
 
-✅ **Bereits erledigt** – `verify.4ever1.tv` zeigt schon auf den Server.
+⚠️ **Wichtig:** Der A-Eintrag muss auf die IP des **Coolify-Servers**
+(`178.104.82.169`) zeigen – **nicht** auf den Server der Hauptseite
+(`178.105.238.222`), sonst landet man auf der falschen Seite.
 
 > Den TURN-Server betreiben wir unter **demselben** Namen `verify.4ever1.tv`
 > (zeigt ja auf denselben Server). Ein extra `turn`-Eintrag ist **nicht nötig**.
 
-> Prüfen: `nslookup verify.4ever1.tv` sollte 178.105.238.222 liefern.
+> Prüfen: `nslookup verify.4ever1.tv` sollte 178.104.82.169 liefern.
 
 ---
 
@@ -107,7 +109,7 @@ docker compose logs -f      # kurz prüfen, dann mit Strg+C beenden
 
 **Alternativ in Coolify:** + New → **Docker Compose** → Inhalt von
 `coturn/docker-compose.yml` einfügen → Environment Variables `TURN_SECRET`,
-`TURN_REALM=verify.4ever1.tv`, `EXTERNAL_IP=178.105.238.222` setzen → Deploy.
+`TURN_REALM=verify.4ever1.tv`, `EXTERNAL_IP=178.104.82.169` setzen → Deploy.
 
 > `.env` enthält das Geheimnis und gehört **nicht** ins Git (ist über
 > `.gitignore` ausgeschlossen).
