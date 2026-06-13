@@ -26,7 +26,6 @@ services:
       --realm=${TURN_REALM}
       --listening-port=3478
       --fingerprint
-      --lt-cred-mech
       --min-port=49160
       --max-port=49200
       --external-ip=${EXTERNAL_IP}

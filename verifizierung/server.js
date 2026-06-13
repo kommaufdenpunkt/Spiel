@@ -72,7 +72,15 @@ const MIME = {
 
 const server = http.createServer((req, res) => {
   // Nur den Pfad-Teil verwenden, Query-Parameter ignorieren.
-  let urlPath = decodeURIComponent(req.url.split('?')[0]);
+  // decodeURIComponent kann bei kaputter %-Kodierung werfen -> abfangen.
+  let urlPath;
+  try {
+    urlPath = decodeURIComponent(req.url.split('?')[0]);
+  } catch {
+    res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' });
+    res.end('Ungültige Anfrage');
+    return;
+  }
 
   // Health-Check (für Coolify/Reverse-Proxy).
   if (urlPath === '/healthz') {

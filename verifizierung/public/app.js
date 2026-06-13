@@ -222,6 +222,9 @@
           remoteWaiting.style.display = '';
           remoteWaiting.textContent = 'Gegenüber hat den Raum verlassen.';
           sysMsg('Gegenüber hat den Raum verlassen.');
+          // Alte Verbindung sauber schließen, damit ein erneuter Beitritt
+          // (z. B. nach Verbindungsabbruch der Bewerberin) frisch aufbaut.
+          resetPeer();
           break;
       }
     };
@@ -239,6 +242,17 @@
   // Beide Seiten dürfen die Verbindung aushandeln; bei Kollisionen gibt die
   // "höfliche" Seite (der Gast) nach. Das macht den Aufbau robust und erlaubt
   // automatische Neu-Aushandlung / ICE-Neustart bei kurzen Störungen.
+
+  // Verbindung vollständig zurücksetzen (z. B. wenn das Gegenüber geht).
+  function resetPeer() {
+    if (state.pc) { try { state.pc.close(); } catch {} }
+    state.pc = null;
+    state.dc = null;
+    state.remoteStream = null;
+    state.makingOffer = false;
+    state.ignoreOffer = false;
+  }
+
   function createPeer() {
     if (state.pc) return state.pc;
     state.polite = (state.role === 'guest');
@@ -542,8 +556,8 @@
       ctx.font = '600 14px -apple-system,Segoe UI,Roboto,sans-serif';
       ctx.fillText('AKTUELLE FRAGE', 20, H - 78);
       ctx.fillStyle = '#e6edf3';
-      ctx.font = '600 24px -apple-system,Segoe UI,Roboto,sans-serif';
-      wrapText(ctx, qBannerText.textContent || '—', 20, H - 48, W - 40, 30);
+      ctx.font = '600 22px -apple-system,Segoe UI,Roboto,sans-serif';
+      wrapText(ctx, qBannerText.textContent || '—', 20, H - 50, W - 40, 26, 2);
 
       state.rafId = requestAnimationFrame(draw);
     };
@@ -640,26 +654,39 @@
     ctx.drawImage(video, sx, sy, sw, sh, x, y, w, h);
   }
 
-  function wrapText(ctx, text, x, y, maxW, lineH) {
-    const words = String(text).split(' ');
-    let line = '', yy = y, lines = 0;
+  // Bricht Text auf maxW um und zeigt höchstens maxLines Zeilen; bei zu
+  // langem Text wird die letzte Zeile mit "…" gekürzt (damit nichts unten
+  // aus dem Videobild läuft).
+  function wrapText(ctx, text, x, y, maxW, lineH, maxLines = 2) {
+    const words = String(text).split(/\s+/).filter(Boolean);
+    const all = [];
+    let line = '';
     for (const w of words) {
       const test = line ? line + ' ' + w : w;
       if (ctx.measureText(test).width > maxW && line) {
-        ctx.fillText(line, x, yy);
-        line = w; yy += lineH; lines++;
-        if (lines >= 1) { /* max 2 Zeilen */ }
-      } else line = test;
+        all.push(line);
+        line = w;
+      } else {
+        line = test;
+      }
     }
-    ctx.fillText(line, x, yy);
+    if (line) all.push(line);
+
+    let lines = all;
+    if (all.length > maxLines) {
+      lines = all.slice(0, maxLines);
+      let last = lines[maxLines - 1];
+      while (last && ctx.measureText(last + ' …').width > maxW) {
+        last = last.slice(0, -1).trimEnd();
+      }
+      lines[maxLines - 1] = last + ' …';
+    }
+    lines.forEach((ln, idx) => ctx.fillText(ln, x, y + idx * lineH));
   }
 
   function pad(n) { return String(n).padStart(2, '0'); }
   function escapeHtml(s) {
     return String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-  }
-  function copyToClipboard(text) {
-    if (navigator.clipboard) navigator.clipboard.writeText(text).catch(() => {});
   }
   let toastTimer = 0;
   function toast(text) {
