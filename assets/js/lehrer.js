@@ -104,8 +104,10 @@ function senden() {
 $("weiter").addEventListener("click", () => { if (index < thema.folien.length - 1) { index++; zeige(); } });
 $("zurueck").addEventListener("click", () => { if (index > 0) { index--; zeige(); } });
 document.addEventListener("keydown", (e) => {
-  if (e.key === "ArrowRight" || e.key === " ") $("weiter").click();
-  if (e.key === "ArrowLeft") $("zurueck").click();
+  if (e.target.matches("input, select, textarea")) return; // nicht beim Tippen blättern
+  if ($("overlay").classList.contains("an")) return;       // nicht hinter dem QR-Vollbild
+  if (e.key === "ArrowRight" || e.key === " ") { e.preventDefault(); $("weiter").click(); }
+  if (e.key === "ArrowLeft") { e.preventDefault(); $("zurueck").click(); }
 });
 
 $("themaWahl").addEventListener("change", (e) => ladeUndZeige(e.target.value, 0));

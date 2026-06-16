@@ -17,8 +17,9 @@ Der Fahrlehrer zeigt die Lektion (Beamer/Bildschirm), die Schüler steigen per
 
 | Status | Thema |
 |---|---|
-| ✅ fertig | **Thema 5 – Grundregel, Vorfahrt und Verkehrsregelungen** |
-| 🛠️ geplant | Themen 1–4, 6–12 (Grundstoff) sowie 13–14 (Auto-Technik) |
+| ✅ fertig | **Thema 5 – Grundregel, Vorfahrt und Verkehrsregelungen** (27 Folien) |
+| ✅ fertig | **Thema 6 – Verkehrszeichen und Verkehrseinrichtungen** (20 Folien) |
+| 🛠️ geplant | Themen 1–4, 7–12 (Grundstoff) sowie 13–14 (Auto-Technik) |
 
 Weitere Themen entstehen Schritt für Schritt nach demselben Muster.
 

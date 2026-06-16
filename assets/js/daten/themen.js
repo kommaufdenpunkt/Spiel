@@ -8,7 +8,7 @@ export const THEMEN = [
   { id: "03", nummer: 3,  bereich: "Grundstoff", titel: "Rechtliche Rahmenbedingungen", verfuegbar: false },
   { id: "04", nummer: 4,  bereich: "Grundstoff", titel: "Straßenverkehrssystem und seine Nutzung", verfuegbar: false },
   { id: "05", nummer: 5,  bereich: "Grundstoff", titel: "Grundregel, Vorfahrt und Verkehrsregelungen", verfuegbar: true },
-  { id: "06", nummer: 6,  bereich: "Grundstoff", titel: "Verkehrszeichen und Verkehrseinrichtungen", verfuegbar: false },
+  { id: "06", nummer: 6,  bereich: "Grundstoff", titel: "Verkehrszeichen und Verkehrseinrichtungen", verfuegbar: true },
   { id: "07", nummer: 7,  bereich: "Grundstoff", titel: "Geschwindigkeit, Abstand und umweltschonende Fahrweise", verfuegbar: false },
   { id: "08", nummer: 8,  bereich: "Grundstoff", titel: "Andere Teilnehmer im Straßenverkehr", verfuegbar: false },
   { id: "09", nummer: 9,  bereich: "Grundstoff", titel: "Verkehrsverhalten bei Fahrmanövern, Verkehrsbeobachtung", verfuegbar: false },
@@ -20,7 +20,8 @@ export const THEMEN = [
 ];
 
 const lader = {
-  "05": () => import("./thema-05.js")
+  "05": () => import("./thema-05.js"),
+  "06": () => import("./thema-06.js")
 };
 
 export async function ladeThema(id) {
