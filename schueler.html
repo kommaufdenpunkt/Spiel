@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Mitmachen · Fahrschule Live</title>
+<link rel="stylesheet" href="assets/css/app.css">
+</head>
+<body>
+<header class="kopf">
+  <div class="marke">
+    <span class="ampel" id="ampel"><i class="r"></i><i class="g"></i><i class="gr"></i></span>
+    <span>Fahrschule&nbsp;Live<small id="kopfThema">verbinde…</small></span>
+  </div>
+  <div class="rechts">
+    <span class="pille live-pille" id="livePille"><span class="punkt"></span><span id="liveText">Live</span></span>
+  </div>
+</header>
+
+<div id="banner"></div>
+
+<main>
+  <div class="buehne"><div id="folie"></div></div>
+
+  <div class="steuer">
+    <button class="btn" id="zurueck">← Zurück</button>
+    <div class="mitte">
+      <span class="zaehler"><span id="nr">–</span> / <span id="gesamt">–</span></span>
+      <div class="fortschritt"><i id="balken"></i></div>
+    </div>
+    <button class="btn primaer" id="weiter">Weiter →</button>
+  </div>
+
+  <p class="schueler-tipp">💡 Tipp: Tippe auf einen Punkt, um ihn zu <b>markieren</b>. Vorblättern geht nicht – du folgst deinem Fahrlehrer.</p>
+</main>
+
+<script type="module" src="assets/js/schueler.js"></script>
+</body>
+</html>

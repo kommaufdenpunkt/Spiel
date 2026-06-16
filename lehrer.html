@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lehrer · Fahrschule Live</title>
+<link rel="stylesheet" href="assets/css/app.css">
+<script src="https://cdn.jsdelivr.net/gh/davidshimjs/qrcodejs/qrcode.min.js"></script>
+</head>
+<body>
+<header class="kopf">
+  <div class="marke">
+    <span class="ampel" id="ampel"><i class="r"></i><i class="g"></i><i class="gr"></i></span>
+    <span>Fahrschule&nbsp;Live<small id="kopfThema">Lehrer-Konsole</small></span>
+  </div>
+  <div class="rechts">
+    <select id="themaWahl" class="btn" style="max-width:60vw"></select>
+    <span class="pille" id="statusPille"><span class="punkt"></span><span id="statusText">…</span></span>
+    <span class="pille"><span>👥</span><span id="teilnehmerZahl">0</span></span>
+  </div>
+</header>
+
+<div id="banner"></div>
+
+<main>
+  <section class="qr-karte">
+    <div class="qr-box" id="qrBox"></div>
+    <div class="qr-info">
+      <h3>So machen deine Schüler mit:</h3>
+      <p>QR-Code scannen <b>oder</b> auf <b id="domainName">ginoco.de</b> diesen Code eingeben:</p>
+      <div class="code" id="raumCode">––––</div>
+      <p class="qr-link" id="raumLink"></p>
+      <button class="btn geist" id="qrGross">🔍 QR groß zeigen (für Beamer)</button>
+    </div>
+  </section>
+
+  <div class="buehne"><div id="folie"></div></div>
+
+  <div class="steuer">
+    <button class="btn gross" id="zurueck">← Zurück</button>
+    <div class="mitte">
+      <span class="zaehler"><span id="nr">1</span> / <span id="gesamt">1</span></span>
+      <div class="fortschritt"><i id="balken"></i></div>
+    </div>
+    <button class="btn primaer gross" id="weiter">Weiter →</button>
+  </div>
+</main>
+
+<div class="overlay" id="overlay">
+  <div class="gross-qr" id="qrGrossBox"></div>
+  <div class="code" id="codeGross">––––</div>
+  <button class="btn gross" id="overlayZu">Schließen</button>
+</div>
+
+<script type="module" src="assets/js/lehrer.js"></script>
+</body>
+</html>

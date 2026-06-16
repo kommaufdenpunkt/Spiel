@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fahrschule Live – Theorie zum Mitmachen</title>
+<link rel="stylesheet" href="assets/css/app.css">
+</head>
+<body>
+<header class="kopf">
+  <div class="marke">
+    <span class="ampel"><i class="r"></i><i class="g"></i><i class="gr"></i></span>
+    <span>Fahrschule&nbsp;Live<small>Theorie zum Mitmachen</small></span>
+  </div>
+</header>
+
+<main>
+  <section class="hero">
+    <h1>Theorie-Unterricht, dem alle live folgen.</h1>
+    <p class="lead">Du zeigst die Lektion, deine Schüler steigen per QR-Code mit dem Handy ein –
+      sie können markieren, mitraten und Screenshots machen, aber nicht vorblättern.</p>
+  </section>
+
+  <div class="wahl">
+    <a href="lehrer.html">
+      <div class="em">🎓</div>
+      <h3>Ich bin Fahrlehrer</h3>
+      <p>Lektion starten, QR-Code zeigen und die Folien steuern.</p>
+    </a>
+    <a href="#beitreten" id="zurBeitritt">
+      <div class="em">📱</div>
+      <h3>Ich bin Fahrschüler</h3>
+      <p>Raum-Code eingeben oder den QR-Code deines Fahrlehrers scannen.</p>
+    </a>
+  </div>
+
+  <section id="beitreten" style="max-width:480px;margin:0 auto 3rem;text-align:center">
+    <h2 style="font-size:1.2rem">Mit Raum-Code beitreten</h2>
+    <form class="beitritt" id="beitrittForm">
+      <input id="codeFeld" maxlength="6" placeholder="z. B. ABCD" autocomplete="off" inputmode="latin">
+      <button class="btn primaer" type="submit">Beitreten</button>
+    </form>
+  </section>
+</main>
+
+<div class="fuss">Inhalte gestützt auf die amtliche StVO · Grundstoff für alle Klassen + Klasse B</div>
+
+<script>
+  document.getElementById("zurBeitritt").addEventListener("click", (e)=>{
+    e.preventDefault();
+    document.getElementById("beitreten").scrollIntoView({behavior:"smooth"});
+    document.getElementById("codeFeld").focus();
+  });
+  document.getElementById("beitrittForm").addEventListener("submit", (e)=>{
+    e.preventDefault();
+    const c = document.getElementById("codeFeld").value.trim().toUpperCase();
+    if(c) location.href = "schueler.html?raum=" + encodeURIComponent(c);
+  });
+</script>
+</body>
+</html>
