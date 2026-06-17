@@ -81,9 +81,14 @@ bestehenden für SSH 22 und HTTP/HTTPS 80/443):
 6. **Domains:** `https://verify.4ever1.tv` eintragen → Coolify holt automatisch
    ein Let's-Encrypt-Zertifikat (HTTPS).
 7. **Environment Variables** setzen:
+   - `MODERATOR_PASSWORD` = (frei wählbares Passwort für den Moderator-Zugang) **Pflicht**
    - `TURN_SECRET` = (das Geheimnis aus Schritt 2)
    - `TURN_HOST` = `verify.4ever1.tv`
 8. **Deploy** klicken.
+
+> **Wichtig:** Ohne `MODERATOR_PASSWORD` ist der Moderator-Zugang gesperrt
+> (die Bewerber-Seite funktioniert weiterhin). Dieses Passwort gibst du nur an
+> Personen, die Räume eröffnen dürfen.
 
 > WebSockets: Coolifys Proxy (Traefik) leitet die WebSocket-Verbindung
 > automatisch weiter – es ist keine Extra-Konfiguration nötig.

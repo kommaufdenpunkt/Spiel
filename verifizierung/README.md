@@ -20,6 +20,12 @@ einreichen.
 - **Chat-Fenster** zwischen euch.
 - **Aufnahme** des kompletten Gesprächs → Download als **MP4** (bzw. WebM, falls
   der Browser kein MP4 aufnehmen kann – siehe unten).
+- **Moderator-Passwort:** Nur wer das Passwort kennt, kann einen Raum eröffnen.
+  Die Bewerber-Seite bleibt offen (Beitritt per Link, ohne Passwort).
+- **Ausweis-Verifizierung:** Die Bewerberin lädt Vorder- & Rückseite hoch und
+  hält den Ausweis neben ihr Gesicht; der Moderator macht Beweis-Fotos, hakt eine
+  Checkliste ab, markiert „verifiziert" und lädt ein **Prüf-Protokoll** herunter.
+  (Fotos gehen verschlüsselt direkt Browser-zu-Browser, der Server speichert nichts.)
 
 ---
 
@@ -42,16 +48,20 @@ Dann im Browser öffnen: <http://localhost:3000>
 
 ## So benutzt du es
 
-1. **Du (Moderator):** Seite öffnen → „Ich moderiere" → Name eingeben →
-   **Raum betreten**. Der Beitritts-Link wird automatisch in die Zwischenablage
-   kopiert und im Chat angezeigt.
-2. **Link an den Bewerber schicken** (WhatsApp, E-Mail …).
+1. **Du (Moderator):** Seite öffnen → „Ich moderiere" → Name **und
+   Moderator-Passwort** eingeben → **Raum betreten**. Der Beitritts-Link wird
+   automatisch in die Zwischenablage kopiert und im Chat angezeigt.
+2. **Link an den Bewerber schicken** (WhatsApp, E-Mail …) – z. B. mit
+   „✉ Einladung kopieren".
 3. **Bewerber** öffnet den Link → Name eingeben → **beitreten** → Kamera/Mikro
-   erlauben.
-4. Ihr seht euch. Du klickst rechts auf **„Nächste Frage ▶"** – der Bewerber
-   sieht die Frage.
-5. **⏺ Aufnahme starten**, das Gespräch führen.
-6. Am Ende **⏹ Beenden & speichern** → das Video wird heruntergeladen.
+   erlauben. (Kein Passwort nötig.)
+4. **Ausweis:** Bewerber öffnet rechts den Tab **„Ausweis"** → lädt Vorder- &
+   Rückseite hoch und hält den Ausweis neben das Gesicht. Du als Moderator siehst
+   die Fotos im Tab „Ausweis", machst per Knopf Live-Fotos, hakst die Checkliste
+   ab und klickst **„Als verifiziert markieren"**.
+5. Du klickst rechts auf **„Nächste Frage ▶"** – der Bewerber sieht die Frage.
+6. **⏺ Aufnahme starten**, das Gespräch führen.
+7. Am Ende **⏹ Beenden & speichern** (Video) und **„Prüf-Protokoll speichern"**.
 
 ---
 

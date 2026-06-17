@@ -116,6 +116,30 @@
   .chatbar{display:flex;gap:.5rem;padding:.6rem;border-top:1px solid var(--line)}
   .chatbar input{flex:1}
 
+  /* Verifizierungs-Panel (Moderator) */
+  .verify-pane{flex:1;overflow:auto;padding:.7rem;display:flex;flex-direction:column;gap:.7rem}
+  .vsection-title{font-size:.7rem;color:var(--accent);text-transform:uppercase;
+    letter-spacing:.1em;margin:.3rem 0 0}
+  .snap-btns{display:flex;gap:.5rem;flex-wrap:wrap}
+  .snap-btns button{flex:1;min-width:130px}
+  .shots{display:flex;gap:.5rem;flex-wrap:wrap}
+  .shot{position:relative;width:calc(50% - .25rem)}
+  .shot img{width:100%;border:1px solid var(--line);border-radius:8px;display:block}
+  .shot .cap{font-size:.66rem;color:var(--dim);text-align:center;margin-top:.15rem}
+  .shot .dl{position:absolute;top:.3rem;right:.3rem;background:#000b;border:0;
+    border-radius:6px;padding:.15rem .4rem;font-size:.72rem;color:#fff;cursor:pointer}
+  .checklist{display:flex;flex-direction:column;gap:.5rem}
+  .checklist label{display:flex;gap:.55rem;align-items:flex-start;font-size:.85rem;
+    line-height:1.35;cursor:pointer}
+  .checklist input{width:auto;margin-top:.2rem;flex:none}
+  .vstatus{padding:.55rem .7rem;border-radius:8px;font-size:.85rem;text-align:center;
+    border:1px solid var(--line)}
+  .vstatus.ok{background:#10261a;border-color:var(--good);color:#9ae6b4}
+  .vstatus.pending{background:#2a2410;border-color:var(--warn);color:#e6d29a}
+  .verify-badge{display:none;align-items:center;gap:.4rem;font-size:.8rem;color:#9ae6b4;
+    background:#10261a;border:1px solid var(--good);padding:.3rem .6rem;border-radius:999px}
+  .verify-badge.on{display:flex}
+
   /* Gast-Ansicht der aktuellen Frage (Vollbild-Hinweis) */
   .guest-q{display:none}
 
@@ -134,7 +158,10 @@
 <body>
 <header>
   <h1>Verifizierungs-Raum <small>Agentur 4ever1 · BIGO LIVE</small></h1>
-  <div id="recBadge" class="rec-badge"><span class="dot"></span><span id="recTime">Aufnahme 00:00</span></div>
+  <div style="display:flex;gap:.6rem;align-items:center">
+    <div id="verifyBadge" class="verify-badge">✓ Verifiziert</div>
+    <div id="recBadge" class="rec-badge"><span class="dot"></span><span id="recTime">Aufnahme 00:00</span></div>
+  </div>
 </header>
 
 <!-- ================= START-BILDSCHIRM ================= -->
@@ -155,6 +182,10 @@
     <div class="field" id="roomField">
       <label for="roomInput">Raum-Code</label>
       <input id="roomInput" placeholder="wird automatisch erstellt" autocapitalize="characters">
+    </div>
+    <div class="field" id="passField" style="display:none">
+      <label for="passInput">Moderator-Passwort</label>
+      <input id="passInput" type="password" placeholder="nur für Moderatoren" autocomplete="current-password">
     </div>
 
     <div class="actions">
@@ -199,6 +230,7 @@
   <aside class="side">
     <div class="tabs">
       <button data-tab="fragen" class="sel" id="tabFragen">Fragen</button>
+      <button data-tab="verify" id="tabVerify">Ausweis</button>
       <button data-tab="chat">Chat</button>
     </div>
 
@@ -208,6 +240,55 @@
       <div class="qnav" id="qNav">
         <button id="prevQ">◀ Zurück</button>
         <button id="nextQ" class="primary">Nächste Frage ▶</button>
+      </div>
+    </div>
+
+    <!-- Ausweis-Verifizierung -->
+    <div class="tabpane" data-pane="verify">
+      <!-- BEWERBER: Ausweis hochladen -->
+      <div class="verify-pane" id="verifyGuest" style="display:none">
+        <div class="vstatus pending">Bitte lade deinen Ausweis hoch und halte ihn neben dein Gesicht.</div>
+
+        <div class="vsection-title">1) Ausweis Vorderseite</div>
+        <button id="upFront" class="primary">📄 Vorderseite hochladen</button>
+        <div class="vsection-title">2) Ausweis Rückseite</div>
+        <button id="upBack" class="primary">📄 Rückseite hochladen</button>
+        <div class="vsection-title">3) Ausweis neben dein Gesicht</div>
+        <p style="font-size:.84rem;color:var(--dim);line-height:1.4;margin:.2rem 0">
+          Halte deinen Ausweis jetzt gut sichtbar neben dein Gesicht in die Kamera –
+          der Moderator macht davon ein Foto. Optional kannst du auch ein Foto hochladen:
+        </p>
+        <button id="upSelfie">🙂 Foto „Ausweis + Gesicht" hochladen</button>
+        <div class="shots" id="guestShots"></div>
+        <input id="fileInput" type="file" accept="image/*" style="display:none">
+      </div>
+
+      <!-- MODERATOR: prüfen -->
+      <div class="verify-pane" id="verifyHost" style="display:none">
+        <div id="vstatus" class="vstatus pending">Status: noch nicht verifiziert</div>
+
+        <div class="vsection-title">Beweis-Fotos</div>
+        <div class="snap-btns">
+          <button id="snapId">📄 Ausweis abfotografieren</button>
+          <button id="snapFace">🙂 Gesicht abfotografieren</button>
+        </div>
+        <div class="shots" id="shots"></div>
+
+        <div class="vsection-title">Geprüfte Angaben</div>
+        <input id="verifiedName" placeholder="Name laut Ausweis">
+        <input id="verifiedDoc" placeholder="Ausweis-Nr. (optional)">
+
+        <div class="vsection-title">Prüf-Checkliste</div>
+        <div class="checklist" id="checklist">
+          <label><input type="checkbox" data-chk> Vorder- &amp; Rückseite erhalten/gesehen</label>
+          <label><input type="checkbox" data-chk> Ausweis gut lesbar</label>
+          <label><input type="checkbox" data-chk> Gesicht stimmt mit dem Ausweis überein</label>
+          <label><input type="checkbox" data-chk> Name stimmt mit den Angaben überein</label>
+          <label><input type="checkbox" data-chk> Ausweis wirkt echt (kein Foto vom Foto)</label>
+        </div>
+
+        <button id="markVerified" class="primary" disabled>✓ Als verifiziert markieren</button>
+        <button id="downloadReport">⤓ Prüf-Protokoll speichern</button>
       </div>
     </div>
 

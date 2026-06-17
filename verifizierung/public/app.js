@@ -68,6 +68,11 @@
     recTimer: 0,
     recMime: '',
     recExt: 'webm',
+    // Verifizierung
+    verified: false,
+    snapshots: [],       // [{label, url, filename}]
+    pendingPhotos: [],   // vom Bewerber hochgeladene Fotos, die noch gesendet werden
+    modPassword: '',
   };
 
   // =======================================================================
@@ -81,8 +86,8 @@
   if (urlRoom) {
     pickedRole = 'guest';
     $('roomInput').value = urlRoom;
-    setRoleUI('guest');
   }
+  setRoleUI(pickedRole);
 
   $('rolePick').addEventListener('click', (e) => {
     const btn = e.target.closest('button[data-role]');
@@ -98,10 +103,12 @@
       $('lobbyTitle').textContent = 'Video-Verifizierung starten';
       $('lobbySub').textContent = 'Erstelle einen Raum und schicke dem Bewerber den Beitritts-Link.';
       $('roomInput').placeholder = 'leer lassen = neuer Raum';
+      $('passField').style.display = '';   // Moderator braucht Passwort
     } else {
       $('lobbyTitle').textContent = 'Verifizierung beitreten';
       $('lobbySub').textContent = 'Gib deinen Namen ein und tritt dem Raum bei.';
       $('roomInput').placeholder = 'Raum-Code vom Moderator';
+      $('passField').style.display = 'none';
     }
   }
 
@@ -124,6 +131,11 @@
       $('lobbyErr').textContent = 'Bitte gib den Raum-Code ein, den du erhalten hast.';
       return;
     }
+    const modPassword = $('passInput').value;
+    if (pickedRole === 'host' && !modPassword) {
+      $('lobbyErr').textContent = 'Bitte gib das Moderator-Passwort ein.';
+      return;
+    }
     if (pickedRole === 'host' && !code) code = genRoomCode();
 
     $('enterBtn').disabled = true;
@@ -144,10 +156,27 @@
     state.role = pickedRole;
     state.name = name;
     state.roomCode = code;
+    state.modPassword = modPassword;
     localVideo.srcObject = state.localStream;
     localTag.textContent = name + ' (Du)';
 
     startRoom();
+  }
+
+  // Zurück zum Startbildschirm (z. B. bei falschem Moderator-Passwort).
+  function backToLobby(errText) {
+    try { if (state.ws) state.ws.close(); } catch {}
+    state.ws = null;
+    if (state.localStream) {
+      state.localStream.getTracks().forEach((t) => { try { t.stop(); } catch {} });
+      state.localStream = null;
+    }
+    room.classList.remove('active');
+    lobby.style.display = '';
+    $('enterBtn').disabled = false;
+    $('enterBtn').textContent = 'Raum betreten';
+    $('lobbyErr').textContent = errText || '';
+    $('passInput').value = '';
   }
 
   // =======================================================================
@@ -181,6 +210,9 @@
     // Fragen-Navigation nur beim Moderator; Gast sieht die Fragen nur.
     qNav.style.display = isHost ? '' : 'none';
     if (!isHost) $('tabFragen').textContent = 'Aktuelle Frage';
+    // Ausweis-Tab: Moderator prüft, Bewerber lädt hoch.
+    $('verifyHost').style.display = isHost ? '' : 'none';
+    $('verifyGuest').style.display = isHost ? 'none' : '';
   }
 
   // ---- WebSocket-Signalisierung -----------------------------------------
@@ -192,6 +224,7 @@
     ws.onopen = () => {
       ws.send(JSON.stringify({
         type: 'join', room: state.roomCode, role: state.role, name: state.name,
+        password: state.modPassword || '',
       }));
     };
 
@@ -207,6 +240,8 @@
           break;
         case 'error':
           if (msg.reason === 'room-full') toast('Der Raum ist bereits voll (2 Personen).');
+          else if (msg.reason === 'bad-password') backToLobby('Falsches Moderator-Passwort.');
+          else if (msg.reason === 'mod-not-configured') backToLobby('Moderator-Zugang ist serverseitig noch nicht eingerichtet.');
           break;
         case 'peer-ready':
           remoteTag.textContent = msg.peerName || 'Gegenüber';
@@ -333,13 +368,38 @@
     dc.onopen = () => {
       // Beim Verbinden aktuelle Frage an den Gast schicken.
       if (state.role === 'host' && state.currentQ >= 0) sendQuestion(state.currentQ);
+      // Bewerber: noch nicht gesendete Ausweis-Fotos jetzt nachschicken.
+      if (state.role !== 'host' && state.pendingPhotos.length) {
+        const queue = state.pendingPhotos.splice(0);
+        queue.forEach((p) => sendPhoto(p.side, p.url));
+      }
     };
     dc.onmessage = (e) => {
       let m; try { m = JSON.parse(e.data); } catch { return; }
       if (m.kind === 'chat') chatMsg(m.text, false, m.from);
       else if (m.kind === 'question') showQuestion(m.index, m.text);
+      else if (m.kind === 'verified') { if (state.role !== 'host') { setGuestVerified(); } }
+      else if (m.kind === 'photo-start') incoming[m.id] = { side: m.side, total: m.total, parts: [] };
+      else if (m.kind === 'photo-chunk') { const p = incoming[m.id]; if (p) p.parts[m.seq] = m.data; }
+      else if (m.kind === 'photo-end') {
+        const p = incoming[m.id]; if (!p) return;
+        delete incoming[m.id];
+        onPhotoReceived(p.side, p.parts.join(''));
+      }
     };
   }
+
+  // Hilfsfunktion: sende ein JSON-Objekt über den Datenkanal (wenn offen).
+  function dcSend(obj) {
+    if (state.dc && state.dc.readyState === 'open') {
+      state.dc.send(JSON.stringify(obj));
+      return true;
+    }
+    return false;
+  }
+
+  // Eingehende (gechunkte) Fotos zwischenspeichern.
+  const incoming = {};
 
   // =======================================================================
   //  FRAGEN
@@ -476,6 +536,188 @@
   }
 
   // =======================================================================
+  //  AUSWEIS-VERIFIZIERUNG
+  //  - Bewerber lädt Vorder-/Rückseite hoch (+ optional Foto Ausweis+Gesicht).
+  //    Bilder gehen verkleinert & verschlüsselt direkt an den Moderator.
+  //  - Moderator kann zusätzlich live Fotos aus dem Video machen, eine
+  //    Checkliste abhaken, als "verifiziert" markieren und ein Protokoll laden.
+  // =======================================================================
+
+  // ---- gemeinsame Helfer ----
+  function downloadDataUrl(dataUrl, filename) {
+    const a = document.createElement('a');
+    a.href = dataUrl; a.download = filename;
+    document.body.appendChild(a); a.click();
+    setTimeout(() => a.remove(), 500);
+  }
+  function safeApplicantName() {
+    return (remoteTag.textContent || 'bewerber')
+      .replace(/\(.*?\)/g, '').replace(/[^a-z0-9äöüß ]/gi, '').trim()
+      .replace(/\s+/g, '_') || 'bewerber';
+  }
+  function stampNow() {
+    const d = new Date();
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}`;
+  }
+  function slug(s) { return String(s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''); }
+
+  // Datei -> verkleinerte JPEG-DataURL (damit sie über den Datenkanal passt).
+  function fileToDataUrl(file, maxDim = 1100, maxLen = 200000) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = reject;
+      reader.onload = () => {
+        const img = new Image();
+        img.onerror = reject;
+        img.onload = () => {
+          const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+          const w = Math.round(img.width * scale), h = Math.round(img.height * scale);
+          const c = document.createElement('canvas');
+          c.width = w; c.height = h;
+          c.getContext('2d').drawImage(img, 0, 0, w, h);
+          let q = 0.85, url = c.toDataURL('image/jpeg', q);
+          while (url.length > maxLen && q > 0.4) { q -= 0.1; url = c.toDataURL('image/jpeg', q); }
+          resolve(url);
+        };
+        img.src = reader.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  // ---- BEWERBER: Fotos hochladen + (gechunkt) an den Moderator senden ----
+  let pendingSide = '';
+  function pickFile(side) { pendingSide = side; const f = $('fileInput'); f.value = ''; f.click(); }
+  if ($('upFront')) $('upFront').addEventListener('click', () => pickFile('Ausweis Vorderseite'));
+  if ($('upBack')) $('upBack').addEventListener('click', () => pickFile('Ausweis Rückseite'));
+  if ($('upSelfie')) $('upSelfie').addEventListener('click', () => pickFile('Ausweis + Gesicht'));
+  if ($('fileInput')) $('fileInput').addEventListener('change', async (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    let url;
+    try { url = await fileToDataUrl(file); }
+    catch { toast('Bild konnte nicht geladen werden.'); return; }
+    addGuestShot(pendingSide, url);
+    const sent = sendPhoto(pendingSide, url);
+    toast(sent ? pendingSide + ' gesendet ✓'
+               : pendingSide + ' gespeichert – wird gesendet, sobald der Moderator da ist');
+  });
+
+  function sendPhoto(side, dataUrl) {
+    if (!state.dc || state.dc.readyState !== 'open') {
+      state.pendingPhotos.push({ side, url: dataUrl });
+      return false;
+    }
+    const id = Math.random().toString(36).slice(2);
+    const CHUNK = 16000;
+    const total = Math.ceil(dataUrl.length / CHUNK);
+    dcSend({ kind: 'photo-start', id, side, total });
+    for (let i = 0; i < total; i++) {
+      dcSend({ kind: 'photo-chunk', id, seq: i, data: dataUrl.slice(i * CHUNK, (i + 1) * CHUNK) });
+    }
+    dcSend({ kind: 'photo-end', id });
+    return true;
+  }
+
+  function addGuestShot(label, dataUrl) {
+    const el = document.createElement('div');
+    el.className = 'shot';
+    el.innerHTML = `<img src="${dataUrl}" alt=""><div class="cap">${escapeHtml(label)} ✓</div>`;
+    $('guestShots').appendChild(el);
+  }
+
+  function setGuestVerified() {
+    const vs = $('verifyGuest').querySelector('.vstatus');
+    if (vs) { vs.className = 'vstatus ok'; vs.textContent = '✓ Du wurdest verifiziert.'; }
+    $('verifyBadge').classList.add('on');
+    toast('✓ Du wurdest verifiziert.');
+  }
+
+  // ---- MODERATOR: empfangene Fotos, eigene Schnappschüsse, Prüfung ----
+  function onPhotoReceived(side, dataUrl) {
+    addShot(side + ' (hochgeladen)', dataUrl);
+    sysMsg(`Bewerber hat „${side}" hochgeladen.`);
+    toast(`„${side}" vom Bewerber erhalten`);
+  }
+
+  function addShot(label, dataUrl) {
+    const filename = `verifizierung_${safeApplicantName()}_${slug(label)}_${stampNow()}.jpg`;
+    state.snapshots.push({ label, url: dataUrl, filename });
+    const el = document.createElement('div');
+    el.className = 'shot';
+    el.innerHTML =
+      `<img src="${dataUrl}" alt=""><button class="dl" title="Speichern">⤓</button>` +
+      `<div class="cap">${escapeHtml(label)}</div>`;
+    el.querySelector('.dl').addEventListener('click', () => downloadDataUrl(dataUrl, filename));
+    $('shots').appendChild(el);
+  }
+
+  function captureSnapshot(label) {
+    if (!remoteVideo.videoWidth) { toast('Noch kein Bild vom Bewerber.'); return; }
+    const c = document.createElement('canvas');
+    c.width = remoteVideo.videoWidth; c.height = remoteVideo.videoHeight;
+    c.getContext('2d').drawImage(remoteVideo, 0, 0);
+    const url = c.toDataURL('image/jpeg', 0.9);
+    addShot(label, url);
+    downloadDataUrl(url, `verifizierung_${safeApplicantName()}_${slug(label)}_${stampNow()}.jpg`);
+    toast(label + ' aufgenommen & gespeichert');
+  }
+  if ($('snapId')) $('snapId').addEventListener('click', () => captureSnapshot('Ausweis (Live-Foto)'));
+  if ($('snapFace')) $('snapFace').addEventListener('click', () => captureSnapshot('Gesicht (Live-Foto)'));
+
+  // Checkliste -> "Als verifiziert markieren" erst freigeben, wenn alles geprüft.
+  function checkBoxes() { return Array.from(document.querySelectorAll('#checklist input[data-chk]')); }
+  if ($('checklist')) $('checklist').addEventListener('change', () => {
+    $('markVerified').disabled = !checkBoxes().every((c) => c.checked);
+  });
+
+  if ($('markVerified')) $('markVerified').addEventListener('click', () => {
+    setVerified(true);
+    dcSend({ kind: 'verified' });
+    toast('Bewerber als verifiziert markiert ✓');
+  });
+
+  function setVerified(v) {
+    state.verified = v;
+    $('verifyBadge').classList.toggle('on', v);
+    const vs = $('vstatus');
+    if (vs) {
+      vs.className = v ? 'vstatus ok' : 'vstatus pending';
+      vs.textContent = v ? 'Status: VERIFIZIERT ✓' : 'Status: noch nicht verifiziert';
+    }
+  }
+
+  if ($('downloadReport')) $('downloadReport').addEventListener('click', () => {
+    const cb = checkBoxes();
+    const lines = [
+      'VERIFIZIERUNGS-PROTOKOLL',
+      'Agentur 4ever1 · BIGO LIVE',
+      '========================================',
+      `Datum/Uhrzeit:   ${new Date().toLocaleString('de-DE')}`,
+      `Raum-Code:       ${state.roomCode}`,
+      `Moderator:       ${state.name}`,
+      `Bewerber (Angabe): ${remoteTag.textContent || '-'}`,
+      `Name laut Ausweis: ${$('verifiedName').value || '-'}`,
+      `Ausweis-Nr.:     ${$('verifiedDoc').value || '-'}`,
+      '',
+      'Prüf-Checkliste:',
+      ...cb.map((c) => `  [${c.checked ? 'x' : ' '}] ${c.parentElement.textContent.trim()}`),
+      '',
+      `Beweis-Fotos (separat gespeichert): ${state.snapshots.length}`,
+      ...state.snapshots.map((s) => `  - ${s.label}: ${s.filename}`),
+      '',
+      `ERGEBNIS: ${state.verified ? 'VERIFIZIERT ✓' : 'NICHT verifiziert'}`,
+      '',
+      'Hinweis: Das Gesprächsvideo wurde separat gespeichert.',
+    ];
+    const blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    downloadDataUrl(url, `pruefprotokoll_${safeApplicantName()}_${stampNow()}.txt`);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    toast('Prüf-Protokoll gespeichert');
+  });
+
+  // =======================================================================
   //  AUFNAHME (nur Moderator)
   //  Beide Videos werden auf eine Leinwand gezeichnet, beide Tonspuren
   //  gemischt -> EIN Video mit beiden Gesichtern, Stimmen und der jeweils
@@ -539,6 +781,15 @@
       ctx.textAlign = 'right';
       ctx.fillText(ts, W - 20, 28);
       ctx.textAlign = 'left';
+
+      // "Verifiziert"-Badge mittig in der Kopfzeile (sobald markiert)
+      if (state.verified) {
+        ctx.fillStyle = '#9ae6b4';
+        ctx.font = '600 18px -apple-system,Segoe UI,Roboto,sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('✓ VERIFIZIERT', W / 2, 28);
+        ctx.textAlign = 'left';
+      }
 
       // Namen
       ctx.fillStyle = '#000a';

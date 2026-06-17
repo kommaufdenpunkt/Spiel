@@ -37,6 +37,10 @@ const STUN_URLS = (process.env.STUN_URLS ||
   'stun:stun.l.google.com:19302,stun:stun1.l.google.com:19302')
   .split(',').map((s) => s.trim()).filter(Boolean);
 
+// Passwort für den Moderator-Zugang. Nur wer es kennt, kann einen Raum als
+// Moderator eröffnen. Die Bewerber-Seite bleibt ohne Passwort zugänglich.
+const MODERATOR_PASSWORD = process.env.MODERATOR_PASSWORD || '';
+
 function buildIceServers() {
   const servers = [{ urls: STUN_URLS }];
   if (TURN_SECRET && TURN_HOST) {
@@ -166,6 +170,19 @@ wss.on('connection', (ws) => {
 
       // Rolle bestimmen: Erster im Raum ist host, zweiter ist guest.
       let role = msg.role === 'host' ? 'host' : 'guest';
+
+      // Moderator-Zugang ist passwortgeschützt.
+      if (role === 'host') {
+        if (!MODERATOR_PASSWORD) {
+          send(ws, { type: 'error', reason: 'mod-not-configured' });
+          return;
+        }
+        if (String(msg.password || '') !== MODERATOR_PASSWORD) {
+          send(ws, { type: 'error', reason: 'bad-password' });
+          return;
+        }
+      }
+
       if (role === 'host' && room.host && room.host !== ws) {
         // Es gibt schon einen Moderator -> als Gast behandeln.
         role = 'guest';
@@ -215,4 +232,5 @@ wss.on('connection', (ws) => {
 server.listen(PORT, () => {
   console.log(`Verifizierungs-Raum läuft auf Port ${PORT}`);
   console.log(`TURN: ${TURN_SECRET && TURN_HOST ? 'aktiv (' + TURN_HOST + ')' : 'nicht konfiguriert – nur STUN'}`);
+  console.log(`Moderator-Passwort: ${MODERATOR_PASSWORD ? 'gesetzt' : 'NICHT gesetzt – Moderator-Zugang gesperrt!'}`);
 });
