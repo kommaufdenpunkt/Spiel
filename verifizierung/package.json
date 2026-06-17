@@ -5,7 +5,8 @@
   "type": "commonjs",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "totp": "node -e \"const s=require('./security').generateTotpSecret();console.log('\\nMODERATOR_TOTP_SECRET='+s);console.log('In der Authenticator-App manuell eintragen (Schluessel):',s);console.log('otpauth-URL:','otpauth://totp/verify.4ever1.tv:Moderator?secret='+s+'&issuer=4ever1\\n');\""
   },
   "engines": {
     "node": ">=18"

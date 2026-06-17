@@ -72,8 +72,41 @@
     verified: false,
     snapshots: [],       // [{label, url, filename}]
     pendingPhotos: [],   // vom Bewerber hochgeladene Fotos, die noch gesendet werden
-    modPassword: '',
+    modToken: '',        // Login-Token des Moderators (aus /api/login)
   };
+
+  // ---- kleine API-Hilfe (mit Moderator-Token) ----
+  async function api(method, path, body) {
+    const headers = {};
+    if (body) headers['Content-Type'] = 'application/json';
+    if (state.modToken) headers['Authorization'] = 'Bearer ' + state.modToken;
+    let res;
+    try { res = await fetch(path, { method, headers, body: body ? JSON.stringify(body) : undefined }); }
+    catch { return { status: 0, body: {} }; }
+    let json = {};
+    try { json = await res.json(); } catch {}
+    return { status: res.status, body: json };
+  }
+
+  async function moderatorLogin() {
+    const password = $('passInput').value;
+    const totp = $('totpInput').value.trim();
+    if (!password) return { ok: false, reason: 'no-password' };
+    const r = await api('POST', '/api/login', { password, totp });
+    if (r.status === 200 && r.body.token) { state.modToken = r.body.token; return { ok: true }; }
+    if (r.status === 403) return { ok: false, reason: 'blocked' };
+    return { ok: false, reason: (r.body && r.body.reason) || 'fail' };
+  }
+
+  function loginErrText(login) {
+    return ({
+      'no-password': 'Bitte Moderator-Passwort eingeben.',
+      'bad-password': 'Falsches Passwort.',
+      'bad-totp': 'Falscher 2FA-Code.',
+      'mod-not-configured': 'Moderator-Zugang ist serverseitig nicht eingerichtet (MODERATOR_PASSWORD setzen).',
+      'blocked': 'Zu viele Fehlversuche – bitte einige Minuten warten.',
+    })[login.reason] || 'Anmeldung fehlgeschlagen.';
+  }
 
   // =======================================================================
   //  LOBBY
@@ -101,25 +134,29 @@
       b.classList.toggle('sel', b.dataset.role === role));
     if (role === 'host') {
       $('lobbyTitle').textContent = 'Video-Verifizierung starten';
-      $('lobbySub').textContent = 'Erstelle einen Raum und schicke dem Bewerber den Beitritts-Link.';
-      $('roomInput').placeholder = 'leer lassen = neuer Raum';
-      $('passField').style.display = '';   // Moderator braucht Passwort
+      $('lobbySub').textContent = 'Melde dich an – ein Einmalcode für den Bewerber wird automatisch erzeugt.';
+      $('passField').style.display = '';   // Moderator: Passwort
+      $('totpField').style.display = '';   // ... + optional 2FA
+      $('adminBtn').style.display = '';
+      $('roomField').style.display = 'none'; // Code wird serverseitig erstellt
     } else {
       $('lobbyTitle').textContent = 'Verifizierung beitreten';
-      $('lobbySub').textContent = 'Gib deinen Namen ein und tritt dem Raum bei.';
-      $('roomInput').placeholder = 'Raum-Code vom Moderator';
+      $('lobbySub').textContent = 'Gib deinen Namen und den Einmalcode ein, den du erhalten hast.';
+      $('roomLabel').textContent = 'Einmalcode';
+      $('roomInput').placeholder = 'Code vom Moderator';
       $('passField').style.display = 'none';
+      $('totpField').style.display = 'none';
+      $('adminBtn').style.display = 'none';
+      $('roomField').style.display = '';
     }
   }
 
-  function genRoomCode() {
-    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-    let s = '';
-    for (let i = 0; i < 6; i++) s += chars[Math.floor(Math.random() * chars.length)];
-    return s;
-  }
-
   $('enterBtn').addEventListener('click', enterRoom);
+
+  function resetEnterBtn() {
+    $('enterBtn').disabled = false;
+    $('enterBtn').textContent = 'Raum betreten';
+  }
 
   async function enterRoom() {
     const name = $('nameInput').value.trim();
@@ -128,27 +165,33 @@
 
     if (!name) { $('lobbyErr').textContent = 'Bitte gib deinen Namen ein.'; return; }
     if (pickedRole === 'guest' && !code) {
-      $('lobbyErr').textContent = 'Bitte gib den Raum-Code ein, den du erhalten hast.';
+      $('lobbyErr').textContent = 'Bitte gib den Einmalcode ein, den du erhalten hast.';
       return;
     }
-    const modPassword = $('passInput').value;
-    if (pickedRole === 'host' && !modPassword) {
-      $('lobbyErr').textContent = 'Bitte gib das Moderator-Passwort ein.';
-      return;
-    }
-    if (pickedRole === 'host' && !code) code = genRoomCode();
 
     $('enterBtn').disabled = true;
-    $('enterBtn').textContent = 'Kamera wird gestartet …';
 
+    // Moderator: erst anmelden (Passwort + ggf. 2FA), dann Einmalcode erzeugen.
+    if (pickedRole === 'host') {
+      $('enterBtn').textContent = 'Anmeldung …';
+      const login = await moderatorLogin();
+      if (!login.ok) { resetEnterBtn(); $('lobbyErr').textContent = loginErrText(login); return; }
+      $('enterBtn').textContent = 'Raum wird erstellt …';
+      const r = await api('POST', '/api/room', { moderatorName: name });
+      if (r.status !== 200 || !r.body.code) {
+        resetEnterBtn(); $('lobbyErr').textContent = 'Raum konnte nicht erstellt werden.'; return;
+      }
+      code = r.body.code;
+    }
+
+    $('enterBtn').textContent = 'Kamera wird gestartet …';
     try {
       state.localStream = await navigator.mediaDevices.getUserMedia({
         video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' },
         audio: { echoCancellation: true, noiseSuppression: true },
       });
     } catch (err) {
-      $('enterBtn').disabled = false;
-      $('enterBtn').textContent = 'Raum betreten';
+      resetEnterBtn();
       $('lobbyErr').textContent = 'Kein Zugriff auf Kamera/Mikrofon. Bitte im Browser erlauben.';
       return;
     }
@@ -156,11 +199,55 @@
     state.role = pickedRole;
     state.name = name;
     state.roomCode = code;
-    state.modPassword = modPassword;
     localVideo.srcObject = state.localStream;
     localTag.textContent = name + ' (Du)';
 
     startRoom();
+  }
+
+  // ---- Admin: gespeicherte Accounts ansehen ----
+  if ($('adminBtn')) $('adminBtn').addEventListener('click', openAdmin);
+  if ($('adminClose')) $('adminClose').addEventListener('click', () => $('adminView').classList.remove('on'));
+
+  async function openAdmin() {
+    $('lobbyErr').textContent = '';
+    if (!state.modToken) {
+      const login = await moderatorLogin();
+      if (!login.ok) { $('lobbyErr').textContent = loginErrText(login); return; }
+    }
+    const r = await api('GET', '/api/accounts');
+    if (r.status !== 200) { toast('Konnte Accounts nicht laden.'); return; }
+    renderAdmin(r.body.accounts || []);
+    $('adminView').classList.add('on');
+  }
+
+  function renderAdmin(list) {
+    const el = $('adminList');
+    el.innerHTML = '';
+    if (!list.length) {
+      el.innerHTML = '<p style="color:var(--dim)">Noch keine gespeicherten Verifizierungen.</p>';
+      return;
+    }
+    list.forEach((a) => {
+      const div = document.createElement('div');
+      div.className = 'acc';
+      const date = new Date(a.createdAt).toLocaleString('de-DE');
+      const thumbs = (a.photos || []).map((p) =>
+        `<img src="/api/photo?id=${a.id}&file=${encodeURIComponent(p.file)}&token=${encodeURIComponent(state.modToken)}" title="${escapeHtml(p.label)}" alt="">`).join('');
+      div.innerHTML =
+        `<div class="top"><div><div class="nm">${escapeHtml(a.verifiedName || a.applicantName || '—')}</div>` +
+        `<div class="meta">Bewerber: ${escapeHtml(a.applicantName || '-')} · ${date}<br>` +
+        `Ausweis-Nr.: ${escapeHtml(a.docNumber || '-')} · Code: ${escapeHtml(a.code || '-')} · Moderator: ${escapeHtml(a.moderatorName || '-')}</div></div>` +
+        `<div class="${a.verified ? 'ok' : 'no'}">${a.verified ? '✓ verifiziert' : 'nicht verifiziert'}</div></div>` +
+        `<div class="thumbs">${thumbs}</div>` +
+        `<div class="acts"><button class="del">🗑 Löschen</button></div>`;
+      div.querySelector('.del').addEventListener('click', async () => {
+        if (!confirm('Diese Verifizierung inkl. Fotos endgültig löschen?')) return;
+        await api('POST', '/api/account-delete', { id: a.id });
+        openAdmin();
+      });
+      el.appendChild(div);
+    });
   }
 
   // Zurück zum Startbildschirm (z. B. bei falschem Moderator-Passwort).
@@ -177,6 +264,8 @@
     $('enterBtn').textContent = 'Raum betreten';
     $('lobbyErr').textContent = errText || '';
     $('passInput').value = '';
+    $('totpInput').value = '';
+    state.modToken = '';
   }
 
   // =======================================================================
@@ -224,7 +313,7 @@
     ws.onopen = () => {
       ws.send(JSON.stringify({
         type: 'join', room: state.roomCode, role: state.role, name: state.name,
-        password: state.modPassword || '',
+        token: state.modToken || '',
       }));
     };
 
@@ -240,8 +329,8 @@
           break;
         case 'error':
           if (msg.reason === 'room-full') toast('Der Raum ist bereits voll (2 Personen).');
-          else if (msg.reason === 'bad-password') backToLobby('Falsches Moderator-Passwort.');
-          else if (msg.reason === 'mod-not-configured') backToLobby('Moderator-Zugang ist serverseitig noch nicht eingerichtet.');
+          else if (msg.reason === 'auth') backToLobby('Anmeldung abgelaufen – bitte neu anmelden.');
+          else if (msg.reason === 'bad-code') backToLobby('Ungültiger oder bereits benutzter Einmalcode.');
           break;
         case 'peer-ready':
           remoteTag.textContent = msg.peerName || 'Gegenüber';
@@ -686,6 +775,33 @@
       vs.textContent = v ? 'Status: VERIFIZIERT ✓' : 'Status: noch nicht verifiziert';
     }
   }
+
+  // Verifizierung als Account auf dem Server speichern (Fotos inklusive).
+  // Verbraucht den Einmalcode.
+  if ($('saveAccount')) $('saveAccount').addEventListener('click', async () => {
+    const body = {
+      code: state.roomCode,
+      applicantName: remoteTag.textContent || '',
+      verifiedName: $('verifiedName').value,
+      docNumber: $('verifiedDoc').value,
+      verified: state.verified,
+      moderatorName: state.name,
+      roomCode: state.roomCode,
+      checklist: checkBoxes().map((c) => ({ label: c.parentElement.textContent.trim(), checked: c.checked })),
+      photos: state.snapshots.map((s) => ({ label: s.label, dataUrl: s.url })),
+    };
+    $('saveAccount').disabled = true;
+    const r = await api('POST', '/api/account', body);
+    if (r.status === 200) {
+      $('saveAccount').textContent = '✓ Account gespeichert';
+      toast('Account gespeichert ✓ (Einmalcode verbraucht)');
+    } else {
+      $('saveAccount').disabled = false;
+      toast(r.body && r.body.reason === 'bad-code'
+        ? 'Code ungültig/verbraucht – evtl. schon gespeichert.'
+        : 'Speichern fehlgeschlagen.');
+    }
+  });
 
   if ($('downloadReport')) $('downloadReport').addEventListener('click', () => {
     const cb = checkBoxes();

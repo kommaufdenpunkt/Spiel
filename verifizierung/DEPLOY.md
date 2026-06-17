@@ -84,11 +84,35 @@ bestehenden für SSH 22 und HTTP/HTTPS 80/443):
    - `MODERATOR_PASSWORD` = (frei wählbares Passwort für den Moderator-Zugang) **Pflicht**
    - `TURN_SECRET` = (das Geheimnis aus Schritt 2)
    - `TURN_HOST` = `verify.4ever1.tv`
-8. **Deploy** klicken.
+   - `DATA_DIR` = `/data`  (Speicherort der Accounts – siehe Schritt 4b)
+   - `STORAGE_KEY` = (`openssl rand -hex 32`) – verschlüsselt die Ausweis-Fotos
+   - *(optional, empfohlen)* `MODERATOR_TOTP_SECRET` = (2FA, siehe Schritt 4c)
+8. **Persistent Storage** anlegen (Schritt 4b) **bevor** du deployst.
+9. **Deploy** klicken.
 
 > **Wichtig:** Ohne `MODERATOR_PASSWORD` ist der Moderator-Zugang gesperrt
 > (die Bewerber-Seite funktioniert weiterhin). Dieses Passwort gibst du nur an
 > Personen, die Räume eröffnen dürfen.
+> **Den `STORAGE_KEY` sicher aufbewahren** – ohne ihn sind gespeicherte Fotos
+> nicht mehr lesbar.
+
+### 4b) Persistent Storage (damit Accounts Redeploys überleben)
+In Coolify bei der App → **Persistent Storage** → **Add** →
+- **Name:** `verify-data`
+- **Mount Path (im Container):** `/data`
+→ Speichern. Damit liegen Codes, Accounts und Fotos dauerhaft auf dem Server
+(unter `/data`), nicht im Container, der bei jedem Deploy neu gebaut wird.
+
+### 4c) 2FA für den Moderator (optional, empfohlen)
+1. Secret erzeugen (lokal oder auf dem Server):
+   ```bash
+   cd verifizierung && npm run totp
+   ```
+2. Den ausgegebenen Wert als `MODERATOR_TOTP_SECRET` in die App-Env eintragen.
+3. Denselben Schlüssel in einer **Authenticator-App** (Google/Microsoft
+   Authenticator) per **manueller Eingabe** hinzufügen (oder die ausgegebene
+   `otpauth://`-URL als QR verwenden).
+4. Beim Moderator-Login wird dann zusätzlich der 6-stellige Code abgefragt.
 
 > WebSockets: Coolifys Proxy (Traefik) leitet die WebSocket-Verbindung
 > automatisch weiter – es ist keine Extra-Konfiguration nötig.

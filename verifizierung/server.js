@@ -19,9 +19,20 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const { WebSocketServer } = require('ws');
+const store = require('./store');
+const security = require('./security');
 
 const PORT = process.env.PORT || 3000;
 const PUBLIC_DIR = path.join(__dirname, 'public');
+
+// Speicherort der Daten (in Coolify: Persistent Volume, z. B. /data).
+const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
+// Schlüssel zum Verschlüsseln der Ausweis-Fotos (leer = unverschlüsselt).
+const STORAGE_KEY = process.env.STORAGE_KEY || '';
+// Optionales 2FA-Secret (base32) für den Moderator. Leer = nur Passwort.
+const MODERATOR_TOTP_SECRET = process.env.MODERATOR_TOTP_SECRET || '';
+
+const storeInfo = store.init({ dir: DATA_DIR, encKey: STORAGE_KEY });
 
 // ---------------------------------------------------------------------------
 // ICE-/TURN-Konfiguration (für zuverlässige Verbindungen)
@@ -62,6 +73,114 @@ function buildIceServers() {
 }
 
 // ---------------------------------------------------------------------------
+// HTTP-Helfer + API (Login, Einmalcodes, Accounts)
+// ---------------------------------------------------------------------------
+function sendJson(res, code, obj) {
+  res.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
+  res.end(JSON.stringify(obj));
+}
+function readBody(req, limit = 25 * 1024 * 1024) {
+  return new Promise((resolve, reject) => {
+    let size = 0; const chunks = [];
+    req.on('data', (c) => {
+      size += c.length;
+      if (size > limit) { reject(new Error('too-large')); req.destroy(); return; }
+      chunks.push(c);
+    });
+    req.on('end', () => {
+      try { resolve(JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}')); }
+      catch (e) { reject(e); }
+    });
+    req.on('error', reject);
+  });
+}
+function getToken(req) {
+  const h = req.headers['authorization'] || '';
+  if (h.startsWith('Bearer ')) return h.slice(7);
+  if (req.headers['x-auth-token']) return req.headers['x-auth-token'];
+  try { return new URL(req.url, 'http://x').searchParams.get('token') || ''; }
+  catch { return ''; }
+}
+function isAuthed(req) { return security.validToken(getToken(req)); }
+
+// Behandelt /api/*-Anfragen. Gibt true zurück, wenn die Anfrage erledigt ist.
+async function handleApi(req, res, urlPath, ip) {
+  if (!urlPath.startsWith('/api/')) return false;
+
+  // ---- Login (Passwort + optional 2FA) ----
+  if (urlPath === '/api/login' && req.method === 'POST') {
+    if (!MODERATOR_PASSWORD) { sendJson(res, 503, { reason: 'mod-not-configured' }); return true; }
+    let body; try { body = await readBody(req, 64 * 1024); } catch { sendJson(res, 400, { reason: 'bad-request' }); return true; }
+    const okPw = String(body.password || '') === MODERATOR_PASSWORD;
+    const okTotp = security.verifyTotp(MODERATOR_TOTP_SECRET, body.totp);
+    if (okPw && okTotp) {
+      security.resetFails(ip);
+      sendJson(res, 200, { token: security.issueToken(), twofa: !!MODERATOR_TOTP_SECRET });
+    } else {
+      security.recordFail(ip);
+      sendJson(res, 401, { reason: !okPw ? 'bad-password' : 'bad-totp' });
+    }
+    return true;
+  }
+
+  // Alle weiteren API-Routen erfordern ein gültiges Login-Token.
+  if (!isAuthed(req)) { sendJson(res, 401, { reason: 'auth' }); return true; }
+
+  // ---- Einmalcode erzeugen ----
+  if (urlPath === '/api/room' && req.method === 'POST') {
+    let body; try { body = await readBody(req, 64 * 1024); } catch { body = {}; }
+    const rec = store.createCode({ createdBy: body.moderatorName, applicantName: body.applicantName });
+    sendJson(res, 200, { code: rec.code });
+    return true;
+  }
+  if (urlPath === '/api/codes' && req.method === 'GET') {
+    sendJson(res, 200, { codes: store.listCodes() }); return true;
+  }
+  if (urlPath === '/api/code-revoke' && req.method === 'POST') {
+    let body; try { body = await readBody(req, 16 * 1024); } catch { body = {}; }
+    store.revokeCode(body.code); sendJson(res, 200, { ok: true }); return true;
+  }
+
+  // ---- Account speichern / auflisten / ansehen / löschen ----
+  if (urlPath === '/api/account' && req.method === 'POST') {
+    let body; try { body = await readBody(req); } catch { sendJson(res, 413, { reason: 'too-large' }); return true; }
+    if (!body.code || !store.isCodeUsable(body.code)) { sendJson(res, 400, { reason: 'bad-code' }); return true; }
+    const rec = store.saveAccount(body);
+    sendJson(res, 200, { id: rec.id });
+    return true;
+  }
+  if (urlPath === '/api/accounts' && req.method === 'GET') {
+    // Metadaten ohne Bilddaten.
+    const list = store.listAccounts().map((a) => ({ ...a, photos: a.photos.map((p) => ({ label: p.label, file: p.file })) }));
+    sendJson(res, 200, { accounts: list }); return true;
+  }
+  if (urlPath === '/api/account' && req.method === 'GET') {
+    const id = new URL(req.url, 'http://x').searchParams.get('id');
+    const acc = store.getAccount(id);
+    if (!acc) { sendJson(res, 404, { reason: 'not-found' }); return true; }
+    sendJson(res, 200, { account: { ...acc, photos: acc.photos.map((p) => ({ label: p.label, file: p.file })) } });
+    return true;
+  }
+  if (urlPath === '/api/photo' && req.method === 'GET') {
+    const q = new URL(req.url, 'http://x').searchParams;
+    const acc = store.getAccount(q.get('id'));
+    const photoRec = acc && acc.photos.find((p) => p.file === q.get('file'));
+    const data = photoRec && store.readPhoto(acc.id, photoRec);
+    if (!data) { res.writeHead(404); res.end('not found'); return true; }
+    res.writeHead(200, { 'Content-Type': data.mime, 'Cache-Control': 'no-store' });
+    res.end(data.buffer);
+    return true;
+  }
+  if (urlPath === '/api/account-delete' && req.method === 'POST') {
+    let body; try { body = await readBody(req, 16 * 1024); } catch { body = {}; }
+    sendJson(res, 200, { ok: store.deleteAccount(body.id) }); return true;
+  }
+
+  sendJson(res, 404, { reason: 'unknown-endpoint' });
+  return true;
+}
+
+// ---------------------------------------------------------------------------
 // 1) Statischer Datei-Server
 // ---------------------------------------------------------------------------
 const MIME = {
@@ -74,7 +193,7 @@ const MIME = {
   '.png': 'image/png',
 };
 
-const server = http.createServer((req, res) => {
+const server = http.createServer(async (req, res) => {
   // Nur den Pfad-Teil verwenden, Query-Parameter ignorieren.
   // decodeURIComponent kann bei kaputter %-Kodierung werfen -> abfangen.
   let urlPath;
@@ -86,10 +205,29 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  const ip = security.clientIp(req);
+
+  // Gesperrte IPs (Brute-Force / Honeypot) sofort abweisen.
+  if (security.isBlocked(ip)) { res.writeHead(403); res.end('Forbidden'); return; }
+
+  // Honeypot: bekannte Angriffs-/Scanner-Pfade -> IP sperren.
+  if (security.isHoneypot(urlPath)) {
+    security.recordHoneypot(ip);
+    res.writeHead(404); res.end('Not found');
+    return;
+  }
+
   // Health-Check (für Coolify/Reverse-Proxy).
   if (urlPath === '/healthz') {
     res.writeHead(200, { 'Content-Type': 'text/plain' });
     res.end('ok');
+    return;
+  }
+
+  // API-Anfragen.
+  if (urlPath.startsWith('/api/')) {
+    try { await handleApi(req, res, urlPath, ip); }
+    catch { if (!res.headersSent) sendJson(res, 500, { reason: 'server-error' }); }
     return;
   }
 
@@ -171,14 +309,17 @@ wss.on('connection', (ws) => {
       // Rolle bestimmen: Erster im Raum ist host, zweiter ist guest.
       let role = msg.role === 'host' ? 'host' : 'guest';
 
-      // Moderator-Zugang ist passwortgeschützt.
+      // Moderator: gültiges Login-Token nötig (kommt aus /api/login).
       if (role === 'host') {
-        if (!MODERATOR_PASSWORD) {
-          send(ws, { type: 'error', reason: 'mod-not-configured' });
+        if (!security.validToken(msg.token)) {
+          send(ws, { type: 'error', reason: 'auth' });
           return;
         }
-        if (String(msg.password || '') !== MODERATOR_PASSWORD) {
-          send(ws, { type: 'error', reason: 'bad-password' });
+      }
+      // Bewerber: nur mit gültigem, unbenutztem Einmalcode.
+      if (role === 'guest') {
+        if (!store.isCodeUsable(code)) {
+          send(ws, { type: 'error', reason: 'bad-code' });
           return;
         }
       }
@@ -233,4 +374,6 @@ server.listen(PORT, () => {
   console.log(`Verifizierungs-Raum läuft auf Port ${PORT}`);
   console.log(`TURN: ${TURN_SECRET && TURN_HOST ? 'aktiv (' + TURN_HOST + ')' : 'nicht konfiguriert – nur STUN'}`);
   console.log(`Moderator-Passwort: ${MODERATOR_PASSWORD ? 'gesetzt' : 'NICHT gesetzt – Moderator-Zugang gesperrt!'}`);
+  console.log(`2FA (TOTP): ${MODERATOR_TOTP_SECRET ? 'aktiv' : 'aus'}`);
+  console.log(`Daten-Verzeichnis: ${storeInfo.DATA_DIR} (Fotos ${storeInfo.encrypted ? 'verschlüsselt' : 'UNverschlüsselt'})`);
 });

@@ -25,7 +25,16 @@ einreichen.
 - **Ausweis-Verifizierung:** Die Bewerberin lädt Vorder- & Rückseite hoch und
   hält den Ausweis neben ihr Gesicht; der Moderator macht Beweis-Fotos, hakt eine
   Checkliste ab, markiert „verifiziert" und lädt ein **Prüf-Protokoll** herunter.
-  (Fotos gehen verschlüsselt direkt Browser-zu-Browser, der Server speichert nichts.)
+- **Einmalcode-Pflicht:** Bewerber kommen nur mit einem vom Moderator erzeugten
+  **Einmalcode** rein (gilt genau einmal).
+- **Accounts:** Jede abgeschlossene Verifizierung wird als Eintrag gespeichert
+  (inkl. Fotos) und ist im Moderator-Bereich einsehbar/löschbar.
+- **Sicherheit:** 2FA (TOTP) für den Moderator, Brute-Force-Sperre + Honeypot,
+  **verschlüsselte** Foto-Speicherung (AES-256).
+
+> ⚠️ **Datenschutz:** Es werden Ausweisdaten dauerhaft gespeichert. Du brauchst
+> dafür eine Rechtsgrundlage/Einwilligung und ein Löschkonzept (manueller
+> Löschen-Button ist eingebaut). Im Zweifel rechtlichen Rat einholen.
 
 ---
 
@@ -137,10 +146,12 @@ Video.
 
 ```
 verifizierung/
-├── server.js            Server: App ausliefern + Verbindung vermitteln + /ice
-├── package.json
+├── server.js            Server: App + Vermittlung + API (Login/Codes/Accounts)
+├── store.js             Persistenz: Codes, Accounts, (verschlüsselte) Fotos
+├── security.js          2FA (TOTP), Brute-Force-Sperre, Honeypot, Tokens
+├── package.json         (npm run totp = 2FA-Secret erzeugen)
 ├── Dockerfile           Container-Image (für Coolify/Docker)
-├── .env.example         Umgebungsvariablen der App (TURN_SECRET, TURN_HOST)
+├── .env.example         Umgebungsvariablen der App
 ├── README.md            diese Anleitung
 ├── DEPLOY.md            Schritt-für-Schritt: verify.4ever1.tv (Hetzner+Coolify)
 ├── coturn/              TURN-Server (für zuverlässige Verbindungen)
@@ -148,6 +159,6 @@ verifizierung/
 │   └── .env.example
 └── public/
     ├── index.html       Oberfläche
-    ├── app.js           Logik (Video, Aufnahme, Chat, Fragen, WebRTC)
+    ├── app.js           Logik (Video, Aufnahme, Chat, Fragen, Ausweis, Admin)
     └── fragen.js        >>> HIER deine Fragen + Einladungstext eintragen <<<
 ```

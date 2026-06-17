@@ -143,6 +143,26 @@
   /* Gast-Ansicht der aktuellen Frage (Vollbild-Hinweis) */
   .guest-q{display:none}
 
+  /* Admin: Account-Liste */
+  .admin{display:none;position:fixed;inset:0;background:#000c;z-index:50;
+    align-items:flex-start;justify-content:center;padding:2rem 1rem;overflow:auto}
+  .admin.on{display:flex}
+  .admin-box{width:100%;max-width:720px;background:var(--panel);border:1px solid var(--line);
+    border-radius:14px;overflow:hidden}
+  .admin-head{display:flex;justify-content:space-between;align-items:center;
+    padding:1rem 1.2rem;border-bottom:1px solid var(--line)}
+  .admin-head h2{margin:0;font-size:1.1rem}
+  .admin-list{padding:1rem 1.2rem;display:flex;flex-direction:column;gap:.7rem}
+  .acc{border:1px solid var(--line);border-radius:10px;padding:.8rem;background:var(--panel2)}
+  .acc .top{display:flex;justify-content:space-between;gap:.6rem;align-items:flex-start}
+  .acc .nm{font-size:.95rem}
+  .acc .meta{font-size:.76rem;color:var(--dim);margin-top:.2rem;line-height:1.4}
+  .acc .ok{color:var(--good)} .acc .no{color:var(--bad)}
+  .acc .thumbs{display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.6rem}
+  .acc .thumbs img{height:84px;border:1px solid var(--line);border-radius:6px}
+  .acc .acts{display:flex;gap:.5rem;margin-top:.6rem}
+  .acc .acts .del{border-color:var(--bad);color:#ff9c93}
+
   .toast{position:fixed;left:50%;bottom:1.2rem;transform:translateX(-50%);
     background:#000d;border:1px solid var(--line);padding:.6rem 1rem;border-radius:10px;
     font-size:.85rem;opacity:0;transition:.2s;pointer-events:none;max-width:90vw}
@@ -180,16 +200,21 @@
       <input id="nameInput" placeholder="z. B. Max Mustermann" autocomplete="name">
     </div>
     <div class="field" id="roomField">
-      <label for="roomInput">Raum-Code</label>
-      <input id="roomInput" placeholder="wird automatisch erstellt" autocapitalize="characters">
+      <label for="roomInput" id="roomLabel">Einmalcode</label>
+      <input id="roomInput" placeholder="Code vom Moderator" autocapitalize="characters">
     </div>
     <div class="field" id="passField" style="display:none">
       <label for="passInput">Moderator-Passwort</label>
       <input id="passInput" type="password" placeholder="nur für Moderatoren" autocomplete="current-password">
     </div>
+    <div class="field" id="totpField" style="display:none">
+      <label for="totpInput">2FA-Code (falls aktiviert)</label>
+      <input id="totpInput" inputmode="numeric" placeholder="6-stelliger Code aus der App" autocomplete="one-time-code">
+    </div>
 
     <div class="actions">
       <button id="enterBtn" class="primary">Raum betreten</button>
+      <button id="adminBtn" style="display:none">🗂 Gespeicherte Accounts ansehen</button>
     </div>
     <div class="err" id="lobbyErr"></div>
     <div class="hint" id="lobbyHint">
@@ -288,6 +313,7 @@
         </div>
 
         <button id="markVerified" class="primary" disabled>✓ Als verifiziert markieren</button>
+        <button id="saveAccount" class="primary">💾 Account speichern (Server)</button>
         <button id="downloadReport">⤓ Prüf-Protokoll speichern</button>
       </div>
     </div>
@@ -301,6 +327,17 @@
       </div>
     </div>
   </aside>
+</div>
+
+<!-- ================= ADMIN: gespeicherte Accounts ================= -->
+<div id="adminView" class="admin">
+  <div class="admin-box">
+    <div class="admin-head">
+      <h2>Gespeicherte Verifizierungen</h2>
+      <button id="adminClose">Schließen</button>
+    </div>
+    <div class="admin-list" id="adminList"></div>
+  </div>
 </div>
 
 <div class="toast" id="toast"></div>

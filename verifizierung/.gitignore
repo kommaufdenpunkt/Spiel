@@ -7,3 +7,6 @@ package-lock.json
 .env.*
 !.env.example
 coturn/.env
+
+# Lokale Daten (Codes/Accounts/Fotos) – nie committen
+data/
