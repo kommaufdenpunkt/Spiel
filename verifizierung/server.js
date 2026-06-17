@@ -33,6 +33,7 @@ const STORAGE_KEY = process.env.STORAGE_KEY || '';
 const MODERATOR_TOTP_SECRET = process.env.MODERATOR_TOTP_SECRET || '';
 
 const storeInfo = store.init({ dir: DATA_DIR, encKey: STORAGE_KEY });
+security.init({ persist: store.logSecurity, initial: store.getSecurityLog() });
 
 // ---------------------------------------------------------------------------
 // ICE-/TURN-Konfiguration (für zuverlässige Verbindungen)
@@ -117,7 +118,7 @@ async function handleApi(req, res, urlPath, ip) {
       security.resetFails(ip);
       sendJson(res, 200, { token: security.issueToken(), twofa: !!MODERATOR_TOTP_SECRET });
     } else {
-      security.recordFail(ip);
+      security.recordFail(ip, 'login: ' + (!okPw ? 'falsches Passwort' : 'falscher 2FA-Code'));
       sendJson(res, 401, { reason: !okPw ? 'bad-password' : 'bad-totp' });
     }
     return true;
@@ -176,6 +177,19 @@ async function handleApi(req, res, urlPath, ip) {
     sendJson(res, 200, { ok: store.deleteAccount(body.id) }); return true;
   }
 
+  // ---- Überwachung (gesperrte IPs + Ereignisse) ----
+  if (urlPath === '/api/security' && req.method === 'GET') {
+    sendJson(res, 200, security.getMonitoring()); return true;
+  }
+  if (urlPath === '/api/security-unblock' && req.method === 'POST') {
+    let body; try { body = await readBody(req, 16 * 1024); } catch { body = {}; }
+    security.unblock(String(body.ip || '')); sendJson(res, 200, { ok: true }); return true;
+  }
+  if (urlPath === '/api/security-block' && req.method === 'POST') {
+    let body; try { body = await readBody(req, 16 * 1024); } catch { body = {}; }
+    security.blockManual(String(body.ip || '')); sendJson(res, 200, { ok: true }); return true;
+  }
+
   sendJson(res, 404, { reason: 'unknown-endpoint' });
   return true;
 }
@@ -212,7 +226,7 @@ const server = http.createServer(async (req, res) => {
 
   // Honeypot: bekannte Angriffs-/Scanner-Pfade -> IP sperren.
   if (security.isHoneypot(urlPath)) {
-    security.recordHoneypot(ip);
+    security.recordHoneypot(ip, urlPath);
     res.writeHead(404); res.end('Not found');
     return;
   }
@@ -282,9 +296,13 @@ function otherPeer(room, ws) {
   return room.host === ws ? room.guest : room.host;
 }
 
-wss.on('connection', (ws) => {
+wss.on('connection', (ws, req) => {
   ws.roomCode = null;
   ws.role = null;
+  ws.ip = security.clientIp(req);
+
+  // Gesperrte IPs (Brute-Force/Honeypot) gar nicht erst zulassen.
+  if (security.isBlocked(ws.ip)) { try { ws.close(); } catch {} return; }
 
   ws.on('message', (raw) => {
     let msg;
@@ -312,6 +330,7 @@ wss.on('connection', (ws) => {
       // Moderator: gültiges Login-Token nötig (kommt aus /api/login).
       if (role === 'host') {
         if (!security.validToken(msg.token)) {
+          security.recordFail(ws.ip, 'WS: ungültiges Moderator-Token');
           send(ws, { type: 'error', reason: 'auth' });
           return;
         }
@@ -319,6 +338,7 @@ wss.on('connection', (ws) => {
       // Bewerber: nur mit gültigem, unbenutztem Einmalcode.
       if (role === 'guest') {
         if (!store.isCodeUsable(code)) {
+          security.recordFail(ws.ip, 'WS: ungültiger Einmalcode (' + code + ')');
           send(ws, { type: 'error', reason: 'bad-code' });
           return;
         }

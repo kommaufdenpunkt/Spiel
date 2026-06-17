@@ -30,6 +30,8 @@ function saveAtomic(file, data) {
 }
 function codesFile() { return path.join(DATA_DIR, 'codes.json'); }
 function accountsFile() { return path.join(DATA_DIR, 'accounts.json'); }
+function securityFile() { return path.join(DATA_DIR, 'security.json'); }
+let secLog = [];
 
 function init({ dir, encKey } = {}) {
   if (dir) { DATA_DIR = dir; PHOTO_DIR = path.join(DATA_DIR, 'photos'); }
@@ -38,8 +40,17 @@ function init({ dir, encKey } = {}) {
   fs.mkdirSync(PHOTO_DIR, { recursive: true });
   codes = load(codesFile(), []);
   accounts = load(accountsFile(), []);
+  secLog = load(securityFile(), []);
   return { DATA_DIR, encrypted: !!ENC_KEY };
 }
+
+// Sicherheits-Ereignisse dauerhaft protokollieren (für die Überwachung).
+function logSecurity(ev) {
+  secLog.push(ev);
+  if (secLog.length > 1000) secLog = secLog.slice(-1000);
+  saveAtomic(securityFile(), secLog);
+}
+function getSecurityLog() { return secLog.slice(); }
 
 function encryptBuf(buf) {
   const iv = crypto.randomBytes(12);
@@ -188,4 +199,5 @@ function deleteAccount(id) {
 module.exports = {
   init, createCode, getCode, isCodeUsable, consumeCode, revokeCode, listCodes,
   saveAccount, listAccounts, getAccount, photoPath, readPhoto, deleteAccount,
+  logSecurity, getSecurityLog,
 };

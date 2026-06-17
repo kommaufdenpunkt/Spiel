@@ -8,6 +8,23 @@
 
 const crypto = require('crypto');
 
+// ---- Ereignis-Protokoll (für die Überwachungs-Ansicht) ---------------------
+const MAX_EVENTS = 300;
+let events = [];          // Ringpuffer der letzten Ereignisse (im Speicher)
+let persistFn = null;     // optionale Funktion zum dauerhaften Speichern
+
+function init({ persist, initial } = {}) {
+  persistFn = persist || null;
+  if (Array.isArray(initial)) events = initial.slice(-MAX_EVENTS);
+}
+function recordEvent(type, ip, detail) {
+  const ev = { time: new Date().toISOString(), type, ip: ip || 'unknown', detail: detail || '' };
+  events.push(ev);
+  if (events.length > MAX_EVENTS) events.shift();
+  if (persistFn) { try { persistFn(ev); } catch {} }
+  return ev;
+}
+
 // ---- Client-IP (hinter Coolify/Traefik via X-Forwarded-For) ----------------
 function clientIp(req) {
   const xff = req.headers['x-forwarded-for'];
@@ -101,7 +118,8 @@ function isBlocked(ip) {
 }
 function block(ip, ms) { blocked.set(ip, Date.now() + ms); }
 
-function recordFail(ip) {
+function recordFail(ip, detail) {
+  recordEvent('auth-fail', ip, detail || '');
   const now = Date.now();
   const rec = fails.get(ip);
   if (!rec || now - rec.first > FAIL_WINDOW) {
@@ -112,6 +130,7 @@ function recordFail(ip) {
   if (rec.count >= MAX_FAILS) {
     block(ip, BLOCK_MS);
     fails.delete(ip);
+    recordEvent('blocked', ip, 'Zu viele Fehlversuche (Brute-Force)');
   }
 }
 function resetFails(ip) { fails.delete(ip); }
@@ -120,13 +139,27 @@ function isHoneypot(urlPath) {
   const p = urlPath.toLowerCase();
   return HONEYPOTS.some((h) => p === h || p.startsWith(h + '/') || p.startsWith(h));
 }
-function recordHoneypot(ip) {
+function recordHoneypot(ip, urlPath) {
   block(ip, HONEYPOT_BLOCK_MS);
-  console.warn(`[security] Honeypot-Treffer von ${ip} – IP gesperrt.`);
+  recordEvent('honeypot', ip, urlPath || '');
+  console.warn(`[security] Honeypot-Treffer von ${ip} (${urlPath || ''}) – IP gesperrt.`);
+}
+
+// Manuelles Sperren/Entsperren + Status für die Überwachung.
+function unblock(ip) { blocked.delete(ip); fails.delete(ip); recordEvent('unblock', ip, 'manuell'); }
+function blockManual(ip) { block(ip, BLOCK_MS); recordEvent('manual-block', ip, 'manuell gesperrt'); }
+function getMonitoring() {
+  const now = Date.now();
+  const blockedList = [];
+  for (const [ip, until] of blocked) {
+    if (until > now) blockedList.push({ ip, until: new Date(until).toISOString(), minutesLeft: Math.ceil((until - now) / 60000) });
+  }
+  return { blocked: blockedList, events: events.slice().reverse() };
 }
 
 module.exports = {
-  clientIp, issueToken, validToken,
+  init, clientIp, issueToken, validToken,
   verifyTotp, generateTotpSecret,
-  isBlocked, recordFail, resetFails, isHoneypot, recordHoneypot,
+  isBlocked, recordFail, resetFails, isHoneypot, recordHoneypot, recordEvent,
+  unblock, blockManual, getMonitoring,
 };

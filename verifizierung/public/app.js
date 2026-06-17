@@ -138,6 +138,7 @@
       $('passField').style.display = '';   // Moderator: Passwort
       $('totpField').style.display = '';   // ... + optional 2FA
       $('adminBtn').style.display = '';
+      $('monitorBtn').style.display = '';
       $('roomField').style.display = 'none'; // Code wird serverseitig erstellt
     } else {
       $('lobbyTitle').textContent = 'Verifizierung beitreten';
@@ -147,6 +148,7 @@
       $('passField').style.display = 'none';
       $('totpField').style.display = 'none';
       $('adminBtn').style.display = 'none';
+      $('monitorBtn').style.display = 'none';
       $('roomField').style.display = '';
     }
   }
@@ -208,6 +210,61 @@
   // ---- Admin: gespeicherte Accounts ansehen ----
   if ($('adminBtn')) $('adminBtn').addEventListener('click', openAdmin);
   if ($('adminClose')) $('adminClose').addEventListener('click', () => $('adminView').classList.remove('on'));
+
+  // ---- Überwachung: Angriffe / Sperren ----
+  if ($('monitorBtn')) $('monitorBtn').addEventListener('click', openMonitor);
+  if ($('monitorClose')) $('monitorClose').addEventListener('click', () => $('monitorView').classList.remove('on'));
+  if ($('monitorRefresh')) $('monitorRefresh').addEventListener('click', loadMonitor);
+
+  async function openMonitor() {
+    $('lobbyErr').textContent = '';
+    if (!state.modToken) {
+      const login = await moderatorLogin();
+      if (!login.ok) { $('lobbyErr').textContent = loginErrText(login); return; }
+    }
+    if (await loadMonitor()) $('monitorView').classList.add('on');
+  }
+
+  async function loadMonitor() {
+    const r = await api('GET', '/api/security');
+    if (r.status !== 200) { toast('Konnte Überwachung nicht laden.'); return false; }
+    renderMonitor(r.body || { blocked: [], events: [] });
+    return true;
+  }
+
+  function renderMonitor(data) {
+    const bl = $('blockedList');
+    bl.innerHTML = '';
+    if (!data.blocked.length) {
+      bl.innerHTML = '<p style="color:var(--dim)">Keine IP aktuell gesperrt. 👍</p>';
+    } else {
+      data.blocked.forEach((b) => {
+        const row = document.createElement('div');
+        row.className = 'biprow';
+        row.innerHTML = `<span class="ipx">🚫 ${escapeHtml(b.ip)} – noch ~${b.minutesLeft} Min.</span>`;
+        const btn = document.createElement('button');
+        btn.textContent = 'Entsperren';
+        btn.addEventListener('click', async () => { await api('POST', '/api/security-unblock', { ip: b.ip }); loadMonitor(); });
+        row.appendChild(btn);
+        bl.appendChild(row);
+      });
+    }
+    const ev = $('eventList');
+    ev.innerHTML = '';
+    if (!data.events.length) {
+      ev.innerHTML = '<div class="evrow"><span class="t">—</span><span class="ty">keine</span><span>Noch keine Ereignisse.</span></div>';
+      return;
+    }
+    data.events.forEach((e) => {
+      const row = document.createElement('div');
+      row.className = 'evrow';
+      const t = new Date(e.time).toLocaleString('de-DE');
+      row.innerHTML = `<span class="t">${escapeHtml(t)}</span>` +
+        `<span class="ty ${escapeHtml(e.type)}">${escapeHtml(e.type)}</span>` +
+        `<span>${escapeHtml(e.ip)} ${e.detail ? '· ' + escapeHtml(e.detail) : ''}</span>`;
+      ev.appendChild(row);
+    });
+  }
 
   async function openAdmin() {
     $('lobbyErr').textContent = '';

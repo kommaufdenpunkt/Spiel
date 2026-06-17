@@ -162,6 +162,20 @@
   .acc .thumbs img{height:84px;border:1px solid var(--line);border-radius:6px}
   .acc .acts{display:flex;gap:.5rem;margin-top:.6rem}
   .acc .acts .del{border-color:var(--bad);color:#ff9c93}
+  .biprow{display:flex;justify-content:space-between;align-items:center;gap:.6rem;
+    border:1px solid var(--line);border-radius:8px;padding:.5rem .7rem;margin-bottom:.4rem;
+    background:var(--panel2);font-size:.85rem}
+  .biprow .ipx{font-variant-numeric:tabular-nums}
+  .evlog{font-size:.8rem;font-family:ui-monospace,Menlo,Consolas,monospace;
+    max-height:46vh;overflow:auto;border:1px solid var(--line);border-radius:8px}
+  .evrow{display:grid;grid-template-columns:9.5rem 7rem 1fr;gap:.5rem;padding:.35rem .6rem;
+    border-bottom:1px solid var(--line)}
+  .evrow:last-child{border-bottom:0}
+  .evrow .t{color:var(--dim)}
+  .evrow .ty{font-weight:600}
+  .ty.honeypot,.ty.blocked,.ty.manual-block{color:var(--bad)}
+  .ty.auth-fail{color:var(--warn)}
+  .ty.unblock{color:var(--good)}
 
   .toast{position:fixed;left:50%;bottom:1.2rem;transform:translateX(-50%);
     background:#000d;border:1px solid var(--line);padding:.6rem 1rem;border-radius:10px;
@@ -215,6 +229,7 @@
     <div class="actions">
       <button id="enterBtn" class="primary">Raum betreten</button>
       <button id="adminBtn" style="display:none">🗂 Gespeicherte Accounts ansehen</button>
+      <button id="monitorBtn" style="display:none">🛡 Überwachung (Angriffe)</button>
     </div>
     <div class="err" id="lobbyErr"></div>
     <div class="hint" id="lobbyHint">
@@ -337,6 +352,25 @@
       <button id="adminClose">Schließen</button>
     </div>
     <div class="admin-list" id="adminList"></div>
+  </div>
+</div>
+
+<!-- ================= ADMIN: Überwachung ================= -->
+<div id="monitorView" class="admin">
+  <div class="admin-box">
+    <div class="admin-head">
+      <h2>🛡 Überwachung – Angriffe & Sperren</h2>
+      <div style="display:flex;gap:.5rem">
+        <button id="monitorRefresh">Aktualisieren</button>
+        <button id="monitorClose">Schließen</button>
+      </div>
+    </div>
+    <div class="admin-list">
+      <div class="vsection-title">Aktuell gesperrte IPs</div>
+      <div id="blockedList"></div>
+      <div class="vsection-title" style="margin-top:1rem">Letzte Ereignisse</div>
+      <div id="eventList" class="evlog"></div>
+    </div>
   </div>
 </div>
 
