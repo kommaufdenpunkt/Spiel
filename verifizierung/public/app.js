@@ -72,7 +72,9 @@
     verified: false,
     snapshots: [],       // [{label, url, filename}]
     pendingPhotos: [],   // vom Bewerber hochgeladene Fotos, die noch gesendet werden
-    modToken: '',        // Login-Token des Moderators (aus /api/login)
+    modToken: '',        // Login-Token (aus /api/login)
+    modName: '',         // Anzeigename des angemeldeten Moderators/Admins
+    isAdmin: false,
   };
 
   // ---- kleine API-Hilfe (mit Moderator-Token) ----
@@ -88,22 +90,33 @@
     return { status: res.status, body: json };
   }
 
-  async function moderatorLogin() {
+  // Login: mit Benutzername = persönlicher Moderator-Login;
+  //        asAdmin = Admin-Login (Benutzername wird ignoriert, nur Passwort+2FA).
+  async function doLogin({ asAdmin } = {}) {
+    const username = asAdmin ? '' : $('userInput').value.trim();
     const password = $('passInput').value;
     const totp = $('totpInput').value.trim();
+    if (!asAdmin && !username) return { ok: false, reason: 'no-username' };
     if (!password) return { ok: false, reason: 'no-password' };
-    const r = await api('POST', '/api/login', { password, totp });
-    if (r.status === 200 && r.body.token) { state.modToken = r.body.token; return { ok: true }; }
+    const r = await api('POST', '/api/login', { username, password, totp });
+    if (r.status === 200 && r.body.token) {
+      state.modToken = r.body.token;
+      state.modName = r.body.name || username;
+      state.isAdmin = r.body.role === 'admin';
+      return { ok: true, role: r.body.role };
+    }
     if (r.status === 403) return { ok: false, reason: 'blocked' };
     return { ok: false, reason: (r.body && r.body.reason) || 'fail' };
   }
 
   function loginErrText(login) {
     return ({
-      'no-password': 'Bitte Moderator-Passwort eingeben.',
+      'no-username': 'Bitte Benutzername eingeben.',
+      'no-password': 'Bitte Passwort eingeben.',
+      'bad-login': 'Benutzername oder Passwort falsch.',
       'bad-password': 'Falsches Passwort.',
       'bad-totp': 'Falscher 2FA-Code.',
-      'mod-not-configured': 'Moderator-Zugang ist serverseitig nicht eingerichtet (MODERATOR_PASSWORD setzen).',
+      'mod-not-configured': 'Admin-Zugang ist serverseitig nicht eingerichtet (ADMIN_PASSWORD setzen).',
       'blocked': 'Zu viele Fehlversuche – bitte einige Minuten warten.',
     })[login.reason] || 'Anmeldung fehlgeschlagen.';
   }
@@ -135,20 +148,26 @@
     if (role === 'host') {
       $('lobbyTitle').textContent = 'Video-Verifizierung starten';
       $('lobbySub').textContent = 'Melde dich an – ein Einmalcode für den Bewerber wird automatisch erzeugt.';
-      $('passField').style.display = '';   // Moderator: Passwort
-      $('totpField').style.display = '';   // ... + optional 2FA
+      $('nameField').style.display = 'none'; // Moderator nutzt Benutzername
+      $('userField').style.display = '';
+      $('passField').style.display = '';
+      $('totpField').style.display = '';
       $('adminBtn').style.display = '';
       $('monitorBtn').style.display = '';
+      $('manageBtn').style.display = '';
       $('roomField').style.display = 'none'; // Code wird serverseitig erstellt
     } else {
       $('lobbyTitle').textContent = 'Verifizierung beitreten';
       $('lobbySub').textContent = 'Gib deinen Namen und den Einmalcode ein, den du erhalten hast.';
       $('roomLabel').textContent = 'Einmalcode';
       $('roomInput').placeholder = 'Code vom Moderator';
+      $('nameField').style.display = '';
+      $('userField').style.display = 'none';
       $('passField').style.display = 'none';
       $('totpField').style.display = 'none';
       $('adminBtn').style.display = 'none';
       $('monitorBtn').style.display = 'none';
+      $('manageBtn').style.display = 'none';
       $('roomField').style.display = '';
     }
   }
@@ -161,11 +180,11 @@
   }
 
   async function enterRoom() {
-    const name = $('nameInput').value.trim();
+    let name = $('nameInput').value.trim();
     let code = $('roomInput').value.trim().toUpperCase();
     $('lobbyErr').textContent = '';
 
-    if (!name) { $('lobbyErr').textContent = 'Bitte gib deinen Namen ein.'; return; }
+    if (pickedRole === 'guest' && !name) { $('lobbyErr').textContent = 'Bitte gib deinen Namen ein.'; return; }
     if (pickedRole === 'guest' && !code) {
       $('lobbyErr').textContent = 'Bitte gib den Einmalcode ein, den du erhalten hast.';
       return;
@@ -173,13 +192,14 @@
 
     $('enterBtn').disabled = true;
 
-    // Moderator: erst anmelden (Passwort + ggf. 2FA), dann Einmalcode erzeugen.
+    // Moderator: erst persönlich anmelden, dann Einmalcode erzeugen.
     if (pickedRole === 'host') {
       $('enterBtn').textContent = 'Anmeldung …';
-      const login = await moderatorLogin();
+      const login = await doLogin();
       if (!login.ok) { resetEnterBtn(); $('lobbyErr').textContent = loginErrText(login); return; }
+      name = state.modName; // Anzeigename = Login-Name
       $('enterBtn').textContent = 'Raum wird erstellt …';
-      const r = await api('POST', '/api/room', { moderatorName: name });
+      const r = await api('POST', '/api/room', {});
       if (r.status !== 200 || !r.body.code) {
         resetEnterBtn(); $('lobbyErr').textContent = 'Raum konnte nicht erstellt werden.'; return;
       }
@@ -219,7 +239,7 @@
   async function openMonitor() {
     $('lobbyErr').textContent = '';
     if (!state.modToken) {
-      const login = await moderatorLogin();
+      const login = await doLogin();
       if (!login.ok) { $('lobbyErr').textContent = loginErrText(login); return; }
     }
     if (await loadMonitor()) $('monitorView').classList.add('on');
@@ -266,10 +286,71 @@
     });
   }
 
+  // ---- Admin: Moderatoren verwalten ----
+  if ($('manageBtn')) $('manageBtn').addEventListener('click', openManage);
+  if ($('manageClose')) $('manageClose').addEventListener('click', () => $('manageView').classList.remove('on'));
+  if ($('newModAdd')) $('newModAdd').addEventListener('click', addModerator);
+
+  async function openManage() {
+    $('lobbyErr').textContent = '';
+    // Verwaltung erfordert Admin-Login (Benutzername leer, Admin-Passwort).
+    const login = await doLogin({ asAdmin: true });
+    if (!login.ok) { $('lobbyErr').textContent = loginErrText(login); return; }
+    if (!state.isAdmin) { $('lobbyErr').textContent = 'Kein Admin-Zugang.'; return; }
+    if (await loadModerators()) $('manageView').classList.add('on');
+  }
+
+  async function loadModerators() {
+    const r = await api('GET', '/api/moderators');
+    if (r.status !== 200) { toast('Konnte Moderatoren nicht laden.'); return false; }
+    renderModerators(r.body.moderators || []);
+    return true;
+  }
+
+  function renderModerators(list) {
+    const el = $('modList');
+    el.innerHTML = '';
+    if (!list.length) { el.innerHTML = '<p style="color:var(--dim)">Noch keine Logins angelegt.</p>'; return; }
+    list.forEach((m) => {
+      const row = document.createElement('div');
+      row.className = 'biprow';
+      const date = new Date(m.createdAt).toLocaleDateString('de-DE');
+      row.innerHTML = `<span>👤 <b>${escapeHtml(m.username)}</b> · 2FA: ${m.has2fa ? '✓' : '–'} · seit ${date}</span>`;
+      const del = document.createElement('button');
+      del.textContent = '🗑 Löschen';
+      del.style.borderColor = 'var(--bad)'; del.style.color = '#ff9c93';
+      del.addEventListener('click', async () => {
+        if (!confirm(`Login „${m.username}" wirklich löschen?`)) return;
+        await api('POST', '/api/moderator-delete', { id: m.id });
+        loadModerators();
+      });
+      row.appendChild(del);
+      el.appendChild(row);
+    });
+  }
+
+  async function addModerator() {
+    const username = $('newModUser').value.trim();
+    const password = $('newModPass').value;
+    if (!username || !password) { $('newModResult').textContent = 'Benutzername und Passwort eingeben.'; return; }
+    const r = await api('POST', '/api/moderators', { username, password });
+    if (r.status !== 200) {
+      $('newModResult').textContent = r.body && r.body.reason === 'exists-or-invalid'
+        ? 'Benutzername existiert bereits oder ist ungültig.' : 'Anlegen fehlgeschlagen.';
+      return;
+    }
+    $('newModUser').value = ''; $('newModPass').value = '';
+    $('newModResult').innerHTML =
+      `✅ Login <b>${escapeHtml(r.body.username)}</b> angelegt. <b>2FA jetzt einrichten:</b> ` +
+      `in der Authenticator-App „Schlüssel manuell eingeben" → <code>${escapeHtml(r.body.totpSecret)}</code> ` +
+      `(diesen Schlüssel der Person sicher geben – er wird nur einmal angezeigt).`;
+    loadModerators();
+  }
+
   async function openAdmin() {
     $('lobbyErr').textContent = '';
     if (!state.modToken) {
-      const login = await moderatorLogin();
+      const login = await doLogin();
       if (!login.ok) { $('lobbyErr').textContent = loginErrText(login); return; }
     }
     const r = await api('GET', '/api/accounts');
@@ -323,6 +404,8 @@
     $('passInput').value = '';
     $('totpInput').value = '';
     state.modToken = '';
+    state.modName = '';
+    state.isAdmin = false;
   }
 
   // =======================================================================

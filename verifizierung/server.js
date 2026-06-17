@@ -49,9 +49,9 @@ const STUN_URLS = (process.env.STUN_URLS ||
   'stun:stun.l.google.com:19302,stun:stun1.l.google.com:19302')
   .split(',').map((s) => s.trim()).filter(Boolean);
 
-// Passwort für den Moderator-Zugang. Nur wer es kennt, kann einen Raum als
-// Moderator eröffnen. Die Bewerber-Seite bleibt ohne Passwort zugänglich.
-const MODERATOR_PASSWORD = process.env.MODERATOR_PASSWORD || '';
+// Admin-Passwort: damit verwaltet man die persönlichen Moderator-Logins
+// (anlegen/löschen). Fällt auf MODERATOR_PASSWORD zurück (Abwärtskompatibilität).
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || process.env.MODERATOR_PASSWORD || '';
 
 function buildIceServers() {
   const servers = [{ urls: STUN_URLS }];
@@ -125,23 +125,45 @@ function getToken(req) {
   catch { return ''; }
 }
 function isAuthed(req) { return security.validToken(getToken(req), security.clientIp(req)); }
+function isAdminReq(req) { return security.isAdminToken(getToken(req), security.clientIp(req)); }
+function reqName(req) { const i = security.tokenInfo(getToken(req)); return i ? i.name : ''; }
 
 // Behandelt /api/*-Anfragen. Gibt true zurück, wenn die Anfrage erledigt ist.
 async function handleApi(req, res, urlPath, ip) {
   if (!urlPath.startsWith('/api/')) return false;
 
-  // ---- Login (Passwort + optional 2FA) ----
+  // ---- Login ----
+  // Mit Benutzername  -> persönlicher Moderator-Login (eigenes Passwort + 2FA).
+  // Ohne Benutzername -> Admin-Login (ADMIN_PASSWORD + optional Admin-2FA),
+  //                      nur zum Verwalten der Moderator-Konten.
   if (urlPath === '/api/login' && req.method === 'POST') {
-    if (!MODERATOR_PASSWORD) { sendJson(res, 503, { reason: 'mod-not-configured' }); return true; }
     let body; try { body = await readBody(req, 64 * 1024); } catch { sendJson(res, 400, { reason: 'bad-request' }); return true; }
-    const okPw = security.safeEqual(body.password || '', MODERATOR_PASSWORD);
+    const username = String(body.username || '').trim();
+
+    if (username) {
+      const m = store.verifyModerator(username, body.password || '');
+      const okTotp = m ? security.verifyTotp(m.totpSecret, body.totp) : false;
+      if (m && okTotp) {
+        security.resetFails(ip);
+        security.recordEvent('login-ok', ip, 'Moderator: ' + m.username);
+        sendJson(res, 200, { token: security.issueToken(ip, { name: m.username, isAdmin: false }), name: m.username, role: 'moderator' });
+      } else {
+        security.recordFail(ip, 'Moderator-Login fehlgeschlagen (' + username + ')');
+        sendJson(res, 401, { reason: m ? 'bad-totp' : 'bad-login' });
+      }
+      return true;
+    }
+
+    // Admin
+    if (!ADMIN_PASSWORD) { sendJson(res, 503, { reason: 'mod-not-configured' }); return true; }
+    const okPw = security.safeEqual(body.password || '', ADMIN_PASSWORD);
     const okTotp = security.verifyTotp(MODERATOR_TOTP_SECRET, body.totp);
     if (okPw && okTotp) {
       security.resetFails(ip);
-      security.recordEvent('login-ok', ip, 'Moderator angemeldet');
-      sendJson(res, 200, { token: security.issueToken(ip), twofa: !!MODERATOR_TOTP_SECRET });
+      security.recordEvent('login-ok', ip, 'Admin');
+      sendJson(res, 200, { token: security.issueToken(ip, { name: 'Admin', isAdmin: true }), name: 'Admin', role: 'admin' });
     } else {
-      security.recordFail(ip, 'login: ' + (!okPw ? 'falsches Passwort' : 'falscher 2FA-Code'));
+      security.recordFail(ip, 'Admin-Login fehlgeschlagen');
       sendJson(res, 401, { reason: !okPw ? 'bad-password' : 'bad-totp' });
     }
     return true;
@@ -150,10 +172,33 @@ async function handleApi(req, res, urlPath, ip) {
   // Alle weiteren API-Routen erfordern ein gültiges Login-Token.
   if (!isAuthed(req)) { sendJson(res, 401, { reason: 'auth' }); return true; }
 
+  // ---- Moderator-Konten verwalten (nur Admin) ----
+  if (urlPath === '/api/moderators' && req.method === 'GET') {
+    if (!isAdminReq(req)) { sendJson(res, 403, { reason: 'admin-only' }); return true; }
+    sendJson(res, 200, { moderators: store.listModerators() }); return true;
+  }
+  if (urlPath === '/api/moderators' && req.method === 'POST') {
+    if (!isAdminReq(req)) { sendJson(res, 403, { reason: 'admin-only' }); return true; }
+    let body; try { body = await readBody(req, 64 * 1024); } catch { body = {}; }
+    const totpSecret = security.generateTotpSecret();
+    const m = store.addModerator({ username: body.username, password: body.password, totpSecret, createdBy: reqName(req) });
+    if (!m) { sendJson(res, 400, { reason: 'exists-or-invalid' }); return true; }
+    security.recordEvent('audit', ip, 'Moderator angelegt: ' + m.username);
+    const otpauth = `otpauth://totp/verify.4ever1.tv:${encodeURIComponent(m.username)}?secret=${totpSecret}&issuer=4ever1`;
+    sendJson(res, 200, { id: m.id, username: m.username, totpSecret, otpauth }); return true;
+  }
+  if (urlPath === '/api/moderator-delete' && req.method === 'POST') {
+    if (!isAdminReq(req)) { sendJson(res, 403, { reason: 'admin-only' }); return true; }
+    let body; try { body = await readBody(req, 16 * 1024); } catch { body = {}; }
+    const ok = store.deleteModerator(body.id);
+    if (ok) security.recordEvent('audit', ip, 'Moderator gelöscht: ' + body.id);
+    sendJson(res, 200, { ok }); return true;
+  }
+
   // ---- Einmalcode erzeugen ----
   if (urlPath === '/api/room' && req.method === 'POST') {
     let body; try { body = await readBody(req, 64 * 1024); } catch { body = {}; }
-    const rec = store.createCode({ createdBy: body.moderatorName, applicantName: body.applicantName });
+    const rec = store.createCode({ createdBy: reqName(req), applicantName: body.applicantName });
     sendJson(res, 200, { code: rec.code });
     return true;
   }
@@ -169,7 +214,7 @@ async function handleApi(req, res, urlPath, ip) {
   if (urlPath === '/api/account' && req.method === 'POST') {
     let body; try { body = await readBody(req); } catch { sendJson(res, 413, { reason: 'too-large' }); return true; }
     if (!body.code || !store.isCodeUsable(body.code)) { sendJson(res, 400, { reason: 'bad-code' }); return true; }
-    const rec = store.saveAccount(body);
+    const rec = store.saveAccount({ ...body, moderatorName: reqName(req) || body.moderatorName });
     security.recordEvent('audit', ip, 'Account gespeichert: ' + (rec.verifiedName || rec.applicantName || rec.id));
     sendJson(res, 200, { id: rec.id });
     return true;
@@ -427,7 +472,8 @@ wss.on('connection', (ws, req) => {
 server.listen(PORT, () => {
   console.log(`Verifizierungs-Raum läuft auf Port ${PORT}`);
   console.log(`TURN: ${TURN_SECRET && TURN_HOST ? 'aktiv (' + TURN_HOST + ')' : 'nicht konfiguriert – nur STUN'}`);
-  console.log(`Moderator-Passwort: ${MODERATOR_PASSWORD ? 'gesetzt' : 'NICHT gesetzt – Moderator-Zugang gesperrt!'}`);
+  console.log(`Admin-Passwort: ${ADMIN_PASSWORD ? 'gesetzt' : 'NICHT gesetzt – Verwaltung gesperrt!'}`);
+  console.log(`Moderator-Konten: ${store.listModerators().length}`);
   console.log(`2FA (TOTP): ${MODERATOR_TOTP_SECRET ? 'aktiv' : 'aus'}`);
   console.log(`Daten-Verzeichnis: ${storeInfo.DATA_DIR} (Fotos ${storeInfo.encrypted ? 'verschlüsselt' : 'UNverschlüsselt'})`);
 });

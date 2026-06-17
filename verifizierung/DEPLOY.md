@@ -81,7 +81,7 @@ bestehenden für SSH 22 und HTTP/HTTPS 80/443):
 6. **Domains:** `https://verify.4ever1.tv` eintragen → Coolify holt automatisch
    ein Let's-Encrypt-Zertifikat (HTTPS).
 7. **Environment Variables** setzen:
-   - `MODERATOR_PASSWORD` = (frei wählbares Passwort für den Moderator-Zugang) **Pflicht**
+   - `ADMIN_PASSWORD` = (frei wählbares Admin-Passwort zum Verwalten der Logins) **Pflicht**
    - `TURN_SECRET` = (das Geheimnis aus Schritt 2)
    - `TURN_HOST` = `verify.4ever1.tv`
    - `DATA_DIR` = `/data`  (Speicherort der Accounts – siehe Schritt 4b)
@@ -90,9 +90,11 @@ bestehenden für SSH 22 und HTTP/HTTPS 80/443):
 8. **Persistent Storage** anlegen (Schritt 4b) **bevor** du deployst.
 9. **Deploy** klicken.
 
-> **Wichtig:** Ohne `MODERATOR_PASSWORD` ist der Moderator-Zugang gesperrt
-> (die Bewerber-Seite funktioniert weiterhin). Dieses Passwort gibst du nur an
-> Personen, die Räume eröffnen dürfen.
+> **Wichtig:** Das `ADMIN_PASSWORD` ist nur für DICH (Verwaltung). Deine
+> Moderatoren melden sich später mit ihrem **eigenen** Benutzernamen + Passwort
+> + 2FA an, die du im Browser anlegst (siehe Schritt 4d).
+> (Hinweis: Eine alte `MODERATOR_PASSWORD`-Variable wird als Admin-Passwort
+> weiterverwendet, falls `ADMIN_PASSWORD` nicht gesetzt ist.)
 > **Den `STORAGE_KEY` sicher aufbewahren** – ohne ihn sind gespeicherte Fotos
 > nicht mehr lesbar.
 
@@ -112,7 +114,18 @@ In Coolify bei der App → **Persistent Storage** → **Add** →
 3. Denselben Schlüssel in einer **Authenticator-App** (Google/Microsoft
    Authenticator) per **manueller Eingabe** hinzufügen (oder die ausgegebene
    `otpauth://`-URL als QR verwenden).
-4. Beim Moderator-Login wird dann zusätzlich der 6-stellige Code abgefragt.
+4. Beim Admin-Login wird dann zusätzlich der 6-stellige Code abgefragt.
+
+### 4d) Die 3 Moderator-Logins anlegen (im Browser)
+1. `https://verify.4ever1.tv` öffnen → **„Ich moderiere"**.
+2. **Benutzername leer lassen**, im Passwort-Feld das **`ADMIN_PASSWORD`** eingeben
+   (+ Admin-2FA falls aktiviert) → **„🛠 Moderatoren verwalten"** klicken.
+3. Für jede deiner 3 Personen: **Benutzername + Passwort** eingeben → **„+ Anlegen"**.
+   Es wird ein **2FA-Schlüssel** angezeigt – diesen der Person sicher geben; sie
+   trägt ihn in ihrer Authenticator-App ein (manuelle Eingabe).
+4. Ab dann meldet sich jede Person mit **eigenem Benutzernamen + Passwort + 2FA**
+   an und kann verifizieren. In jeder gespeicherten Verifizierung steht, **wer**
+   sie durchgeführt hat.
 
 > WebSockets: Coolifys Proxy (Traefik) leitet die WebSocket-Verbindung
 > automatisch weiter – es ist keine Extra-Konfiguration nötig.

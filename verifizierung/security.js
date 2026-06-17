@@ -43,9 +43,9 @@ function safeEqual(a, b) {
 const tokens = new Map(); // token -> {exp, ip}
 const TOKEN_TTL = 8 * 60 * 60 * 1000; // 8 Stunden
 
-function issueToken(ip) {
+function issueToken(ip, info = {}) {
   const t = crypto.randomBytes(24).toString('hex');
-  tokens.set(t, { exp: Date.now() + TOKEN_TTL, ip: ip || '' });
+  tokens.set(t, { exp: Date.now() + TOKEN_TTL, ip: ip || '', name: info.name || '', isAdmin: !!info.isAdmin });
   return t;
 }
 function validToken(t, ip) {
@@ -55,6 +55,8 @@ function validToken(t, ip) {
   if (rec.ip && ip && rec.ip !== ip) return false; // an IP gebunden
   return true;
 }
+function tokenInfo(t) { return tokens.get(t) || null; }
+function isAdminToken(t, ip) { return validToken(t, ip) && !!tokens.get(t).isAdmin; }
 
 // ---- Allgemeines Rate-Limit pro IP -----------------------------------------
 const reqCounts = new Map(); // ip -> {count, windowStart}
@@ -185,7 +187,7 @@ function getMonitoring() {
 }
 
 module.exports = {
-  init, clientIp, issueToken, validToken, safeEqual, rateLimit,
+  init, clientIp, issueToken, validToken, tokenInfo, isAdminToken, safeEqual, rateLimit,
   verifyTotp, generateTotpSecret,
   isBlocked, recordFail, resetFails, isHoneypot, recordHoneypot, recordEvent,
   unblock, blockManual, getMonitoring,

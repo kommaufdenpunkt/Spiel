@@ -209,17 +209,21 @@
       <button data-role="guest"><span class="ic">👤</span>Ich bin Bewerber</button>
     </div>
 
-    <div class="field">
+    <div class="field" id="nameField">
       <label for="nameInput">Dein Name</label>
       <input id="nameInput" placeholder="z. B. Max Mustermann" autocomplete="name">
+    </div>
+    <div class="field" id="userField" style="display:none">
+      <label for="userInput">Benutzername</label>
+      <input id="userInput" placeholder="dein persönlicher Login" autocomplete="username">
     </div>
     <div class="field" id="roomField">
       <label for="roomInput" id="roomLabel">Einmalcode</label>
       <input id="roomInput" placeholder="Code vom Moderator" autocapitalize="characters">
     </div>
     <div class="field" id="passField" style="display:none">
-      <label for="passInput">Moderator-Passwort</label>
-      <input id="passInput" type="password" placeholder="nur für Moderatoren" autocomplete="current-password">
+      <label for="passInput">Passwort</label>
+      <input id="passInput" type="password" placeholder="dein Passwort" autocomplete="current-password">
     </div>
     <div class="field" id="totpField" style="display:none">
       <label for="totpInput">2FA-Code (falls aktiviert)</label>
@@ -230,6 +234,7 @@
       <button id="enterBtn" class="primary">Raum betreten</button>
       <button id="adminBtn" style="display:none">🗂 Gespeicherte Accounts ansehen</button>
       <button id="monitorBtn" style="display:none">🛡 Überwachung (Angriffe)</button>
+      <button id="manageBtn" style="display:none">🛠 Moderatoren verwalten (Admin)</button>
     </div>
     <div class="err" id="lobbyErr"></div>
     <div class="hint" id="lobbyHint">
@@ -370,6 +375,29 @@
       <div id="blockedList"></div>
       <div class="vsection-title" style="margin-top:1rem">Letzte Ereignisse</div>
       <div id="eventList" class="evlog"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ================= ADMIN: Moderatoren verwalten ================= -->
+<div id="manageView" class="admin">
+  <div class="admin-box">
+    <div class="admin-head">
+      <h2>🛠 Moderatoren verwalten</h2>
+      <button id="manageClose">Schließen</button>
+    </div>
+    <div class="admin-list">
+      <div class="vsection-title">Neuen Login anlegen</div>
+      <div class="biprow" style="display:block">
+        <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+          <input id="newModUser" placeholder="Benutzername" style="flex:1;min-width:140px">
+          <input id="newModPass" type="text" placeholder="Passwort" style="flex:1;min-width:140px">
+          <button id="newModAdd" class="primary">+ Anlegen</button>
+        </div>
+        <div id="newModResult" style="font-size:.82rem;color:var(--dim);margin-top:.5rem"></div>
+      </div>
+      <div class="vsection-title" style="margin-top:1rem">Vorhandene Logins</div>
+      <div id="modList"></div>
     </div>
   </div>
 </div>

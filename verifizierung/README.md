@@ -20,8 +20,10 @@ einreichen.
 - **Chat-Fenster** zwischen euch.
 - **Aufnahme** des kompletten Gesprächs → Download als **MP4** (bzw. WebM, falls
   der Browser kein MP4 aufnehmen kann – siehe unten).
-- **Moderator-Passwort:** Nur wer das Passwort kennt, kann einen Raum eröffnen.
-  Die Bewerber-Seite bleibt offen (Beitritt per Link, ohne Passwort).
+- **Persönliche Moderator-Logins:** Jede:r aus dem Team hat einen eigenen
+  Login (Benutzername + Passwort + eigenes 2FA). Verwaltet wird das über ein
+  **Admin-Passwort** (Logins im Browser anlegen/löschen). In jeder Verifizierung
+  steht, **wer** sie durchgeführt hat. Die Bewerber-Seite bleibt offen (Code-Beitritt).
 - **Ausweis-Verifizierung:** Die Bewerberin lädt Vorder- & Rückseite hoch und
   hält den Ausweis neben ihr Gesicht; der Moderator macht Beweis-Fotos, hakt eine
   Checkliste ab, markiert „verifiziert" und lädt ein **Prüf-Protokoll** herunter.
@@ -57,9 +59,12 @@ Dann im Browser öffnen: <http://localhost:3000>
 
 ## So benutzt du es
 
-1. **Du (Moderator):** Seite öffnen → „Ich moderiere" → Name **und
-   Moderator-Passwort** eingeben → **Raum betreten**. Der Beitritts-Link wird
-   automatisch in die Zwischenablage kopiert und im Chat angezeigt.
+0. **Einmalig (Admin):** „Ich moderiere" → Benutzername leer lassen,
+   **Admin-Passwort** eingeben → „🛠 Moderatoren verwalten" → die persönlichen
+   Logins für dein Team anlegen (jeweils mit eigenem 2FA-Schlüssel).
+1. **Du (Moderator):** Seite öffnen → „Ich moderiere" → **Benutzername +
+   Passwort + 2FA** → **Raum betreten**. Der Beitritts-Link/Einmalcode wird
+   automatisch kopiert und im Chat angezeigt.
 2. **Link an den Bewerber schicken** (WhatsApp, E-Mail …) – z. B. mit
    „✉ Einladung kopieren".
 3. **Bewerber** öffnet den Link → Name eingeben → **beitreten** → Kamera/Mikro

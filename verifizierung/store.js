@@ -46,7 +46,9 @@ function saveAtomic(file, data) {
 function codesFile() { return path.join(DATA_DIR, 'codes.json'); }
 function accountsFile() { return path.join(DATA_DIR, 'accounts.json'); }
 function securityFile() { return path.join(DATA_DIR, 'security.json'); }
+function moderatorsFile() { return path.join(DATA_DIR, 'moderators.json'); }
 let secLog = [];
+let moderators = [];
 
 function init({ dir, encKey } = {}) {
   if (dir) { DATA_DIR = dir; PHOTO_DIR = path.join(DATA_DIR, 'photos'); }
@@ -56,7 +58,52 @@ function init({ dir, encKey } = {}) {
   codes = load(codesFile(), []);
   accounts = load(accountsFile(), []);
   secLog = load(securityFile(), []);
+  moderators = load(moderatorsFile(), []);
   return { DATA_DIR, encrypted: !!ENC_KEY };
+}
+
+// ---- Moderator-Konten (persönliche Logins) ---------------------------------
+function listModerators() {
+  return moderators.map((m) => ({
+    id: m.id, username: m.username, createdAt: m.createdAt,
+    createdBy: m.createdBy || '', has2fa: !!m.totpSecret,
+  }));
+}
+function getModeratorByUsername(u) {
+  const name = String(u || '').trim().toLowerCase();
+  return moderators.find((m) => m.username.toLowerCase() === name) || null;
+}
+function verifyModerator(username, password) {
+  const m = getModeratorByUsername(username);
+  if (!m) return null;
+  const h = crypto.scryptSync(String(password), m.salt, 64);
+  const stored = Buffer.from(m.hash, 'hex');
+  if (h.length === stored.length && crypto.timingSafeEqual(h, stored)) return m;
+  return null;
+}
+function addModerator({ username, password, totpSecret, createdBy }) {
+  const name = String(username || '').trim();
+  if (!name || !password || getModeratorByUsername(name)) return null;
+  const salt = crypto.randomBytes(16).toString('hex');
+  const hash = crypto.scryptSync(String(password), salt, 64).toString('hex');
+  const rec = {
+    id: crypto.randomUUID(),
+    username: name,
+    salt, hash,
+    totpSecret: totpSecret || '',
+    createdAt: new Date().toISOString(),
+    createdBy: String(createdBy || '').slice(0, 60),
+  };
+  moderators.push(rec);
+  saveAtomic(moderatorsFile(), moderators);
+  return rec;
+}
+function deleteModerator(id) {
+  const i = moderators.findIndex((m) => m.id === id);
+  if (i < 0) return false;
+  moderators.splice(i, 1);
+  saveAtomic(moderatorsFile(), moderators);
+  return true;
 }
 
 // Sicherheits-Ereignisse dauerhaft protokollieren (für die Überwachung).
@@ -215,4 +262,5 @@ module.exports = {
   init, createCode, getCode, isCodeUsable, consumeCode, revokeCode, listCodes,
   saveAccount, listAccounts, getAccount, photoPath, readPhoto, deleteAccount,
   logSecurity, getSecurityLog,
+  listModerators, getModeratorByUsername, verifyModerator, addModerator, deleteModerator,
 };
