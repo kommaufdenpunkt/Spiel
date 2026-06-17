@@ -1,64 +1,107 @@
-// Echtzeit-Schicht über Firebase Realtime Database.
-// Lehrer schreibt den Stand (Thema + aktuelle Folie), Schüler hören zu.
-// Fällt sauber zurück, wenn noch kein Backend eingerichtet ist.
+// Live-Sync OHNE Server-Einrichtung.
+// Die Geräte verbinden sich direkt miteinander (WebRTC über PeerJS):
+//   Lehrer = Host ("Sender"), Schüler = Gast.
+// Es ist KEIN Konto, KEINE Datenbank und KEINE Konfiguration nötig.
+// (Eine optionale Firebase-Variante liegt weiterhin in firebase-config.js bereit.)
 
-import { firebaseConfig, istKonfiguriert } from "./firebase-config.js";
-
-let db = null;
-let fb = null;        // geladenes Firebase-Database-Modul
-let bereitP = null;   // Promise: Initialisierung
-
-async function bereit() {
-  if (!istKonfiguriert()) return false;
-  if (bereitP) return bereitP;
-  bereitP = (async () => {
-    const appMod = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js");
-    fb = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js");
-    const app = appMod.initializeApp(firebaseConfig);
-    db = fb.getDatabase(app);
-    return true;
-  })();
-  return bereitP;
+let PeerLib = null;
+async function ladePeer() {
+  if (!PeerLib) {
+    const m = await import("https://esm.sh/peerjs@1.5.4");
+    PeerLib = m.Peer || m.default;
+  }
+  return PeerLib;
 }
 
-export function konfiguriert() {
-  return istKonfiguriert();
+// Namensraum, damit kurze Raum-Codes nicht mit fremden PeerJS-Apps kollidieren.
+const PREFIX = "fahrschule-live-2026-";
+
+export function konfiguriert() { return true; } // kein Setup nötig
+
+// ============================================================
+//  LEHRER: Host starten
+// ============================================================
+export async function starteHost(code, { onTeilnehmer, onStatus } = {}) {
+  const Peer = await ladePeer();
+  const verbindungen = new Set();
+  let letzterStand = null;
+  let peer = null;
+
+  function baue() {
+    peer = new Peer(PREFIX + code, { debug: 1 });
+
+    peer.on("open", () => onStatus && onStatus("bereit"));
+
+    peer.on("connection", (conn) => {
+      conn.on("open", () => {
+        verbindungen.add(conn);
+        onTeilnehmer && onTeilnehmer(verbindungen.size);
+        if (letzterStand) { try { conn.send(letzterStand); } catch {} }
+      });
+      const weg = () => { if (verbindungen.delete(conn)) onTeilnehmer && onTeilnehmer(verbindungen.size); };
+      conn.on("close", weg);
+      conn.on("error", weg);
+    });
+
+    peer.on("disconnected", () => { try { peer.reconnect(); } catch {} });
+
+    peer.on("error", (err) => {
+      if (err && err.type === "unavailable-id") { onStatus && onStatus("id-belegt"); return; }
+      onStatus && onStatus("verbinde");
+      // Verbindung zum Vermittlungs-Server verloren → neu aufbauen
+      setTimeout(() => { try { peer.destroy(); } catch {} baue(); }, 3000);
+    });
+  }
+
+  baue();
+  window.addEventListener("beforeunload", () => { try { peer.destroy(); } catch {} });
+
+  return {
+    sende(stand) {
+      letzterStand = stand;
+      for (const c of verbindungen) { try { c.send(stand); } catch {} }
+    },
+    anzahl() { return verbindungen.size; }
+  };
 }
 
-const pfad = (code) => "raeume/" + code;
+// ============================================================
+//  SCHÜLER: mit dem Host verbinden (mit automatischem Wiederverbinden)
+// ============================================================
+export async function verbinde(code, { onStand, onStatus } = {}) {
+  const Peer = await ladePeer();
+  let peer = null, conn = null, lebt = true, timer = null;
 
-// ---- Lehrer: Stand setzen ----
-export async function setStand(code, stand) {
-  if (!(await bereit())) return false;
-  await fb.update(fb.ref(db, pfad(code)), { ...stand, aktualisiert: Date.now() });
-  return true;
-}
+  function planeNeu() {
+    if (!lebt) return;
+    clearTimeout(timer);
+    timer = setTimeout(() => { verbindeMitHost(); }, 2500);
+  }
 
-// ---- Lehrer: Teilnehmer beobachten ----
-export async function beobachteTeilnehmer(code, cb) {
-  if (!(await bereit())) return () => {};
-  const r = fb.ref(db, pfad(code) + "/teilnehmer");
-  const ab = fb.onValue(r, (snap) => {
-    const v = snap.val() || {};
-    cb(Object.keys(v).length);
-  });
-  return ab;
-}
+  function verbindeMitHost() {
+    if (!lebt || !peer || peer.destroyed) return;
+    onStatus && onStatus("verbinde");
+    conn = peer.connect(PREFIX + code, { reliable: true });
+    let offen = false;
+    conn.on("open", () => { offen = true; onStatus && onStatus("verbunden"); });
+    conn.on("data", (d) => onStand && onStand(d));
+    conn.on("close", () => { onStatus && onStatus("getrennt"); planeNeu(); });
+    conn.on("error", () => { if (!offen) planeNeu(); });
+  }
 
-// ---- Schüler: Stand abonnieren ----
-export async function abonniere(code, cb) {
-  if (!(await bereit())) return () => {};
-  const r = fb.ref(db, pfad(code));
-  const ab = fb.onValue(r, (snap) => cb(snap.val()));
-  return ab;
-}
+  function baue() {
+    peer = new Peer(undefined, { debug: 1 });
+    peer.on("open", () => verbindeMitHost());
+    peer.on("disconnected", () => { try { peer.reconnect(); } catch {} });
+    peer.on("error", (err) => {
+      // Host noch nicht online / nicht erreichbar → erneut versuchen
+      onStatus && onStatus(err && err.type === "peer-unavailable" ? "warten" : "verbinde");
+      planeNeu();
+    });
+  }
 
-// ---- Schüler: Anwesenheit melden (verschwindet beim Verlassen) ----
-export async function meldeAnwesenheit(code) {
-  if (!(await bereit())) return () => {};
-  const id = "t_" + Math.random().toString(36).slice(2, 9);
-  const r = fb.ref(db, pfad(code) + "/teilnehmer/" + id);
-  await fb.set(r, true);
-  fb.onDisconnect(r).remove();
-  return () => fb.remove(r);
+  baue();
+  window.addEventListener("beforeunload", () => { lebt = false; try { peer.destroy(); } catch {} });
+
+  return { trenne() { lebt = false; clearTimeout(timer); try { peer.destroy(); } catch {} } };
 }

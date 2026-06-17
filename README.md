@@ -32,39 +32,33 @@ schueler.html     Schüler-Ansicht (folgt live, markieren)
 CNAME             Custom-Domain für GitHub Pages → ginoco.de
 assets/css/app.css
 assets/js/
-  firebase-config.js  ← hier deine Backend-Daten eintragen
-  sync.js             Echtzeit-Verbindung (Firebase Realtime Database)
+  sync.js             Live-Verbindung der Geräte (WebRTC/PeerJS, ohne Server)
+  firebase-config.js  optionale Alternative (Firebase) – wird aktuell NICHT genutzt
   render.js           Render-Engine für alle Folien-/Spieltypen
   lehrer.js / schueler.js
   daten/themen.js     Register aller 14 Themen
   daten/thema-05.js   Inhalt von Thema 5
 ```
 
-## Backend einrichten (einmalig, kostenlos)
+## Live-Verbindung – ohne Einrichtung
 
-Damit die Schüler-Handys live folgen, wird eine **Firebase Realtime Database** genutzt.
+Die Schüler-Handys folgen dem Lehrer-Gerät über eine **direkte Verbindung**
+(WebRTC über PeerJS). Es ist **kein Konto, keine Datenbank und keine
+Konfiguration** nötig – einfach Lehrer-Seite öffnen, QR-Code zeigen, fertig.
 
-1. Auf <https://console.firebase.google.com> ein **kostenloses Projekt** anlegen.
-2. Im Menü **Realtime Database → Datenbank erstellen** (Region z. B. *europe-west1*).
-3. Unter **Projekteinstellungen → Allgemein → Meine Apps** eine **Web-App** (`</>`) hinzufügen und die Konfigurationswerte kopieren.
-4. Diese Werte in `assets/js/firebase-config.js` eintragen (die `DEIN_…`-Platzhalter ersetzen).
-5. **Regeln** der Realtime Database für den Klassenraum-Betrieb (Lesen/Schreiben des Raum-Knotens) setzen, z. B.:
+- Das Lehrer-Gerät ist der „Sender" (Host), der Raum-Code ist die Adresse.
+- Jedes Schüler-Handy verbindet sich über den QR-Code/Code direkt damit.
+- Spät dazukommende Schüler bekommen sofort die aktuelle Folie.
 
-   ```json
-   {
-     "rules": {
-       "raeume": {
-         "$raum": { ".read": true, ".write": true }
-       }
-     }
-   }
-   ```
+**Wann läuft es am besten?** Im selben Raum/WLAN praktisch immer. Bei Schülern in
+sehr restriktiven Fremd-Netzen kann eine reine Direktverbindung selten scheitern
+(dafür bräuchte es einen Relay-/TURN-Server) – für den Klassenraum ist das aber
+der reibungsloseste Weg.
 
-   > Hinweis: Das ist eine einfache, offene Regel für den Unterricht. Für mehr
-   > Schutz kann man später eine Zugangs-Authentifizierung ergänzen.
-
-Solange die Platzhalter nicht ersetzt sind, läuft das Tool im **Test-Modus**:
-Du kannst durch die Lektion klicken, aber die Handys folgen noch nicht automatisch.
+### Optionale Alternative: Firebase
+In `assets/js/firebase-config.js` liegt eine vorbereitete Firebase-Konfiguration
+bereit (aktuell **nicht** aktiv). Wer später eine serverbasierte Variante mit
+Relay/Verlauf möchte, kann darauf umstellen – sag einfach Bescheid.
 
 ## Veröffentlichen auf ginoco.de (GitHub Pages)
 

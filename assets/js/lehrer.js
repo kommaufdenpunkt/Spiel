@@ -3,7 +3,7 @@
 
 import { THEMEN, ladeThema, themaInfo } from "./daten/themen.js";
 import { renderFolie } from "./render.js";
-import { setStand, beobachteTeilnehmer, konfiguriert } from "./sync.js";
+import { starteHost } from "./sync.js";
 
 const $ = (id) => document.getElementById(id);
 
@@ -59,19 +59,33 @@ $("qrGross").addEventListener("click", () => {
 });
 $("overlayZu").addEventListener("click", () => $("overlay").classList.remove("an"));
 
-// ---- Status / Banner ----
-function statusSetzen() {
-  const live = konfiguriert();
-  $("ampel").classList.toggle("live", live);
-  $("statusPille").className = "pille " + (live ? "an" : "warn");
-  $("statusText").textContent = live ? "Live verbunden" : "Test-Modus";
-  if (!live) {
-    $("banner").innerHTML = `<div class="banner"><b>Test-Modus:</b> Du kannst die Lektion schon durchklicken,
-      aber Schüler-Handys folgen noch nicht automatisch. Trage dafür einmalig deine Firebase-Daten in
-      <code>assets/js/firebase-config.js</code> ein (Anleitung in der README).</div>`;
+// ---- Live-Host starten (direkte Verbindung, ohne Server-Einrichtung) ----
+let host = null;
+$("statusPille").className = "pille warn";
+$("statusText").textContent = "Verbinde…";
+
+starteHost(raum, {
+  onTeilnehmer: (n) => { $("teilnehmerZahl").textContent = n; },
+  onStatus: (s) => {
+    if (s === "bereit") {
+      $("ampel").classList.add("live");
+      $("statusPille").className = "pille an";
+      $("statusText").textContent = "Live – Raum offen";
+      $("banner").innerHTML = "";
+    } else if (s === "id-belegt") {
+      $("ampel").classList.remove("live");
+      $("statusPille").className = "pille warn";
+      $("statusText").textContent = "Code belegt";
+      $("banner").innerHTML = `<div class="banner"><b>Dieser Raum-Code ist gerade noch aktiv.</b>
+        Bitte die Seite neu laden – dann bekommst du automatisch einen frischen Code.
+        <button class="btn" onclick="location.href=location.pathname">Neuer Code</button></div>`;
+    } else {
+      $("ampel").classList.remove("live");
+      $("statusPille").className = "pille warn";
+      $("statusText").textContent = "Verbinde…";
+    }
   }
-}
-statusSetzen();
+}).then((h) => { host = h; senden(); });
 
 // ---- Thema laden & anzeigen ----
 async function ladeUndZeige(neuId, startIndex = 0) {
@@ -98,7 +112,7 @@ function zeige() {
 }
 
 function senden() {
-  setStand(raum, { thema: themaId, folie: index, titel: thema.titel, gesamt: thema.folien.length });
+  if (host && thema) host.sende({ thema: themaId, folie: index, titel: thema.titel, gesamt: thema.folien.length });
 }
 
 $("weiter").addEventListener("click", () => { if (index < thema.folien.length - 1) { index++; zeige(); } });
@@ -111,8 +125,5 @@ document.addEventListener("keydown", (e) => {
 });
 
 $("themaWahl").addEventListener("change", (e) => ladeUndZeige(e.target.value, 0));
-
-// ---- Teilnehmer zählen ----
-beobachteTeilnehmer(raum, (n) => { $("teilnehmerZahl").textContent = n; });
 
 ladeUndZeige(themaId, 0);
