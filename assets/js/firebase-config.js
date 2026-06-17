@@ -12,13 +12,14 @@
 // ------------------------------------------------------------
 
 export const firebaseConfig = {
-  apiKey: "DEIN_API_KEY",
-  authDomain: "DEIN_PROJEKT.firebaseapp.com",
-  databaseURL: "https://DEIN_PROJEKT-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "DEIN_PROJEKT",
-  storageBucket: "DEIN_PROJEKT.appspot.com",
-  messagingSenderId: "DEINE_SENDER_ID",
-  appId: "DEINE_APP_ID"
+  apiKey: "AIzaSyBJkfPl1Jv04eVQpvYmPVSJ_wOXPz7CZak",
+  authDomain: "ginoco-68964.firebaseapp.com",
+  databaseURL: "https://ginoco-68964-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "ginoco-68964",
+  storageBucket: "ginoco-68964.firebasestorage.app",
+  messagingSenderId: "100465372476",
+  appId: "1:100465372476:web:06eb5affbd655f366f8239",
+  measurementId: "G-MXC3QLG24Z"
 };
 
 // Wird automatisch erkannt – nichts ändern.
