@@ -80,6 +80,28 @@ function sendJson(res, code, obj) {
   res.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
   res.end(JSON.stringify(obj));
 }
+
+// Sicherheits-HTTP-Header (gegen XSS, Clickjacking, Protokoll-Downgrade …).
+function setSecurityHeaders(res) {
+  res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Referrer-Policy', 'no-referrer');
+  // Kamera/Mikro nur für die eigene Seite erlaubt (für die Video-Funktion nötig).
+  res.setHeader('Permissions-Policy', 'camera=(self), microphone=(self), geolocation=()');
+  res.setHeader('Content-Security-Policy', [
+    "default-src 'self'",
+    "script-src 'self'",
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: blob:",
+    "media-src 'self' blob: mediastream:",
+    "connect-src 'self' ws: wss:",
+    "font-src 'self'",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "frame-ancestors 'none'",
+  ].join('; '));
+}
 function readBody(req, limit = 25 * 1024 * 1024) {
   return new Promise((resolve, reject) => {
     let size = 0; const chunks = [];
@@ -102,7 +124,7 @@ function getToken(req) {
   try { return new URL(req.url, 'http://x').searchParams.get('token') || ''; }
   catch { return ''; }
 }
-function isAuthed(req) { return security.validToken(getToken(req)); }
+function isAuthed(req) { return security.validToken(getToken(req), security.clientIp(req)); }
 
 // Behandelt /api/*-Anfragen. Gibt true zurück, wenn die Anfrage erledigt ist.
 async function handleApi(req, res, urlPath, ip) {
@@ -112,11 +134,12 @@ async function handleApi(req, res, urlPath, ip) {
   if (urlPath === '/api/login' && req.method === 'POST') {
     if (!MODERATOR_PASSWORD) { sendJson(res, 503, { reason: 'mod-not-configured' }); return true; }
     let body; try { body = await readBody(req, 64 * 1024); } catch { sendJson(res, 400, { reason: 'bad-request' }); return true; }
-    const okPw = String(body.password || '') === MODERATOR_PASSWORD;
+    const okPw = security.safeEqual(body.password || '', MODERATOR_PASSWORD);
     const okTotp = security.verifyTotp(MODERATOR_TOTP_SECRET, body.totp);
     if (okPw && okTotp) {
       security.resetFails(ip);
-      sendJson(res, 200, { token: security.issueToken(), twofa: !!MODERATOR_TOTP_SECRET });
+      security.recordEvent('login-ok', ip, 'Moderator angemeldet');
+      sendJson(res, 200, { token: security.issueToken(ip), twofa: !!MODERATOR_TOTP_SECRET });
     } else {
       security.recordFail(ip, 'login: ' + (!okPw ? 'falsches Passwort' : 'falscher 2FA-Code'));
       sendJson(res, 401, { reason: !okPw ? 'bad-password' : 'bad-totp' });
@@ -147,6 +170,7 @@ async function handleApi(req, res, urlPath, ip) {
     let body; try { body = await readBody(req); } catch { sendJson(res, 413, { reason: 'too-large' }); return true; }
     if (!body.code || !store.isCodeUsable(body.code)) { sendJson(res, 400, { reason: 'bad-code' }); return true; }
     const rec = store.saveAccount(body);
+    security.recordEvent('audit', ip, 'Account gespeichert: ' + (rec.verifiedName || rec.applicantName || rec.id));
     sendJson(res, 200, { id: rec.id });
     return true;
   }
@@ -174,7 +198,9 @@ async function handleApi(req, res, urlPath, ip) {
   }
   if (urlPath === '/api/account-delete' && req.method === 'POST') {
     let body; try { body = await readBody(req, 16 * 1024); } catch { body = {}; }
-    sendJson(res, 200, { ok: store.deleteAccount(body.id) }); return true;
+    const ok = store.deleteAccount(body.id);
+    if (ok) security.recordEvent('audit', ip, 'Account gelöscht: ' + body.id);
+    sendJson(res, 200, { ok }); return true;
   }
 
   // ---- Überwachung (gesperrte IPs + Ereignisse) ----
@@ -220,6 +246,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   const ip = security.clientIp(req);
+  setSecurityHeaders(res);
 
   // Gesperrte IPs (Brute-Force / Honeypot) sofort abweisen.
   if (security.isBlocked(ip)) { res.writeHead(403); res.end('Forbidden'); return; }
@@ -228,6 +255,13 @@ const server = http.createServer(async (req, res) => {
   if (security.isHoneypot(urlPath)) {
     security.recordHoneypot(ip, urlPath);
     res.writeHead(404); res.end('Not found');
+    return;
+  }
+
+  // Allgemeines Rate-Limit (Health-Check ausgenommen).
+  if (urlPath !== '/healthz' && !security.rateLimit(ip)) {
+    res.writeHead(429, { 'Content-Type': 'text/plain; charset=utf-8' });
+    res.end('Zu viele Anfragen');
     return;
   }
 
@@ -329,7 +363,7 @@ wss.on('connection', (ws, req) => {
 
       // Moderator: gültiges Login-Token nötig (kommt aus /api/login).
       if (role === 'host') {
-        if (!security.validToken(msg.token)) {
+        if (!security.validToken(msg.token, ws.ip)) {
           security.recordFail(ws.ip, 'WS: ungültiges Moderator-Token');
           send(ws, { type: 'error', reason: 'auth' });
           return;

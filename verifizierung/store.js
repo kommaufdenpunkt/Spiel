@@ -20,12 +20,27 @@ let codes = [];      // [{code, createdAt, createdBy, applicantName, status, use
 let accounts = [];   // [{id, code, ...metadaten, photos:[{label,file,mime,enc}]}]
 
 function load(file, fallback) {
-  try { return JSON.parse(fs.readFileSync(file, 'utf8')); }
+  let raw;
+  try { raw = fs.readFileSync(file, 'utf8'); }
+  catch { return fallback; } // Datei existiert noch nicht
+  if (raw.startsWith('ENC1:')) {
+    if (!ENC_KEY) {
+      throw new Error(`${file} ist verschlüsselt, aber STORAGE_KEY fehlt. Server-Start abgebrochen, um Datenverlust zu vermeiden.`);
+    }
+    try {
+      return JSON.parse(decryptBuf(Buffer.from(raw.slice(5), 'base64')).toString('utf8'));
+    } catch {
+      throw new Error(`${file} konnte nicht entschlüsselt werden – falscher STORAGE_KEY? Server-Start abgebrochen, um Überschreiben zu vermeiden.`);
+    }
+  }
+  try { return JSON.parse(raw); } // (noch) unverschlüsselt – wird beim nächsten Speichern verschlüsselt
   catch { return fallback; }
 }
 function saveAtomic(file, data) {
   const tmp = file + '.tmp';
-  fs.writeFileSync(tmp, JSON.stringify(data, null, 2));
+  let out = JSON.stringify(data, null, 2);
+  if (ENC_KEY) out = 'ENC1:' + encryptBuf(Buffer.from(out, 'utf8')).toString('base64');
+  fs.writeFileSync(tmp, out);
   fs.renameSync(tmp, file);
 }
 function codesFile() { return path.join(DATA_DIR, 'codes.json'); }

@@ -32,19 +32,46 @@ function clientIp(req) {
   return (req.socket && req.socket.remoteAddress) || 'unknown';
 }
 
-// ---- Login-Tokens ----------------------------------------------------------
-const tokens = new Map(); // token -> expiry(ms)
+// ---- Timing-sicherer Vergleich (gegen Timing-Angriffe) ---------------------
+function safeEqual(a, b) {
+  const ha = crypto.createHash('sha256').update(String(a)).digest();
+  const hb = crypto.createHash('sha256').update(String(b)).digest();
+  return crypto.timingSafeEqual(ha, hb);
+}
+
+// ---- Login-Tokens (kurzlebig, an die Client-IP gebunden) -------------------
+const tokens = new Map(); // token -> {exp, ip}
 const TOKEN_TTL = 8 * 60 * 60 * 1000; // 8 Stunden
 
-function issueToken() {
+function issueToken(ip) {
   const t = crypto.randomBytes(24).toString('hex');
-  tokens.set(t, Date.now() + TOKEN_TTL);
+  tokens.set(t, { exp: Date.now() + TOKEN_TTL, ip: ip || '' });
   return t;
 }
-function validToken(t) {
-  const exp = tokens.get(t);
-  if (!exp) return false;
-  if (Date.now() > exp) { tokens.delete(t); return false; }
+function validToken(t, ip) {
+  const rec = tokens.get(t);
+  if (!rec) return false;
+  if (Date.now() > rec.exp) { tokens.delete(t); return false; }
+  if (rec.ip && ip && rec.ip !== ip) return false; // an IP gebunden
+  return true;
+}
+
+// ---- Allgemeines Rate-Limit pro IP -----------------------------------------
+const reqCounts = new Map(); // ip -> {count, windowStart}
+const RATE_MAX = 300;        // Anfragen
+const RATE_WINDOW = 60 * 1000; // pro 60 Sekunden
+function rateLimit(ip) {
+  const now = Date.now();
+  const rec = reqCounts.get(ip);
+  if (!rec || now - rec.windowStart > RATE_WINDOW) {
+    reqCounts.set(ip, { count: 1, windowStart: now });
+    return true;
+  }
+  rec.count++;
+  if (rec.count > RATE_MAX) {
+    if (rec.count === RATE_MAX + 1) recordEvent('rate-limit', ip, 'zu viele Anfragen');
+    return false;
+  }
   return true;
 }
 
@@ -158,7 +185,7 @@ function getMonitoring() {
 }
 
 module.exports = {
-  init, clientIp, issueToken, validToken,
+  init, clientIp, issueToken, validToken, safeEqual, rateLimit,
   verifyTotp, generateTotpSecret,
   isBlocked, recordFail, resetFails, isHoneypot, recordHoneypot, recordEvent,
   unblock, blockManual, getMonitoring,
