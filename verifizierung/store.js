@@ -15,9 +15,11 @@ const crypto = require('crypto');
 
 let DATA_DIR = path.join(__dirname, 'data');
 let PHOTO_DIR = path.join(DATA_DIR, 'photos');
+let REC_DIR = path.join(DATA_DIR, 'recordings');
 let ENC_KEY = null;  // 32-Byte-Schlüssel für Foto-Verschlüsselung (oder null)
 let codes = [];      // [{code, createdAt, createdBy, applicantName, status, usedAt}]
 let accounts = [];   // [{id, code, ...metadaten, photos:[{label,file,mime,enc}]}]
+let recordings = []; // [{id, file, mime, ext, enc, bytes, durationSec, ...metadaten}]
 
 function load(file, fallback) {
   let raw;
@@ -47,18 +49,25 @@ function codesFile() { return path.join(DATA_DIR, 'codes.json'); }
 function accountsFile() { return path.join(DATA_DIR, 'accounts.json'); }
 function securityFile() { return path.join(DATA_DIR, 'security.json'); }
 function moderatorsFile() { return path.join(DATA_DIR, 'moderators.json'); }
+function recordingsFile() { return path.join(DATA_DIR, 'recordings.json'); }
 let secLog = [];
 let moderators = [];
 
 function init({ dir, encKey } = {}) {
-  if (dir) { DATA_DIR = dir; PHOTO_DIR = path.join(DATA_DIR, 'photos'); }
+  if (dir) {
+    DATA_DIR = dir;
+    PHOTO_DIR = path.join(DATA_DIR, 'photos');
+    REC_DIR = path.join(DATA_DIR, 'recordings');
+  }
   // Schlüssel aus Passphrase ableiten (32 Byte für AES-256).
   ENC_KEY = encKey ? crypto.createHash('sha256').update(String(encKey)).digest() : null;
   fs.mkdirSync(PHOTO_DIR, { recursive: true });
+  fs.mkdirSync(REC_DIR, { recursive: true });
   codes = load(codesFile(), []);
   accounts = load(accountsFile(), []);
   secLog = load(securityFile(), []);
   moderators = load(moderatorsFile(), []);
+  recordings = load(recordingsFile(), []);
   return { DATA_DIR, encrypted: !!ENC_KEY };
 }
 
@@ -293,9 +302,79 @@ function deleteAccount(id) {
   return true;
 }
 
+// ---- Aufnahmen (verschlüsselte Verifizierungs-Videos) ----------------------
+// Videos werden – wie die Fotos – verschlüsselt auf der Platte abgelegt und
+// sind ausschließlich nach Admin-Login über den Server abrufbar. Aufbewahrung
+// ist unbegrenzt; gelöscht wird nur manuell im Panel.
+function recordingPath(file) {
+  // Verhindert Pfad-Ausbruch.
+  const p = path.normalize(path.join(REC_DIR, file));
+  if (!p.startsWith(REC_DIR)) return null;
+  return p;
+}
+
+function saveRecording(data) {
+  const buffer = Buffer.isBuffer(data.buffer) ? data.buffer : Buffer.from(data.buffer || []);
+  if (!buffer.length) return null;
+  const id = crypto.randomUUID();
+  const ext = String(data.ext || 'webm').toLowerCase().replace(/[^a-z0-9]/g, '') || 'webm';
+  const enc = !!ENC_KEY;
+  const file = `${id}.${ext}${enc ? '.enc' : ''}`;
+  const out = enc ? encryptBuf(buffer) : buffer;
+  fs.mkdirSync(REC_DIR, { recursive: true });
+  fs.writeFileSync(recordingPath(file), out);
+  const rec = {
+    id,
+    file,
+    mime: String(data.mime || 'video/webm').slice(0, 80),
+    ext,
+    enc,
+    bytes: buffer.length,
+    durationSec: Math.max(0, Math.round(Number(data.durationSec) || 0)),
+    applicantName: String(data.applicantName || '').slice(0, 80),
+    roomCode: String(data.roomCode || '').slice(0, 20),
+    moderatorName: String(data.moderatorName || '').slice(0, 60),
+    createdAt: new Date().toISOString(),
+  };
+  recordings.push(rec);
+  saveAtomic(recordingsFile(), recordings);
+  return rec;
+}
+
+function listRecordings() {
+  // Nur Metadaten (keine Videodaten), neueste zuerst.
+  return recordings.slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+function getRecording(id) {
+  return recordings.find((r) => r.id === id) || null;
+}
+// Liefert die (ggf. entschlüsselten) Videodaten zu einem Aufnahme-Eintrag.
+function readRecording(id) {
+  const rec = getRecording(id);
+  if (!rec) return null;
+  const p = recordingPath(rec.file);
+  if (!p || !fs.existsSync(p)) return null;
+  let buf = fs.readFileSync(p);
+  if (rec.enc) {
+    if (!ENC_KEY) return null; // verschlüsselt, aber kein Schlüssel -> nicht lesbar
+    try { buf = decryptBuf(buf); } catch { return null; }
+  }
+  return { buffer: buf, mime: rec.mime || 'video/webm' };
+}
+function deleteRecording(id) {
+  const idx = recordings.findIndex((r) => r.id === id);
+  if (idx < 0) return false;
+  const p = recordingPath(recordings[idx].file);
+  if (p) { try { fs.rmSync(p, { force: true }); } catch {} }
+  recordings.splice(idx, 1);
+  saveAtomic(recordingsFile(), recordings);
+  return true;
+}
+
 module.exports = {
   init, createCode, getCode, isCodeUsable, consumeCode, revokeCode, listCodes,
   saveAccount, listAccounts, getAccount, photoPath, readPhoto, deleteAccount,
+  saveRecording, listRecordings, getRecording, readRecording, deleteRecording,
   logSecurity, getSecurityLog,
   listModerators, getModeratorByUsername, verifyModerator, addModerator, deleteModerator,
   resetModeratorPassword, changeOwnPassword, lockModerator, unlockModerator,

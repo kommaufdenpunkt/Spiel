@@ -419,7 +419,41 @@
     const r = await api('GET', '/api/accounts');
     if (r.status !== 200) { toast('Konnte Accounts nicht laden.'); return; }
     renderAdmin(r.body.accounts || []);
+    const rr = await api('GET', '/api/recordings');
+    renderRecordings(rr.status === 200 ? (rr.body.recordings || []) : []);
     $('adminView').classList.add('on');
+  }
+
+  function renderRecordings(list) {
+    const el = $('recList');
+    if (!el) return;
+    el.innerHTML = '';
+    if (!list.length) {
+      el.innerHTML = '<p style="color:var(--dim)">Noch keine Aufnahmen.</p>';
+      return;
+    }
+    list.forEach((r) => {
+      const div = document.createElement('div');
+      div.className = 'acc';
+      const date = new Date(r.createdAt).toLocaleString('de-DE');
+      const mm = Math.floor((r.durationSec || 0) / 60), ss = (r.durationSec || 0) % 60;
+      const dur = `${mm}:${String(ss).padStart(2, '0')}`;
+      const mb = (r.bytes / (1024 * 1024)).toFixed(1);
+      const src = `/api/recording?id=${encodeURIComponent(r.id)}&token=${encodeURIComponent(state.modToken)}`;
+      div.innerHTML =
+        `<div class="top"><div><div class="nm">${escapeHtml(r.applicantName || 'Bewerber')}</div>` +
+        `<div class="meta">${date} · Dauer ${dur} · ${mb} MB · ${escapeHtml(r.ext || '')}<br>` +
+        `Raum: ${escapeHtml(r.roomCode || '-')} · Moderator: ${escapeHtml(r.moderatorName || '-')}</div></div></div>` +
+        `<video controls preload="none" src="${src}" style="width:100%;max-height:360px;border-radius:8px;background:#000;margin:.4rem 0"></video>` +
+        `<div class="acts"><a class="dl" href="${src}" download="verifizierung_${encodeURIComponent((r.applicantName||'bewerber').replace(/\s+/g,'_'))}.${escapeHtml(r.ext||'webm')}" style="margin-right:.6rem">⬇ Herunterladen</a>` +
+        `<button class="del">🗑 Löschen</button></div>`;
+      div.querySelector('.del').addEventListener('click', async () => {
+        if (!confirm('Diese Aufnahme endgültig löschen?')) return;
+        await api('POST', '/api/recording-delete', { id: r.id });
+        openAdmin();
+      });
+      el.appendChild(div);
+    });
   }
 
   function renderAdmin(list) {
@@ -1231,6 +1265,32 @@
       toast('Video als WebM gespeichert (siehe README für MP4)');
     } else {
       toast('Video als MP4 gespeichert');
+    }
+
+    // Zusätzlich verschlüsselt auf dem Server ablegen (nur für eingeloggte
+    // Moderatoren; abrufbar ausschließlich nach Admin-Login im Panel).
+    uploadRecording(blob, type);
+  }
+
+  async function uploadRecording(blob, type) {
+    if (!state.modToken) return; // ohne Login keine serverseitige Ablage
+    const dur = state.recStart ? Math.round((Date.now() - state.recStart) / 1000) : 0;
+    const params = new URLSearchParams({
+      room: state.roomCode || '',
+      applicant: (remoteTag.textContent || '').slice(0, 80),
+      dur: String(dur),
+      ext: state.recExt || 'webm',
+    });
+    try {
+      const res = await fetch('/api/recording?' + params.toString(), {
+        method: 'POST',
+        headers: { 'Content-Type': type, 'Authorization': 'Bearer ' + state.modToken },
+        body: blob,
+      });
+      if (res.ok) { sysMsg('Aufnahme verschlüsselt im Panel gespeichert.'); toast('Aufnahme im Panel gesichert'); }
+      else { sysMsg('Aufnahme konnte nicht im Panel gespeichert werden (HTTP ' + res.status + ').'); }
+    } catch {
+      sysMsg('Aufnahme konnte nicht zum Server übertragen werden (Netzwerk).');
     }
   }
 

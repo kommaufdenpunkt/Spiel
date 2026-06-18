@@ -120,6 +120,19 @@ function readBody(req, limit = 25 * 1024 * 1024) {
     req.on('error', reject);
   });
 }
+// Liest den Anfrage-Body als rohen Buffer (für Video-Uploads).
+function readRawBody(req, limit = 300 * 1024 * 1024) {
+  return new Promise((resolve, reject) => {
+    let size = 0; const chunks = [];
+    req.on('data', (c) => {
+      size += c.length;
+      if (size > limit) { reject(new Error('too-large')); req.destroy(); return; }
+      chunks.push(c);
+    });
+    req.on('end', () => resolve(Buffer.concat(chunks)));
+    req.on('error', reject);
+  });
+}
 function getToken(req) {
   const h = req.headers['authorization'] || '';
   if (h.startsWith('Bearer ')) return h.slice(7);
@@ -294,6 +307,73 @@ async function handleApi(req, res, urlPath, ip) {
     let body; try { body = await readBody(req, 16 * 1024); } catch { body = {}; }
     const ok = store.deleteAccount(body.id);
     if (ok) security.recordEvent('audit', ip, 'Account gelöscht: ' + body.id);
+    sendJson(res, 200, { ok }); return true;
+  }
+
+  // ---- Aufnahmen (verschlüsselte Verifizierungs-Videos) ----
+  // Hochladen darf jeder eingeloggte Moderator (rohes Video im Body).
+  if (urlPath === '/api/recording' && req.method === 'POST') {
+    let buf; try { buf = await readRawBody(req); } catch { sendJson(res, 413, { reason: 'too-large' }); return true; }
+    if (!buf.length) { sendJson(res, 400, { reason: 'empty' }); return true; }
+    const q = new URL(req.url, 'http://x').searchParams;
+    const rec = store.saveRecording({
+      buffer: buf,
+      mime: (req.headers['content-type'] || 'video/webm').split(';')[0].trim(),
+      ext: q.get('ext') || 'webm',
+      durationSec: q.get('dur'),
+      applicantName: q.get('applicant') || '',
+      roomCode: q.get('room') || '',
+      moderatorName: reqName(req),
+    });
+    if (!rec) { sendJson(res, 400, { reason: 'bad-recording' }); return true; }
+    security.recordEvent('audit', ip, 'Aufnahme gespeichert: ' + (rec.applicantName || rec.id));
+    sendJson(res, 200, { id: rec.id }); return true;
+  }
+  // Auflisten/Ansehen/Löschen = NUR Admin.
+  if (urlPath === '/api/recordings' && req.method === 'GET') {
+    if (!isAdminReq(req)) { sendJson(res, 403, { reason: 'admin-only' }); return true; }
+    sendJson(res, 200, { recordings: store.listRecordings() }); return true;
+  }
+  if (urlPath === '/api/recording' && req.method === 'GET') {
+    if (!isAdminReq(req)) { res.writeHead(403); res.end('Forbidden'); return true; }
+    const q = new URL(req.url, 'http://x').searchParams;
+    const data = store.readRecording(q.get('id'));
+    if (!data) { res.writeHead(404); res.end('not found'); return true; }
+    const total = data.buffer.length;
+    const range = req.headers['range'];
+    // Range-Anfragen (Vor-/Zurückspulen im <video>) bedienen.
+    const m = range && /^bytes=(\d*)-(\d*)$/.exec(range);
+    if (m) {
+      let start = m[1] === '' ? 0 : parseInt(m[1], 10);
+      let end = m[2] === '' ? total - 1 : parseInt(m[2], 10);
+      if (isNaN(start) || isNaN(end) || start > end || start >= total) {
+        res.writeHead(416, { 'Content-Range': `bytes */${total}` }); res.end(); return true;
+      }
+      end = Math.min(end, total - 1);
+      res.writeHead(206, {
+        'Content-Type': data.mime,
+        'Content-Range': `bytes ${start}-${end}/${total}`,
+        'Accept-Ranges': 'bytes',
+        'Content-Length': end - start + 1,
+        'Cache-Control': 'no-store',
+      });
+      res.end(req.method === 'HEAD' ? undefined : data.buffer.subarray(start, end + 1));
+      return true;
+    }
+    res.writeHead(200, {
+      'Content-Type': data.mime,
+      'Content-Length': total,
+      'Accept-Ranges': 'bytes',
+      'Cache-Control': 'no-store',
+    });
+    res.end(data.buffer);
+    return true;
+  }
+  if (urlPath === '/api/recording-delete' && req.method === 'POST') {
+    if (!isAdminReq(req)) { sendJson(res, 403, { reason: 'admin-only' }); return true; }
+    let body; try { body = await readBody(req, 16 * 1024); } catch { body = {}; }
+    const ok = store.deleteRecording(body.id);
+    if (ok) security.recordEvent('audit', ip, 'Aufnahme gelöscht: ' + body.id);
     sendJson(res, 200, { ok }); return true;
   }
 

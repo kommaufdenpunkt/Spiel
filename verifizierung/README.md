@@ -19,7 +19,10 @@ einreichen.
   die aktuelle Frage groß; sie wird auch ins Video eingeblendet.
 - **Chat-Fenster** zwischen euch.
 - **Aufnahme** des kompletten Gesprächs → Download als **MP4** (bzw. WebM, falls
-  der Browser kein MP4 aufnehmen kann – siehe unten).
+  der Browser kein MP4 aufnehmen kann – siehe unten). Zusätzlich wird die
+  Aufnahme **verschlüsselt auf dem Server** abgelegt und ist – nur nach
+  **Admin-Login** – im Panel ansehbar, herunterladbar und löschbar (öffentlich
+  ist nichts abrufbar).
 - **Persönliche Moderator-Logins:** Jede:r aus dem Team hat einen eigenen
   Login (Benutzername + Passwort + eigenes 2FA). Verwaltet wird das über ein
   **Admin-Passwort** (Logins im Browser anlegen/löschen). In jeder Verifizierung
@@ -34,10 +37,12 @@ einreichen.
 - **Sicherheit:** 2FA (TOTP), Brute-Force-Sperre + Honeypot, Login-Härtung.
 - **Verschlüsselung (durchgängig):**
   - *Übertragung:* HTTPS (Web) + WebRTC/DTLS (Video & Datei-Upload Browser↔Browser).
-  - *Speicherung:* **alle** Daten – Ausweis-Fotos, Profilbild **und** Metadaten
-    (Name, BIGO-ID, Ausweis-Nr.) – verschlüsselt mit **AES-256-GCM** (`STORAGE_KEY`).
-    Ohne korrekten Schlüssel sind die Daten unlesbar; mit falschem Schlüssel
-    startet der Server bewusst nicht.
+  - *Speicherung:* **alle** Daten – Ausweis-Fotos, Profilbild, Gesprächs-Videos
+    **und** Metadaten (Name, BIGO-ID, Ausweis-Nr.) – verschlüsselt mit
+    **AES-256-GCM** (`STORAGE_KEY`). Ohne korrekten Schlüssel sind die Daten
+    unlesbar; mit falschem Schlüssel startet der Server bewusst nicht.
+  - *Zugriff:* Aufnahmen und Akten sind **nicht öffentlich** – Hochladen setzt
+    einen Moderator-Login voraus, Ansehen/Löschen nur mit Admin-Login.
 - **Einwilligung:** Der Bewerber muss vor dem Beitritt der Datenverarbeitung
   aktiv zustimmen (Häkchen).
 
@@ -150,9 +155,13 @@ Tipp: Nimm zum Aufnehmen am besten **Safari (Mac/iPhone)** oder eine aktuelle
 ## Datenschutz / Hinweis
 
 Bitte den Bewerber **vor der Aufnahme** über die Aufzeichnung informieren und
-sein Einverständnis einholen. Das Video läuft direkt zwischen den beiden
-Browsern; der Server vermittelt nur den Verbindungsaufbau und speichert kein
-Video.
+sein Einverständnis einholen. Das Live-Gespräch läuft direkt zwischen den beiden
+Browsern; der Server vermittelt nur den Verbindungsaufbau. Die **fertige
+Aufnahme** wird nach dem Beenden zusätzlich **verschlüsselt auf dem Server**
+gespeichert (AES-256-GCM) und ist ausschließlich nach **Admin-Login** im Panel
+abruf- und löschbar. Die Aufbewahrung ist **unbegrenzt** (keine automatische
+Löschung); entfernt wird nur manuell über den Löschen-Button. Plane dafür ein
+Löschkonzept ein.
 
 ---
 
@@ -161,7 +170,7 @@ Video.
 ```
 verifizierung/
 ├── server.js            Server: App + Vermittlung + API (Login/Codes/Accounts)
-├── store.js             Persistenz: Codes, Accounts, (verschlüsselte) Fotos
+├── store.js             Persistenz: Codes, Accounts, (verschlüsselte) Fotos + Videos
 ├── security.js          2FA (TOTP), Brute-Force-Sperre, Honeypot, Tokens
 ├── package.json         (npm run totp = 2FA-Secret erzeugen)
 ├── Dockerfile           Container-Image (für Coolify/Docker)
