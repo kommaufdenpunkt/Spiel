@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Moderatoren-Panel · 4ever1</title>
+<style>
+  :root{
+    --bg:#0a0e14; --panel:#141b24; --panel2:#1b232e; --line:#283341; --line2:#33414f;
+    --ink:#eaf0f7; --dim:#93a0b1; --accent:#5b8cff; --accent2:#3b6ef0;
+    --good:#3fb950; --bad:#f85149; --warn:#e3b341;
+    --shadow:0 18px 50px -18px #000c, 0 2px 8px #0006;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{color:var(--ink);-webkit-font-smoothing:antialiased;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    min-height:100%;display:flex;flex-direction:column;
+    background:radial-gradient(1100px 560px at 78% -12%, #2247a83a, transparent 60%),
+      radial-gradient(820px 480px at -5% 108%, #0e3b6e2e, transparent 55%),var(--bg)}
+  button{font-family:inherit;cursor:pointer;border:1px solid var(--line);
+    background:linear-gradient(180deg,#212a36,#19212b);color:var(--ink);
+    padding:.55rem .95rem;border-radius:10px;font-size:.88rem;font-weight:500;
+    transition:transform .12s,border-color .12s,filter .12s,box-shadow .12s;box-shadow:inset 0 1px 0 #ffffff10}
+  button:hover:not(:disabled){border-color:var(--accent);transform:translateY(-1px)}
+  button:disabled{opacity:.4;cursor:default}
+  button.primary{background:linear-gradient(180deg,var(--accent),var(--accent2));border-color:#6f9bff;color:#fff}
+  button.primary:hover:not(:disabled){filter:brightness(1.08)}
+  button.danger{background:linear-gradient(180deg,#3a191c,#2a1416);border-color:var(--bad);color:#ff9c93}
+  input{font-family:inherit;font-size:.95rem;padding:.6rem .8rem;border-radius:10px;
+    border:1px solid var(--line);background:#0b0f15;color:var(--ink);width:100%;transition:.12s}
+  input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px #5b8cff33}
+  ::-webkit-scrollbar{width:10px;height:10px}
+  ::-webkit-scrollbar-thumb{background:#2c3744;border-radius:8px;border:2px solid transparent;background-clip:content-box}
+
+  header{display:flex;align-items:center;justify-content:space-between;gap:1rem;
+    padding:.7rem 1.1rem;border-bottom:1px solid var(--line);background:#0d131bcc;
+    backdrop-filter:blur(10px);position:sticky;top:0;z-index:5}
+  .brand{display:flex;align-items:center;gap:.65rem}
+  .logo{width:32px;height:32px;border-radius:9px;display:grid;place-items:center;flex:none;
+    background:linear-gradient(135deg,#6f9bff,#3b6ef0);color:#fff;font-size:1rem;
+    box-shadow:0 6px 16px -6px #3b6ef0cc,inset 0 1px 0 #ffffff40}
+  header h1{font-size:1rem;margin:0;font-weight:650}
+  header h1 small{display:block;font-size:.64rem;color:var(--dim);letter-spacing:.18em;
+    text-transform:uppercase;font-weight:500;margin-top:1px}
+  .whoami{font-size:.82rem;color:var(--dim);display:flex;gap:.7rem;align-items:center}
+
+  /* Login */
+  .login{flex:1;display:flex;align-items:center;justify-content:center;padding:1.5rem}
+  .card{width:100%;max-width:400px;background:linear-gradient(180deg,#161d27,#11171f);
+    border:1px solid var(--line);border-radius:18px;padding:2rem 1.8rem;box-shadow:var(--shadow);
+    position:relative;overflow:hidden}
+  .card::before{content:"";position:absolute;top:0;left:0;right:0;height:3px;
+    background:linear-gradient(90deg,#5b8cff,#3b6ef0 55%,#22d3ee)}
+  .card h2{margin:.2rem 0 .3rem;font-size:1.3rem}
+  .card p.sub{margin:0 0 1.3rem;color:var(--dim);font-size:.88rem;line-height:1.5}
+  .field{margin-bottom:.9rem}
+  .field label{display:block;font-size:.72rem;color:var(--dim);margin-bottom:.3rem;
+    text-transform:uppercase;letter-spacing:.09em}
+  .err{color:#ff9c93;font-size:.85rem;margin-top:.7rem;min-height:1.1em}
+
+  /* Dashboard */
+  .dash{flex:1;display:none;min-height:0}
+  .dash.on{display:flex}
+  .nav{width:230px;border-right:1px solid var(--line);background:var(--panel);padding:.8rem;
+    display:flex;flex-direction:column;gap:.35rem;flex:none}
+  .nav button{text-align:left;background:transparent;border:0;color:var(--dim);box-shadow:none;
+    padding:.7rem .8rem;border-radius:10px;font-size:.92rem}
+  .nav button:hover{color:var(--ink);transform:none;background:#1b232e}
+  .nav button.sel{color:#fff;background:linear-gradient(180deg,#21314a,#1a2740);
+    box-shadow:0 0 0 1px #5b8cff44}
+  .content{flex:1;overflow:auto;padding:1.4rem 1.6rem;min-width:0}
+  .content h2{margin:.1rem 0 1rem;font-size:1.3rem;font-weight:680}
+  .sub{color:var(--dim);font-size:.85rem;margin:-.6rem 0 1.2rem;line-height:1.5}
+  .section{display:none}
+  .section.on{display:block}
+
+  .stats{display:flex;gap:.8rem;flex-wrap:wrap;margin-bottom:1.3rem}
+  .stat{flex:1;min-width:140px;background:var(--panel2);border:1px solid var(--line);
+    border-radius:14px;padding:1rem 1.1rem}
+  .stat .n{font-size:1.7rem;font-weight:700}
+  .stat .l{font-size:.76rem;color:var(--dim);text-transform:uppercase;letter-spacing:.08em;margin-top:.2rem}
+
+  .row{display:flex;justify-content:space-between;align-items:center;gap:.6rem;
+    border:1px solid var(--line);border-radius:12px;padding:.7rem .85rem;margin-bottom:.5rem;
+    background:var(--panel2);font-size:.9rem}
+  .row .acts{display:flex;gap:.4rem;flex-wrap:wrap}
+  .muted{color:var(--dim);font-size:.78rem}
+  .pill{font-size:.72rem;padding:.15rem .5rem;border-radius:999px;border:1px solid var(--line)}
+  .pill.ok{color:#9ae6b4;border-color:var(--good);background:#10261a}
+  .pill.no{color:#ff9c93;border-color:var(--bad);background:#2a1416}
+  .pill.warn{color:#e6d29a;border-color:var(--warn);background:#2a2410}
+
+  .addbar{display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1rem;
+    background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:.7rem}
+  .addbar input{flex:1;min-width:140px}
+  .note{font-size:.82rem;color:var(--dim);margin-top:.5rem;line-height:1.5}
+  .note code{background:#0b0f15;border:1px solid var(--line);border-radius:6px;padding:.05rem .35rem;color:#cdd9e5}
+
+  .acc{border:1px solid var(--line);border-radius:14px;padding:1rem;background:var(--panel2);margin-bottom:.7rem}
+  .acc .top{display:flex;justify-content:space-between;gap:.6rem;align-items:flex-start}
+  .acc .nm{font-size:1rem;font-weight:650}
+  .acc .meta{font-size:.78rem;color:var(--dim);margin-top:.25rem;line-height:1.5}
+  .thumbs{display:flex;gap:.6rem;flex-wrap:wrap;margin-top:.7rem}
+  .thumbs figure{margin:0;display:flex;flex-direction:column;gap:.25rem;align-items:center;width:104px}
+  .thumbs img{height:90px;width:104px;object-fit:cover;border:1px solid var(--line);border-radius:8px;cursor:zoom-in}
+  .thumbs img:hover{border-color:var(--accent)}
+  .thumbs figcaption{font-size:.62rem;color:var(--dim);text-align:center;line-height:1.2}
+
+  .evlog{font-size:.8rem;font-family:ui-monospace,Menlo,Consolas,monospace;
+    border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  .evrow{display:grid;grid-template-columns:11rem 8rem 1fr;gap:.5rem;padding:.4rem .7rem;border-bottom:1px solid var(--line)}
+  .evrow:last-child{border-bottom:0}
+  .evrow .t{color:var(--dim)}
+  .ty{font-weight:600}
+  .ty.honeypot,.ty.blocked,.ty.manual-block{color:var(--bad)}
+  .ty.auth-fail{color:var(--warn)} .ty.unblock,.ty.login-ok{color:var(--good)}
+  .empty{color:var(--dim);font-size:.9rem;padding:1rem 0}
+  .toast{position:fixed;left:50%;bottom:1.3rem;transform:translateX(-50%) translateY(8px);
+    background:#11161ef0;border:1px solid var(--line2);padding:.65rem 1.1rem;border-radius:12px;
+    font-size:.85rem;opacity:0;transition:.22s;pointer-events:none;box-shadow:var(--shadow)}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  @media(max-width:760px){ .nav{width:100%;flex-direction:row;overflow:auto;border-right:0;border-bottom:1px solid var(--line)} .dash.on{flex-direction:column} }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <span class="logo">🛡</span>
+    <h1>Moderatoren-Panel <small>Agentur 4ever1 · Admin</small></h1>
+  </div>
+  <div class="whoami" id="whoami" style="display:none">
+    <span id="whoName"></span>
+    <button id="logoutBtn">Abmelden</button>
+  </div>
+</header>
+
+<!-- LOGIN -->
+<div class="login" id="login">
+  <div class="card">
+    <h2>Admin-Anmeldung</h2>
+    <p class="sub">Zugang zum Moderatoren-Panel. Nur für Administratoren.</p>
+    <div class="field">
+      <label for="pw">Admin-Passwort</label>
+      <input id="pw" type="password" autocomplete="current-password" placeholder="Admin-Passwort">
+    </div>
+    <div class="field">
+      <label for="totp">2FA-Code (falls aktiviert)</label>
+      <input id="totp" inputmode="numeric" autocomplete="one-time-code" placeholder="6-stelliger Code">
+    </div>
+    <button id="loginBtn" class="primary" style="width:100%">Anmelden</button>
+    <div class="err" id="loginErr"></div>
+  </div>
+</div>
+
+<!-- DASHBOARD -->
+<div class="dash" id="dash">
+  <nav class="nav">
+    <button data-sec="overview" class="sel">📊 Übersicht</button>
+    <button data-sec="moderators">👥 Moderatoren</button>
+    <button data-sec="accounts">🗂 Personalakten</button>
+    <button data-sec="reports">🎬 Aufnahmen / Meldungen</button>
+    <button data-sec="security">🛡 Überwachung</button>
+  </nav>
+  <div class="content">
+    <!-- Übersicht -->
+    <div class="section on" data-pane="overview">
+      <h2>Übersicht</h2>
+      <div class="stats" id="stats"></div>
+      <p class="note">Hier siehst du auf einen Blick, was deine 3 Moderatoren sammeln.
+        Über die Navigation links erreichst du alle Details.</p>
+    </div>
+    <!-- Moderatoren -->
+    <div class="section" data-pane="moderators">
+      <h2>Moderatoren</h2>
+      <p class="sub">Persönliche Logins anlegen, sperren/entsperren, Passwort zurücksetzen.</p>
+      <div class="addbar">
+        <input id="newUser" placeholder="Benutzername">
+        <input id="newPass" placeholder="Start-Passwort (min. 8 Zeichen)">
+        <button id="addMod" class="primary">+ Anlegen</button>
+      </div>
+      <div id="newModInfo" class="note"></div>
+      <div id="modList"></div>
+    </div>
+    <!-- Personalakten -->
+    <div class="section" data-pane="accounts">
+      <h2>Personalakten</h2>
+      <p class="sub">Alle abgeschlossenen Verifizierungen inkl. Fotos. Klick aufs Bild = vergrößern.</p>
+      <div id="accList"></div>
+    </div>
+    <!-- Aufnahmen -->
+    <div class="section" data-pane="reports">
+      <h2>Aufnahmen / Meldungen</h2>
+      <p class="sub">Aufgezeichnete Verifizierungs-Sitzungen (Auditions) und Meldungen.</p>
+      <div id="repList"><div class="empty">Aufnahme-Funktion wird in Phase 2 angebunden – das Panel ist dafür bereits vorbereitet.</div></div>
+    </div>
+    <!-- Überwachung -->
+    <div class="section" data-pane="security">
+      <h2>Überwachung</h2>
+      <p class="sub">Gesperrte IPs und sicherheitsrelevante Ereignisse (Login-Versuche, Honeypot …).</p>
+      <button id="refreshSec" style="margin-bottom:1rem">Aktualisieren</button>
+      <h3 style="font-size:.95rem;margin:.4rem 0">Gesperrte IPs</h3>
+      <div id="blockedList"></div>
+      <h3 style="font-size:.95rem;margin:1rem 0 .4rem">Letzte Ereignisse</h3>
+      <div class="evlog" id="eventList"></div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<script src="panel.js"></script>
+</body>
+</html>

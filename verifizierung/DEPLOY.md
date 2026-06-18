@@ -80,6 +80,10 @@ bestehenden für SSH 22 und HTTP/HTTPS 80/443):
 5. **Port / Ports Exposes:** `3000`.
 6. **Domains:** `https://verify.4ever1.tv` eintragen → Coolify holt automatisch
    ein Let's-Encrypt-Zertifikat (HTTPS).
+   - **Moderatoren-Panel:** zusätzlich `https://mcp.vibevibo.de` als zweite Domain
+     bei **derselben** App eintragen (DNS auf den Server zeigen lassen). Diese
+     Subdomain liefert direkt das Admin-Panel aus. (Alternativ jederzeit unter
+     `https://verify.4ever1.tv/panel` erreichbar.)
 7. **Environment Variables** setzen:
    - `ADMIN_PASSWORD` = (frei wählbares Admin-Passwort zum Verwalten der Logins) **Pflicht**
    - `TURN_SECRET` = (das Geheimnis aus Schritt 2)

@@ -385,6 +385,12 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // Moderatoren-Panel: eigene Seite. Über die Subdomain mcp.* wird es direkt
+  // als Startseite ausgeliefert; sonst per /panel erreichbar.
+  const host = String(req.headers.host || '').toLowerCase();
+  if (urlPath === '/panel' || (urlPath === '/' && host.startsWith('mcp.'))) {
+    urlPath = '/panel.html';
+  }
   if (urlPath === '/') urlPath = '/index.html';
 
   // Pfad sicher auflösen (kein Ausbruch aus /public).
