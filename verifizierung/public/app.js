@@ -402,10 +402,10 @@
 
   async function openAdmin() {
     $('lobbyErr').textContent = '';
-    if (!state.modToken) {
-      const login = await doLogin();
-      if (!login.ok) { $('lobbyErr').textContent = loginErrText(login); return; }
-    }
+    // Personalakte = nur Admin (Benutzername leer + Admin-Passwort).
+    const login = await doLogin({ asAdmin: true });
+    if (!login.ok) { $('lobbyErr').textContent = loginErrText(login); return; }
+    if (!state.isAdmin) { $('lobbyErr').textContent = 'Kein Admin-Zugang.'; return; }
     const r = await api('GET', '/api/accounts');
     if (r.status !== 200) { toast('Konnte Accounts nicht laden.'); return; }
     renderAdmin(r.body.accounts || []);

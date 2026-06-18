@@ -238,12 +238,14 @@ async function handleApi(req, res, urlPath, ip) {
     sendJson(res, 200, { id: rec.id });
     return true;
   }
+  // Personalakte ansehen/löschen = NUR Admin (Moderatoren speichern nur).
   if (urlPath === '/api/accounts' && req.method === 'GET') {
-    // Metadaten ohne Bilddaten.
+    if (!isAdminReq(req)) { sendJson(res, 403, { reason: 'admin-only' }); return true; }
     const list = store.listAccounts().map((a) => ({ ...a, photos: a.photos.map((p) => ({ label: p.label, file: p.file })) }));
     sendJson(res, 200, { accounts: list }); return true;
   }
   if (urlPath === '/api/account' && req.method === 'GET') {
+    if (!isAdminReq(req)) { sendJson(res, 403, { reason: 'admin-only' }); return true; }
     const id = new URL(req.url, 'http://x').searchParams.get('id');
     const acc = store.getAccount(id);
     if (!acc) { sendJson(res, 404, { reason: 'not-found' }); return true; }
@@ -251,6 +253,7 @@ async function handleApi(req, res, urlPath, ip) {
     return true;
   }
   if (urlPath === '/api/photo' && req.method === 'GET') {
+    if (!isAdminReq(req)) { res.writeHead(403); res.end('Forbidden'); return true; }
     const q = new URL(req.url, 'http://x').searchParams;
     const acc = store.getAccount(q.get('id'));
     const photoRec = acc && acc.photos.find((p) => p.file === q.get('file'));
@@ -261,6 +264,7 @@ async function handleApi(req, res, urlPath, ip) {
     return true;
   }
   if (urlPath === '/api/account-delete' && req.method === 'POST') {
+    if (!isAdminReq(req)) { sendJson(res, 403, { reason: 'admin-only' }); return true; }
     let body; try { body = await readBody(req, 16 * 1024); } catch { body = {}; }
     const ok = store.deleteAccount(body.id);
     if (ok) security.recordEvent('audit', ip, 'Account gelöscht: ' + body.id);
