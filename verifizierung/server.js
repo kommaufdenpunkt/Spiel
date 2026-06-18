@@ -146,7 +146,7 @@ async function handleApi(req, res, urlPath, ip) {
       if (m && okTotp) {
         security.resetFails(ip);
         security.recordEvent('login-ok', ip, 'Moderator: ' + m.username);
-        sendJson(res, 200, { token: security.issueToken(ip, { name: m.username, isAdmin: false }), name: m.username, role: 'moderator' });
+        sendJson(res, 200, { token: security.issueToken(ip, { name: m.username, isAdmin: false }), name: m.username, role: 'moderator', mustChange: !!m.mustChange });
       } else {
         security.recordFail(ip, 'Moderator-Login fehlgeschlagen (' + username + ')');
         sendJson(res, 401, { reason: m ? 'bad-totp' : 'bad-login' });
@@ -172,6 +172,16 @@ async function handleApi(req, res, urlPath, ip) {
   // Alle weiteren API-Routen erfordern ein gültiges Login-Token.
   if (!isAuthed(req)) { sendJson(res, 401, { reason: 'auth' }); return true; }
 
+  // ---- Eigenes Passwort ändern (eingeloggter Moderator) ----
+  if (urlPath === '/api/change-password' && req.method === 'POST') {
+    let body; try { body = await readBody(req, 16 * 1024); } catch { body = {}; }
+    const pw = String(body.newPassword || '');
+    if (pw.length < 8) { sendJson(res, 400, { reason: 'too-short' }); return true; }
+    const ok = store.changeOwnPassword(reqName(req), pw);
+    if (ok) security.recordEvent('audit', ip, 'Passwort geändert: ' + reqName(req));
+    sendJson(res, ok ? 200 : 400, { ok }); return true;
+  }
+
   // ---- Moderator-Konten verwalten (nur Admin) ----
   if (urlPath === '/api/moderators' && req.method === 'GET') {
     if (!isAdminReq(req)) { sendJson(res, 403, { reason: 'admin-only' }); return true; }
@@ -193,6 +203,15 @@ async function handleApi(req, res, urlPath, ip) {
     const ok = store.deleteModerator(body.id);
     if (ok) security.recordEvent('audit', ip, 'Moderator gelöscht: ' + body.id);
     sendJson(res, 200, { ok }); return true;
+  }
+  if (urlPath === '/api/moderator-reset' && req.method === 'POST') {
+    if (!isAdminReq(req)) { sendJson(res, 403, { reason: 'admin-only' }); return true; }
+    let body; try { body = await readBody(req, 16 * 1024); } catch { body = {}; }
+    const pw = String(body.newPassword || '');
+    if (pw.length < 8) { sendJson(res, 400, { reason: 'too-short' }); return true; }
+    const ok = store.resetModeratorPassword(body.id, pw);
+    if (ok) security.recordEvent('audit', ip, 'Passwort zurückgesetzt für ' + body.id);
+    sendJson(res, ok ? 200 : 400, { ok }); return true;
   }
 
   // ---- Einmalcode erzeugen ----

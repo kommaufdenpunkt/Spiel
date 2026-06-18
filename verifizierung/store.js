@@ -66,13 +66,14 @@ function init({ dir, encKey } = {}) {
 function listModerators() {
   return moderators.map((m) => ({
     id: m.id, username: m.username, createdAt: m.createdAt,
-    createdBy: m.createdBy || '', has2fa: !!m.totpSecret,
+    createdBy: m.createdBy || '', has2fa: !!m.totpSecret, mustChange: !!m.mustChange,
   }));
 }
 function getModeratorByUsername(u) {
   const name = String(u || '').trim().toLowerCase();
   return moderators.find((m) => m.username.toLowerCase() === name) || null;
 }
+function getModeratorById(id) { return moderators.find((m) => m.id === id) || null; }
 function verifyModerator(username, password) {
   const m = getModeratorByUsername(username);
   if (!m) return null;
@@ -80,6 +81,12 @@ function verifyModerator(username, password) {
   const stored = Buffer.from(m.hash, 'hex');
   if (h.length === stored.length && crypto.timingSafeEqual(h, stored)) return m;
   return null;
+}
+function setPassword(m, password, mustChange) {
+  m.salt = crypto.randomBytes(16).toString('hex');
+  m.hash = crypto.scryptSync(String(password), m.salt, 64).toString('hex');
+  m.mustChange = !!mustChange;
+  saveAtomic(moderatorsFile(), moderators);
 }
 function addModerator({ username, password, totpSecret, createdBy }) {
   const name = String(username || '').trim();
@@ -91,12 +98,27 @@ function addModerator({ username, password, totpSecret, createdBy }) {
     username: name,
     salt, hash,
     totpSecret: totpSecret || '',
+    mustChange: true, // beim ersten Login muss das Passwort geändert werden
     createdAt: new Date().toISOString(),
     createdBy: String(createdBy || '').slice(0, 60),
   };
   moderators.push(rec);
   saveAtomic(moderatorsFile(), moderators);
   return rec;
+}
+// Admin setzt ein neues Passwort -> Person muss es beim nächsten Login ändern.
+function resetModeratorPassword(id, newPassword) {
+  const m = getModeratorById(id);
+  if (!m || !newPassword) return false;
+  setPassword(m, newPassword, true);
+  return true;
+}
+// Moderator ändert sein eigenes Passwort -> Zwang aufgehoben.
+function changeOwnPassword(username, newPassword) {
+  const m = getModeratorByUsername(username);
+  if (!m || !newPassword) return false;
+  setPassword(m, newPassword, false);
+  return true;
 }
 function deleteModerator(id) {
   const i = moderators.findIndex((m) => m.id === id);
@@ -221,6 +243,9 @@ function saveAccount(data) {
     id,
     code: String(data.code || '').toUpperCase(),
     applicantName: String(data.applicantName || '').slice(0, 80),
+    firstName: String(data.firstName || '').slice(0, 60),
+    lastName: String(data.lastName || '').slice(0, 60),
+    bigoId: String(data.bigoId || '').slice(0, 60),
     verifiedName: String(data.verifiedName || '').slice(0, 120),
     docNumber: String(data.docNumber || '').slice(0, 60),
     verified: !!data.verified,
@@ -263,4 +288,5 @@ module.exports = {
   saveAccount, listAccounts, getAccount, photoPath, readPhoto, deleteAccount,
   logSecurity, getSecurityLog,
   listModerators, getModeratorByUsername, verifyModerator, addModerator, deleteModerator,
+  resetModeratorPassword, changeOwnPassword,
 };

@@ -120,12 +120,15 @@ In Coolify bei der App → **Persistent Storage** → **Add** →
 1. `https://verify.4ever1.tv` öffnen → **„Ich moderiere"**.
 2. **Benutzername leer lassen**, im Passwort-Feld das **`ADMIN_PASSWORD`** eingeben
    (+ Admin-2FA falls aktiviert) → **„🛠 Moderatoren verwalten"** klicken.
-3. Für jede deiner 3 Personen: **Benutzername + Passwort** eingeben → **„+ Anlegen"**.
+3. Für jede deiner 3 Personen: **Benutzername + Start-Passwort** eingeben → **„+ Anlegen"**.
    Es wird ein **2FA-Schlüssel** angezeigt – diesen der Person sicher geben; sie
    trägt ihn in ihrer Authenticator-App ein (manuelle Eingabe).
 4. Ab dann meldet sich jede Person mit **eigenem Benutzernamen + Passwort + 2FA**
-   an und kann verifizieren. In jeder gespeicherten Verifizierung steht, **wer**
-   sie durchgeführt hat.
+   an. **Beim ersten Login muss sie ein eigenes Passwort festlegen** (Zwang).
+   In jeder gespeicherten Verifizierung steht, **wer** sie durchgeführt hat.
+5. **Passwort vergessen?** In „🛠 Moderatoren verwalten" bei der Person auf
+   **„🔑 PW zurücksetzen"** → neues Start-Passwort vergeben und ihr geben; sie
+   muss es beim nächsten Login wieder ändern.
 
 > WebSockets: Coolifys Proxy (Traefik) leitet die WebSocket-Verbindung
 > automatisch weiter – es ist keine Extra-Konfiguration nötig.

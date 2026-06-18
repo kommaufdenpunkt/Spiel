@@ -67,10 +67,10 @@ Dann im Browser öffnen: <http://localhost:3000>
    automatisch kopiert und im Chat angezeigt.
 2. **Link an den Bewerber schicken** (WhatsApp, E-Mail …) – z. B. mit
    „✉ Einladung kopieren".
-3. **Bewerber** öffnet den Link → Name eingeben → **beitreten** → Kamera/Mikro
-   erlauben. (Kein Passwort nötig.)
-4. **Ausweis:** Bewerber öffnet rechts den Tab **„Ausweis"** → lädt Vorder- &
-   Rückseite hoch und hält den Ausweis neben das Gesicht. Du als Moderator siehst
+3. **Bewerber** öffnet den Link → **Vorname, Nachname, BIGO-ID** eingeben →
+   **beitreten** → Kamera/Mikro erlauben. (Kein Passwort nötig.)
+4. **Ausweis:** Bewerber öffnet rechts den Tab **„Ausweis"** → lädt **Profilbild**,
+   Ausweis-Vorder- & Rückseite hoch und hält den Ausweis neben das Gesicht. Du als Moderator siehst
    die Fotos im Tab „Ausweis", machst per Knopf Live-Fotos, hakst die Checkliste
    ab und klickst **„Als verifiziert markieren"**.
 5. Du klickst rechts auf **„Nächste Frage ▶"** – der Bewerber sieht die Frage.

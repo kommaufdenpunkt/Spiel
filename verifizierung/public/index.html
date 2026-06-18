@@ -209,9 +209,19 @@
       <button data-role="guest"><span class="ic">👤</span>Ich bin Bewerber</button>
     </div>
 
-    <div class="field" id="nameField">
-      <label for="nameInput">Dein Name</label>
-      <input id="nameInput" placeholder="z. B. Max Mustermann" autocomplete="name">
+    <div id="guestFields">
+      <div class="field">
+        <label for="gVorname">Vorname</label>
+        <input id="gVorname" placeholder="dein Vorname" autocomplete="given-name">
+      </div>
+      <div class="field">
+        <label for="gNachname">Nachname</label>
+        <input id="gNachname" placeholder="dein Nachname" autocomplete="family-name">
+      </div>
+      <div class="field">
+        <label for="gBigo">BIGO-ID</label>
+        <input id="gBigo" placeholder="deine BIGO LIVE ID" inputmode="numeric">
+      </div>
     </div>
     <div class="field" id="userField" style="display:none">
       <label for="userInput">Benutzername</label>
@@ -292,13 +302,15 @@
     <div class="tabpane" data-pane="verify">
       <!-- BEWERBER: Ausweis hochladen -->
       <div class="verify-pane" id="verifyGuest" style="display:none">
-        <div class="vstatus pending">Bitte lade deinen Ausweis hoch und halte ihn neben dein Gesicht.</div>
+        <div class="vstatus pending">Bitte lade dein Profilbild und deinen Ausweis hoch und halte den Ausweis neben dein Gesicht.</div>
 
-        <div class="vsection-title">1) Ausweis Vorderseite</div>
+        <div class="vsection-title">1) Profilbild</div>
+        <button id="upProfile" class="primary">🖼 Profilbild hochladen</button>
+        <div class="vsection-title">2) Ausweis Vorderseite</div>
         <button id="upFront" class="primary">📄 Vorderseite hochladen</button>
-        <div class="vsection-title">2) Ausweis Rückseite</div>
+        <div class="vsection-title">3) Ausweis Rückseite</div>
         <button id="upBack" class="primary">📄 Rückseite hochladen</button>
-        <div class="vsection-title">3) Ausweis neben dein Gesicht</div>
+        <div class="vsection-title">4) Ausweis neben dein Gesicht</div>
         <p style="font-size:.84rem;color:var(--dim);line-height:1.4;margin:.2rem 0">
           Halte deinen Ausweis jetzt gut sichtbar neben dein Gesicht in die Kamera –
           der Moderator macht davon ein Foto. Optional kannst du auch ein Foto hochladen:
@@ -312,6 +324,8 @@
       <div class="verify-pane" id="verifyHost" style="display:none">
         <div id="vstatus" class="vstatus pending">Status: noch nicht verifiziert</div>
 
+        <div id="applicantInfo" class="vstatus" style="display:none"></div>
+
         <div class="vsection-title">Beweis-Fotos</div>
         <div class="snap-btns">
           <button id="snapId">📄 Ausweis abfotografieren</button>
@@ -321,6 +335,7 @@
 
         <div class="vsection-title">Geprüfte Angaben</div>
         <input id="verifiedName" placeholder="Name laut Ausweis">
+        <input id="verifiedBigo" placeholder="BIGO-ID">
         <input id="verifiedDoc" placeholder="Ausweis-Nr. (optional)">
 
         <div class="vsection-title">Prüf-Checkliste</div>
@@ -398,6 +413,27 @@
       </div>
       <div class="vsection-title" style="margin-top:1rem">Vorhandene Logins</div>
       <div id="modList"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ================= Passwort festlegen (Zwang) ================= -->
+<div id="pwView" class="admin">
+  <div class="admin-box">
+    <div class="admin-head"><h2>🔑 Neues Passwort festlegen</h2></div>
+    <div class="admin-list">
+      <p style="color:var(--dim);font-size:.85rem;line-height:1.4">
+        Bitte lege jetzt dein persönliches Passwort fest (mindestens 8 Zeichen).
+        Aus Sicherheitsgründen ist das beim ersten Login (und nach einem
+        Zurücksetzen) erforderlich.
+      </p>
+      <input id="pwNew" type="password" placeholder="Neues Passwort" autocomplete="new-password">
+      <input id="pwNew2" type="password" placeholder="Neues Passwort wiederholen" autocomplete="new-password">
+      <div class="err" id="pwErr"></div>
+      <div style="display:flex;gap:.5rem;margin-top:.4rem">
+        <button id="pwSave" class="primary">Passwort speichern</button>
+        <button id="pwCancel">Abbrechen</button>
+      </div>
     </div>
   </div>
 </div>

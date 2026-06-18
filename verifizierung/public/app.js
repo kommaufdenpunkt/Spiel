@@ -75,6 +75,8 @@
     modToken: '',        // Login-Token (aus /api/login)
     modName: '',         // Anzeigename des angemeldeten Moderators/Admins
     isAdmin: false,
+    mustChange: false,   // Passwort muss geändert werden (erster Login/Reset)
+    applicantInfo: null, // Selbstauskunft des Bewerbers (Vorname/Nachname/BIGO-ID)
   };
 
   // ---- kleine API-Hilfe (mit Moderator-Token) ----
@@ -103,10 +105,33 @@
       state.modToken = r.body.token;
       state.modName = r.body.name || username;
       state.isAdmin = r.body.role === 'admin';
+      state.mustChange = !!r.body.mustChange;
       return { ok: true, role: r.body.role };
     }
     if (r.status === 403) return { ok: false, reason: 'blocked' };
     return { ok: false, reason: (r.body && r.body.reason) || 'fail' };
+  }
+
+  // Erzwungener Passwortwechsel (Promise: true = geändert, false = abgebrochen).
+  function forcePasswordChange() {
+    return new Promise((resolve) => {
+      $('pwErr').textContent = '';
+      $('pwNew').value = ''; $('pwNew2').value = '';
+      $('pwView').classList.add('on');
+      const cleanup = () => {
+        $('pwView').classList.remove('on');
+        $('pwSave').onclick = null; $('pwCancel').onclick = null;
+      };
+      $('pwSave').onclick = async () => {
+        const a = $('pwNew').value, b = $('pwNew2').value;
+        if (a.length < 8) { $('pwErr').textContent = 'Mindestens 8 Zeichen.'; return; }
+        if (a !== b) { $('pwErr').textContent = 'Die Passwörter stimmen nicht überein.'; return; }
+        const r = await api('POST', '/api/change-password', { newPassword: a });
+        if (r.status === 200) { state.mustChange = false; cleanup(); toast('Passwort gesetzt ✓'); resolve(true); }
+        else $('pwErr').textContent = 'Konnte nicht gespeichert werden.';
+      };
+      $('pwCancel').onclick = () => { cleanup(); backToLobby(''); resolve(false); };
+    });
   }
 
   function loginErrText(login) {
@@ -148,7 +173,7 @@
     if (role === 'host') {
       $('lobbyTitle').textContent = 'Video-Verifizierung starten';
       $('lobbySub').textContent = 'Melde dich an – ein Einmalcode für den Bewerber wird automatisch erzeugt.';
-      $('nameField').style.display = 'none'; // Moderator nutzt Benutzername
+      $('guestFields').style.display = 'none'; // Moderator nutzt Benutzername
       $('userField').style.display = '';
       $('passField').style.display = '';
       $('totpField').style.display = '';
@@ -161,7 +186,7 @@
       $('lobbySub').textContent = 'Gib deinen Namen und den Einmalcode ein, den du erhalten hast.';
       $('roomLabel').textContent = 'Einmalcode';
       $('roomInput').placeholder = 'Code vom Moderator';
-      $('nameField').style.display = '';
+      $('guestFields').style.display = '';
       $('userField').style.display = 'none';
       $('passField').style.display = 'none';
       $('totpField').style.display = 'none';
@@ -180,14 +205,19 @@
   }
 
   async function enterRoom() {
-    let name = $('nameInput').value.trim();
+    let name = '';
     let code = $('roomInput').value.trim().toUpperCase();
     $('lobbyErr').textContent = '';
 
-    if (pickedRole === 'guest' && !name) { $('lobbyErr').textContent = 'Bitte gib deinen Namen ein.'; return; }
-    if (pickedRole === 'guest' && !code) {
-      $('lobbyErr').textContent = 'Bitte gib den Einmalcode ein, den du erhalten hast.';
-      return;
+    if (pickedRole === 'guest') {
+      const firstName = $('gVorname').value.trim();
+      const lastName = $('gNachname').value.trim();
+      const bigoId = $('gBigo').value.trim();
+      if (!firstName || !lastName) { $('lobbyErr').textContent = 'Bitte Vor- und Nachnamen eingeben.'; return; }
+      if (!bigoId) { $('lobbyErr').textContent = 'Bitte deine BIGO-ID eingeben.'; return; }
+      if (!code) { $('lobbyErr').textContent = 'Bitte gib den Einmalcode ein, den du erhalten hast.'; return; }
+      name = (firstName + ' ' + lastName).trim();
+      state.applicantInfo = { firstName, lastName, bigoId };
     }
 
     $('enterBtn').disabled = true;
@@ -197,6 +227,11 @@
       $('enterBtn').textContent = 'Anmeldung …';
       const login = await doLogin();
       if (!login.ok) { resetEnterBtn(); $('lobbyErr').textContent = loginErrText(login); return; }
+      // Erstlogin/Reset: Passwortwechsel erzwingen, bevor es weitergeht.
+      if (state.mustChange) {
+        const changed = await forcePasswordChange();
+        if (!changed) { resetEnterBtn(); return; }
+      }
       name = state.modName; // Anzeigename = Login-Name
       $('enterBtn').textContent = 'Raum wird erstellt …';
       const r = await api('POST', '/api/room', {});
@@ -315,16 +350,31 @@
       const row = document.createElement('div');
       row.className = 'biprow';
       const date = new Date(m.createdAt).toLocaleDateString('de-DE');
-      row.innerHTML = `<span>👤 <b>${escapeHtml(m.username)}</b> · 2FA: ${m.has2fa ? '✓' : '–'} · seit ${date}</span>`;
+      const flag = m.mustChange ? ' · <span style="color:var(--warn)">muss PW ändern</span>' : '';
+      row.innerHTML = `<span>👤 <b>${escapeHtml(m.username)}</b> · 2FA: ${m.has2fa ? '✓' : '–'} · seit ${date}${flag}</span>`;
+      const acts = document.createElement('span');
+      acts.style.display = 'flex'; acts.style.gap = '.4rem';
+      const reset = document.createElement('button');
+      reset.textContent = '🔑 PW zurücksetzen';
+      reset.addEventListener('click', async () => {
+        const np = prompt(`Neues Passwort für „${m.username}" (mind. 8 Zeichen).\nGib es der Person weiter – sie muss es beim nächsten Login ändern.`);
+        if (np === null) return;
+        if (np.length < 8) { toast('Mindestens 8 Zeichen.'); return; }
+        const r = await api('POST', '/api/moderator-reset', { id: m.id, newPassword: np });
+        toast(r.status === 200 ? 'Passwort zurückgesetzt ✓' : 'Fehlgeschlagen.');
+        loadModerators();
+      });
       const del = document.createElement('button');
-      del.textContent = '🗑 Löschen';
+      del.textContent = '🗑';
+      del.title = 'Löschen';
       del.style.borderColor = 'var(--bad)'; del.style.color = '#ff9c93';
       del.addEventListener('click', async () => {
         if (!confirm(`Login „${m.username}" wirklich löschen?`)) return;
         await api('POST', '/api/moderator-delete', { id: m.id });
         loadModerators();
       });
-      row.appendChild(del);
+      acts.appendChild(reset); acts.appendChild(del);
+      row.appendChild(acts);
       el.appendChild(row);
     });
   }
@@ -374,7 +424,7 @@
         `<img src="/api/photo?id=${a.id}&file=${encodeURIComponent(p.file)}&token=${encodeURIComponent(state.modToken)}" title="${escapeHtml(p.label)}" alt="">`).join('');
       div.innerHTML =
         `<div class="top"><div><div class="nm">${escapeHtml(a.verifiedName || a.applicantName || '—')}</div>` +
-        `<div class="meta">Bewerber: ${escapeHtml(a.applicantName || '-')} · ${date}<br>` +
+        `<div class="meta">Bewerber: ${escapeHtml(a.applicantName || '-')} · BIGO-ID: ${escapeHtml(a.bigoId || '-')} · ${date}<br>` +
         `Ausweis-Nr.: ${escapeHtml(a.docNumber || '-')} · Code: ${escapeHtml(a.code || '-')} · Moderator: ${escapeHtml(a.moderatorName || '-')}</div></div>` +
         `<div class="${a.verified ? 'ok' : 'no'}">${a.verified ? '✓ verifiziert' : 'nicht verifiziert'}</div></div>` +
         `<div class="thumbs">${thumbs}</div>` +
@@ -406,6 +456,8 @@
     state.modToken = '';
     state.modName = '';
     state.isAdmin = false;
+    state.mustChange = false;
+    state.applicantInfo = null;
   }
 
   // =======================================================================
@@ -597,16 +649,21 @@
     dc.onopen = () => {
       // Beim Verbinden aktuelle Frage an den Gast schicken.
       if (state.role === 'host' && state.currentQ >= 0) sendQuestion(state.currentQ);
-      // Bewerber: noch nicht gesendete Ausweis-Fotos jetzt nachschicken.
-      if (state.role !== 'host' && state.pendingPhotos.length) {
-        const queue = state.pendingPhotos.splice(0);
-        queue.forEach((p) => sendPhoto(p.side, p.url));
+      if (state.role !== 'host') {
+        // Bewerber: Selbstauskunft (Vorname/Nachname/BIGO-ID) an den Moderator senden.
+        if (state.applicantInfo) dcSend({ kind: 'applicant-info', ...state.applicantInfo });
+        // noch nicht gesendete Fotos jetzt nachschicken.
+        if (state.pendingPhotos.length) {
+          const queue = state.pendingPhotos.splice(0);
+          queue.forEach((p) => sendPhoto(p.side, p.url));
+        }
       }
     };
     dc.onmessage = (e) => {
       let m; try { m = JSON.parse(e.data); } catch { return; }
       if (m.kind === 'chat') chatMsg(m.text, false, m.from);
       else if (m.kind === 'question') showQuestion(m.index, m.text);
+      else if (m.kind === 'applicant-info' && state.role === 'host') applyApplicantInfo(m);
       else if (m.kind === 'verified') { if (state.role !== 'host') { setGuestVerified(); } }
       else if (m.kind === 'photo-start') incoming[m.id] = { side: m.side, total: m.total, parts: [] };
       else if (m.kind === 'photo-chunk') { const p = incoming[m.id]; if (p) p.parts[m.seq] = m.data; }
@@ -817,6 +874,7 @@
   // ---- BEWERBER: Fotos hochladen + (gechunkt) an den Moderator senden ----
   let pendingSide = '';
   function pickFile(side) { pendingSide = side; const f = $('fileInput'); f.value = ''; f.click(); }
+  if ($('upProfile')) $('upProfile').addEventListener('click', () => pickFile('Profilbild'));
   if ($('upFront')) $('upFront').addEventListener('click', () => pickFile('Ausweis Vorderseite'));
   if ($('upBack')) $('upBack').addEventListener('click', () => pickFile('Ausweis Rückseite'));
   if ($('upSelfie')) $('upSelfie').addEventListener('click', () => pickFile('Ausweis + Gesicht'));
@@ -906,6 +964,19 @@
     toast('Bewerber als verifiziert markiert ✓');
   });
 
+  // Moderator: Selbstauskunft des Bewerbers anzeigen + Felder vorbelegen.
+  function applyApplicantInfo(m) {
+    state.applicantInfo = { firstName: m.firstName || '', lastName: m.lastName || '', bigoId: m.bigoId || '' };
+    const full = ((m.firstName || '') + ' ' + (m.lastName || '')).trim();
+    if ($('verifiedName') && !$('verifiedName').value) $('verifiedName').value = full;
+    if ($('verifiedBigo') && !$('verifiedBigo').value) $('verifiedBigo').value = m.bigoId || '';
+    const el = $('applicantInfo');
+    if (el) {
+      el.style.display = '';
+      el.innerHTML = `Selbstauskunft Bewerber: <b>${escapeHtml(full || '-')}</b> · BIGO-ID: <b>${escapeHtml(m.bigoId || '-')}</b>`;
+    }
+  }
+
   function setVerified(v) {
     state.verified = v;
     $('verifyBadge').classList.toggle('on', v);
@@ -919,9 +990,13 @@
   // Verifizierung als Account auf dem Server speichern (Fotos inklusive).
   // Verbraucht den Einmalcode.
   if ($('saveAccount')) $('saveAccount').addEventListener('click', async () => {
+    const info = state.applicantInfo || {};
     const body = {
       code: state.roomCode,
       applicantName: remoteTag.textContent || '',
+      firstName: info.firstName || '',
+      lastName: info.lastName || '',
+      bigoId: $('verifiedBigo').value || info.bigoId || '',
       verifiedName: $('verifiedName').value,
       docNumber: $('verifiedDoc').value,
       verified: state.verified,
