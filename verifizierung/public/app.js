@@ -49,7 +49,6 @@
     ws: null,
     pc: null,
     dc: null,            // Datenkanal (Chat + Fragen-Sync)
-    inviteLink: '',
     iceServers: null,
     // Perfect-Negotiation-Zustand
     polite: false,
@@ -505,6 +504,41 @@
     $('waitingView').classList.remove('on');
     backToLobby();
   }
+
+  // Moderator: aktuelles Gespräch beenden und zurück in den Warteraum, um den
+  // nächsten Bewerber abzuholen (ohne sich abzumelden).
+  function leaveRoom() {
+    if (state.recorder && state.recorder.state === 'recording') stopRecording();
+    try { if (state.ws) state.ws.close(); } catch {}
+    state.ws = null;
+    resetPeer();
+    if (state.localStream) {
+      state.localStream.getTracks().forEach((t) => { try { t.stop(); } catch {} });
+      state.localStream = null;
+    }
+    resetRoomForNext();
+    room.classList.remove('active');
+    openWaiting();
+  }
+  // Verify-Panel, Medien und Chat für den nächsten Bewerber leeren.
+  function resetRoomForNext() {
+    state.snapshots = [];
+    state.chunks = [];
+    state.applicantInfo = null;
+    state.currentQ = -1;
+    if ($('shots')) $('shots').innerHTML = '';
+    if ($('guestShots')) $('guestShots').innerHTML = '';
+    checkBoxes().forEach((c) => { c.checked = false; });
+    if ($('saveAccount')) { $('saveAccount').disabled = true; $('saveAccount').textContent = '✅ Freigeben & Akte anlegen'; }
+    ['verifiedName', 'verifiedBigo', 'verifiedDoc'].forEach((id) => { if ($(id)) $(id).value = ''; });
+    if ($('applicantInfo')) { $('applicantInfo').style.display = 'none'; $('applicantInfo').innerHTML = ''; }
+    setVerified(false);
+    if (chatLog) chatLog.innerHTML = '';
+    remoteVideo.srcObject = null;
+    remoteWaiting.style.display = '';
+    remoteWaiting.textContent = 'Warte auf Gegenüber …';
+  }
+  if ($('leaveBtn')) $('leaveBtn').addEventListener('click', leaveRoom);
   async function refreshWaiting() {
     const r = await api('GET', '/api/waiting');
     if (r.status === 200) renderWaiting(r.body.waiting || []);
@@ -602,9 +636,7 @@
     state.iceServers = await loadIceServers();
     connectSignaling();
 
-    if (state.role === 'host') {
-      state.inviteLink = `${location.origin}${location.pathname}?raum=${state.roomCode}`;
-    } else {
+    if (state.role !== 'host') {
       sysMsg('Du bist beigetreten. Warte auf den Moderator …');
     }
   }
@@ -614,6 +646,7 @@
     // Aufnahme-Steuerung + Einladung nur beim Moderator.
     $('recBtn').style.display = isHost ? '' : 'none';
     $('stopBtn').style.display = isHost ? '' : 'none';
+    $('leaveBtn').style.display = isHost ? '' : 'none';
     // Fragen-Navigation nur beim Moderator; Gast sieht die Fragen nur.
     qNav.style.display = isHost ? '' : 'none';
     if (!isHost) $('tabFragen').textContent = 'Aktuelle Frage';
@@ -926,34 +959,6 @@
     $('camBtn').textContent = tr.enabled ? '📷 Kamera an' : '🚫 Kamera aus';
   });
 
-  // Fertige Einladungs-Nachricht (inkl. Link) in die Zwischenablage kopieren.
-  if ($('inviteBtn')) $('inviteBtn').addEventListener('click', copyInvitation);
-
-  function buildInvitation() {
-    const tpl = window.EINLADUNGS_TEXT || '{LINK}';
-    return tpl.replace(/\{LINK\}/g, state.inviteLink);
-  }
-
-  function copyInvitation() {
-    const text = buildInvitation();
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(text).then(
-        () => toast('Einladung kopiert – jetzt an die Bewerberin schicken'),
-        () => showInvitationFallback(text)
-      );
-    } else {
-      showInvitationFallback(text);
-    }
-  }
-
-  // Falls das automatische Kopieren nicht erlaubt ist (z. B. ohne HTTPS):
-  // Text im Chat anzeigen, damit man ihn manuell markieren/kopieren kann.
-  function showInvitationFallback(text) {
-    sysMsg('Einladung (bitte markieren & kopieren):');
-    sysMsg(text);
-    toast('Automatisches Kopieren blockiert – Text steht im Chat');
-  }
-
   // =======================================================================
   //  AUSWEIS-VERIFIZIERUNG
   //  - Bewerber lädt Vorder-/Rückseite hoch (+ optional Foto Ausweis+Gesicht).
@@ -1114,11 +1119,10 @@
     }
   }
 
-  // Ein Klick = Bewerber als verifiziert markieren, ihm Bescheid geben und die
-  // Akte (mit Fotos) auf dem Server anlegen. Verbraucht den Einmalcode.
+  // Ein Klick = Akte (mit Fotos) auf dem Server anlegen und – nur wenn das
+  // klappt – den Bewerber als verifiziert markieren und ihm Bescheid geben.
+  // Verbraucht den Einmalcode.
   if ($('saveAccount')) $('saveAccount').addEventListener('click', async () => {
-    setVerified(true);
-    dcSend({ kind: 'verified' });
     const info = state.applicantInfo || {};
     const body = {
       code: state.roomCode,
@@ -1137,6 +1141,8 @@
     $('saveAccount').disabled = true;
     const r = await api('POST', '/api/account', body);
     if (r.status === 200) {
+      setVerified(true);
+      dcSend({ kind: 'verified' });
       $('saveAccount').textContent = '✓ Freigegeben – Akte angelegt';
       sysMsg('Bewerber freigegeben – Akte wurde angelegt (Einmalcode verbraucht).');
       toast('Freigegeben ✓ – Akte angelegt');

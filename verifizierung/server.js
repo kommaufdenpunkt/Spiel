@@ -632,9 +632,13 @@ wss.on('connection', (ws, req) => {
     send(peer, { type: 'peer-left' });
     if (room.host === ws) {
       room.host = undefined;
-      // Moderator weg -> Bewerber (falls noch da) wieder als "frei" anzeigen.
       const w = waiting.get(ws.roomCode);
-      if (w && room.guest) w.busy = false;
+      if (w && room.guest) {
+        // Schon freigegeben (Einmalcode verbraucht)? Dann ist der Bewerber fertig
+        // und gehört nicht zurück in die Warteliste. Sonst wieder als "frei" zeigen.
+        if (!store.isCodeUsable(ws.roomCode)) waiting.delete(ws.roomCode);
+        else w.busy = false;
+      }
     }
     if (room.guest === ws) {
       room.guest = undefined;
