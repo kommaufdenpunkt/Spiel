@@ -183,9 +183,13 @@
       $('monitorBtn').style.display = '';
       $('manageBtn').style.display = '';
       $('roomField').style.display = 'none'; // Code wird serverseitig erstellt
+      $('enterBtn').textContent = 'Anmelden';
     } else {
       $('lobbyTitle').textContent = 'Verifizierung beitreten';
-      $('lobbySub').textContent = 'Gib deinen Namen und den Einmalcode ein, den du erhalten hast.';
+      // Über den Einladungslink ist der Code schon da -> nur noch Name + Beitreten.
+      $('lobbySub').textContent = urlRoom
+        ? 'Gib deinen Namen ein und tritt bei.'
+        : 'Gib deinen Namen und den Einmalcode ein, den du erhalten hast.';
       $('roomLabel').textContent = 'Einmalcode';
       $('roomInput').placeholder = 'Code vom Moderator';
       $('guestFields').style.display = '';
@@ -195,7 +199,8 @@
       $('adminBtn').style.display = 'none';
       $('monitorBtn').style.display = 'none';
       $('manageBtn').style.display = 'none';
-      $('roomField').style.display = '';
+      $('roomField').style.display = urlRoom ? 'none' : '';
+      $('enterBtn').textContent = 'Beitreten';
     }
   }
 
@@ -203,7 +208,7 @@
 
   function resetEnterBtn() {
     $('enterBtn').disabled = false;
-    $('enterBtn').textContent = 'Raum betreten';
+    $('enterBtn').textContent = pickedRole === 'guest' ? 'Beitreten' : 'Anmelden';
   }
 
   async function enterRoom() {
@@ -212,14 +217,16 @@
     $('lobbyErr').textContent = '';
 
     if (pickedRole === 'guest') {
-      const firstName = $('gVorname').value.trim();
-      const lastName = $('gNachname').value.trim();
-      const bigoId = $('gBigo').value.trim();
-      if (!firstName || !lastName) { $('lobbyErr').textContent = 'Bitte Vor- und Nachnamen eingeben.'; return; }
-      if (!bigoId) { $('lobbyErr').textContent = 'Bitte deine BIGO-ID eingeben.'; return; }
+      const fullName = $('gName').value.trim().replace(/\s+/g, ' ');
+      const bigoId = $('gBigo').value.trim(); // optional
+      if (!fullName) { $('lobbyErr').textContent = 'Bitte gib deinen Namen ein.'; return; }
       if (!code) { $('lobbyErr').textContent = 'Bitte gib den Einmalcode ein, den du erhalten hast.'; return; }
       if (!$('gConsent').checked) { $('lobbyErr').textContent = 'Bitte stimme der Datenverarbeitung zu, um fortzufahren.'; return; }
-      name = (firstName + ' ' + lastName).trim();
+      // Aus dem einen Namensfeld Vor-/Nachnamen ableiten (erstes Wort = Vorname).
+      const parts = fullName.split(' ');
+      const firstName = parts.shift() || '';
+      const lastName = parts.join(' ');
+      name = fullName;
       state.applicantInfo = { firstName, lastName, bigoId };
     }
 
@@ -573,7 +580,7 @@
     room.classList.remove('active');
     lobby.style.display = '';
     $('enterBtn').disabled = false;
-    $('enterBtn').textContent = 'Raum betreten';
+    $('enterBtn').textContent = pickedRole === 'guest' ? 'Beitreten' : 'Anmelden';
     $('lobbyErr').textContent = errText || '';
     $('passInput').value = '';
     $('totpInput').value = '';

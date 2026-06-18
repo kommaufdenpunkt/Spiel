@@ -71,8 +71,12 @@
     box-shadow:var(--shadow);position:relative;overflow:hidden}
   .card::before{content:"";position:absolute;top:0;left:0;right:0;height:3px;
     background:linear-gradient(90deg,#5b8cff,#3b6ef0 55%,#22d3ee)}
-  .card h2{margin:.2rem 0 .3rem;font-size:1.34rem;font-weight:680;letter-spacing:-.01em}
-  .card p.sub{margin:0 0 1.4rem;color:var(--dim);font-size:.9rem;line-height:1.55}
+  .card h2{margin:.2rem 0 .3rem;font-size:1.5rem;font-weight:700;letter-spacing:-.01em}
+  .card p.sub{margin:0 0 1.4rem;color:var(--dim);font-size:.95rem;line-height:1.55}
+  /* Lobby-Eingaben & Hauptknopf etwas größer/fingerfreundlicher. */
+  .card .field input{font-size:1rem;padding:.78rem .9rem;border-radius:11px}
+  .card .actions #enterBtn{padding:.95rem 1.1rem;font-size:1.05rem;font-weight:650;border-radius:12px}
+  .opt{color:#5d6b7c;font-weight:400;text-transform:none;letter-spacing:0}
   .field{margin-bottom:1rem}
   .field label{display:block;font-size:.74rem;color:var(--dim);margin-bottom:.35rem;
     text-transform:uppercase;letter-spacing:.09em;font-weight:500}
@@ -254,21 +258,16 @@
 
     <div id="guestFields">
       <div class="field">
-        <label for="gVorname">Vorname</label>
-        <input id="gVorname" placeholder="dein Vorname" autocomplete="given-name">
+        <label for="gName">Dein Name</label>
+        <input id="gName" placeholder="Vor- und Nachname" autocomplete="name">
       </div>
       <div class="field">
-        <label for="gNachname">Nachname</label>
-        <input id="gNachname" placeholder="dein Nachname" autocomplete="family-name">
-      </div>
-      <div class="field">
-        <label for="gBigo">BIGO-ID</label>
+        <label for="gBigo">BIGO-ID <span class="opt">(optional)</span></label>
         <input id="gBigo" placeholder="deine BIGO LIVE ID" inputmode="numeric">
       </div>
       <label class="consent"><input type="checkbox" id="gConsent">
-        Ich willige ein, dass meine Angaben und hochgeladenen Dokumente (Ausweis,
-        Profilbild) zum Zweck der Verifizierung verarbeitet und verschlüsselt
-        gespeichert werden.</label>
+        Ich bin mit der verschlüsselten Verarbeitung meiner Angaben und Dokumente
+        zur Verifizierung einverstanden.</label>
     </div>
     <div class="field" id="userField" style="display:none">
       <label for="userInput">Benutzername</label>
@@ -288,7 +287,7 @@
     </div>
 
     <div class="actions">
-      <button id="enterBtn" class="primary">Raum betreten</button>
+      <button id="enterBtn" class="primary">Anmelden</button>
       <button id="adminBtn" style="display:none">🗂 Personalakte / Accounts (Admin)</button>
       <button id="monitorBtn" style="display:none">🛡 Überwachung (Angriffe)</button>
       <button id="manageBtn" style="display:none">🛠 Moderatoren verwalten (Admin)</button>

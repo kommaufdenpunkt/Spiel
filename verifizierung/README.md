@@ -81,13 +81,13 @@ Dann im Browser öffnen: <http://localhost:3000>
    **Admin-Passwort** eingeben → „🛠 Moderatoren verwalten" → die persönlichen
    Logins für dein Team anlegen (jeweils mit eigenem 2FA-Schlüssel).
 1. **Du (Moderator):** Seite öffnen → „Ich moderiere" → **Benutzername +
-   Passwort + 2FA** → **Raum betreten**. Danach landest du im **Warteraum**.
+   Passwort + 2FA** → **Anmelden**. Danach landest du im **Warteraum**.
 2. Im Warteraum **„➕ Einmalcode für neuen Bewerber"** klicken – der Code und der
    Beitritts-Link werden erzeugt (Link wird automatisch kopiert). Diesen an den
    Bewerber schicken (WhatsApp, E-Mail …).
-3. **Bewerber** öffnet den Link (oder gibt den Code ein) → **Vorname, Nachname,
-   BIGO-ID** eingeben → **beitreten** → Kamera/Mikro erlauben. (Kein Passwort,
-   der Einmalcode ist sein Zugang.)
+3. **Bewerber** öffnet den Link → nur noch **Name** eingeben → **Beitreten** →
+   Kamera/Mikro erlauben. (BIGO-ID ist optional und kann auch im Gespräch
+   nachgetragen werden; kein Passwort nötig – der Einmalcode ist sein Zugang.)
 4. Der Bewerber erscheint jetzt im **Warteraum** des Moderators. Klick auf
    **„📞 Abholen"** startet das Video-Gespräch mit genau diesem Bewerber.
    Mehrere Moderatoren können sich so Bewerber aus der gemeinsamen Warteliste
