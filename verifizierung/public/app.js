@@ -354,9 +354,19 @@
       row.className = 'biprow';
       const date = new Date(m.createdAt).toLocaleDateString('de-DE');
       const flag = m.mustChange ? ' · <span style="color:var(--warn)">muss PW ändern</span>' : '';
-      row.innerHTML = `<span>👤 <b>${escapeHtml(m.username)}</b> · 2FA: ${m.has2fa ? '✓' : '–'} · seit ${date}${flag}</span>`;
+      const lockFlag = m.locked ? ' · <span style="color:var(--bad)">🔒 gesperrt</span>' : '';
+      row.innerHTML = `<span>👤 <b>${escapeHtml(m.username)}</b> · 2FA: ${m.has2fa ? '✓' : '–'} · seit ${date}${flag}${lockFlag}</span>`;
       const acts = document.createElement('span');
       acts.style.display = 'flex'; acts.style.gap = '.4rem';
+      if (m.locked) {
+        const unlock = document.createElement('button');
+        unlock.textContent = '🔓 Entsperren';
+        unlock.addEventListener('click', async () => {
+          await api('POST', '/api/moderator-unlock', { id: m.id });
+          toast('Konto entsperrt'); loadModerators();
+        });
+        acts.appendChild(unlock);
+      }
       const reset = document.createElement('button');
       reset.textContent = '🔑 PW zurücksetzen';
       reset.addEventListener('click', async () => {

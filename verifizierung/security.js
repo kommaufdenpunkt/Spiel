@@ -174,6 +174,26 @@ function recordHoneypot(ip, urlPath) {
   console.warn(`[security] Honeypot-Treffer von ${ip} (${urlPath || ''}) – IP gesperrt.`);
 }
 
+// ---- Fehlversuche pro KONTO (zusätzlich zur IP-Sperre) ---------------------
+const acctFails = new Map(); // username(lower) -> {count, first}
+const MAX_ACCT_FAILS = 5;
+function recordAccountFail(username) {
+  const u = String(username || '').toLowerCase();
+  const now = Date.now();
+  const rec = acctFails.get(u);
+  if (!rec || now - rec.first > FAIL_WINDOW) { acctFails.set(u, { count: 1, first: now }); return false; }
+  rec.count++;
+  if (rec.count >= MAX_ACCT_FAILS) { acctFails.delete(u); return true; } // -> Konto sperren
+  return false;
+}
+function resetAccountFails(username) { acctFails.delete(String(username || '').toLowerCase()); }
+
+// ---- Optionale IP-Allowlist fürs Login -------------------------------------
+let loginAllowIps = [];
+function setLoginAllowIps(arr) { loginAllowIps = (arr || []).map((s) => s.trim()).filter(Boolean); }
+function loginIpAllowed(ip) { return loginAllowIps.length === 0 || loginAllowIps.includes(ip); }
+function loginIpRestricted() { return loginAllowIps.length > 0; }
+
 // Manuelles Sperren/Entsperren + Status für die Überwachung.
 function unblock(ip) { blocked.delete(ip); fails.delete(ip); recordEvent('unblock', ip, 'manuell'); }
 function blockManual(ip) { block(ip, BLOCK_MS); recordEvent('manual-block', ip, 'manuell gesperrt'); }
@@ -191,4 +211,6 @@ module.exports = {
   verifyTotp, generateTotpSecret,
   isBlocked, recordFail, resetFails, isHoneypot, recordHoneypot, recordEvent,
   unblock, blockManual, getMonitoring,
+  recordAccountFail, resetAccountFails,
+  setLoginAllowIps, loginIpAllowed, loginIpRestricted,
 };

@@ -29,11 +29,14 @@ const PUBLIC_DIR = path.join(__dirname, 'public');
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
 // Schlüssel zum Verschlüsseln der Ausweis-Fotos (leer = unverschlüsselt).
 const STORAGE_KEY = process.env.STORAGE_KEY || '';
-// Optionales 2FA-Secret (base32) für den Moderator. Leer = nur Passwort.
+// Optionales 2FA-Secret (base32) für den ADMIN. Leer = nur Passwort (unsicher).
 const MODERATOR_TOTP_SECRET = process.env.MODERATOR_TOTP_SECRET || '';
+// Optionale IP-Allowlist fürs Login (Komma-getrennt). Leer = keine Beschränkung.
+const LOGIN_ALLOW_IPS = process.env.LOGIN_ALLOW_IPS || '';
 
 const storeInfo = store.init({ dir: DATA_DIR, encKey: STORAGE_KEY });
 security.init({ persist: store.logSecurity, initial: store.getSecurityLog() });
+security.setLoginAllowIps(LOGIN_ALLOW_IPS.split(','));
 
 // ---------------------------------------------------------------------------
 // ICE-/TURN-Konfiguration (für zuverlässige Verbindungen)
@@ -137,18 +140,34 @@ async function handleApi(req, res, urlPath, ip) {
   // Ohne Benutzername -> Admin-Login (ADMIN_PASSWORD + optional Admin-2FA),
   //                      nur zum Verwalten der Moderator-Konten.
   if (urlPath === '/api/login' && req.method === 'POST') {
+    // Optionale Standort-/IP-Sperre: Login nur von erlaubten IPs.
+    if (!security.loginIpAllowed(ip)) {
+      security.recordEvent('blocked', ip, 'Login von nicht erlaubter IP');
+      sendJson(res, 403, { reason: 'ip-blocked' }); return true;
+    }
     let body; try { body = await readBody(req, 64 * 1024); } catch { sendJson(res, 400, { reason: 'bad-request' }); return true; }
     const username = String(body.username || '').trim();
 
     if (username) {
+      const existing = store.getModeratorByUsername(username);
+      if (existing && existing.locked) {
+        security.recordEvent('auth-fail', ip, 'Gesperrtes Konto: ' + username);
+        sendJson(res, 403, { reason: 'account-locked' }); return true;
+      }
       const m = store.verifyModerator(username, body.password || '');
       const okTotp = m ? security.verifyTotp(m.totpSecret, body.totp) : false;
       if (m && okTotp) {
         security.resetFails(ip);
+        security.resetAccountFails(username);
         security.recordEvent('login-ok', ip, 'Moderator: ' + m.username);
         sendJson(res, 200, { token: security.issueToken(ip, { name: m.username, isAdmin: false }), name: m.username, role: 'moderator', mustChange: !!m.mustChange });
       } else {
         security.recordFail(ip, 'Moderator-Login fehlgeschlagen (' + username + ')');
+        // Zusätzlich: Fehlversuche pro Konto -> Konto sperren.
+        if (existing && security.recordAccountFail(username)) {
+          store.lockModerator(username);
+          security.recordEvent('blocked', ip, 'Konto gesperrt (zu viele Fehlversuche): ' + username);
+        }
         sendJson(res, 401, { reason: m ? 'bad-totp' : 'bad-login' });
       }
       return true;
@@ -211,6 +230,13 @@ async function handleApi(req, res, urlPath, ip) {
     if (pw.length < 8) { sendJson(res, 400, { reason: 'too-short' }); return true; }
     const ok = store.resetModeratorPassword(body.id, pw);
     if (ok) security.recordEvent('audit', ip, 'Passwort zurückgesetzt für ' + body.id);
+    sendJson(res, ok ? 200 : 400, { ok }); return true;
+  }
+  if (urlPath === '/api/moderator-unlock' && req.method === 'POST') {
+    if (!isAdminReq(req)) { sendJson(res, 403, { reason: 'admin-only' }); return true; }
+    let body; try { body = await readBody(req, 16 * 1024); } catch { body = {}; }
+    const ok = store.unlockModerator(body.id);
+    if (ok) security.recordEvent('audit', ip, 'Konto entsperrt: ' + body.id);
     sendJson(res, ok ? 200 : 400, { ok }); return true;
   }
 
@@ -499,7 +525,8 @@ server.listen(PORT, () => {
   console.log(`TURN: ${TURN_SECRET && TURN_HOST ? 'aktiv (' + TURN_HOST + ')' : 'nicht konfiguriert – nur STUN'}`);
   console.log(`Admin-Passwort: ${ADMIN_PASSWORD ? 'gesetzt' : 'NICHT gesetzt – Verwaltung gesperrt!'}`);
   console.log(`Moderator-Konten: ${store.listModerators().length}`);
-  console.log(`2FA (TOTP): ${MODERATOR_TOTP_SECRET ? 'aktiv' : 'aus'}`);
+  console.log(`Admin-2FA: ${MODERATOR_TOTP_SECRET ? 'aktiv' : 'AUS – empfohlen: MODERATOR_TOTP_SECRET setzen!'}`);
+  console.log(`Login-IP-Sperre: ${security.loginIpRestricted() ? 'aktiv' : 'aus'}`);
   console.log(`Daten-Verzeichnis: ${storeInfo.DATA_DIR} (Daten ${storeInfo.encrypted ? 'verschlüsselt' : 'UNverschlüsselt'})`);
   if (!storeInfo.encrypted) {
     console.warn('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!');

@@ -67,7 +67,17 @@ function listModerators() {
   return moderators.map((m) => ({
     id: m.id, username: m.username, createdAt: m.createdAt,
     createdBy: m.createdBy || '', has2fa: !!m.totpSecret, mustChange: !!m.mustChange,
+    locked: !!m.locked,
   }));
+}
+function lockModerator(username) {
+  const m = getModeratorByUsername(username);
+  if (m && !m.locked) { m.locked = true; saveAtomic(moderatorsFile(), moderators); }
+}
+function unlockModerator(id) {
+  const m = getModeratorById(id);
+  if (!m) return false;
+  m.locked = false; saveAtomic(moderatorsFile(), moderators); return true;
 }
 function getModeratorByUsername(u) {
   const name = String(u || '').trim().toLowerCase();
@@ -288,5 +298,5 @@ module.exports = {
   saveAccount, listAccounts, getAccount, photoPath, readPhoto, deleteAccount,
   logSecurity, getSecurityLog,
   listModerators, getModeratorByUsername, verifyModerator, addModerator, deleteModerator,
-  resetModeratorPassword, changeOwnPassword,
+  resetModeratorPassword, changeOwnPassword, lockModerator, unlockModerator,
 };
