@@ -177,6 +177,10 @@
   .ty.auth-fail{color:var(--warn)}
   .ty.unblock{color:var(--good)}
 
+  .consent{display:flex;gap:.5rem;align-items:flex-start;font-size:.8rem;
+    color:var(--dim);line-height:1.4;margin-top:.2rem}
+  .consent input{margin-top:.15rem;flex:0 0 auto}
+
   .toast{position:fixed;left:50%;bottom:1.2rem;transform:translateX(-50%);
     background:#000d;border:1px solid var(--line);padding:.6rem 1rem;border-radius:10px;
     font-size:.85rem;opacity:0;transition:.2s;pointer-events:none;max-width:90vw}
@@ -222,6 +226,10 @@
         <label for="gBigo">BIGO-ID</label>
         <input id="gBigo" placeholder="deine BIGO LIVE ID" inputmode="numeric">
       </div>
+      <label class="consent"><input type="checkbox" id="gConsent">
+        Ich willige ein, dass meine Angaben und hochgeladenen Dokumente (Ausweis,
+        Profilbild) zum Zweck der Verifizierung verarbeitet und verschlüsselt
+        gespeichert werden.</label>
     </div>
     <div class="field" id="userField" style="display:none">
       <label for="userInput">Benutzername</label>

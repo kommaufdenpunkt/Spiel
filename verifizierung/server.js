@@ -496,5 +496,12 @@ server.listen(PORT, () => {
   console.log(`Admin-Passwort: ${ADMIN_PASSWORD ? 'gesetzt' : 'NICHT gesetzt – Verwaltung gesperrt!'}`);
   console.log(`Moderator-Konten: ${store.listModerators().length}`);
   console.log(`2FA (TOTP): ${MODERATOR_TOTP_SECRET ? 'aktiv' : 'aus'}`);
-  console.log(`Daten-Verzeichnis: ${storeInfo.DATA_DIR} (Fotos ${storeInfo.encrypted ? 'verschlüsselt' : 'UNverschlüsselt'})`);
+  console.log(`Daten-Verzeichnis: ${storeInfo.DATA_DIR} (Daten ${storeInfo.encrypted ? 'verschlüsselt' : 'UNverschlüsselt'})`);
+  if (!storeInfo.encrypted) {
+    console.warn('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!');
+    console.warn('!! WARNUNG: STORAGE_KEY ist NICHT gesetzt.                 !!');
+    console.warn('!! Ausweis-Daten/Fotos werden UNVERSCHLÜSSELT gespeichert! !!');
+    console.warn('!! Für den Echtbetrieb unbedingt STORAGE_KEY setzen.       !!');
+    console.warn('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!');
+  }
 });

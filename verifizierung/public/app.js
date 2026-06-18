@@ -157,6 +157,8 @@
   if (urlRoom) {
     pickedRole = 'guest';
     $('roomInput').value = urlRoom;
+    // Über den Einladungslink ist man immer Bewerber – Rollenauswahl ausblenden.
+    $('rolePick').style.display = 'none';
   }
   setRoleUI(pickedRole);
 
@@ -216,6 +218,7 @@
       if (!firstName || !lastName) { $('lobbyErr').textContent = 'Bitte Vor- und Nachnamen eingeben.'; return; }
       if (!bigoId) { $('lobbyErr').textContent = 'Bitte deine BIGO-ID eingeben.'; return; }
       if (!code) { $('lobbyErr').textContent = 'Bitte gib den Einmalcode ein, den du erhalten hast.'; return; }
+      if (!$('gConsent').checked) { $('lobbyErr').textContent = 'Bitte stimme der Datenverarbeitung zu, um fortzufahren.'; return; }
       name = (firstName + ' ' + lastName).trim();
       state.applicantInfo = { firstName, lastName, bigoId };
     }
@@ -494,6 +497,8 @@
     // Ausweis-Tab: Moderator prüft, Bewerber lädt hoch.
     $('verifyHost').style.display = isHost ? '' : 'none';
     $('verifyGuest').style.display = isHost ? 'none' : '';
+    // Bewerber direkt zum Ausweis-Tab führen.
+    if (!isHost) selectTab('verify');
   }
 
   // ---- WebSocket-Signalisierung -----------------------------------------
@@ -739,10 +744,12 @@
   document.querySelector('.tabs').addEventListener('click', (e) => {
     const btn = e.target.closest('button[data-tab]');
     if (!btn) return;
-    const tab = btn.dataset.tab;
-    document.querySelectorAll('.tabs button').forEach((b) => b.classList.toggle('sel', b === btn));
-    document.querySelectorAll('.tabpane').forEach((p) => p.classList.toggle('sel', p.dataset.pane === tab));
+    selectTab(btn.dataset.tab);
   });
+  function selectTab(tab) {
+    document.querySelectorAll('.tabs button').forEach((b) => b.classList.toggle('sel', b.dataset.tab === tab));
+    document.querySelectorAll('.tabpane').forEach((p) => p.classList.toggle('sel', p.dataset.pane === tab));
+  }
 
   // =======================================================================
   //  CHAT

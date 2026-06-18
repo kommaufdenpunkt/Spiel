@@ -31,12 +31,21 @@ einreichen.
   **Einmalcode** rein (gilt genau einmal).
 - **Accounts:** Jede abgeschlossene Verifizierung wird als Eintrag gespeichert
   (inkl. Fotos) und ist im Moderator-Bereich einsehbar/löschbar.
-- **Sicherheit:** 2FA (TOTP) für den Moderator, Brute-Force-Sperre + Honeypot,
-  **verschlüsselte** Foto-Speicherung (AES-256).
+- **Sicherheit:** 2FA (TOTP), Brute-Force-Sperre + Honeypot, Login-Härtung.
+- **Verschlüsselung (durchgängig):**
+  - *Übertragung:* HTTPS (Web) + WebRTC/DTLS (Video & Datei-Upload Browser↔Browser).
+  - *Speicherung:* **alle** Daten – Ausweis-Fotos, Profilbild **und** Metadaten
+    (Name, BIGO-ID, Ausweis-Nr.) – verschlüsselt mit **AES-256-GCM** (`STORAGE_KEY`).
+    Ohne korrekten Schlüssel sind die Daten unlesbar; mit falschem Schlüssel
+    startet der Server bewusst nicht.
+- **Einwilligung:** Der Bewerber muss vor dem Beitritt der Datenverarbeitung
+  aktiv zustimmen (Häkchen).
 
 > ⚠️ **Datenschutz:** Es werden Ausweisdaten dauerhaft gespeichert. Du brauchst
 > dafür eine Rechtsgrundlage/Einwilligung und ein Löschkonzept (manueller
 > Löschen-Button ist eingebaut). Im Zweifel rechtlichen Rat einholen.
+> **Wichtig:** `STORAGE_KEY` setzen – sonst werden die Daten unverschlüsselt
+> gespeichert (der Server warnt beim Start deutlich).
 
 ---
 
