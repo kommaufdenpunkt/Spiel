@@ -423,8 +423,11 @@
       const div = document.createElement('div');
       div.className = 'acc';
       const date = new Date(a.createdAt).toLocaleString('de-DE');
-      const thumbs = (a.photos || []).map((p) =>
-        `<img src="/api/photo?id=${a.id}&file=${encodeURIComponent(p.file)}&token=${encodeURIComponent(state.modToken)}" title="${escapeHtml(p.label)}" alt="">`).join('');
+      const thumbs = (a.photos || []).map((p) => {
+        const src = `/api/photo?id=${a.id}&file=${encodeURIComponent(p.file)}&token=${encodeURIComponent(state.modToken)}`;
+        return `<figure><a href="${src}" target="_blank" rel="noopener"><img src="${src}" alt=""></a>` +
+          `<figcaption>${escapeHtml(p.label)}</figcaption></figure>`;
+      }).join('');
       div.innerHTML =
         `<div class="top"><div><div class="nm">${escapeHtml(a.verifiedName || a.applicantName || '—')}</div>` +
         `<div class="meta">Bewerber: ${escapeHtml(a.applicantName || '-')} · BIGO-ID: ${escapeHtml(a.bigoId || '-')} · ${date}<br>` +
