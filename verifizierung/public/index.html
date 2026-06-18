@@ -294,8 +294,7 @@
     </div>
     <div class="err" id="lobbyErr"></div>
     <div class="hint" id="lobbyHint">
-      📷 Beim Beitritt fragt der Browser nach Kamera &amp; Mikrofon – bitte erlauben.
-      Funktioniert am besten in Chrome, Edge oder Safari.
+      📷 Bitte Kamera &amp; Mikrofon erlauben. Am besten in Chrome, Edge oder Safari.
     </div>
   </div>
 </div>
@@ -321,7 +320,6 @@
     <div class="controls">
       <button id="micBtn">🎤 Mikro an</button>
       <button id="camBtn">📷 Kamera an</button>
-      <button id="inviteBtn">✉ Einladung kopieren</button>
       <span class="spacer"></span>
       <button id="recBtn" class="primary">⏺ Aufnahme starten</button>
       <button id="stopBtn" class="danger" disabled>⏹ Beenden &amp; speichern</button>
@@ -356,12 +354,11 @@
         <button id="upFront" class="primary">📄 Vorderseite hochladen</button>
         <div class="vsection-title">3) Ausweis Rückseite</div>
         <button id="upBack" class="primary">📄 Rückseite hochladen</button>
-        <div class="vsection-title">4) Ausweis neben dein Gesicht</div>
+        <div class="vsection-title">4) Ausweis neben dein Gesicht halten</div>
         <p style="font-size:.84rem;color:var(--dim);line-height:1.4;margin:.2rem 0">
-          Halte deinen Ausweis jetzt gut sichtbar neben dein Gesicht in die Kamera –
-          der Moderator macht davon ein Foto. Optional kannst du auch ein Foto hochladen:
+          Halte den Ausweis gut sichtbar neben dein Gesicht – der Moderator macht das Foto.
         </p>
-        <button id="upSelfie">🙂 Foto „Ausweis + Gesicht" hochladen</button>
+        <button id="upSelfie">🙂 Optional: selbst ein Foto hochladen</button>
         <div class="shots" id="guestShots"></div>
         <input id="fileInput" type="file" accept="image/*" style="display:none">
       </div>
@@ -393,8 +390,8 @@
           <label><input type="checkbox" data-chk> Ausweis wirkt echt (kein Foto vom Foto)</label>
         </div>
 
-        <button id="markVerified" class="primary" disabled>✓ Als verifiziert markieren</button>
-        <button id="saveAccount" class="primary">✅ Freigeben &amp; Akte anlegen</button>
+        <button id="saveAccount" class="primary" disabled>✅ Freigeben &amp; Akte anlegen</button>
+        <p style="font-size:.78rem;color:var(--dim);margin:.1rem 0 0">Erst möglich, wenn die Checkliste komplett abgehakt ist.</p>
         <button id="downloadReport">⤓ Prüf-Protokoll speichern</button>
       </div>
     </div>

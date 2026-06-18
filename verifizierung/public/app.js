@@ -602,14 +602,10 @@
     state.iceServers = await loadIceServers();
     connectSignaling();
 
-    // Moderator: Beitritts-Link + fertige Einladung anbieten.
     if (state.role === 'host') {
       state.inviteLink = `${location.origin}${location.pathname}?raum=${state.roomCode}`;
-      sysMsg(`Raum-Code: ${state.roomCode}`);
-      sysMsg('Beitritts-Link: ' + state.inviteLink);
-      copyInvitation();
     } else {
-      sysMsg('Du bist dem Raum beigetreten. Warte auf den Moderator …');
+      sysMsg('Du bist beigetreten. Warte auf den Moderator …');
     }
   }
 
@@ -618,7 +614,6 @@
     // Aufnahme-Steuerung + Einladung nur beim Moderator.
     $('recBtn').style.display = isHost ? '' : 'none';
     $('stopBtn').style.display = isHost ? '' : 'none';
-    $('inviteBtn').style.display = isHost ? '' : 'none';
     // Fragen-Navigation nur beim Moderator; Gast sieht die Fragen nur.
     qNav.style.display = isHost ? '' : 'none';
     if (!isHost) $('tabFragen').textContent = 'Aktuelle Frage';
@@ -932,7 +927,7 @@
   });
 
   // Fertige Einladungs-Nachricht (inkl. Link) in die Zwischenablage kopieren.
-  $('inviteBtn').addEventListener('click', copyInvitation);
+  if ($('inviteBtn')) $('inviteBtn').addEventListener('click', copyInvitation);
 
   function buildInvitation() {
     const tpl = window.EINLADUNGS_TEXT || '{LINK}';
@@ -1090,16 +1085,10 @@
   if ($('snapId')) $('snapId').addEventListener('click', () => captureSnapshot('Ausweis (Live-Foto)'));
   if ($('snapFace')) $('snapFace').addEventListener('click', () => captureSnapshot('Gesicht (Live-Foto)'));
 
-  // Checkliste -> "Als verifiziert markieren" erst freigeben, wenn alles geprüft.
+  // Checkliste -> "Freigeben" erst möglich, wenn alles geprüft ist.
   function checkBoxes() { return Array.from(document.querySelectorAll('#checklist input[data-chk]')); }
   if ($('checklist')) $('checklist').addEventListener('change', () => {
-    $('markVerified').disabled = !checkBoxes().every((c) => c.checked);
-  });
-
-  if ($('markVerified')) $('markVerified').addEventListener('click', () => {
-    setVerified(true);
-    dcSend({ kind: 'verified' });
-    toast('Bewerber als verifiziert markiert ✓');
+    $('saveAccount').disabled = !checkBoxes().every((c) => c.checked);
   });
 
   // Moderator: Selbstauskunft des Bewerbers anzeigen + Felder vorbelegen.
@@ -1125,13 +1114,11 @@
     }
   }
 
-  // Verifizierung als Account auf dem Server speichern (Fotos inklusive).
-  // Verbraucht den Einmalcode.
+  // Ein Klick = Bewerber als verifiziert markieren, ihm Bescheid geben und die
+  // Akte (mit Fotos) auf dem Server anlegen. Verbraucht den Einmalcode.
   if ($('saveAccount')) $('saveAccount').addEventListener('click', async () => {
-    if (!state.verified &&
-        !confirm('Der Bewerber ist noch nicht als verifiziert markiert. Trotzdem freigeben und Akte anlegen?')) {
-      return;
-    }
+    setVerified(true);
+    dcSend({ kind: 'verified' });
     const info = state.applicantInfo || {};
     const body = {
       code: state.roomCode,
@@ -1141,7 +1128,7 @@
       bigoId: $('verifiedBigo').value || info.bigoId || '',
       verifiedName: $('verifiedName').value,
       docNumber: $('verifiedDoc').value,
-      verified: state.verified,
+      verified: true,
       moderatorName: state.name,
       roomCode: state.roomCode,
       checklist: checkBoxes().map((c) => ({ label: c.parentElement.textContent.trim(), checked: c.checked })),
