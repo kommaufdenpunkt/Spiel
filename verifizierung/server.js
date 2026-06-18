@@ -322,8 +322,10 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // Allgemeines Rate-Limit (Health-Check ausgenommen).
-  if (urlPath !== '/healthz' && !security.rateLimit(ip)) {
+  // Allgemeines Rate-Limit – nur für NICHT angemeldete Anfragen (Login/öffentlich).
+  // Eingeloggte Moderatoren/Admins werden nicht gedrosselt (z. B. viele Foto-
+  // Thumbnails in der Account-Liste). Brute-Force-Schutz + Honeypot bleiben aktiv.
+  if (urlPath !== '/healthz' && !isAuthed(req) && !security.rateLimit(ip)) {
     res.writeHead(429, { 'Content-Type': 'text/plain; charset=utf-8' });
     res.end('Zu viele Anfragen');
     return;
