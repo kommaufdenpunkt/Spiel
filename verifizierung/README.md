@@ -31,9 +31,13 @@ einreichen.
   hält den Ausweis neben ihr Gesicht; der Moderator macht Beweis-Fotos, hakt eine
   Checkliste ab, markiert „verifiziert" und lädt ein **Prüf-Protokoll** herunter.
 - **Einmalcode-Pflicht:** Bewerber kommen nur mit einem vom Moderator erzeugten
-  **Einmalcode** rein (gilt genau einmal).
-- **Accounts:** Jede abgeschlossene Verifizierung wird als Eintrag gespeichert
-  (inkl. Fotos) und ist im Moderator-Bereich einsehbar/löschbar.
+  **Einmalcode** rein (gilt genau einmal); der Code ist zugleich ihr Zugang.
+- **Warteraum:** Beigetretene Bewerber landen in einer **Warteliste**, die alle
+  eingeloggten Moderatoren sehen. Per **„Abholen"** nimmt sich ein Moderator den
+  nächsten Bewerber und startet die Verifizierung (faire Reihenfolge).
+- **Akte erst bei Freigabe:** Erst wenn der Moderator **„Freigeben"** klickt, wird
+  die Akte (Eintrag inkl. Fotos) **automatisch** angelegt und ist nach Admin-Login
+  einsehbar/löschbar. Vorher existiert nur ein flüchtiger Wartelisten-Eintrag.
 - **Sicherheit:** 2FA (TOTP), Brute-Force-Sperre + Honeypot, Login-Härtung.
 - **Verschlüsselung (durchgängig):**
   - *Übertragung:* HTTPS (Web) + WebRTC/DTLS (Video & Datei-Upload Browser↔Browser).
@@ -77,19 +81,27 @@ Dann im Browser öffnen: <http://localhost:3000>
    **Admin-Passwort** eingeben → „🛠 Moderatoren verwalten" → die persönlichen
    Logins für dein Team anlegen (jeweils mit eigenem 2FA-Schlüssel).
 1. **Du (Moderator):** Seite öffnen → „Ich moderiere" → **Benutzername +
-   Passwort + 2FA** → **Raum betreten**. Der Beitritts-Link/Einmalcode wird
-   automatisch kopiert und im Chat angezeigt.
-2. **Link an den Bewerber schicken** (WhatsApp, E-Mail …) – z. B. mit
-   „✉ Einladung kopieren".
-3. **Bewerber** öffnet den Link → **Vorname, Nachname, BIGO-ID** eingeben →
-   **beitreten** → Kamera/Mikro erlauben. (Kein Passwort nötig.)
-4. **Ausweis:** Bewerber öffnet rechts den Tab **„Ausweis"** → lädt **Profilbild**,
+   Passwort + 2FA** → **Raum betreten**. Danach landest du im **Warteraum**.
+2. Im Warteraum **„➕ Einmalcode für neuen Bewerber"** klicken – der Code und der
+   Beitritts-Link werden erzeugt (Link wird automatisch kopiert). Diesen an den
+   Bewerber schicken (WhatsApp, E-Mail …).
+3. **Bewerber** öffnet den Link (oder gibt den Code ein) → **Vorname, Nachname,
+   BIGO-ID** eingeben → **beitreten** → Kamera/Mikro erlauben. (Kein Passwort,
+   der Einmalcode ist sein Zugang.)
+4. Der Bewerber erscheint jetzt im **Warteraum** des Moderators. Klick auf
+   **„📞 Abholen"** startet das Video-Gespräch mit genau diesem Bewerber.
+   Mehrere Moderatoren können sich so Bewerber aus der gemeinsamen Warteliste
+   nehmen.
+5. **Ausweis:** Bewerber öffnet rechts den Tab **„Ausweis"** → lädt **Profilbild**,
    Ausweis-Vorder- & Rückseite hoch und hält den Ausweis neben das Gesicht. Du als Moderator siehst
    die Fotos im Tab „Ausweis", machst per Knopf Live-Fotos, hakst die Checkliste
    ab und klickst **„Als verifiziert markieren"**.
-5. Du klickst rechts auf **„Nächste Frage ▶"** – der Bewerber sieht die Frage.
-6. **⏺ Aufnahme starten**, das Gespräch führen.
-7. Am Ende **⏹ Beenden & speichern** (Video) und **„Prüf-Protokoll speichern"**.
+6. Du klickst rechts auf **„Nächste Frage ▶"** – der Bewerber sieht die Frage.
+7. **⏺ Aufnahme starten**, das Gespräch führen.
+8. Am Ende **⏹ Beenden & speichern** (Video). Mit **„✅ Freigeben & Akte anlegen"**
+   wird der Bewerber freigegeben – dabei wird **automatisch die Akte angelegt**
+   (mit Fotos, verschlüsselt) und der Einmalcode verbraucht. Optional noch
+   **„Prüf-Protokoll speichern"**.
 
 ---
 

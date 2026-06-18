@@ -174,7 +174,7 @@
       b.classList.toggle('sel', b.dataset.role === role));
     if (role === 'host') {
       $('lobbyTitle').textContent = 'Video-Verifizierung starten';
-      $('lobbySub').textContent = 'Melde dich an – ein Einmalcode für den Bewerber wird automatisch erzeugt.';
+      $('lobbySub').textContent = 'Melde dich an – danach siehst du den Warteraum und kannst wartende Bewerber abholen.';
       $('guestFields').style.display = 'none'; // Moderator nutzt Benutzername
       $('userField').style.display = '';
       $('passField').style.display = '';
@@ -225,7 +225,7 @@
 
     $('enterBtn').disabled = true;
 
-    // Moderator: erst persönlich anmelden, dann Einmalcode erzeugen.
+    // Moderator: anmelden -> Warteraum öffnen (Bewerber dort abholen).
     if (pickedRole === 'host') {
       $('enterBtn').textContent = 'Anmeldung …';
       const login = await doLogin();
@@ -235,13 +235,9 @@
         const changed = await forcePasswordChange();
         if (!changed) { resetEnterBtn(); return; }
       }
-      name = state.modName; // Anzeigename = Login-Name
-      $('enterBtn').textContent = 'Raum wird erstellt …';
-      const r = await api('POST', '/api/room', {});
-      if (r.status !== 200 || !r.body.code) {
-        resetEnterBtn(); $('lobbyErr').textContent = 'Raum konnte nicht erstellt werden.'; return;
-      }
-      code = r.body.code;
+      resetEnterBtn();
+      openWaiting();
+      return;
     }
 
     $('enterBtn').textContent = 'Kamera wird gestartet …';
@@ -488,6 +484,84 @@
     });
   }
 
+  // ---- Moderator: Warteraum (wartende Bewerber abholen) ----
+  function openWaiting() {
+    $('waitingView').classList.add('on');
+    $('newCodeResult').textContent = '';
+    refreshWaiting();
+    clearInterval(state.waitingTimer);
+    state.waitingTimer = setInterval(refreshWaiting, 4000);
+  }
+  function closeWaiting() {
+    clearInterval(state.waitingTimer);
+    state.waitingTimer = 0;
+    $('waitingView').classList.remove('on');
+    backToLobby();
+  }
+  async function refreshWaiting() {
+    const r = await api('GET', '/api/waiting');
+    if (r.status === 200) renderWaiting(r.body.waiting || []);
+  }
+  function renderWaiting(list) {
+    const el = $('waitingList');
+    el.innerHTML = '';
+    if (!list.length) {
+      el.innerHTML = '<p style="color:var(--dim)">Niemand wartet gerade. Erzeuge oben einen Einmalcode und gib ihn an einen Bewerber weiter.</p>';
+      return;
+    }
+    list.forEach((w) => {
+      const div = document.createElement('div');
+      div.className = 'acc';
+      const full = ((w.firstName || '') + ' ' + (w.lastName || '')).trim() || w.name || 'Bewerber';
+      const secs = Math.max(0, Math.round((Date.now() - w.joinedAt) / 1000));
+      const since = secs < 60 ? secs + ' Sek.' : Math.floor(secs / 60) + ' Min.';
+      div.innerHTML =
+        `<div class="top"><div><div class="nm">${escapeHtml(full)}</div>` +
+        `<div class="meta">BIGO-ID: ${escapeHtml(w.bigoId || '-')} · Code: ${escapeHtml(w.code)} · wartet seit ${since}</div></div>` +
+        `<div class="${w.busy ? 'no' : 'ok'}">${w.busy ? 'in Bearbeitung' : 'wartet'}</div></div>` +
+        `<div class="acts"><button class="pick primary"${w.busy ? ' disabled' : ''}>📞 Abholen</button></div>`;
+      const btn = div.querySelector('.pick');
+      if (btn) btn.addEventListener('click', () => abholen(w.code, full));
+      el.appendChild(div);
+    });
+  }
+  async function abholen(code, applicantName) {
+    clearInterval(state.waitingTimer);
+    state.waitingTimer = 0;
+    $('waitingView').classList.remove('on');
+    try {
+      state.localStream = await navigator.mediaDevices.getUserMedia({
+        video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' },
+        audio: { echoCancellation: true, noiseSuppression: true },
+      });
+    } catch (err) {
+      openWaiting();
+      toast('Kein Zugriff auf Kamera/Mikrofon. Bitte im Browser erlauben.');
+      return;
+    }
+    state.role = 'host';
+    state.name = state.modName;
+    state.roomCode = code;
+    if (applicantName) remoteTag.textContent = applicantName;
+    localVideo.srcObject = state.localStream;
+    localTag.textContent = state.modName + ' (Du)';
+    startRoom();
+  }
+  if ($('waitingClose')) $('waitingClose').addEventListener('click', closeWaiting);
+  if ($('waitingRefresh')) $('waitingRefresh').addEventListener('click', refreshWaiting);
+  if ($('newCodeBtn')) $('newCodeBtn').addEventListener('click', async () => {
+    $('newCodeBtn').disabled = true;
+    const r = await api('POST', '/api/room', {});
+    $('newCodeBtn').disabled = false;
+    if (r.status === 200 && r.body.code) {
+      const link = `${location.origin}${location.pathname}?raum=${r.body.code}`;
+      $('newCodeResult').innerHTML = `Code: <b>${escapeHtml(r.body.code)}</b>`;
+      try { await navigator.clipboard.writeText(link); $('newCodeResult').innerHTML += ' · Link kopiert ✓'; } catch {}
+    } else {
+      $('newCodeResult').textContent = 'Konnte keinen Code erzeugen.';
+    }
+  });
+
   // Zurück zum Startbildschirm (z. B. bei falschem Moderator-Passwort).
   function backToLobby(errText) {
     try { if (state.ws) state.ws.close(); } catch {}
@@ -558,6 +632,9 @@
       ws.send(JSON.stringify({
         type: 'join', room: state.roomCode, role: state.role, name: state.name,
         token: state.modToken || '',
+        // Bewerber: Selbstauskunft mitsenden, damit der Moderator ihn im
+        // Warteraum mit Namen/BIGO-ID sieht und gezielt abholen kann.
+        info: state.role === 'guest' ? (state.applicantInfo || {}) : undefined,
       }));
     };
 
@@ -1044,6 +1121,10 @@
   // Verifizierung als Account auf dem Server speichern (Fotos inklusive).
   // Verbraucht den Einmalcode.
   if ($('saveAccount')) $('saveAccount').addEventListener('click', async () => {
+    if (!state.verified &&
+        !confirm('Der Bewerber ist noch nicht als verifiziert markiert. Trotzdem freigeben und Akte anlegen?')) {
+      return;
+    }
     const info = state.applicantInfo || {};
     const body = {
       code: state.roomCode,
@@ -1062,13 +1143,14 @@
     $('saveAccount').disabled = true;
     const r = await api('POST', '/api/account', body);
     if (r.status === 200) {
-      $('saveAccount').textContent = '✓ Account gespeichert';
-      toast('Account gespeichert ✓ (Einmalcode verbraucht)');
+      $('saveAccount').textContent = '✓ Freigegeben – Akte angelegt';
+      sysMsg('Bewerber freigegeben – Akte wurde angelegt (Einmalcode verbraucht).');
+      toast('Freigegeben ✓ – Akte angelegt');
     } else {
       $('saveAccount').disabled = false;
       toast(r.body && r.body.reason === 'bad-code'
-        ? 'Code ungültig/verbraucht – evtl. schon gespeichert.'
-        : 'Speichern fehlgeschlagen.');
+        ? 'Code ungültig/verbraucht – evtl. schon freigegeben.'
+        : 'Freigabe fehlgeschlagen.');
     }
   });
 

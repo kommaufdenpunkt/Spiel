@@ -395,7 +395,7 @@
         </div>
 
         <button id="markVerified" class="primary" disabled>✓ Als verifiziert markieren</button>
-        <button id="saveAccount" class="primary">💾 Account speichern (Server)</button>
+        <button id="saveAccount" class="primary">✅ Freigeben &amp; Akte anlegen</button>
         <button id="downloadReport">⤓ Prüf-Protokoll speichern</button>
       </div>
     </div>
@@ -412,6 +412,33 @@
 </div>
 
 <!-- ================= ADMIN: gespeicherte Accounts ================= -->
+<!-- ================= MODERATOR: Warteraum (Bewerber abholen) ================= -->
+<div id="waitingView" class="admin">
+  <div class="admin-box">
+    <div class="admin-head">
+      <h2>📞 Warteraum – Bewerber abholen</h2>
+      <div style="display:flex;gap:.5rem">
+        <button id="waitingRefresh">Aktualisieren</button>
+        <button id="waitingClose">Abmelden</button>
+      </div>
+    </div>
+    <div class="admin-list">
+      <div class="biprow" style="display:block">
+        <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center">
+          <button id="newCodeBtn" class="primary">➕ Einmalcode für neuen Bewerber</button>
+          <span id="newCodeResult" style="font-size:.9rem;color:var(--dim)"></span>
+        </div>
+        <div style="font-size:.8rem;color:var(--dim);margin-top:.4rem">
+          Gib den Code (oder den Beitritts-Link) an den Bewerber weiter. Sobald er beigetreten ist,
+          erscheint er unten und kann abgeholt werden.
+        </div>
+      </div>
+      <div class="vsection-title" style="margin-top:1rem">Wartende Bewerber</div>
+      <div id="waitingList"></div>
+    </div>
+  </div>
+</div>
+
 <div id="adminView" class="admin">
   <div class="admin-box">
     <div class="admin-head">

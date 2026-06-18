@@ -267,6 +267,13 @@ async function handleApi(req, res, urlPath, ip) {
     let body; try { body = await readBody(req, 16 * 1024); } catch { body = {}; }
     store.revokeCode(body.code); sendJson(res, 200, { ok: true }); return true;
   }
+  // ---- Warteliste: wartende Bewerber zum "Abholen" (eingeloggte Moderatoren) ----
+  if (urlPath === '/api/waiting' && req.method === 'GET') {
+    const list = Array.from(waiting.values())
+      .sort((a, b) => a.joinedAt - b.joinedAt) // älteste zuerst (faire Reihenfolge)
+      .map((w) => ({ ...w }));
+    sendJson(res, 200, { waiting: list }); return true;
+  }
 
   // ---- Account speichern / auflisten / ansehen / löschen ----
   if (urlPath === '/api/account' && req.method === 'POST') {
@@ -500,6 +507,12 @@ const wss = new WebSocketServer({ server });
 
 /** rooms: Map<roomCode, { host?: ws, guest?: ws }> */
 const rooms = new Map();
+/**
+ * waiting: Map<roomCode, { code, name, firstName, lastName, bigoId, joinedAt, busy }>
+ * Bewerber, die mit ihrem Einmalcode beigetreten sind und darauf warten, von
+ * einem Moderator "abgeholt" zu werden. Rein flüchtig (nur solange verbunden).
+ */
+const waiting = new Map();
 
 function send(ws, obj) {
   if (ws && ws.readyState === ws.OPEN) {
@@ -574,11 +587,28 @@ wss.on('connection', (ws, req) => {
       room[role] = ws;
       ws.peerName = String(msg.name || '').slice(0, 60);
 
+      // Bewerber tritt in die Warteliste ein (Moderatoren sehen ihn dort und
+      // können ihn "abholen"). Selbstauskunft kommt direkt mit dem Beitritt.
+      if (role === 'guest') {
+        const info = msg.info || {};
+        waiting.set(code, {
+          code,
+          name: ws.peerName,
+          firstName: String(info.firstName || '').slice(0, 60),
+          lastName: String(info.lastName || '').slice(0, 60),
+          bigoId: String(info.bigoId || '').slice(0, 60),
+          joinedAt: Date.now(),
+          busy: !!room.host,
+        });
+      }
+
       send(ws, { type: 'joined', role, room: code });
 
       // Wenn beide da sind: dem Moderator Bescheid geben, dass er die
       // Verbindung aufbauen (das WebRTC-Angebot erstellen) soll.
       if (room.host && room.guest) {
+        const w = waiting.get(code);
+        if (w) w.busy = true; // wird gerade bearbeitet -> nicht mehr "frei"
         send(room.host, { type: 'peer-ready', peerName: room.guest.peerName });
         send(room.guest, { type: 'peer-ready', peerName: room.host.peerName });
       }
@@ -600,8 +630,16 @@ wss.on('connection', (ws, req) => {
     if (!room) return;
     const peer = otherPeer(room, ws);
     send(peer, { type: 'peer-left' });
-    if (room.host === ws) room.host = undefined;
-    if (room.guest === ws) room.guest = undefined;
+    if (room.host === ws) {
+      room.host = undefined;
+      // Moderator weg -> Bewerber (falls noch da) wieder als "frei" anzeigen.
+      const w = waiting.get(ws.roomCode);
+      if (w && room.guest) w.busy = false;
+    }
+    if (room.guest === ws) {
+      room.guest = undefined;
+      waiting.delete(ws.roomCode); // Bewerber weg -> aus der Warteliste raus
+    }
     if (!room.host && !room.guest) rooms.delete(ws.roomCode);
   });
 });
