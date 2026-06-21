@@ -40,6 +40,8 @@
     transition:border-color .12s,box-shadow .12s}
   input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px #5b8cff33}
   input::placeholder{color:#5d6b7c}
+  /* Checkboxen/Radios dürfen nicht von der 100%-Breite oben erfasst werden. */
+  input[type=checkbox],input[type=radio]{width:auto;padding:0}
   a{color:var(--accent)}
   ::-webkit-scrollbar{width:10px;height:10px}
   ::-webkit-scrollbar-thumb{background:#2c3744;border-radius:8px;border:2px solid transparent;background-clip:content-box}
@@ -226,7 +228,7 @@
 
   .consent{display:flex;gap:.5rem;align-items:flex-start;font-size:.8rem;
     color:var(--dim);line-height:1.4;margin-top:.2rem}
-  .consent input{margin-top:.15rem;flex:0 0 auto}
+  .consent input{margin-top:.15rem;flex:0 0 auto;width:auto}
 
   .toast{position:fixed;left:50%;bottom:1.3rem;transform:translateX(-50%) translateY(8px);
     background:#11161ef0;border:1px solid var(--line2);padding:.65rem 1.1rem;border-radius:12px;
