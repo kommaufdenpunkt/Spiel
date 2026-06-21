@@ -148,59 +148,32 @@
   // =======================================================================
   //  LOBBY
   // =======================================================================
-  let pickedRole = 'host';
+  // Startseite ist für Bewerber. Mitarbeiter (Moderator/Admin) blenden ihren
+  // Login über den dezenten Link "Mitarbeiter-Login" ein.
+  let pickedRole = 'guest';
 
-  // Wenn die Seite mit ?raum=CODE geöffnet wird, ist man Bewerber.
+  // Einladungslink ?raum=CODE: Bewerbernummer vorausfüllen.
   const params = new URLSearchParams(location.search);
   const urlRoom = (params.get('raum') || params.get('room') || '').toUpperCase();
-  if (urlRoom) {
-    pickedRole = 'guest';
-    $('roomInput').value = urlRoom;
-    // Über den Einladungslink ist man immer Bewerber – Rollenauswahl ausblenden.
-    $('rolePick').style.display = 'none';
-  }
+  if (urlRoom) $('roomInput').value = urlRoom;
   setRoleUI(pickedRole);
 
-  $('rolePick').addEventListener('click', (e) => {
-    const btn = e.target.closest('button[data-role]');
-    if (!btn) return;
-    pickedRole = btn.dataset.role;
+  $('staffToggle').addEventListener('click', () => {
+    pickedRole = pickedRole === 'guest' ? 'host' : 'guest';
+    $('lobbyErr').textContent = '';
     setRoleUI(pickedRole);
   });
 
   function setRoleUI(role) {
-    document.querySelectorAll('#rolePick button').forEach((b) =>
-      b.classList.toggle('sel', b.dataset.role === role));
-    if (role === 'host') {
-      $('lobbyTitle').textContent = 'Video-Verifizierung starten';
-      $('lobbySub').textContent = 'Melde dich an – danach siehst du den Warteraum und kannst wartende Bewerber abholen.';
-      $('guestFields').style.display = 'none'; // Moderator nutzt Benutzername
-      $('userField').style.display = '';
-      $('passField').style.display = '';
-      $('totpField').style.display = '';
-      $('adminBtn').style.display = '';
-      $('monitorBtn').style.display = '';
-      $('manageBtn').style.display = '';
-      $('roomField').style.display = 'none'; // Code wird serverseitig erstellt
-      $('enterBtn').textContent = 'Anmelden';
-    } else {
-      $('lobbyTitle').textContent = 'Verifizierung beitreten';
-      // Über den Einladungslink ist der Code schon da -> nur noch Name + Beitreten.
-      $('lobbySub').textContent = urlRoom
-        ? 'Gib deinen Namen ein und tritt bei.'
-        : 'Gib deinen Namen und den Einmalcode ein, den du erhalten hast.';
-      $('roomLabel').textContent = 'Einmalcode';
-      $('roomInput').placeholder = 'Code vom Moderator';
-      $('guestFields').style.display = '';
-      $('userField').style.display = 'none';
-      $('passField').style.display = 'none';
-      $('totpField').style.display = 'none';
-      $('adminBtn').style.display = 'none';
-      $('monitorBtn').style.display = 'none';
-      $('manageBtn').style.display = 'none';
-      $('roomField').style.display = urlRoom ? 'none' : '';
-      $('enterBtn').textContent = 'Beitreten';
-    }
+    const guest = role !== 'host';
+    $('applicantFields').style.display = guest ? '' : 'none';
+    $('staffFields').style.display = guest ? 'none' : '';
+    $('lobbyTitle').textContent = guest ? 'Verifizierung beitreten' : 'Mitarbeiter-Anmeldung';
+    $('lobbySub').textContent = guest
+      ? 'Gib deine Bewerbernummer ein, die du erhalten hast.'
+      : 'Nur für Moderatoren und Admins.';
+    $('enterBtn').textContent = guest ? 'Beitreten' : 'Anmelden';
+    $('staffToggle').textContent = guest ? 'Mitarbeiter-Login →' : '← Zurück zur Bewerber-Ansicht';
   }
 
   $('enterBtn').addEventListener('click', enterRoom);
@@ -216,17 +189,12 @@
     $('lobbyErr').textContent = '';
 
     if (pickedRole === 'guest') {
-      const fullName = $('gName').value.trim().replace(/\s+/g, ' ');
-      const bigoId = $('gBigo').value.trim(); // optional
-      if (!fullName) { $('lobbyErr').textContent = 'Bitte gib deinen Namen ein.'; return; }
-      if (!code) { $('lobbyErr').textContent = 'Bitte gib den Einmalcode ein, den du erhalten hast.'; return; }
+      if (!code) { $('lobbyErr').textContent = 'Bitte gib deine Bewerbernummer ein.'; return; }
       if (!$('gConsent').checked) { $('lobbyErr').textContent = 'Bitte stimme der Datenverarbeitung zu, um fortzufahren.'; return; }
-      // Aus dem einen Namensfeld Vor-/Nachnamen ableiten (erstes Wort = Vorname).
-      const parts = fullName.split(' ');
-      const firstName = parts.shift() || '';
-      const lastName = parts.join(' ');
-      name = fullName;
-      state.applicantInfo = { firstName, lastName, bigoId };
+      // Der Bewerber gibt nur seine Nummer ein; Name/Daten erfasst der Moderator
+      // während des Gesprächs anhand des Ausweises.
+      name = 'Bewerber';
+      state.applicantInfo = {};
     }
 
     $('enterBtn').disabled = true;
@@ -267,12 +235,10 @@
     startRoom();
   }
 
-  // ---- Admin: gespeicherte Accounts ansehen ----
-  if ($('adminBtn')) $('adminBtn').addEventListener('click', openAdmin);
+  // Hinweis: Akten/Überwachung/Moderatorenverwaltung sind bewusst NICHT auf der
+  // Startseite – sie laufen über das separate Admin-Panel (/panel) mit Login.
   if ($('adminClose')) $('adminClose').addEventListener('click', () => $('adminView').classList.remove('on'));
 
-  // ---- Überwachung: Angriffe / Sperren ----
-  if ($('monitorBtn')) $('monitorBtn').addEventListener('click', openMonitor);
   if ($('monitorClose')) $('monitorClose').addEventListener('click', () => $('monitorView').classList.remove('on'));
   if ($('monitorRefresh')) $('monitorRefresh').addEventListener('click', loadMonitor);
 
@@ -327,7 +293,6 @@
   }
 
   // ---- Admin: Moderatoren verwalten ----
-  if ($('manageBtn')) $('manageBtn').addEventListener('click', openManage);
   if ($('manageClose')) $('manageClose').addEventListener('click', () => $('manageView').classList.remove('on'));
   if ($('newModAdd')) $('newModAdd').addEventListener('click', addModerator);
 
@@ -547,25 +512,26 @@
     const el = $('waitingList');
     el.innerHTML = '';
     if (!list.length) {
-      el.innerHTML = '<p style="color:var(--dim)">Niemand wartet gerade. Erzeuge oben einen Einmalcode und gib ihn an einen Bewerber weiter.</p>';
+      el.innerHTML = '<p style="color:var(--dim)">Niemand wartet gerade. Erzeuge oben eine Bewerbernummer und gib sie an einen Bewerber weiter.</p>';
       return;
     }
     list.forEach((w) => {
       const div = document.createElement('div');
       div.className = 'acc';
-      const full = ((w.firstName || '') + ' ' + (w.lastName || '')).trim() || w.name || 'Bewerber';
+      // Bewerber gibt nur seine Nummer ein -> Anzeige über die Bewerbernummer.
+      const title = ((w.firstName || '') + ' ' + (w.lastName || '')).trim() || ('Bewerber-Nr. ' + w.code);
       const secs = Math.max(0, Math.round((Date.now() - w.joinedAt) / 1000));
       const since = secs < 60 ? secs + ' Sek.' : Math.floor(secs / 60) + ' Min.';
       const status = w.busy
         ? (w.claimedBy ? `wird von ${escapeHtml(w.claimedBy)} geholt` : 'in Bearbeitung')
         : 'wartet';
       div.innerHTML =
-        `<div class="top"><div><div class="nm">${escapeHtml(full)}</div>` +
-        `<div class="meta">BIGO-ID: ${escapeHtml(w.bigoId || '-')} · Code: ${escapeHtml(w.code)} · wartet seit ${since}</div></div>` +
+        `<div class="top"><div><div class="nm">${escapeHtml(title)}</div>` +
+        `<div class="meta">wartet seit ${since}</div></div>` +
         `<div class="${w.busy ? 'busy' : 'ok'}">${status}</div></div>` +
         `<div class="acts"><button class="pick primary"${w.busy ? ' disabled' : ''}>📞 Abholen</button></div>`;
       const btn = div.querySelector('.pick');
-      if (btn) btn.addEventListener('click', () => abholen(w.code, full));
+      if (btn) btn.addEventListener('click', () => abholen(w.code, title));
       el.appendChild(div);
     });
   }
@@ -611,10 +577,10 @@
     $('newCodeBtn').disabled = false;
     if (r.status === 200 && r.body.code) {
       const link = `${location.origin}${location.pathname}?raum=${r.body.code}`;
-      $('newCodeResult').innerHTML = `Code: <b>${escapeHtml(r.body.code)}</b>`;
+      $('newCodeResult').innerHTML = `Bewerbernummer: <b>${escapeHtml(r.body.code)}</b>`;
       try { await navigator.clipboard.writeText(link); $('newCodeResult').innerHTML += ' · Link kopiert ✓'; } catch {}
     } else {
-      $('newCodeResult').textContent = 'Konnte keinen Code erzeugen.';
+      $('newCodeResult').textContent = 'Konnte keine Bewerbernummer erzeugen.';
     }
   });
 
@@ -701,7 +667,7 @@
         case 'error':
           if (msg.reason === 'room-full') toast('Der Raum ist bereits voll (2 Personen).');
           else if (msg.reason === 'auth') backToLobby('Anmeldung abgelaufen – bitte neu anmelden.');
-          else if (msg.reason === 'bad-code') backToLobby('Ungültiger oder bereits benutzter Einmalcode.');
+          else if (msg.reason === 'bad-code') backToLobby('Ungültige oder bereits benutzte Bewerbernummer.');
           break;
         case 'peer-ready':
           remoteTag.textContent = msg.peerName || 'Gegenüber';
