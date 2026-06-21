@@ -19,7 +19,10 @@ einreichen.
   die aktuelle Frage groß; sie wird auch ins Video eingeblendet.
 - **Chat-Fenster** zwischen euch.
 - **Aufnahme** des kompletten Gesprächs → Download als **MP4** (bzw. WebM, falls
-  der Browser kein MP4 aufnehmen kann – siehe unten).
+  der Browser kein MP4 aufnehmen kann – siehe unten). Zusätzlich wird die
+  Aufnahme **verschlüsselt auf dem Server** abgelegt und ist – nur nach
+  **Admin-Login** – im Panel ansehbar, herunterladbar und löschbar (öffentlich
+  ist nichts abrufbar).
 - **Persönliche Moderator-Logins:** Jede:r aus dem Team hat einen eigenen
   Login (Benutzername + Passwort + eigenes 2FA). Verwaltet wird das über ein
   **Admin-Passwort** (Logins im Browser anlegen/löschen). In jeder Verifizierung
@@ -28,16 +31,25 @@ einreichen.
   hält den Ausweis neben ihr Gesicht; der Moderator macht Beweis-Fotos, hakt eine
   Checkliste ab, markiert „verifiziert" und lädt ein **Prüf-Protokoll** herunter.
 - **Einmalcode-Pflicht:** Bewerber kommen nur mit einem vom Moderator erzeugten
-  **Einmalcode** rein (gilt genau einmal).
-- **Accounts:** Jede abgeschlossene Verifizierung wird als Eintrag gespeichert
-  (inkl. Fotos) und ist im Moderator-Bereich einsehbar/löschbar.
+  **Einmalcode** rein (gilt genau einmal); der Code ist zugleich ihr Zugang.
+- **Warteraum:** Beigetretene Bewerber landen in einer **Warteliste**, die alle
+  eingeloggten Moderatoren sehen. Per **„Abholen"** nimmt sich ein Moderator den
+  nächsten Bewerber und startet die Verifizierung (faire Reihenfolge).
+  **Team-sicher:** Ein Bewerber wird beim Abholen serverseitig reserviert – zwei
+  Moderatoren können denselben nicht gleichzeitig bekommen; die Liste zeigt
+  „wird von … geholt".
+- **Akte erst bei Freigabe:** Erst wenn der Moderator **„Freigeben"** klickt, wird
+  die Akte (Eintrag inkl. Fotos) **automatisch** angelegt und ist nach Admin-Login
+  einsehbar/löschbar. Vorher existiert nur ein flüchtiger Wartelisten-Eintrag.
 - **Sicherheit:** 2FA (TOTP), Brute-Force-Sperre + Honeypot, Login-Härtung.
 - **Verschlüsselung (durchgängig):**
   - *Übertragung:* HTTPS (Web) + WebRTC/DTLS (Video & Datei-Upload Browser↔Browser).
-  - *Speicherung:* **alle** Daten – Ausweis-Fotos, Profilbild **und** Metadaten
-    (Name, BIGO-ID, Ausweis-Nr.) – verschlüsselt mit **AES-256-GCM** (`STORAGE_KEY`).
-    Ohne korrekten Schlüssel sind die Daten unlesbar; mit falschem Schlüssel
-    startet der Server bewusst nicht.
+  - *Speicherung:* **alle** Daten – Ausweis-Fotos, Profilbild, Gesprächs-Videos
+    **und** Metadaten (Name, BIGO-ID, Ausweis-Nr.) – verschlüsselt mit
+    **AES-256-GCM** (`STORAGE_KEY`). Ohne korrekten Schlüssel sind die Daten
+    unlesbar; mit falschem Schlüssel startet der Server bewusst nicht.
+  - *Zugriff:* Aufnahmen und Akten sind **nicht öffentlich** – Hochladen setzt
+    einen Moderator-Login voraus, Ansehen/Löschen nur mit Admin-Login.
 - **Einwilligung:** Der Bewerber muss vor dem Beitritt der Datenverarbeitung
   aktiv zustimmen (Häkchen).
 
@@ -72,19 +84,27 @@ Dann im Browser öffnen: <http://localhost:3000>
    **Admin-Passwort** eingeben → „🛠 Moderatoren verwalten" → die persönlichen
    Logins für dein Team anlegen (jeweils mit eigenem 2FA-Schlüssel).
 1. **Du (Moderator):** Seite öffnen → „Ich moderiere" → **Benutzername +
-   Passwort + 2FA** → **Raum betreten**. Der Beitritts-Link/Einmalcode wird
-   automatisch kopiert und im Chat angezeigt.
-2. **Link an den Bewerber schicken** (WhatsApp, E-Mail …) – z. B. mit
-   „✉ Einladung kopieren".
-3. **Bewerber** öffnet den Link → **Vorname, Nachname, BIGO-ID** eingeben →
-   **beitreten** → Kamera/Mikro erlauben. (Kein Passwort nötig.)
-4. **Ausweis:** Bewerber öffnet rechts den Tab **„Ausweis"** → lädt **Profilbild**,
+   Passwort + 2FA** → **Anmelden**. Danach landest du im **Warteraum**.
+2. Im Warteraum **„➕ Einmalcode für neuen Bewerber"** klicken – der Code und der
+   Beitritts-Link werden erzeugt (Link wird automatisch kopiert). Diesen an den
+   Bewerber schicken (WhatsApp, E-Mail …).
+3. **Bewerber** öffnet den Link → nur noch **Name** eingeben → **Beitreten** →
+   Kamera/Mikro erlauben. (BIGO-ID ist optional und kann auch im Gespräch
+   nachgetragen werden; kein Passwort nötig – der Einmalcode ist sein Zugang.)
+4. Der Bewerber erscheint jetzt im **Warteraum** des Moderators. Klick auf
+   **„📞 Abholen"** startet das Video-Gespräch mit genau diesem Bewerber.
+   Mehrere Moderatoren können sich so Bewerber aus der gemeinsamen Warteliste
+   nehmen.
+5. **Ausweis:** Bewerber öffnet rechts den Tab **„Ausweis"** → lädt **Profilbild**,
    Ausweis-Vorder- & Rückseite hoch und hält den Ausweis neben das Gesicht. Du als Moderator siehst
    die Fotos im Tab „Ausweis", machst per Knopf Live-Fotos, hakst die Checkliste
    ab und klickst **„Als verifiziert markieren"**.
-5. Du klickst rechts auf **„Nächste Frage ▶"** – der Bewerber sieht die Frage.
-6. **⏺ Aufnahme starten**, das Gespräch führen.
-7. Am Ende **⏹ Beenden & speichern** (Video) und **„Prüf-Protokoll speichern"**.
+6. Du klickst rechts auf **„Nächste Frage ▶"** – der Bewerber sieht die Frage.
+7. **⏺ Aufnahme starten**, das Gespräch führen.
+8. Am Ende **⏹ Beenden & speichern** (Video). Mit **„✅ Freigeben & Akte anlegen"**
+   wird der Bewerber freigegeben – dabei wird **automatisch die Akte angelegt**
+   (mit Fotos, verschlüsselt) und der Einmalcode verbraucht. Optional noch
+   **„Prüf-Protokoll speichern"**.
 
 ---
 
@@ -150,9 +170,13 @@ Tipp: Nimm zum Aufnehmen am besten **Safari (Mac/iPhone)** oder eine aktuelle
 ## Datenschutz / Hinweis
 
 Bitte den Bewerber **vor der Aufnahme** über die Aufzeichnung informieren und
-sein Einverständnis einholen. Das Video läuft direkt zwischen den beiden
-Browsern; der Server vermittelt nur den Verbindungsaufbau und speichert kein
-Video.
+sein Einverständnis einholen. Das Live-Gespräch läuft direkt zwischen den beiden
+Browsern; der Server vermittelt nur den Verbindungsaufbau. Die **fertige
+Aufnahme** wird nach dem Beenden zusätzlich **verschlüsselt auf dem Server**
+gespeichert (AES-256-GCM) und ist ausschließlich nach **Admin-Login** im Panel
+abruf- und löschbar. Die Aufbewahrung ist **unbegrenzt** (keine automatische
+Löschung); entfernt wird nur manuell über den Löschen-Button. Plane dafür ein
+Löschkonzept ein.
 
 ---
 
@@ -161,7 +185,7 @@ Video.
 ```
 verifizierung/
 ├── server.js            Server: App + Vermittlung + API (Login/Codes/Accounts)
-├── store.js             Persistenz: Codes, Accounts, (verschlüsselte) Fotos
+├── store.js             Persistenz: Codes, Accounts, (verschlüsselte) Fotos + Videos
 ├── security.js          2FA (TOTP), Brute-Force-Sperre, Honeypot, Tokens
 ├── package.json         (npm run totp = 2FA-Secret erzeugen)
 ├── Dockerfile           Container-Image (für Coolify/Docker)

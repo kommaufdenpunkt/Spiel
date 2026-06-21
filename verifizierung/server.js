@@ -120,6 +120,19 @@ function readBody(req, limit = 25 * 1024 * 1024) {
     req.on('error', reject);
   });
 }
+// Liest den Anfrage-Body als rohen Buffer (für Video-Uploads).
+function readRawBody(req, limit = 300 * 1024 * 1024) {
+  return new Promise((resolve, reject) => {
+    let size = 0; const chunks = [];
+    req.on('data', (c) => {
+      size += c.length;
+      if (size > limit) { reject(new Error('too-large')); req.destroy(); return; }
+      chunks.push(c);
+    });
+    req.on('end', () => resolve(Buffer.concat(chunks)));
+    req.on('error', reject);
+  });
+}
 function getToken(req) {
   const h = req.headers['authorization'] || '';
   if (h.startsWith('Bearer ')) return h.slice(7);
@@ -254,6 +267,44 @@ async function handleApi(req, res, urlPath, ip) {
     let body; try { body = await readBody(req, 16 * 1024); } catch { body = {}; }
     store.revokeCode(body.code); sendJson(res, 200, { ok: true }); return true;
   }
+  // ---- Warteliste: wartende Bewerber zum "Abholen" (eingeloggte Moderatoren) ----
+  if (urlPath === '/api/waiting' && req.method === 'GET') {
+    const list = Array.from(waiting.values())
+      .sort((a, b) => a.joinedAt - b.joinedAt) // älteste zuerst (faire Reihenfolge)
+      .map((w) => {
+        const busy = waitingBusy(w);
+        return {
+          code: w.code, name: w.name, firstName: w.firstName, lastName: w.lastName,
+          bigoId: w.bigoId, joinedAt: w.joinedAt,
+          busy, claimedBy: busy ? w.claimedBy : null,
+        };
+      });
+    sendJson(res, 200, { waiting: list }); return true;
+  }
+  // Bewerber reservieren ("Abholen"), bevor die Kamera startet. Atomar: zwei
+  // Moderatoren können denselben Bewerber nicht gleichzeitig bekommen.
+  if (urlPath === '/api/waiting/claim' && req.method === 'POST') {
+    let body; try { body = await readBody(req, 16 * 1024); } catch { body = {}; }
+    const code = String(body.code || '').trim().toUpperCase();
+    const entry = waiting.get(code);
+    if (!entry) { sendJson(res, 404, { reason: 'gone' }); return true; }
+    if (waitingBusy(entry)) { sendJson(res, 409, { reason: 'busy', by: entry.claimedBy || '' }); return true; }
+    entry.claimedBy = reqName(req) || 'Moderator';
+    entry.claimedAt = Date.now();
+    sendJson(res, 200, { ok: true }); return true;
+  }
+  // Reservierung wieder freigeben (z. B. wenn die Kamera nicht freigegeben wurde).
+  if (urlPath === '/api/waiting/release' && req.method === 'POST') {
+    let body; try { body = await readBody(req, 16 * 1024); } catch { body = {}; }
+    const code = String(body.code || '').trim().toUpperCase();
+    const entry = waiting.get(code);
+    const room = rooms.get(code);
+    // Nur lösen, wenn ich selbst reserviert hatte und noch kein Gespräch läuft.
+    if (entry && !(room && room.host) && entry.claimedBy === (reqName(req) || 'Moderator')) {
+      entry.claimedBy = null; entry.claimedAt = 0;
+    }
+    sendJson(res, 200, { ok: true }); return true;
+  }
 
   // ---- Account speichern / auflisten / ansehen / löschen ----
   if (urlPath === '/api/account' && req.method === 'POST') {
@@ -294,6 +345,73 @@ async function handleApi(req, res, urlPath, ip) {
     let body; try { body = await readBody(req, 16 * 1024); } catch { body = {}; }
     const ok = store.deleteAccount(body.id);
     if (ok) security.recordEvent('audit', ip, 'Account gelöscht: ' + body.id);
+    sendJson(res, 200, { ok }); return true;
+  }
+
+  // ---- Aufnahmen (verschlüsselte Verifizierungs-Videos) ----
+  // Hochladen darf jeder eingeloggte Moderator (rohes Video im Body).
+  if (urlPath === '/api/recording' && req.method === 'POST') {
+    let buf; try { buf = await readRawBody(req); } catch { sendJson(res, 413, { reason: 'too-large' }); return true; }
+    if (!buf.length) { sendJson(res, 400, { reason: 'empty' }); return true; }
+    const q = new URL(req.url, 'http://x').searchParams;
+    const rec = store.saveRecording({
+      buffer: buf,
+      mime: (req.headers['content-type'] || 'video/webm').split(';')[0].trim(),
+      ext: q.get('ext') || 'webm',
+      durationSec: q.get('dur'),
+      applicantName: q.get('applicant') || '',
+      roomCode: q.get('room') || '',
+      moderatorName: reqName(req),
+    });
+    if (!rec) { sendJson(res, 400, { reason: 'bad-recording' }); return true; }
+    security.recordEvent('audit', ip, 'Aufnahme gespeichert: ' + (rec.applicantName || rec.id));
+    sendJson(res, 200, { id: rec.id }); return true;
+  }
+  // Auflisten/Ansehen/Löschen = NUR Admin.
+  if (urlPath === '/api/recordings' && req.method === 'GET') {
+    if (!isAdminReq(req)) { sendJson(res, 403, { reason: 'admin-only' }); return true; }
+    sendJson(res, 200, { recordings: store.listRecordings() }); return true;
+  }
+  if (urlPath === '/api/recording' && req.method === 'GET') {
+    if (!isAdminReq(req)) { res.writeHead(403); res.end('Forbidden'); return true; }
+    const q = new URL(req.url, 'http://x').searchParams;
+    const data = store.readRecording(q.get('id'));
+    if (!data) { res.writeHead(404); res.end('not found'); return true; }
+    const total = data.buffer.length;
+    const range = req.headers['range'];
+    // Range-Anfragen (Vor-/Zurückspulen im <video>) bedienen.
+    const m = range && /^bytes=(\d*)-(\d*)$/.exec(range);
+    if (m) {
+      let start = m[1] === '' ? 0 : parseInt(m[1], 10);
+      let end = m[2] === '' ? total - 1 : parseInt(m[2], 10);
+      if (isNaN(start) || isNaN(end) || start > end || start >= total) {
+        res.writeHead(416, { 'Content-Range': `bytes */${total}` }); res.end(); return true;
+      }
+      end = Math.min(end, total - 1);
+      res.writeHead(206, {
+        'Content-Type': data.mime,
+        'Content-Range': `bytes ${start}-${end}/${total}`,
+        'Accept-Ranges': 'bytes',
+        'Content-Length': end - start + 1,
+        'Cache-Control': 'no-store',
+      });
+      res.end(req.method === 'HEAD' ? undefined : data.buffer.subarray(start, end + 1));
+      return true;
+    }
+    res.writeHead(200, {
+      'Content-Type': data.mime,
+      'Content-Length': total,
+      'Accept-Ranges': 'bytes',
+      'Cache-Control': 'no-store',
+    });
+    res.end(data.buffer);
+    return true;
+  }
+  if (urlPath === '/api/recording-delete' && req.method === 'POST') {
+    if (!isAdminReq(req)) { sendJson(res, 403, { reason: 'admin-only' }); return true; }
+    let body; try { body = await readBody(req, 16 * 1024); } catch { body = {}; }
+    const ok = store.deleteRecording(body.id);
+    if (ok) security.recordEvent('audit', ip, 'Aufnahme gelöscht: ' + body.id);
     sendJson(res, 200, { ok }); return true;
   }
 
@@ -420,6 +538,24 @@ const wss = new WebSocketServer({ server });
 
 /** rooms: Map<roomCode, { host?: ws, guest?: ws }> */
 const rooms = new Map();
+/**
+ * waiting: Map<roomCode, { code, name, firstName, lastName, bigoId, joinedAt,
+ *                          claimedBy, claimedAt }>
+ * Bewerber, die mit ihrem Einmalcode beigetreten sind und darauf warten, von
+ * einem Moderator "abgeholt" zu werden. Rein flüchtig (nur solange verbunden).
+ */
+const waiting = new Map();
+// Eine Reservierung ("Claim") gilt so lange, bis der Moderator wirklich im Raum
+// ist. Falls er es sich anders überlegt / die Kamera nicht freigibt, verfällt
+// die Reservierung nach dieser Zeit, damit ihn jemand anderes abholen kann.
+const CLAIM_TTL = 30000;
+// Ist ein wartender Bewerber gerade vergeben? (Aktiver Moderator im Raum ODER
+// eine noch gültige Reservierung.)
+function waitingBusy(entry) {
+  const room = rooms.get(entry.code);
+  if (room && room.host) return true;
+  return !!(entry.claimedBy && (Date.now() - entry.claimedAt) < CLAIM_TTL);
+}
 
 function send(ws, obj) {
   if (ws && ws.readyState === ws.OPEN) {
@@ -494,11 +630,29 @@ wss.on('connection', (ws, req) => {
       room[role] = ws;
       ws.peerName = String(msg.name || '').slice(0, 60);
 
+      // Bewerber tritt in die Warteliste ein (Moderatoren sehen ihn dort und
+      // können ihn "abholen"). Selbstauskunft kommt direkt mit dem Beitritt.
+      if (role === 'guest') {
+        const info = msg.info || {};
+        waiting.set(code, {
+          code,
+          name: ws.peerName,
+          firstName: String(info.firstName || '').slice(0, 60),
+          lastName: String(info.lastName || '').slice(0, 60),
+          bigoId: String(info.bigoId || '').slice(0, 60),
+          joinedAt: Date.now(),
+          claimedBy: null,   // welcher Moderator hat reserviert/holt ab
+          claimedAt: 0,      // Zeitpunkt der Reservierung (für Ablauf)
+        });
+      }
+
       send(ws, { type: 'joined', role, room: code });
 
       // Wenn beide da sind: dem Moderator Bescheid geben, dass er die
       // Verbindung aufbauen (das WebRTC-Angebot erstellen) soll.
       if (room.host && room.guest) {
+        const w = waiting.get(code);
+        if (w) { w.claimedBy = room.host.peerName || w.claimedBy; w.claimedAt = Date.now(); }
         send(room.host, { type: 'peer-ready', peerName: room.guest.peerName });
         send(room.guest, { type: 'peer-ready', peerName: room.host.peerName });
       }
@@ -520,8 +674,21 @@ wss.on('connection', (ws, req) => {
     if (!room) return;
     const peer = otherPeer(room, ws);
     send(peer, { type: 'peer-left' });
-    if (room.host === ws) room.host = undefined;
-    if (room.guest === ws) room.guest = undefined;
+    if (room.host === ws) {
+      room.host = undefined;
+      const w = waiting.get(ws.roomCode);
+      if (w && room.guest) {
+        // Schon freigegeben (Einmalcode verbraucht)? Dann ist der Bewerber fertig
+        // und gehört nicht zurück in die Warteliste. Sonst Reservierung lösen,
+        // damit ihn wieder jemand abholen kann.
+        if (!store.isCodeUsable(ws.roomCode)) waiting.delete(ws.roomCode);
+        else { w.claimedBy = null; w.claimedAt = 0; }
+      }
+    }
+    if (room.guest === ws) {
+      room.guest = undefined;
+      waiting.delete(ws.roomCode); // Bewerber weg -> aus der Warteliste raus
+    }
     if (!room.host && !room.guest) rooms.delete(ws.roomCode);
   });
 });

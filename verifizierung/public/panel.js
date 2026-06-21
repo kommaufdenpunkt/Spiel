@@ -76,23 +76,27 @@
     if (sec === 'overview') loadOverview();
     if (sec === 'moderators') loadModerators();
     if (sec === 'accounts') loadAccounts();
+    if (sec === 'reports') loadRecordings();
     if (sec === 'security') loadSecurity();
   }
 
   // ---- Übersicht ----
   async function loadOverview() {
-    const [mods, accs, sec] = await Promise.all([
+    const [mods, accs, sec, recs] = await Promise.all([
       api('GET', '/api/moderators'), api('GET', '/api/accounts'), api('GET', '/api/security'),
+      api('GET', '/api/recordings'),
     ]);
     const m = (mods.body.moderators || []);
     const a = (accs.body.accounts || []);
     const verified = a.filter((x) => x.verified).length;
     const blocked = (sec.body.blocked || []).length;
     const locked = m.filter((x) => x.locked).length;
+    const rec = (recs.body.recordings || []).length;
     $('stats').innerHTML =
       stat(m.length, 'Moderatoren' + (locked ? ` (${locked} gesperrt)` : '')) +
       stat(a.length, 'Verifizierungen') +
       stat(verified, 'davon verifiziert') +
+      stat(rec, 'Aufnahmen') +
       stat(blocked, 'gesperrte IPs');
   }
   function stat(n, l) { return `<div class="stat"><div class="n">${n}</div><div class="l">${esc(l)}</div></div>`; }
@@ -179,6 +183,39 @@
       });
       del.classList.add('danger');
       acts.appendChild(del); div.appendChild(acts);
+      el.appendChild(div);
+    });
+  }
+
+  // ---- Aufnahmen ----
+  async function loadRecordings() {
+    const r = await api('GET', '/api/recordings');
+    const list = r.body.recordings || [];
+    const el = $('repList');
+    if (!list.length) { el.innerHTML = '<div class="empty">Noch keine Aufnahmen.</div>'; return; }
+    el.innerHTML = '';
+    list.forEach((rec) => {
+      const div = document.createElement('div'); div.className = 'acc';
+      const date = new Date(rec.createdAt).toLocaleString('de-DE');
+      const mm = Math.floor((rec.durationSec || 0) / 60), ss = (rec.durationSec || 0) % 60;
+      const dur = mm + ':' + String(ss).padStart(2, '0');
+      const mb = (rec.bytes / (1024 * 1024)).toFixed(1);
+      const src = `/api/recording?id=${encodeURIComponent(rec.id)}&token=${encodeURIComponent(token)}`;
+      div.innerHTML =
+        `<div class="top"><div><div class="nm">${esc(rec.applicantName || 'Bewerber')}</div>` +
+        `<div class="meta">${esc(date)} · Dauer ${dur} · ${mb} MB · Raum ${esc(rec.roomCode || '-')}<br>` +
+        `Moderator: ${esc(rec.moderatorName || '-')}</div></div></div>` +
+        `<video controls preload="none" src="${src}" style="width:100%;max-height:360px;border-radius:8px;background:#000;margin:.5rem 0"></video>`;
+      const acts = document.createElement('div'); acts.style.marginTop = '.4rem';
+      const dl = document.createElement('a');
+      dl.href = src; dl.textContent = '⬇ Herunterladen'; dl.style.marginRight = '.7rem';
+      dl.setAttribute('download', 'aufnahme_' + (rec.applicantName || 'bewerber').replace(/\s+/g, '_') + '.' + (rec.ext || 'webm'));
+      const del = btn('🗑 Aufnahme löschen', async () => {
+        if (!confirm('Diese Aufnahme endgültig löschen?')) return;
+        await api('POST', '/api/recording-delete', { id: rec.id }); loadRecordings(); loadOverview();
+      });
+      del.classList.add('danger');
+      acts.appendChild(dl); acts.appendChild(del); div.appendChild(acts);
       el.appendChild(div);
     });
   }

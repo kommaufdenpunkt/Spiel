@@ -49,7 +49,6 @@
     ws: null,
     pc: null,
     dc: null,            // Datenkanal (Chat + Fragen-Sync)
-    inviteLink: '',
     iceServers: null,
     // Perfect-Negotiation-Zustand
     polite: false,
@@ -174,7 +173,7 @@
       b.classList.toggle('sel', b.dataset.role === role));
     if (role === 'host') {
       $('lobbyTitle').textContent = 'Video-Verifizierung starten';
-      $('lobbySub').textContent = 'Melde dich an – ein Einmalcode für den Bewerber wird automatisch erzeugt.';
+      $('lobbySub').textContent = 'Melde dich an – danach siehst du den Warteraum und kannst wartende Bewerber abholen.';
       $('guestFields').style.display = 'none'; // Moderator nutzt Benutzername
       $('userField').style.display = '';
       $('passField').style.display = '';
@@ -183,9 +182,13 @@
       $('monitorBtn').style.display = '';
       $('manageBtn').style.display = '';
       $('roomField').style.display = 'none'; // Code wird serverseitig erstellt
+      $('enterBtn').textContent = 'Anmelden';
     } else {
       $('lobbyTitle').textContent = 'Verifizierung beitreten';
-      $('lobbySub').textContent = 'Gib deinen Namen und den Einmalcode ein, den du erhalten hast.';
+      // Über den Einladungslink ist der Code schon da -> nur noch Name + Beitreten.
+      $('lobbySub').textContent = urlRoom
+        ? 'Gib deinen Namen ein und tritt bei.'
+        : 'Gib deinen Namen und den Einmalcode ein, den du erhalten hast.';
       $('roomLabel').textContent = 'Einmalcode';
       $('roomInput').placeholder = 'Code vom Moderator';
       $('guestFields').style.display = '';
@@ -195,7 +198,8 @@
       $('adminBtn').style.display = 'none';
       $('monitorBtn').style.display = 'none';
       $('manageBtn').style.display = 'none';
-      $('roomField').style.display = '';
+      $('roomField').style.display = urlRoom ? 'none' : '';
+      $('enterBtn').textContent = 'Beitreten';
     }
   }
 
@@ -203,7 +207,7 @@
 
   function resetEnterBtn() {
     $('enterBtn').disabled = false;
-    $('enterBtn').textContent = 'Raum betreten';
+    $('enterBtn').textContent = pickedRole === 'guest' ? 'Beitreten' : 'Anmelden';
   }
 
   async function enterRoom() {
@@ -212,20 +216,22 @@
     $('lobbyErr').textContent = '';
 
     if (pickedRole === 'guest') {
-      const firstName = $('gVorname').value.trim();
-      const lastName = $('gNachname').value.trim();
-      const bigoId = $('gBigo').value.trim();
-      if (!firstName || !lastName) { $('lobbyErr').textContent = 'Bitte Vor- und Nachnamen eingeben.'; return; }
-      if (!bigoId) { $('lobbyErr').textContent = 'Bitte deine BIGO-ID eingeben.'; return; }
+      const fullName = $('gName').value.trim().replace(/\s+/g, ' ');
+      const bigoId = $('gBigo').value.trim(); // optional
+      if (!fullName) { $('lobbyErr').textContent = 'Bitte gib deinen Namen ein.'; return; }
       if (!code) { $('lobbyErr').textContent = 'Bitte gib den Einmalcode ein, den du erhalten hast.'; return; }
       if (!$('gConsent').checked) { $('lobbyErr').textContent = 'Bitte stimme der Datenverarbeitung zu, um fortzufahren.'; return; }
-      name = (firstName + ' ' + lastName).trim();
+      // Aus dem einen Namensfeld Vor-/Nachnamen ableiten (erstes Wort = Vorname).
+      const parts = fullName.split(' ');
+      const firstName = parts.shift() || '';
+      const lastName = parts.join(' ');
+      name = fullName;
       state.applicantInfo = { firstName, lastName, bigoId };
     }
 
     $('enterBtn').disabled = true;
 
-    // Moderator: erst persönlich anmelden, dann Einmalcode erzeugen.
+    // Moderator: anmelden -> Warteraum öffnen (Bewerber dort abholen).
     if (pickedRole === 'host') {
       $('enterBtn').textContent = 'Anmeldung …';
       const login = await doLogin();
@@ -235,13 +241,9 @@
         const changed = await forcePasswordChange();
         if (!changed) { resetEnterBtn(); return; }
       }
-      name = state.modName; // Anzeigename = Login-Name
-      $('enterBtn').textContent = 'Raum wird erstellt …';
-      const r = await api('POST', '/api/room', {});
-      if (r.status !== 200 || !r.body.code) {
-        resetEnterBtn(); $('lobbyErr').textContent = 'Raum konnte nicht erstellt werden.'; return;
-      }
-      code = r.body.code;
+      resetEnterBtn();
+      openWaiting();
+      return;
     }
 
     $('enterBtn').textContent = 'Kamera wird gestartet …';
@@ -419,7 +421,41 @@
     const r = await api('GET', '/api/accounts');
     if (r.status !== 200) { toast('Konnte Accounts nicht laden.'); return; }
     renderAdmin(r.body.accounts || []);
+    const rr = await api('GET', '/api/recordings');
+    renderRecordings(rr.status === 200 ? (rr.body.recordings || []) : []);
     $('adminView').classList.add('on');
+  }
+
+  function renderRecordings(list) {
+    const el = $('recList');
+    if (!el) return;
+    el.innerHTML = '';
+    if (!list.length) {
+      el.innerHTML = '<p style="color:var(--dim)">Noch keine Aufnahmen.</p>';
+      return;
+    }
+    list.forEach((r) => {
+      const div = document.createElement('div');
+      div.className = 'acc';
+      const date = new Date(r.createdAt).toLocaleString('de-DE');
+      const mm = Math.floor((r.durationSec || 0) / 60), ss = (r.durationSec || 0) % 60;
+      const dur = `${mm}:${String(ss).padStart(2, '0')}`;
+      const mb = (r.bytes / (1024 * 1024)).toFixed(1);
+      const src = `/api/recording?id=${encodeURIComponent(r.id)}&token=${encodeURIComponent(state.modToken)}`;
+      div.innerHTML =
+        `<div class="top"><div><div class="nm">${escapeHtml(r.applicantName || 'Bewerber')}</div>` +
+        `<div class="meta">${date} · Dauer ${dur} · ${mb} MB · ${escapeHtml(r.ext || '')}<br>` +
+        `Raum: ${escapeHtml(r.roomCode || '-')} · Moderator: ${escapeHtml(r.moderatorName || '-')}</div></div></div>` +
+        `<video controls preload="none" src="${src}" style="width:100%;max-height:360px;border-radius:8px;background:#000;margin:.4rem 0"></video>` +
+        `<div class="acts"><a class="dlbtn" href="${src}" download="verifizierung_${encodeURIComponent((r.applicantName||'bewerber').replace(/\s+/g,'_'))}.${escapeHtml(r.ext||'webm')}">⬇ Herunterladen</a>` +
+        `<button class="del">🗑 Löschen</button></div>`;
+      div.querySelector('.del').addEventListener('click', async () => {
+        if (!confirm('Diese Aufnahme endgültig löschen?')) return;
+        await api('POST', '/api/recording-delete', { id: r.id });
+        openAdmin();
+      });
+      el.appendChild(div);
+    });
   }
 
   function renderAdmin(list) {
@@ -454,6 +490,134 @@
     });
   }
 
+  // ---- Moderator: Warteraum (wartende Bewerber abholen) ----
+  function openWaiting() {
+    $('waitingView').classList.add('on');
+    $('newCodeResult').textContent = '';
+    refreshWaiting();
+    clearInterval(state.waitingTimer);
+    state.waitingTimer = setInterval(refreshWaiting, 3000);
+  }
+  function closeWaiting() {
+    clearInterval(state.waitingTimer);
+    state.waitingTimer = 0;
+    $('waitingView').classList.remove('on');
+    backToLobby();
+  }
+
+  // Moderator: aktuelles Gespräch beenden und zurück in den Warteraum, um den
+  // nächsten Bewerber abzuholen (ohne sich abzumelden).
+  function leaveRoom() {
+    if (state.recorder && state.recorder.state === 'recording') stopRecording();
+    try { if (state.ws) state.ws.close(); } catch {}
+    state.ws = null;
+    resetPeer();
+    if (state.localStream) {
+      state.localStream.getTracks().forEach((t) => { try { t.stop(); } catch {} });
+      state.localStream = null;
+    }
+    resetRoomForNext();
+    room.classList.remove('active');
+    openWaiting();
+  }
+  // Verify-Panel, Medien und Chat für den nächsten Bewerber leeren.
+  function resetRoomForNext() {
+    state.snapshots = [];
+    state.chunks = [];
+    state.applicantInfo = null;
+    state.currentQ = -1;
+    if ($('shots')) $('shots').innerHTML = '';
+    if ($('guestShots')) $('guestShots').innerHTML = '';
+    checkBoxes().forEach((c) => { c.checked = false; });
+    if ($('saveAccount')) { $('saveAccount').disabled = true; $('saveAccount').textContent = '✅ Freigeben & Akte anlegen'; }
+    ['verifiedName', 'verifiedBigo', 'verifiedDoc'].forEach((id) => { if ($(id)) $(id).value = ''; });
+    if ($('applicantInfo')) { $('applicantInfo').style.display = 'none'; $('applicantInfo').innerHTML = ''; }
+    setVerified(false);
+    if (chatLog) chatLog.innerHTML = '';
+    remoteVideo.srcObject = null;
+    remoteWaiting.style.display = '';
+    remoteWaiting.textContent = 'Warte auf Gegenüber …';
+  }
+  if ($('leaveBtn')) $('leaveBtn').addEventListener('click', leaveRoom);
+  async function refreshWaiting() {
+    const r = await api('GET', '/api/waiting');
+    if (r.status === 200) renderWaiting(r.body.waiting || []);
+  }
+  function renderWaiting(list) {
+    const el = $('waitingList');
+    el.innerHTML = '';
+    if (!list.length) {
+      el.innerHTML = '<p style="color:var(--dim)">Niemand wartet gerade. Erzeuge oben einen Einmalcode und gib ihn an einen Bewerber weiter.</p>';
+      return;
+    }
+    list.forEach((w) => {
+      const div = document.createElement('div');
+      div.className = 'acc';
+      const full = ((w.firstName || '') + ' ' + (w.lastName || '')).trim() || w.name || 'Bewerber';
+      const secs = Math.max(0, Math.round((Date.now() - w.joinedAt) / 1000));
+      const since = secs < 60 ? secs + ' Sek.' : Math.floor(secs / 60) + ' Min.';
+      const status = w.busy
+        ? (w.claimedBy ? `wird von ${escapeHtml(w.claimedBy)} geholt` : 'in Bearbeitung')
+        : 'wartet';
+      div.innerHTML =
+        `<div class="top"><div><div class="nm">${escapeHtml(full)}</div>` +
+        `<div class="meta">BIGO-ID: ${escapeHtml(w.bigoId || '-')} · Code: ${escapeHtml(w.code)} · wartet seit ${since}</div></div>` +
+        `<div class="${w.busy ? 'busy' : 'ok'}">${status}</div></div>` +
+        `<div class="acts"><button class="pick primary"${w.busy ? ' disabled' : ''}>📞 Abholen</button></div>`;
+      const btn = div.querySelector('.pick');
+      if (btn) btn.addEventListener('click', () => abholen(w.code, full));
+      el.appendChild(div);
+    });
+  }
+  async function abholen(code, applicantName) {
+    // Erst serverseitig reservieren – verhindert, dass zwei Moderatoren
+    // denselben Bewerber abholen.
+    const claim = await api('POST', '/api/waiting/claim', { code });
+    if (claim.status !== 200) {
+      toast(claim.body && claim.body.by
+        ? `Wird gerade von ${claim.body.by} übernommen.`
+        : 'Bewerber ist nicht mehr verfügbar.');
+      refreshWaiting();
+      return;
+    }
+    clearInterval(state.waitingTimer);
+    state.waitingTimer = 0;
+    $('waitingView').classList.remove('on');
+    try {
+      state.localStream = await navigator.mediaDevices.getUserMedia({
+        video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' },
+        audio: { echoCancellation: true, noiseSuppression: true },
+      });
+    } catch (err) {
+      // Reservierung wieder freigeben, damit ihn jemand anderes abholen kann.
+      api('POST', '/api/waiting/release', { code });
+      openWaiting();
+      toast('Kein Zugriff auf Kamera/Mikrofon. Bitte im Browser erlauben.');
+      return;
+    }
+    state.role = 'host';
+    state.name = state.modName;
+    state.roomCode = code;
+    if (applicantName) remoteTag.textContent = applicantName;
+    localVideo.srcObject = state.localStream;
+    localTag.textContent = state.modName + ' (Du)';
+    startRoom();
+  }
+  if ($('waitingClose')) $('waitingClose').addEventListener('click', closeWaiting);
+  if ($('waitingRefresh')) $('waitingRefresh').addEventListener('click', refreshWaiting);
+  if ($('newCodeBtn')) $('newCodeBtn').addEventListener('click', async () => {
+    $('newCodeBtn').disabled = true;
+    const r = await api('POST', '/api/room', {});
+    $('newCodeBtn').disabled = false;
+    if (r.status === 200 && r.body.code) {
+      const link = `${location.origin}${location.pathname}?raum=${r.body.code}`;
+      $('newCodeResult').innerHTML = `Code: <b>${escapeHtml(r.body.code)}</b>`;
+      try { await navigator.clipboard.writeText(link); $('newCodeResult').innerHTML += ' · Link kopiert ✓'; } catch {}
+    } else {
+      $('newCodeResult').textContent = 'Konnte keinen Code erzeugen.';
+    }
+  });
+
   // Zurück zum Startbildschirm (z. B. bei falschem Moderator-Passwort).
   function backToLobby(errText) {
     try { if (state.ws) state.ws.close(); } catch {}
@@ -465,7 +629,7 @@
     room.classList.remove('active');
     lobby.style.display = '';
     $('enterBtn').disabled = false;
-    $('enterBtn').textContent = 'Raum betreten';
+    $('enterBtn').textContent = pickedRole === 'guest' ? 'Beitreten' : 'Anmelden';
     $('lobbyErr').textContent = errText || '';
     $('passInput').value = '';
     $('totpInput').value = '';
@@ -487,14 +651,8 @@
     state.iceServers = await loadIceServers();
     connectSignaling();
 
-    // Moderator: Beitritts-Link + fertige Einladung anbieten.
-    if (state.role === 'host') {
-      state.inviteLink = `${location.origin}${location.pathname}?raum=${state.roomCode}`;
-      sysMsg(`Raum-Code: ${state.roomCode}`);
-      sysMsg('Beitritts-Link: ' + state.inviteLink);
-      copyInvitation();
-    } else {
-      sysMsg('Du bist dem Raum beigetreten. Warte auf den Moderator …');
+    if (state.role !== 'host') {
+      sysMsg('Du bist beigetreten. Warte auf den Moderator …');
     }
   }
 
@@ -503,7 +661,7 @@
     // Aufnahme-Steuerung + Einladung nur beim Moderator.
     $('recBtn').style.display = isHost ? '' : 'none';
     $('stopBtn').style.display = isHost ? '' : 'none';
-    $('inviteBtn').style.display = isHost ? '' : 'none';
+    $('leaveBtn').style.display = isHost ? '' : 'none';
     // Fragen-Navigation nur beim Moderator; Gast sieht die Fragen nur.
     qNav.style.display = isHost ? '' : 'none';
     if (!isHost) $('tabFragen').textContent = 'Aktuelle Frage';
@@ -524,6 +682,9 @@
       ws.send(JSON.stringify({
         type: 'join', room: state.roomCode, role: state.role, name: state.name,
         token: state.modToken || '',
+        // Bewerber: Selbstauskunft mitsenden, damit der Moderator ihn im
+        // Warteraum mit Namen/BIGO-ID sieht und gezielt abholen kann.
+        info: state.role === 'guest' ? (state.applicantInfo || {}) : undefined,
       }));
     };
 
@@ -813,34 +974,6 @@
     $('camBtn').textContent = tr.enabled ? '📷 Kamera an' : '🚫 Kamera aus';
   });
 
-  // Fertige Einladungs-Nachricht (inkl. Link) in die Zwischenablage kopieren.
-  $('inviteBtn').addEventListener('click', copyInvitation);
-
-  function buildInvitation() {
-    const tpl = window.EINLADUNGS_TEXT || '{LINK}';
-    return tpl.replace(/\{LINK\}/g, state.inviteLink);
-  }
-
-  function copyInvitation() {
-    const text = buildInvitation();
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(text).then(
-        () => toast('Einladung kopiert – jetzt an die Bewerberin schicken'),
-        () => showInvitationFallback(text)
-      );
-    } else {
-      showInvitationFallback(text);
-    }
-  }
-
-  // Falls das automatische Kopieren nicht erlaubt ist (z. B. ohne HTTPS):
-  // Text im Chat anzeigen, damit man ihn manuell markieren/kopieren kann.
-  function showInvitationFallback(text) {
-    sysMsg('Einladung (bitte markieren & kopieren):');
-    sysMsg(text);
-    toast('Automatisches Kopieren blockiert – Text steht im Chat');
-  }
-
   // =======================================================================
   //  AUSWEIS-VERIFIZIERUNG
   //  - Bewerber lädt Vorder-/Rückseite hoch (+ optional Foto Ausweis+Gesicht).
@@ -972,16 +1105,10 @@
   if ($('snapId')) $('snapId').addEventListener('click', () => captureSnapshot('Ausweis (Live-Foto)'));
   if ($('snapFace')) $('snapFace').addEventListener('click', () => captureSnapshot('Gesicht (Live-Foto)'));
 
-  // Checkliste -> "Als verifiziert markieren" erst freigeben, wenn alles geprüft.
+  // Checkliste -> "Freigeben" erst möglich, wenn alles geprüft ist.
   function checkBoxes() { return Array.from(document.querySelectorAll('#checklist input[data-chk]')); }
   if ($('checklist')) $('checklist').addEventListener('change', () => {
-    $('markVerified').disabled = !checkBoxes().every((c) => c.checked);
-  });
-
-  if ($('markVerified')) $('markVerified').addEventListener('click', () => {
-    setVerified(true);
-    dcSend({ kind: 'verified' });
-    toast('Bewerber als verifiziert markiert ✓');
+    $('saveAccount').disabled = !checkBoxes().every((c) => c.checked);
   });
 
   // Moderator: Selbstauskunft des Bewerbers anzeigen + Felder vorbelegen.
@@ -1007,7 +1134,8 @@
     }
   }
 
-  // Verifizierung als Account auf dem Server speichern (Fotos inklusive).
+  // Ein Klick = Akte (mit Fotos) auf dem Server anlegen und – nur wenn das
+  // klappt – den Bewerber als verifiziert markieren und ihm Bescheid geben.
   // Verbraucht den Einmalcode.
   if ($('saveAccount')) $('saveAccount').addEventListener('click', async () => {
     const info = state.applicantInfo || {};
@@ -1019,7 +1147,7 @@
       bigoId: $('verifiedBigo').value || info.bigoId || '',
       verifiedName: $('verifiedName').value,
       docNumber: $('verifiedDoc').value,
-      verified: state.verified,
+      verified: true,
       moderatorName: state.name,
       roomCode: state.roomCode,
       checklist: checkBoxes().map((c) => ({ label: c.parentElement.textContent.trim(), checked: c.checked })),
@@ -1028,13 +1156,16 @@
     $('saveAccount').disabled = true;
     const r = await api('POST', '/api/account', body);
     if (r.status === 200) {
-      $('saveAccount').textContent = '✓ Account gespeichert';
-      toast('Account gespeichert ✓ (Einmalcode verbraucht)');
+      setVerified(true);
+      dcSend({ kind: 'verified' });
+      $('saveAccount').textContent = '✓ Freigegeben – Akte angelegt';
+      sysMsg('Bewerber freigegeben – Akte wurde angelegt (Einmalcode verbraucht).');
+      toast('Freigegeben ✓ – Akte angelegt');
     } else {
       $('saveAccount').disabled = false;
       toast(r.body && r.body.reason === 'bad-code'
-        ? 'Code ungültig/verbraucht – evtl. schon gespeichert.'
-        : 'Speichern fehlgeschlagen.');
+        ? 'Code ungültig/verbraucht – evtl. schon freigegeben.'
+        : 'Freigabe fehlgeschlagen.');
     }
   });
 
@@ -1231,6 +1362,32 @@
       toast('Video als WebM gespeichert (siehe README für MP4)');
     } else {
       toast('Video als MP4 gespeichert');
+    }
+
+    // Zusätzlich verschlüsselt auf dem Server ablegen (nur für eingeloggte
+    // Moderatoren; abrufbar ausschließlich nach Admin-Login im Panel).
+    uploadRecording(blob, type);
+  }
+
+  async function uploadRecording(blob, type) {
+    if (!state.modToken) return; // ohne Login keine serverseitige Ablage
+    const dur = state.recStart ? Math.round((Date.now() - state.recStart) / 1000) : 0;
+    const params = new URLSearchParams({
+      room: state.roomCode || '',
+      applicant: (remoteTag.textContent || '').slice(0, 80),
+      dur: String(dur),
+      ext: state.recExt || 'webm',
+    });
+    try {
+      const res = await fetch('/api/recording?' + params.toString(), {
+        method: 'POST',
+        headers: { 'Content-Type': type, 'Authorization': 'Bearer ' + state.modToken },
+        body: blob,
+      });
+      if (res.ok) { sysMsg('Aufnahme verschlüsselt im Panel gespeichert.'); toast('Aufnahme im Panel gesichert'); }
+      else { sysMsg('Aufnahme konnte nicht im Panel gespeichert werden (HTTP ' + res.status + ').'); }
+    } catch {
+      sysMsg('Aufnahme konnte nicht zum Server übertragen werden (Netzwerk).');
     }
   }
 
