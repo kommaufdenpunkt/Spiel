@@ -80,25 +80,28 @@ Dann im Browser öffnen: <http://localhost:3000>
 
 ## So benutzt du es
 
-0. **Einmalig (Admin):** „Ich moderiere" → Benutzername leer lassen,
-   **Admin-Passwort** eingeben → „🛠 Moderatoren verwalten" → die persönlichen
-   Logins für dein Team anlegen (jeweils mit eigenem 2FA-Schlüssel).
-1. **Du (Moderator):** Seite öffnen → „Ich moderiere" → **Benutzername +
+   Die **Startseite ist nur für Bewerber** (ein Feld für die Bewerbernummer).
+   Moderatoren/Admins blenden ihren Login über den dezenten Link
+   **„Mitarbeiter-Login"** ein. Die Akten/Verwaltung laufen separat über das
+   **Admin-Panel** (`/panel`, eigener Admin-Login).
+0. **Einmalig (Admin):** Im Admin-Panel (`/panel`) einloggen → Moderatoren
+   anlegen (jeweils mit eigenem 2FA-Schlüssel).
+1. **Du (Moderator):** Seite öffnen → **„Mitarbeiter-Login"** → **Benutzername +
    Passwort + 2FA** → **Anmelden**. Danach landest du im **Warteraum**.
-2. Im Warteraum **„➕ Einmalcode für neuen Bewerber"** klicken – der Code und der
-   Beitritts-Link werden erzeugt (Link wird automatisch kopiert). Diesen an den
+2. Im Warteraum **„➕ Bewerbernummer erzeugen"** klicken – Nummer und
+   Beitritts-Link werden erzeugt (Link wird automatisch kopiert). Diese an den
    Bewerber schicken (WhatsApp, E-Mail …).
-3. **Bewerber** öffnet den Link → nur noch **Name** eingeben → **Beitreten** →
-   Kamera/Mikro erlauben. (BIGO-ID ist optional und kann auch im Gespräch
-   nachgetragen werden; kein Passwort nötig – der Einmalcode ist sein Zugang.)
+3. **Bewerber** öffnet den Link (oder gibt die Nummer ein) → **Beitreten** →
+   Kamera/Mikro erlauben. Mehr muss er nicht eingeben; kein Passwort nötig –
+   die Bewerbernummer ist sein Zugang.
 4. Der Bewerber erscheint jetzt im **Warteraum** des Moderators. Klick auf
    **„📞 Abholen"** startet das Video-Gespräch mit genau diesem Bewerber.
    Mehrere Moderatoren können sich so Bewerber aus der gemeinsamen Warteliste
    nehmen.
 5. **Ausweis:** Bewerber öffnet rechts den Tab **„Ausweis"** → lädt **Profilbild**,
    Ausweis-Vorder- & Rückseite hoch und hält den Ausweis neben das Gesicht. Du als Moderator siehst
-   die Fotos im Tab „Ausweis", machst per Knopf Live-Fotos, hakst die Checkliste
-   ab und klickst **„Als verifiziert markieren"**.
+   die Fotos im Tab „Ausweis", machst per Knopf Live-Fotos und hakst die
+   Checkliste ab (erst dann lässt sich freigeben).
 6. Du klickst rechts auf **„Nächste Frage ▶"** – der Bewerber sieht die Frage.
 7. **⏺ Aufnahme starten**, das Gespräch führen.
 8. Am Ende **⏹ Beenden & speichern** (Video). Mit **„✅ Freigeben & Akte anlegen"**

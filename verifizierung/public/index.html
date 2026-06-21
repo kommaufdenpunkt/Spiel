@@ -83,12 +83,10 @@
   .field label{display:block;font-size:.74rem;color:var(--dim);margin-bottom:.35rem;
     text-transform:uppercase;letter-spacing:.09em;font-weight:500}
   .lobby .actions{display:flex;flex-direction:column;gap:.7rem;margin-top:.6rem}
-  .role-pick{display:flex;gap:.6rem;margin-bottom:1.2rem}
-  .role-pick button{flex:1;padding:.85rem .5rem;display:flex;flex-direction:column;
-    align-items:center;gap:.3rem;font-size:.85rem}
-  .role-pick button.sel{border-color:var(--accent);color:#fff;
-    background:linear-gradient(180deg,#21314a,#1a2740);box-shadow:0 0 0 1px #5b8cff55,0 10px 24px -12px #3b6ef0aa}
-  .role-pick .ic{font-size:1.35rem}
+  /* Dezenter Mitarbeiter-Login-Link unter der Bewerber-Eingabe. */
+  .linklike{display:block;margin:.8rem auto 0;background:none;border:0;box-shadow:none;
+    color:var(--dim);font-size:.82rem;text-decoration:underline;padding:.3rem}
+  .linklike:hover:not(:disabled){color:var(--ink);transform:none;border:0;box-shadow:none}
   .hint{font-size:.78rem;color:var(--dim);margin-top:1rem;line-height:1.55;
     background:#0e141caa;border:1px solid var(--line);border-radius:10px;padding:.6rem .75rem}
   .err{color:#ff9c93;font-size:.85rem;margin-top:.8rem;min-height:1.1em}
@@ -258,51 +256,40 @@
 <!-- ================= START-BILDSCHIRM ================= -->
 <div id="lobby" class="lobby">
   <div class="card">
-    <h2 id="lobbyTitle">Video-Verifizierung</h2>
-    <p class="sub" id="lobbySub">Erstelle einen Raum und schicke dem Bewerber den Link – oder tritt einem Raum bei.</p>
+    <h2 id="lobbyTitle">Verifizierung beitreten</h2>
+    <p class="sub" id="lobbySub">Gib deine Bewerbernummer ein, die du erhalten hast.</p>
 
-    <div class="role-pick" id="rolePick">
-      <button data-role="host" class="sel"><span class="ic">🎬</span>Ich moderiere</button>
-      <button data-role="guest"><span class="ic">👤</span>Ich bin Bewerber</button>
-    </div>
-
-    <div id="guestFields">
+    <!-- BEWERBER: nur die Bewerbernummer eingeben -->
+    <div id="applicantFields">
       <div class="field">
-        <label for="gName">Dein Name</label>
-        <input id="gName" placeholder="Vor- und Nachname" autocomplete="name">
-      </div>
-      <div class="field">
-        <label for="gBigo">BIGO-ID <span class="opt">(optional)</span></label>
-        <input id="gBigo" placeholder="deine BIGO LIVE ID" inputmode="numeric">
+        <label for="roomInput" id="roomLabel">Bewerbernummer</label>
+        <input id="roomInput" placeholder="z. B. ABC123XY" autocapitalize="characters">
       </div>
       <label class="consent"><input type="checkbox" id="gConsent">
-        Ich bin mit der verschlüsselten Verarbeitung meiner Angaben und Dokumente
-        zur Verifizierung einverstanden.</label>
+        Ich bin mit der verschlüsselten Verarbeitung meiner Daten zur Verifizierung einverstanden.</label>
     </div>
-    <div class="field" id="userField" style="display:none">
-      <label for="userInput">Benutzername</label>
-      <input id="userInput" placeholder="dein persönlicher Login" autocomplete="username">
-    </div>
-    <div class="field" id="roomField">
-      <label for="roomInput" id="roomLabel">Einmalcode</label>
-      <input id="roomInput" placeholder="Code vom Moderator" autocapitalize="characters">
-    </div>
-    <div class="field" id="passField" style="display:none">
-      <label for="passInput">Passwort</label>
-      <input id="passInput" type="password" placeholder="dein Passwort" autocomplete="current-password">
-    </div>
-    <div class="field" id="totpField" style="display:none">
-      <label for="totpInput">2FA-Code (falls aktiviert)</label>
-      <input id="totpInput" inputmode="numeric" placeholder="6-stelliger Code aus der App" autocomplete="one-time-code">
+
+    <!-- MITARBEITER (Moderator/Admin): Login, standardmäßig versteckt -->
+    <div id="staffFields" style="display:none">
+      <div class="field">
+        <label for="userInput">Benutzername</label>
+        <input id="userInput" placeholder="dein persönlicher Login" autocomplete="username">
+      </div>
+      <div class="field">
+        <label for="passInput">Passwort</label>
+        <input id="passInput" type="password" placeholder="dein Passwort" autocomplete="current-password">
+      </div>
+      <div class="field">
+        <label for="totpInput">2FA-Code (falls aktiviert)</label>
+        <input id="totpInput" inputmode="numeric" placeholder="6-stelliger Code aus der App" autocomplete="one-time-code">
+      </div>
     </div>
 
     <div class="actions">
-      <button id="enterBtn" class="primary">Anmelden</button>
-      <button id="adminBtn" style="display:none">🗂 Personalakte / Accounts (Admin)</button>
-      <button id="monitorBtn" style="display:none">🛡 Überwachung (Angriffe)</button>
-      <button id="manageBtn" style="display:none">🛠 Moderatoren verwalten (Admin)</button>
+      <button id="enterBtn" class="primary">Beitreten</button>
     </div>
     <div class="err" id="lobbyErr"></div>
+    <button id="staffToggle" class="linklike">Mitarbeiter-Login →</button>
     <div class="hint" id="lobbyHint">
       📷 Bitte Kamera &amp; Mikrofon erlauben. Am besten in Chrome, Edge oder Safari.
     </div>
@@ -432,12 +419,12 @@
     <div class="admin-list">
       <div class="biprow" style="display:block">
         <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center">
-          <button id="newCodeBtn" class="primary">➕ Einmalcode für neuen Bewerber</button>
+          <button id="newCodeBtn" class="primary">➕ Bewerbernummer erzeugen</button>
           <span id="newCodeResult" style="font-size:.9rem;color:var(--dim)"></span>
         </div>
         <div style="font-size:.8rem;color:var(--dim);margin-top:.4rem">
-          Gib den Code (oder den Beitritts-Link) an den Bewerber weiter. Sobald er beigetreten ist,
-          erscheint er unten und kann abgeholt werden.
+          Gib die Bewerbernummer (oder den Beitritts-Link) an den Bewerber weiter. Sobald er
+          beigetreten ist, erscheint er unten und kann abgeholt werden.
         </div>
       </div>
       <div class="vsection-title" style="margin-top:1rem">Wartende Bewerber</div>
