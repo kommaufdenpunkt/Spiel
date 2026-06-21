@@ -35,6 +35,9 @@ einreichen.
 - **Warteraum:** Beigetretene Bewerber landen in einer **Warteliste**, die alle
   eingeloggten Moderatoren sehen. Per **„Abholen"** nimmt sich ein Moderator den
   nächsten Bewerber und startet die Verifizierung (faire Reihenfolge).
+  **Team-sicher:** Ein Bewerber wird beim Abholen serverseitig reserviert – zwei
+  Moderatoren können denselben nicht gleichzeitig bekommen; die Liste zeigt
+  „wird von … geholt".
 - **Akte erst bei Freigabe:** Erst wenn der Moderator **„Freigeben"** klickt, wird
   die Akte (Eintrag inkl. Fotos) **automatisch** angelegt und ist nach Admin-Login
   einsehbar/löschbar. Vorher existiert nur ein flüchtiger Wartelisten-Eintrag.

@@ -271,8 +271,39 @@ async function handleApi(req, res, urlPath, ip) {
   if (urlPath === '/api/waiting' && req.method === 'GET') {
     const list = Array.from(waiting.values())
       .sort((a, b) => a.joinedAt - b.joinedAt) // älteste zuerst (faire Reihenfolge)
-      .map((w) => ({ ...w }));
+      .map((w) => {
+        const busy = waitingBusy(w);
+        return {
+          code: w.code, name: w.name, firstName: w.firstName, lastName: w.lastName,
+          bigoId: w.bigoId, joinedAt: w.joinedAt,
+          busy, claimedBy: busy ? w.claimedBy : null,
+        };
+      });
     sendJson(res, 200, { waiting: list }); return true;
+  }
+  // Bewerber reservieren ("Abholen"), bevor die Kamera startet. Atomar: zwei
+  // Moderatoren können denselben Bewerber nicht gleichzeitig bekommen.
+  if (urlPath === '/api/waiting/claim' && req.method === 'POST') {
+    let body; try { body = await readBody(req, 16 * 1024); } catch { body = {}; }
+    const code = String(body.code || '').trim().toUpperCase();
+    const entry = waiting.get(code);
+    if (!entry) { sendJson(res, 404, { reason: 'gone' }); return true; }
+    if (waitingBusy(entry)) { sendJson(res, 409, { reason: 'busy', by: entry.claimedBy || '' }); return true; }
+    entry.claimedBy = reqName(req) || 'Moderator';
+    entry.claimedAt = Date.now();
+    sendJson(res, 200, { ok: true }); return true;
+  }
+  // Reservierung wieder freigeben (z. B. wenn die Kamera nicht freigegeben wurde).
+  if (urlPath === '/api/waiting/release' && req.method === 'POST') {
+    let body; try { body = await readBody(req, 16 * 1024); } catch { body = {}; }
+    const code = String(body.code || '').trim().toUpperCase();
+    const entry = waiting.get(code);
+    const room = rooms.get(code);
+    // Nur lösen, wenn ich selbst reserviert hatte und noch kein Gespräch läuft.
+    if (entry && !(room && room.host) && entry.claimedBy === (reqName(req) || 'Moderator')) {
+      entry.claimedBy = null; entry.claimedAt = 0;
+    }
+    sendJson(res, 200, { ok: true }); return true;
   }
 
   // ---- Account speichern / auflisten / ansehen / löschen ----
@@ -508,11 +539,23 @@ const wss = new WebSocketServer({ server });
 /** rooms: Map<roomCode, { host?: ws, guest?: ws }> */
 const rooms = new Map();
 /**
- * waiting: Map<roomCode, { code, name, firstName, lastName, bigoId, joinedAt, busy }>
+ * waiting: Map<roomCode, { code, name, firstName, lastName, bigoId, joinedAt,
+ *                          claimedBy, claimedAt }>
  * Bewerber, die mit ihrem Einmalcode beigetreten sind und darauf warten, von
  * einem Moderator "abgeholt" zu werden. Rein flüchtig (nur solange verbunden).
  */
 const waiting = new Map();
+// Eine Reservierung ("Claim") gilt so lange, bis der Moderator wirklich im Raum
+// ist. Falls er es sich anders überlegt / die Kamera nicht freigibt, verfällt
+// die Reservierung nach dieser Zeit, damit ihn jemand anderes abholen kann.
+const CLAIM_TTL = 30000;
+// Ist ein wartender Bewerber gerade vergeben? (Aktiver Moderator im Raum ODER
+// eine noch gültige Reservierung.)
+function waitingBusy(entry) {
+  const room = rooms.get(entry.code);
+  if (room && room.host) return true;
+  return !!(entry.claimedBy && (Date.now() - entry.claimedAt) < CLAIM_TTL);
+}
 
 function send(ws, obj) {
   if (ws && ws.readyState === ws.OPEN) {
@@ -598,7 +641,8 @@ wss.on('connection', (ws, req) => {
           lastName: String(info.lastName || '').slice(0, 60),
           bigoId: String(info.bigoId || '').slice(0, 60),
           joinedAt: Date.now(),
-          busy: !!room.host,
+          claimedBy: null,   // welcher Moderator hat reserviert/holt ab
+          claimedAt: 0,      // Zeitpunkt der Reservierung (für Ablauf)
         });
       }
 
@@ -608,7 +652,7 @@ wss.on('connection', (ws, req) => {
       // Verbindung aufbauen (das WebRTC-Angebot erstellen) soll.
       if (room.host && room.guest) {
         const w = waiting.get(code);
-        if (w) w.busy = true; // wird gerade bearbeitet -> nicht mehr "frei"
+        if (w) { w.claimedBy = room.host.peerName || w.claimedBy; w.claimedAt = Date.now(); }
         send(room.host, { type: 'peer-ready', peerName: room.guest.peerName });
         send(room.guest, { type: 'peer-ready', peerName: room.host.peerName });
       }
@@ -635,9 +679,10 @@ wss.on('connection', (ws, req) => {
       const w = waiting.get(ws.roomCode);
       if (w && room.guest) {
         // Schon freigegeben (Einmalcode verbraucht)? Dann ist der Bewerber fertig
-        // und gehört nicht zurück in die Warteliste. Sonst wieder als "frei" zeigen.
+        // und gehört nicht zurück in die Warteliste. Sonst Reservierung lösen,
+        // damit ihn wieder jemand abholen kann.
         if (!store.isCodeUsable(ws.roomCode)) waiting.delete(ws.roomCode);
-        else w.busy = false;
+        else { w.claimedBy = null; w.claimedAt = 0; }
       }
     }
     if (room.guest === ws) {

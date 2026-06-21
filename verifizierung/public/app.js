@@ -496,7 +496,7 @@
     $('newCodeResult').textContent = '';
     refreshWaiting();
     clearInterval(state.waitingTimer);
-    state.waitingTimer = setInterval(refreshWaiting, 4000);
+    state.waitingTimer = setInterval(refreshWaiting, 3000);
   }
   function closeWaiting() {
     clearInterval(state.waitingTimer);
@@ -556,10 +556,13 @@
       const full = ((w.firstName || '') + ' ' + (w.lastName || '')).trim() || w.name || 'Bewerber';
       const secs = Math.max(0, Math.round((Date.now() - w.joinedAt) / 1000));
       const since = secs < 60 ? secs + ' Sek.' : Math.floor(secs / 60) + ' Min.';
+      const status = w.busy
+        ? (w.claimedBy ? `wird von ${escapeHtml(w.claimedBy)} geholt` : 'in Bearbeitung')
+        : 'wartet';
       div.innerHTML =
         `<div class="top"><div><div class="nm">${escapeHtml(full)}</div>` +
         `<div class="meta">BIGO-ID: ${escapeHtml(w.bigoId || '-')} · Code: ${escapeHtml(w.code)} · wartet seit ${since}</div></div>` +
-        `<div class="${w.busy ? 'no' : 'ok'}">${w.busy ? 'in Bearbeitung' : 'wartet'}</div></div>` +
+        `<div class="${w.busy ? 'no' : 'ok'}">${status}</div></div>` +
         `<div class="acts"><button class="pick primary"${w.busy ? ' disabled' : ''}>📞 Abholen</button></div>`;
       const btn = div.querySelector('.pick');
       if (btn) btn.addEventListener('click', () => abholen(w.code, full));
@@ -567,6 +570,16 @@
     });
   }
   async function abholen(code, applicantName) {
+    // Erst serverseitig reservieren – verhindert, dass zwei Moderatoren
+    // denselben Bewerber abholen.
+    const claim = await api('POST', '/api/waiting/claim', { code });
+    if (claim.status !== 200) {
+      toast(claim.body && claim.body.by
+        ? `Wird gerade von ${claim.body.by} übernommen.`
+        : 'Bewerber ist nicht mehr verfügbar.');
+      refreshWaiting();
+      return;
+    }
     clearInterval(state.waitingTimer);
     state.waitingTimer = 0;
     $('waitingView').classList.remove('on');
@@ -576,6 +589,8 @@
         audio: { echoCancellation: true, noiseSuppression: true },
       });
     } catch (err) {
+      // Reservierung wieder freigeben, damit ihn jemand anderes abholen kann.
+      api('POST', '/api/waiting/release', { code });
       openWaiting();
       toast('Kein Zugriff auf Kamera/Mikrofon. Bitte im Browser erlauben.');
       return;
