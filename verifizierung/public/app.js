@@ -447,7 +447,7 @@
         `<div class="meta">${date} · Dauer ${dur} · ${mb} MB · ${escapeHtml(r.ext || '')}<br>` +
         `Raum: ${escapeHtml(r.roomCode || '-')} · Moderator: ${escapeHtml(r.moderatorName || '-')}</div></div></div>` +
         `<video controls preload="none" src="${src}" style="width:100%;max-height:360px;border-radius:8px;background:#000;margin:.4rem 0"></video>` +
-        `<div class="acts"><a class="dl" href="${src}" download="verifizierung_${encodeURIComponent((r.applicantName||'bewerber').replace(/\s+/g,'_'))}.${escapeHtml(r.ext||'webm')}" style="margin-right:.6rem">⬇ Herunterladen</a>` +
+        `<div class="acts"><a class="dlbtn" href="${src}" download="verifizierung_${encodeURIComponent((r.applicantName||'bewerber').replace(/\s+/g,'_'))}.${escapeHtml(r.ext||'webm')}">⬇ Herunterladen</a>` +
         `<button class="del">🗑 Löschen</button></div>`;
       div.querySelector('.del').addEventListener('click', async () => {
         if (!confirm('Diese Aufnahme endgültig löschen?')) return;
@@ -562,7 +562,7 @@
       div.innerHTML =
         `<div class="top"><div><div class="nm">${escapeHtml(full)}</div>` +
         `<div class="meta">BIGO-ID: ${escapeHtml(w.bigoId || '-')} · Code: ${escapeHtml(w.code)} · wartet seit ${since}</div></div>` +
-        `<div class="${w.busy ? 'no' : 'ok'}">${status}</div></div>` +
+        `<div class="${w.busy ? 'busy' : 'ok'}">${status}</div></div>` +
         `<div class="acts"><button class="pick primary"${w.busy ? ' disabled' : ''}>📞 Abholen</button></div>`;
       const btn = div.querySelector('.pick');
       if (btn) btn.addEventListener('click', () => abholen(w.code, full));
