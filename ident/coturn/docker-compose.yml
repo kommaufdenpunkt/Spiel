@@ -1,0 +1,16 @@
+# coturn – TURN/STUN-Server für ident (turn.4ever1.tv)
+#
+# Direkt auf dem Server starten (NICHT hinter den Coolify-Webproxy hängen –
+# TURN läuft auf UDP/TCP 3478 + 5349, das ist kein HTTP):
+#     cp turnserver.conf.example turnserver.conf   # dann Geheimnis + IP eintragen
+#     docker compose up -d
+#
+# Host-Networking ist nötig, weil TURN einen breiten UDP-Portbereich (Relay) braucht.
+services:
+  coturn:
+    image: coturn/coturn:4.6
+    container_name: coturn
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - ./turnserver.conf:/etc/coturn/turnserver.conf:ro
