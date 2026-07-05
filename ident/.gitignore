@@ -1,0 +1,11 @@
+node_modules/
+package-lock.json
+*.log
+
+# Geheimnisse / lokale Umgebung
+.env
+.env.*
+!.env.example
+
+# Lokale (verschlüsselte) Daten – nie committen
+data/

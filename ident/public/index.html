@@ -1,0 +1,277 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ident · Video-Identifizierung · 4ever1</title>
+<style>
+  :root{
+    --bg:#eef3fa; --panel:#fff; --panel2:#f3f6fb; --line:#e3e9f2; --line2:#d3dcea;
+    --ink:#1b2738; --dim:#6b7a90; --accent:#3b6ef0; --accent2:#2a55c8;
+    --good:#1a9e4b; --bad:#e0443f; --rec:#ef4444; --warn:#c98a00;
+    --shadow:0 14px 38px -16px rgba(31,64,135,.20), 0 2px 8px rgba(20,40,80,.06);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{color:var(--ink);-webkit-font-smoothing:antialiased;min-height:100%;display:flex;flex-direction:column;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:radial-gradient(1100px 560px at 78% -12%,#cfddff80,transparent 60%),
+      radial-gradient(820px 480px at -5% 108%,#d9e7ff70,transparent 55%),var(--bg)}
+  button{font-family:inherit;cursor:pointer;border:1px solid var(--line);background:#fff;color:var(--ink);
+    padding:.62rem 1.05rem;border-radius:10px;font-size:.9rem;font-weight:550;
+    transition:transform .12s,border-color .12s,filter .12s,box-shadow .12s;box-shadow:0 1px 2px rgba(20,40,80,.05)}
+  button:hover:not(:disabled){border-color:var(--accent);transform:translateY(-1px);box-shadow:0 8px 18px -10px rgba(31,64,135,.3)}
+  button:disabled{opacity:.5;cursor:default}
+  button:focus-visible{outline:none;box-shadow:0 0 0 3px #3b6ef044}
+  button.primary{background:linear-gradient(180deg,#4a7bf5,#2a55c8);border-color:#2a55c8;color:#fff;box-shadow:0 10px 22px -10px rgba(59,110,240,.55)}
+  button.primary:hover:not(:disabled){filter:brightness(1.05)}
+  button.good{background:linear-gradient(180deg,#2bb35c,#178a44);border-color:#178a44;color:#fff}
+  button.danger{background:#fdecec;border-color:#f1b6b4;color:#c23b37}
+  input{font-family:inherit;font-size:1rem;padding:.72rem .85rem;border-radius:10px;border:1px solid var(--line);
+    background:#fff;color:var(--ink);width:100%;transition:.12s}
+  input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px #3b6ef033}
+  input::placeholder{color:#9aa7b8}
+  input[type=checkbox]{width:auto;padding:0}
+  a{color:var(--accent)}
+  ::-webkit-scrollbar{width:10px;height:10px}
+  ::-webkit-scrollbar-thumb{background:#c7d2e2;border-radius:8px;border:2px solid transparent;background-clip:content-box}
+
+  header{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:.7rem 1.1rem;
+    border-bottom:1px solid var(--line);background:#ffffffd9;backdrop-filter:blur(10px);position:sticky;top:0;z-index:5}
+  .brand{display:flex;align-items:center;gap:.65rem}
+  .logo{width:32px;height:32px;border-radius:9px;display:grid;place-items:center;flex:none;
+    background:linear-gradient(135deg,#6f9bff,#3b6ef0);color:#fff;font-size:1rem;box-shadow:0 6px 16px -6px #3b6ef0cc}
+  header h1{font-size:1rem;margin:0;font-weight:650}
+  header h1 small{display:block;font-size:.64rem;color:var(--dim);letter-spacing:.18em;text-transform:uppercase;margin-top:1px}
+  .badge{display:none;align-items:center;gap:.4rem;font-size:.8rem;padding:.3rem .6rem;border-radius:999px}
+  .badge.on{display:flex}
+  .badge.rec{color:#c23b37;background:#fdecec;border:1px solid #f1b6b4}
+  .badge.ok{color:#1a7a3c;background:#e7f6ec;border:1px solid #9fd8b0}
+  .dot{width:.6rem;height:.6rem;border-radius:50%;background:var(--rec);animation:pulse 1.3s infinite}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 #ef444466}70%{box-shadow:0 0 0 7px #ef444400}100%{box-shadow:0 0 0 0 #ef444400}}
+
+  /* Lobby */
+  .lobby{flex:1;display:flex;align-items:center;justify-content:center;padding:1.5rem}
+  .card{width:100%;max-width:460px;background:#fff;border:1px solid var(--line);border-radius:18px;
+    padding:2rem 1.8rem;box-shadow:var(--shadow);position:relative;overflow:hidden}
+  .card::before{content:"";position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,#5b8cff,#3b6ef0 55%,#22d3ee)}
+  .card h2{margin:.2rem 0 .3rem;font-size:1.5rem;font-weight:700}
+  .card p.sub{margin:0 0 1.3rem;color:var(--dim);font-size:.95rem;line-height:1.55}
+  .steps{display:flex;flex-direction:column;gap:.6rem;margin:.2rem 0 1.3rem}
+  .step{display:flex;gap:.75rem;align-items:center;padding:.65rem .75rem;border:1px solid var(--line);border-radius:13px;background:var(--panel2)}
+  .step .si{width:40px;height:40px;flex:none;border-radius:11px;display:grid;place-items:center;font-size:1.2rem;background:#e7eeff;color:var(--accent)}
+  .step .st b{display:block;font-size:.9rem}
+  .step .st span{font-size:.78rem;color:var(--dim);line-height:1.3}
+  .field{margin-bottom:1rem}
+  .field label{display:block;font-size:.74rem;color:var(--dim);margin-bottom:.35rem;text-transform:uppercase;letter-spacing:.09em;font-weight:500}
+  .actions{display:flex;flex-direction:column;gap:.7rem;margin-top:.4rem}
+  .actions #enterBtn{padding:.95rem 1.1rem;font-size:1.05rem;font-weight:650;border-radius:12px}
+  .consent{display:flex;gap:.5rem;align-items:flex-start;font-size:.82rem;color:var(--dim);line-height:1.4;margin-top:.2rem}
+  .consent input{margin-top:.15rem;flex:none}
+  .linklike{display:block;margin:.9rem auto 0;background:none;border:0;box-shadow:none;color:var(--dim);font-size:.82rem;text-decoration:underline;padding:.3rem}
+  .linklike:hover:not(:disabled){color:var(--ink);transform:none;border:0;box-shadow:none}
+  .hint{font-size:.78rem;color:var(--dim);margin-top:1rem;line-height:1.55;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:.6rem .75rem}
+  .err{color:var(--bad);font-size:.85rem;margin-top:.8rem;min-height:1.1em}
+
+  /* Raum */
+  .room{flex:1;display:none;grid-template-columns:1fr 360px;min-height:0}
+  .room.active{display:grid}
+  .stage{position:relative;background:#0b1220;display:flex;flex-direction:column;min-height:0}
+  .videos{flex:1;position:relative;display:grid;grid-template-columns:1fr 1fr;gap:2px;background:#0b1220;min-height:0}
+  .vwrap{position:relative;background:#0d1526;overflow:hidden;display:flex;align-items:center;justify-content:center}
+  .vwrap video{width:100%;height:100%;object-fit:cover;background:#0d1526}
+  .vwrap .tag{position:absolute;left:.6rem;bottom:.6rem;font-size:.76rem;background:#000a;padding:.25rem .6rem;border-radius:6px;color:#fff}
+  .vwrap .waiting{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#b6c2d2;font-size:.9rem;text-align:center;padding:1rem}
+  .banner{padding:.8rem 1.1rem;background:var(--panel2);border-top:1px solid var(--line);min-height:3rem;display:flex;align-items:center;gap:.7rem;font-size:.92rem}
+  .banner .lbl{font-size:.66rem;color:var(--accent);letter-spacing:.14em;text-transform:uppercase;white-space:nowrap}
+  .controls{display:flex;flex-wrap:wrap;gap:.55rem;padding:.8rem 1.1rem;border-top:1px solid var(--line);background:var(--panel)}
+  .controls .spacer{flex:1}
+
+  .side{border-left:1px solid var(--line);background:var(--panel);display:flex;flex-direction:column;min-height:0}
+  .tabs{display:flex;border-bottom:1px solid var(--line);background:var(--panel2)}
+  .tabs button{flex:1;border:0;border-radius:0;background:transparent;color:var(--dim);padding:.75rem;border-bottom:2px solid transparent;font-weight:500;box-shadow:none}
+  .tabs button.sel{color:var(--ink);border-bottom-color:var(--accent);background:linear-gradient(180deg,#3b6ef014,transparent)}
+  .pane{display:none;flex:1;min-height:0;flex-direction:column;overflow:auto;padding:.85rem;gap:.7rem}
+  .pane.sel{display:flex}
+  .sect{font-size:.7rem;color:var(--accent);text-transform:uppercase;letter-spacing:.1em;margin:.3rem 0 0;font-weight:600}
+  .status{padding:.6rem .75rem;border-radius:10px;font-size:.86rem;border:1px solid var(--line);background:var(--panel2);line-height:1.4}
+  .status.ok{background:#e7f6ec;border-color:#9fd8b0;color:#1a7a3c}
+  .status.pending{background:#fff4e0;border-color:#f0d199;color:#9a6a00}
+  .status.bad{background:#fdecec;border-color:#f3c4c2;color:#c23b37}
+  .gstep{display:flex;gap:.7rem;align-items:center;padding:.6rem .7rem;border:1px solid var(--line);border-radius:12px;background:var(--panel2)}
+  .gstep.done{border-color:#9fd8b0;background:#e7f6ec}
+  .gstep .gn{width:30px;height:30px;flex:none;border-radius:8px;display:grid;place-items:center;font-size:.9rem;font-weight:700;background:#e7eeff;color:var(--accent)}
+  .gstep.done .gn{background:#1a9e4b;color:#fff}
+  .gstep .gt{flex:1;font-size:.86rem}
+  .gstep .gt small{display:block;color:var(--dim);font-size:.74rem}
+  .shots{display:flex;gap:.5rem;flex-wrap:wrap}
+  .shot{position:relative;width:calc(50% - .25rem)}
+  .shot img{width:100%;border:1px solid var(--line);border-radius:8px;display:block;cursor:zoom-in}
+  .shot .cap{font-size:.66rem;color:var(--dim);text-align:center;margin-top:.15rem}
+  .checklist{display:flex;flex-direction:column;gap:.5rem}
+  .checklist label{display:flex;gap:.55rem;align-items:flex-start;font-size:.85rem;line-height:1.35;cursor:pointer}
+  .checklist input{margin-top:.15rem}
+  .snap-btns{display:flex;gap:.5rem;flex-wrap:wrap}
+  .snap-btns button{flex:1;min-width:130px}
+  .chatlog{flex:1;overflow:auto;display:flex;flex-direction:column;gap:.5rem}
+  .msg{max-width:85%;padding:.45rem .7rem;border-radius:10px;font-size:.86rem;line-height:1.35;word-break:break-word}
+  .msg.me{align-self:flex-end;background:linear-gradient(180deg,#4a7bf5,#2a55c8);color:#fff;border-bottom-right-radius:4px}
+  .msg.them{align-self:flex-start;background:var(--panel2);border:1px solid var(--line)}
+  .msg.sys{align-self:center;color:var(--dim);font-size:.78rem;font-style:italic}
+  .chatbar{display:flex;gap:.5rem;padding-top:.5rem;border-top:1px solid var(--line)}
+  .chatbar input{flex:1}
+
+  .toast{position:fixed;left:50%;bottom:1.3rem;transform:translateX(-50%) translateY(8px);background:#fffffff2;color:var(--ink);
+    border:1px solid var(--line2);padding:.65rem 1.1rem;border-radius:12px;font-size:.85rem;opacity:0;transition:.22s;
+    pointer-events:none;max-width:90vw;box-shadow:var(--shadow);backdrop-filter:blur(8px)}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  #lightbox{position:fixed;inset:0;background:rgba(23,39,56,.8);display:none;align-items:center;justify-content:center;z-index:60;padding:2rem}
+  #lightbox.on{display:flex}
+  #lightbox img{max-width:100%;max-height:100%;border-radius:12px}
+
+  @media(max-width:820px){
+    .room.active{grid-template-columns:1fr;grid-template-rows:1fr auto}
+    .side{border-left:0;border-top:1px solid var(--line);max-height:46vh}
+    .videos{grid-template-columns:1fr;grid-template-rows:1fr 1fr}
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <span class="logo">🛡</span>
+    <h1>ident <small>Agentur 4ever1</small></h1>
+  </div>
+  <div style="display:flex;gap:.6rem;align-items:center">
+    <div id="okBadge" class="badge ok">✓ Verifiziert</div>
+    <div id="recBadge" class="badge rec"><span class="dot"></span><span id="recTime">00:00</span></div>
+  </div>
+</header>
+
+<!-- ===================== START ===================== -->
+<div id="lobby" class="lobby">
+  <div class="card">
+    <h2 id="lobbyTitle">Identifizierung starten</h2>
+    <p class="sub" id="lobbySub">Gib deine Zugangsnummer ein, die du erhalten hast.</p>
+
+    <div id="applicantFields">
+      <div class="steps">
+        <div class="step"><span class="si">🪪</span><div class="st"><b>Ausweis fotografieren</b><span>Vorder- & Rückseite</span></div></div>
+        <div class="step"><span class="si">🤳</span><div class="st"><b>Selfie mit Ausweis</b><span>Ausweis neben dein Gesicht halten</span></div></div>
+        <div class="step"><span class="si">🎥</span><div class="st"><b>Kurzes Video-Gespräch</b><span>mit einem Prüfer der Agentur</span></div></div>
+      </div>
+      <div class="field">
+        <label for="codeInput">Zugangsnummer</label>
+        <input id="codeInput" placeholder="z. B. ABC123XY" autocapitalize="characters">
+      </div>
+      <label class="consent"><input type="checkbox" id="consent">
+        Ich willige ein, dass meine Angaben, Ausweis- und Gesichtsbilder sowie die
+        Videoaufzeichnung zum Zweck der Identitätsprüfung verarbeitet und verschlüsselt gespeichert werden.</label>
+    </div>
+
+    <div id="staffFields" style="display:none">
+      <div class="field"><label for="userInput">Benutzername</label><input id="userInput" placeholder="dein persönlicher Login" autocomplete="username"></div>
+      <div class="field"><label for="passInput">Passwort</label><input id="passInput" type="password" placeholder="dein Passwort" autocomplete="current-password"></div>
+      <div class="field"><label for="totpInput">2FA-Code</label><input id="totpInput" inputmode="numeric" placeholder="6-stelliger Code" autocomplete="one-time-code"></div>
+    </div>
+
+    <div class="actions"><button id="enterBtn" class="primary">Identifizierung starten</button></div>
+    <div class="err" id="lobbyErr"></div>
+    <button id="staffToggle" class="linklike">Mitarbeiter-Login →</button>
+    <div class="hint" id="lobbyHint">📷 Beim Start fragt der Browser nach Kamera &amp; Mikrofon – bitte erlauben. Am besten in Chrome, Edge oder Safari.</div>
+  </div>
+</div>
+
+<!-- ===================== RAUM ===================== -->
+<div id="room" class="room">
+  <section class="stage">
+    <div class="videos">
+      <div class="vwrap"><video id="localVideo" autoplay playsinline muted></video><div class="tag" id="localTag">Du</div></div>
+      <div class="vwrap"><video id="remoteVideo" autoplay playsinline></video><div class="tag" id="remoteTag">Gegenüber</div><div class="waiting" id="remoteWaiting">Warte auf Gegenüber …</div></div>
+    </div>
+    <div class="banner"><span class="lbl">Status</span><span id="bannerText">Verbindung wird aufgebaut …</span></div>
+    <div class="controls">
+      <button id="micBtn">🎤 Mikro an</button>
+      <button id="camBtn">📷 Kamera an</button>
+      <button id="leaveBtn" style="display:none">⤺ Zurück zum Warteraum</button>
+      <span class="spacer"></span>
+      <button id="recBtn" class="primary" style="display:none">⏺ Aufnahme starten</button>
+      <button id="stopRecBtn" class="danger" style="display:none" disabled>⏹ Aufnahme stoppen</button>
+    </div>
+  </section>
+
+  <aside class="side">
+    <div class="tabs">
+      <button data-tab="main" class="sel" id="tabMain">Prüfung</button>
+      <button data-tab="chat" id="tabChat">Chat</button>
+    </div>
+
+    <!-- BEWERBER -->
+    <div class="pane sel" data-pane="main" id="guidePane" style="display:none">
+      <div class="status pending" id="guideStatus">Bitte lade nacheinander die Bilder hoch.</div>
+      <div class="gstep" id="gs1"><span class="gn">1</span><div class="gt">Ausweis-Vorderseite<small>gut lesbar, alle Ecken sichtbar</small></div></div>
+      <button id="upFront" class="primary">📄 Vorderseite hochladen</button>
+      <div class="gstep" id="gs2"><span class="gn">2</span><div class="gt">Ausweis-Rückseite</div></div>
+      <button id="upBack" class="primary">📄 Rückseite hochladen</button>
+      <div class="gstep" id="gs3"><span class="gn">3</span><div class="gt">Selfie mit Ausweis<small>Ausweis neben dein Gesicht</small></div></div>
+      <button id="upSelfie" class="primary">🤳 Selfie mit Ausweis hochladen</button>
+      <div class="sect">Deine hochgeladenen Bilder</div>
+      <div class="shots" id="guestShots"></div>
+      <input id="fileInput" type="file" accept="image/*" capture="environment" style="display:none">
+    </div>
+
+    <!-- PRÜFER -->
+    <div class="pane sel" data-pane="main" id="reviewPane" style="display:none">
+      <div class="status pending" id="reviewStatus">Warte auf die Bilder des Bewerbers …</div>
+      <div class="sect">Vom Bewerber erhalten</div>
+      <div class="shots" id="hostShots"></div>
+      <div class="sect">Live-Fotos aus dem Video</div>
+      <div class="snap-btns">
+        <button id="snapDoc">📄 Ausweis abfotografieren</button>
+        <button id="snapFace">🙂 Gesicht abfotografieren</button>
+      </div>
+      <div class="shots" id="snapShots"></div>
+      <div class="sect">Geprüfte Angaben</div>
+      <input id="vName" placeholder="Name laut Ausweis">
+      <input id="vDocNumber" placeholder="Ausweis-Nr.">
+      <input id="vDocType" placeholder="Ausweisart (z. B. Personalausweis)">
+      <div class="sect">Prüf-Checkliste</div>
+      <div class="checklist" id="checklist">
+        <label><input type="checkbox" data-chk> Ausweis-Vorder- & Rückseite gesehen</label>
+        <label><input type="checkbox" data-chk> Ausweis gut lesbar & unverändert</label>
+        <label><input type="checkbox" data-chk> Gesicht stimmt mit dem Ausweis überein</label>
+        <label><input type="checkbox" data-chk> Ausweis wirkt echt (Hologramm/kein Foto vom Foto)</label>
+      </div>
+      <button id="approveBtn" class="good" disabled>✅ Freigeben &amp; Akte anlegen</button>
+      <button id="rejectBtn" class="danger">✖ Ablehnen</button>
+    </div>
+
+    <!-- CHAT -->
+    <div class="pane" data-pane="chat">
+      <div class="chatlog" id="chatLog"></div>
+      <div class="chatbar"><input id="chatInput" placeholder="Nachricht …" maxlength="500"><button id="chatSend" class="primary">Senden</button></div>
+    </div>
+  </aside>
+</div>
+
+<!-- ===================== WARTERAUM (Prüfer) ===================== -->
+<div id="waitingView" class="lobby" style="display:none">
+  <div class="card" style="max-width:560px">
+    <h2>📞 Warteraum</h2>
+    <p class="sub" id="waitWho"></p>
+    <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;margin-bottom:.4rem">
+      <button id="newCodeBtn" class="primary">➕ Zugangsnummer erzeugen</button>
+      <span id="newCodeResult" style="font-size:.9rem;color:var(--dim)"></span>
+    </div>
+    <div class="hint">Gib die Zugangsnummer (oder den Link) an den Bewerber weiter. Sobald er beitritt, erscheint er unten und kann abgeholt werden.</div>
+    <div class="sect" style="margin-top:1rem">Wartende Bewerber</div>
+    <div id="waitingList"></div>
+    <div class="actions" style="margin-top:1rem"><button id="waitLogout">Abmelden</button></div>
+  </div>
+</div>
+
+<div id="lightbox"><img id="lightboxImg" alt=""></div>
+<div class="toast" id="toast"></div>
+<script src="app.js"></script>
+</body>
+</html>
