@@ -9,3 +9,6 @@ package-lock.json
 
 # Lokale (verschlüsselte) Daten – nie committen
 data/
+
+# coturn: echte Konfig enthält das Geheimnis – nur das .example committen
+coturn/turnserver.conf

@@ -1,0 +1,42 @@
+# coturn-Konfiguration für ident (turn.4ever1.tv)
+# 1) Kopieren:   cp turnserver.conf.example turnserver.conf
+# 2) Unten das GEHEIMNIS und die ÖFFENTLICHE SERVER-IP eintragen.
+# 3) Firewall öffnen (siehe README) und:  docker compose up -d
+
+listening-port=3478
+tls-listening-port=5349
+realm=turn.4ever1.tv
+server-name=turn.4ever1.tv
+
+# Öffentliche IP dieses Servers (laut deinem DNS: 178.105.238.222).
+# Bei Cloud/NAT zwingend nötig, sonst kommt kein Video zustande.
+external-ip=178.105.238.222
+
+# Ephemere Zugangsdaten (TURN-REST-API, HMAC). Dieses Geheimnis MUSS exakt
+# gleich sein wie TURN_SECRET in der ident-App. Lang & zufällig wählen, z. B.:
+#   openssl rand -hex 32
+use-auth-secret
+static-auth-secret=HIER_LANGES_ZUFAELLIGES_GEHEIMNIS_EINTRAGEN
+
+# Relay-Portbereich (zusätzlich in der Firewall als UDP 49160-49200 öffnen)
+min-port=49160
+max-port=49200
+
+# ---- Härtung ----
+fingerprint
+no-cli
+no-tlsv1
+no-tlsv1_1
+no-multicast-peers
+no-loopback-peers
+# Kein Weiterleiten in private/interne Netze (Schutz vor Missbrauch/SSRF):
+denied-peer-ip=10.0.0.0-10.255.255.255
+denied-peer-ip=172.16.0.0-172.31.255.255
+denied-peer-ip=192.168.0.0-192.168.255.255
+denied-peer-ip=169.254.0.0-169.254.255.255
+
+# ---- Optional: TLS für turns:5349 ----
+# Braucht ein Zertifikat für turn.4ever1.tv (z. B. per certbot erzeugt und
+# hier hineinkopiert). Ohne TLS funktionieren turn:/stun: weiterhin.
+# cert=/etc/coturn/fullchain.pem
+# pkey=/etc/coturn/privkey.pem
