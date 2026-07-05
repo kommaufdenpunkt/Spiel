@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ident · Admin</title>
+<style>
+  :root{--bg:#eef3fa;--panel:#fff;--panel2:#f3f6fb;--line:#e3e9f2;--line2:#d3dcea;--ink:#1b2738;--dim:#6b7a90;--accent:#3b6ef0;--accent2:#2a55c8;--good:#1a9e4b;--bad:#e0443f;--warn:#c98a00;--shadow:0 14px 38px -16px rgba(31,64,135,.2),0 2px 8px rgba(20,40,80,.06)}
+  *{box-sizing:border-box}html,body{margin:0;height:100%}
+  body{color:var(--ink);min-height:100%;display:flex;flex-direction:column;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:radial-gradient(1100px 560px at 78% -12%,#cfddff80,transparent 60%),radial-gradient(820px 480px at -5% 108%,#d9e7ff70,transparent 55%),var(--bg)}
+  button{font-family:inherit;cursor:pointer;border:1px solid var(--line);background:#fff;color:var(--ink);padding:.55rem .95rem;border-radius:10px;font-size:.88rem;font-weight:550;transition:.12s;box-shadow:0 1px 2px rgba(20,40,80,.05)}
+  button:hover:not(:disabled){border-color:var(--accent);transform:translateY(-1px)}button:disabled{opacity:.5;cursor:default}
+  button.primary{background:linear-gradient(180deg,#4a7bf5,#2a55c8);border-color:#2a55c8;color:#fff}
+  button.danger{background:#fdecec;border-color:#f1b6b4;color:#c23b37}
+  input{font-family:inherit;font-size:.95rem;padding:.6rem .8rem;border-radius:10px;border:1px solid var(--line);background:#fff;color:var(--ink);width:100%}
+  input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px #3b6ef033}
+  header{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:.7rem 1.1rem;border-bottom:1px solid var(--line);background:#ffffffd9;position:sticky;top:0;z-index:5}
+  .brand{display:flex;align-items:center;gap:.65rem}
+  .logo{width:32px;height:32px;border-radius:9px;display:grid;place-items:center;background:linear-gradient(135deg,#6f9bff,#3b6ef0);color:#fff;box-shadow:0 6px 16px -6px #3b6ef0cc}
+  header h1{font-size:1rem;margin:0}header h1 small{display:block;font-size:.64rem;color:var(--dim);letter-spacing:.18em;text-transform:uppercase}
+  .whoami{font-size:.82rem;color:var(--dim);display:flex;gap:.7rem;align-items:center}
+  .login{flex:1;display:flex;align-items:center;justify-content:center;padding:1.5rem}
+  .card{width:100%;max-width:400px;background:#fff;border:1px solid var(--line);border-radius:18px;padding:2rem 1.8rem;box-shadow:var(--shadow);position:relative;overflow:hidden}
+  .card::before{content:"";position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,#5b8cff,#3b6ef0 55%,#22d3ee)}
+  .card h2{margin:.2rem 0 1rem;font-size:1.3rem}
+  .field{margin-bottom:.9rem}.field label{display:block;font-size:.72rem;color:var(--dim);margin-bottom:.3rem;text-transform:uppercase;letter-spacing:.09em}
+  .err{color:var(--bad);font-size:.85rem;margin-top:.7rem;min-height:1.1em}
+  .dash{flex:1;display:none;min-height:0}.dash.on{display:flex}
+  .nav{width:220px;border-right:1px solid var(--line);background:var(--panel);padding:.8rem;display:flex;flex-direction:column;gap:.35rem;flex:none}
+  .nav button{text-align:left;background:transparent;border:0;color:var(--dim);box-shadow:none;padding:.7rem .8rem;border-radius:10px;font-size:.92rem}
+  .nav button:hover{color:var(--ink);background:#eef3fa}
+  .nav button.sel{color:#fff;background:linear-gradient(180deg,#4a7bf5,#2a55c8)}
+  .content{flex:1;overflow:auto;padding:1.4rem 1.6rem;min-width:0}
+  .content h2{margin:.1rem 0 1rem;font-size:1.3rem}
+  .sub{color:var(--dim);font-size:.85rem;margin:-.6rem 0 1.2rem;line-height:1.5}
+  .section{display:none}.section.on{display:block}
+  .stats{display:flex;gap:.8rem;flex-wrap:wrap;margin-bottom:1.3rem}
+  .stat{flex:1;min-width:130px;background:var(--panel2);border:1px solid var(--line);border-radius:14px;padding:1rem 1.1rem}
+  .stat .n{font-size:1.7rem;font-weight:700}.stat .l{font-size:.76rem;color:var(--dim);text-transform:uppercase;letter-spacing:.08em;margin-top:.2rem}
+  .row{display:flex;justify-content:space-between;align-items:center;gap:.6rem;border:1px solid var(--line);border-radius:12px;padding:.7rem .85rem;margin-bottom:.5rem;background:var(--panel2);font-size:.9rem}
+  .row .acts{display:flex;gap:.4rem;flex-wrap:wrap}.muted{color:var(--dim);font-size:.78rem}
+  .pill{font-size:.72rem;padding:.15rem .5rem;border-radius:999px;border:1px solid var(--line);white-space:nowrap}
+  .pill.ok{color:#1a7a3c;border-color:#bfe6cb;background:#e7f6ec}.pill.no{color:#c23b37;border-color:#f3c4c2;background:#fdecec}.pill.warn{color:#9a6a00;border-color:#f0d49a;background:#fff4e0}
+  .addbar{display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1rem;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:.7rem}
+  .addbar input{flex:1;min-width:140px}.note{font-size:.82rem;color:var(--dim);margin-top:.5rem;line-height:1.5}
+  .note code{background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:.05rem .35rem}
+  .acc{border:1px solid var(--line);border-radius:14px;padding:1rem;background:var(--panel2);margin-bottom:.7rem}
+  .acc .top{display:flex;justify-content:space-between;gap:.6rem;align-items:flex-start}.acc .nm{font-size:1rem;font-weight:650}.acc .meta{font-size:.78rem;color:var(--dim);margin-top:.25rem;line-height:1.5}
+  .thumbs{display:flex;gap:.6rem;flex-wrap:wrap;margin-top:.7rem}.thumbs figure{margin:0;display:flex;flex-direction:column;gap:.25rem;align-items:center;width:104px}
+  .thumbs img{height:90px;width:104px;object-fit:cover;border:1px solid var(--line);border-radius:8px;cursor:zoom-in}.thumbs figcaption{font-size:.62rem;color:var(--dim);text-align:center}
+  .evlog{font-size:.8rem;font-family:ui-monospace,Menlo,Consolas,monospace;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  .evrow{display:grid;grid-template-columns:11rem 8rem 1fr;gap:.5rem;padding:.4rem .7rem;border-bottom:1px solid var(--line)}.evrow:last-child{border-bottom:0}.evrow .t{color:var(--dim)}
+  .empty{color:var(--dim);font-size:.9rem;padding:1rem 0}
+  .toast{position:fixed;left:50%;bottom:1.3rem;transform:translateX(-50%) translateY(8px);background:#fffffff2;color:var(--ink);border:1px solid var(--line2);padding:.65rem 1.1rem;border-radius:12px;font-size:.85rem;opacity:0;transition:.22s;pointer-events:none;box-shadow:var(--shadow)}.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  @media(max-width:760px){.nav{width:100%;flex-direction:row;overflow:auto;border-right:0;border-bottom:1px solid var(--line)}.dash.on{flex-direction:column}}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand"><span class="logo">🛡</span><h1>ident <small>Admin-Panel</small></h1></div>
+  <div class="whoami" id="whoami"></div>
+</header>
+
+<div class="login" id="login">
+  <div class="card">
+    <h2>Admin-Anmeldung</h2>
+    <div class="field"><label>Admin-Passwort</label><input id="pw" type="password" autocomplete="current-password"></div>
+    <div class="field"><label>2FA-Code (falls aktiv)</label><input id="totp" inputmode="numeric" placeholder="6-stellig"></div>
+    <button id="loginBtn" class="primary" style="width:100%">Anmelden</button>
+    <div class="err" id="loginErr"></div>
+  </div>
+</div>
+
+<div class="dash" id="dash">
+  <nav class="nav">
+    <button data-sec="overview" class="sel">📊 Übersicht</button>
+    <button data-sec="cases">🗂 Fälle / Akten</button>
+    <button data-sec="rec">🎬 Aufnahmen</button>
+    <button data-sec="agents">👥 Mitarbeiter</button>
+    <button data-sec="security">🛡 Überwachung</button>
+    <button id="logout" style="margin-top:auto;color:var(--bad)">Abmelden</button>
+  </nav>
+  <div class="content">
+    <div class="section on" data-pane="overview"><h2>Übersicht</h2><div class="stats" id="stats"></div></div>
+    <div class="section" data-pane="cases"><h2>Fälle / Akten</h2><p class="sub">Abgeschlossene Identifizierungen inkl. Ausweis-/Gesichtsbilder – verschlüsselt.</p><div id="caseList"></div></div>
+    <div class="section" data-pane="rec"><h2>Aufnahmen</h2><p class="sub">Aufgezeichnete Video-Gespräche – verschlüsselt gespeichert.</p><div id="recList"></div></div>
+    <div class="section" data-pane="agents"><h2>Mitarbeiter</h2>
+      <div class="addbar"><input id="newUser" placeholder="Benutzername"><input id="newPass" placeholder="Startpasswort"><select id="newRole" style="padding:.6rem;border-radius:10px;border:1px solid var(--line)"><option value="agent">Prüfer</option><option value="admin">Admin</option></select><button id="addAgent" class="primary">+ Anlegen</button></div>
+      <div id="agentResult" class="note"></div><div id="agentList"></div>
+    </div>
+    <div class="section" data-pane="security"><h2>Überwachung</h2>
+      <h3 style="font-size:.95rem">Gesperrte IPs</h3><div id="blockedList"></div>
+      <h3 style="font-size:.95rem;margin-top:1rem">Letzte Ereignisse</h3><div id="eventList" class="evlog"></div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<script src="admin.js"></script>
+</body>
+</html>

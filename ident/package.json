@@ -1,0 +1,13 @@
+{
+  "name": "ident",
+  "version": "1.0.0",
+  "description": "ident – Video-Identifizierung (Agentur 4ever1)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "license": "UNLICENSED"
+}
