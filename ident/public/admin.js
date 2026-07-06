@@ -95,7 +95,7 @@
         </ol>
         ${r.body.qr ? `<img src="${r.body.qr}" alt="2FA-QR-Code" style="width:200px;height:200px;background:#fff;padding:8px;border-radius:12px;border:1px solid var(--line)">` : ''}
         <ol start="3" style="margin:.6rem 0 .2rem 1.1rem;padding:0;line-height:1.5">
-          <li>Der Prüfer meldet sich auf <b>ident.4ever1.tv</b> an → Link <b>„Mitarbeiter-Login →"</b> (nicht unter /admin!).</li>
+          <li>Der Prüfer öffnet seinen eigenen Link: <b>ident.4ever1.tv/pruefer</b> (die Anmeldung erscheint dort direkt).</li>
           <li>Dort eingeben: <b>Benutzername</b> + <b>Startpasswort</b> + den <b>6-stelligen Code</b> aus der App.</li>
           <li>Beim <b>ersten Login</b> setzt der Prüfer sein <b>eigenes Passwort</b>.</li>
         </ol>
