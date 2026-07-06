@@ -9,6 +9,11 @@
   const $ = (id) => document.getElementById(id);
   const FALLBACK_ICE = [{ urls: ['stun:stun.l.google.com:19302'] }];
 
+  // App auf dem Home-Bildschirm installierbar machen (PWA).
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));
+  }
+
   const localVideo = $('localVideo'), remoteVideo = $('remoteVideo');
   const remoteWaiting = $('remoteWaiting'), remoteTag = $('remoteTag'), localTag = $('localTag');
   const chatLog = $('chatLog');
@@ -150,12 +155,19 @@
     $('waitingView').style.display = 'none';
     startRoom();
   }
+  // Bewerber-Link: IMMER auf die Bewerber-Seite zeigen – nie auf die Prüfer-
+  // Subdomain/den Prüfer-Pfad (sonst landet der Bewerber im Mitarbeiter-Login).
+  function applicantLink(code) {
+    const host = location.host.replace(/^pruefer\./i, 'ident.');
+    return `${location.protocol}//${host}/?code=${encodeURIComponent(code)}`;
+  }
   $('newCodeBtn').addEventListener('click', async () => {
     $('newCodeBtn').disabled = true; const r = await api('POST', '/api/code', {}); $('newCodeBtn').disabled = false;
     if (r.status === 200 && r.body.code) {
-      const link = `${location.origin}${location.pathname}?code=${r.body.code}`;
-      $('newCodeResult').innerHTML = `Nummer: <b>${esc(r.body.code)}</b>`;
-      try { await navigator.clipboard.writeText(link); $('newCodeResult').innerHTML += ' · Link kopiert ✓'; } catch {}
+      const link = applicantLink(r.body.code);
+      let copied = false;
+      try { await navigator.clipboard.writeText(link); copied = true; } catch {}
+      $('newCodeResult').innerHTML = `Nummer: <b>${esc(r.body.code)}</b>${copied ? ' · Link kopiert ✓' : ''}<br><a href="${esc(link)}" target="_blank" rel="noopener" style="word-break:break-all;color:var(--accent)">${esc(link)}</a>`;
     } else $('newCodeResult').textContent = 'Konnte keine Nummer erzeugen.';
   });
   $('waitLogout').addEventListener('click', () => { clearInterval(state.waitingTimer); state.token = ''; state.name = ''; state.isAdmin = false; $('waitingView').style.display = 'none'; $('lobby').style.display = ''; $('passInput').value = ''; $('totpInput').value = ''; });
@@ -175,6 +187,9 @@
     $('recBtn').style.display = host ? '' : 'none';
     $('stopRecBtn').style.display = host ? '' : 'none';
     $('leaveBtn').style.display = host ? '' : 'none';
+    // Großes Bild = das Gegenüber: für den Prüfer der Bewerber, für den Bewerber der Prüfer.
+    remoteTag.textContent = host ? 'Bewerber' : 'Prüfer';
+    remoteWaiting.textContent = host ? 'Warte auf das Video des Bewerbers …' : 'Warte auf den Prüfer …';
   }
 
   function connectSignaling() {
