@@ -64,14 +64,14 @@
     const guest = m !== 'host';
     $('applicantFields').style.display = guest ? '' : 'none';
     $('staffFields').style.display = guest ? 'none' : '';
-    $('lobbyTitle').textContent = guest ? 'Identifizierung starten' : 'Mitarbeiter-Anmeldung';
+    $('lobbyTitle').textContent = guest ? 'Audition starten' : 'Mitarbeiter-Anmeldung';
     $('lobbySub').textContent = guest ? 'Gib deine Zugangsnummer ein, die du erhalten hast.' : 'Nur für Prüfer und Admins.';
-    $('enterBtn').textContent = guest ? 'Identifizierung starten' : 'Anmelden';
+    $('enterBtn').textContent = guest ? 'Audition starten' : 'Anmelden';
     $('staffToggle').textContent = guest ? 'Mitarbeiter-Login →' : '← Zurück';
   }
 
   $('enterBtn').addEventListener('click', enterRoom);
-  function resetEnter() { $('enterBtn').disabled = false; $('enterBtn').textContent = mode === 'guest' ? 'Identifizierung starten' : 'Anmelden'; }
+  function resetEnter() { $('enterBtn').disabled = false; $('enterBtn').textContent = mode === 'guest' ? 'Audition starten' : 'Anmelden'; }
 
   async function enterRoom() {
     $('lobbyErr').textContent = '';
@@ -327,7 +327,8 @@
   });
   async function saveCase(result, rejectReason) {
     const body = {
-      code: state.code, verifiedName: $('vName').value, docNumber: $('vDocNumber').value, docType: $('vDocType').value,
+      code: state.code, bigoName: $('vBigoName').value, age: $('vAge').value,
+      verifiedName: $('vName').value, docNumber: $('vDocNumber').value, docType: $('vDocType').value,
       result, rejectReason: rejectReason || '', agentName: state.name,
       checklist: checkBoxes().map((c) => ({ label: c.parentElement.textContent.trim(), checked: c.checked })),
       docs: state.docs.concat(state.snaps).map((d) => ({ label: d.label, dataUrl: d.dataUrl })),
@@ -345,8 +346,8 @@
     }
   }
   function onResult(result) { // Bewerber-Seite
-    if (result === 'approved') { $('okBadge').classList.add('on'); $('guideStatus').className = 'status ok'; $('guideStatus').textContent = '✓ Du wurdest erfolgreich verifiziert.'; toast('Verifiziert ✓'); }
-    else { $('guideStatus').className = 'status bad'; $('guideStatus').textContent = '✖ Die Prüfung wurde abgelehnt. Bei Fragen wende dich an die Agentur.'; }
+    if (result === 'approved') { $('okBadge').classList.add('on'); $('guideStatus').className = 'status ok'; $('guideStatus').textContent = '✓ Deine Audition wurde erfolgreich übermittelt. Viel Erfolg – die Agentur 4EVER1 meldet sich!'; toast('Übermittelt ✓'); }
+    else { $('guideStatus').className = 'status bad'; $('guideStatus').textContent = '✖ Die Audition wurde nicht angenommen. Bei Fragen wende dich an die Agentur 4EVER1.'; }
   }
 
   // ---- gemeinsame Bild-Kachel ----
