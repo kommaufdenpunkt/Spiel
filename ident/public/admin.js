@@ -87,7 +87,20 @@
     const r = await api('POST', '/api/agents', { username, password, role });
     if (r.status === 200) {
       $('newUser').value = ''; $('newPass').value = '';
-      $('agentResult').innerHTML = `Angelegt: <b>${esc(r.body.username)}</b>. <b>2FA-Schlüssel</b> (einmal zeigen, im Authenticator eintragen): <code>${esc(r.body.totpSecret)}</code>. Erstpasswort muss beim ersten Login geändert werden.`;
+      $('agentResult').innerHTML = `
+        <div><b>${esc(r.body.username)}</b> wurde angelegt. Jetzt die 2FA (Pflicht) einrichten:</div>
+        <ol style="margin:.6rem 0 .4rem 1.1rem;padding:0;line-height:1.5">
+          <li><b>Authenticator-App</b> auf dem Handy installieren – z. B. <b>Google Authenticator</b> (kostenlos im App Store / Play Store).</li>
+          <li>In der App auf <b>„+"</b> → <b>„QR-Code scannen"</b> und den Code unten scannen:</li>
+        </ol>
+        ${r.body.qr ? `<img src="${r.body.qr}" alt="2FA-QR-Code" style="width:200px;height:200px;background:#fff;padding:8px;border-radius:12px;border:1px solid var(--line)">` : ''}
+        <ol start="3" style="margin:.6rem 0 .2rem 1.1rem;padding:0;line-height:1.5">
+          <li>Der Prüfer meldet sich auf <b>ident.4ever1.tv</b> an → Link <b>„Mitarbeiter-Login →"</b> (nicht unter /admin!).</li>
+          <li>Dort eingeben: <b>Benutzername</b> + <b>Startpasswort</b> + den <b>6-stelligen Code</b> aus der App.</li>
+          <li>Beim <b>ersten Login</b> setzt der Prüfer sein <b>eigenes Passwort</b>.</li>
+        </ol>
+        <div class="muted" style="margin-top:.5rem">Falls das Scannen nicht klappt, den Schlüssel in der App manuell eintragen: <code>${esc(r.body.totpSecret)}</code></div>
+        <div class="muted" style="margin-top:.3rem">⚠️ Dieser QR-Code wird aus Sicherheitsgründen <b>nur jetzt</b> angezeigt. Am besten gleich scannen. Verloren? Einfach den Prüfer löschen und neu anlegen.</div>`;
       loadAgents();
     } else toast(r.body && r.body.reason === 'exists-or-invalid' ? 'Benutzername existiert bereits.' : 'Anlegen fehlgeschlagen.');
   });

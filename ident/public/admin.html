@@ -69,6 +69,7 @@
     <div class="field"><label>2FA-Code (falls aktiv)</label><input id="totp" inputmode="numeric" placeholder="6-stellig"></div>
     <button id="loginBtn" class="primary" style="width:100%">Anmelden</button>
     <div class="err" id="loginErr"></div>
+    <div class="muted" style="margin-top:.8rem;text-align:center;font-size:.9rem">Diese Seite ist nur für den <b>Admin</b>.<br>Prüfer melden sich auf der <a href="/">Startseite</a> an → „Mitarbeiter-Login".</div>
   </div>
 </div>
 
@@ -86,6 +87,7 @@
     <div class="section" data-pane="cases"><h2>Fälle / Akten</h2><p class="sub">Abgeschlossene Identifizierungen inkl. Ausweis-/Gesichtsbilder – verschlüsselt.</p><div id="caseList"></div></div>
     <div class="section" data-pane="rec"><h2>Aufnahmen</h2><p class="sub">Aufgezeichnete Video-Gespräche – verschlüsselt gespeichert.</p><div id="recList"></div></div>
     <div class="section" data-pane="agents"><h2>Mitarbeiter</h2>
+      <div class="note" style="margin-bottom:.7rem">🔐 <b>2FA ist Pflicht</b> (wir arbeiten mit sensiblen Daten). Nach dem Anlegen erscheint hier ein <b>QR-Code</b> – ihn mit einer Authenticator-App (z. B. Google Authenticator) scannen. Prüfer loggen sich danach auf der <b>Startseite</b> ein (Link „Mitarbeiter-Login"), <b>nicht</b> unter /admin.</div>
       <div class="addbar"><input id="newUser" placeholder="Benutzername"><input id="newPass" placeholder="Startpasswort"><select id="newRole" style="padding:.6rem;border-radius:10px;border:1px solid var(--line)"><option value="agent">Prüfer</option><option value="admin">Admin</option></select><button id="addAgent" class="primary">+ Anlegen</button></div>
       <div id="agentResult" class="note"></div><div id="agentList"></div>
     </div>
