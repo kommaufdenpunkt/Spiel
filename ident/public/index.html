@@ -76,6 +76,8 @@
   .actions #enterBtn{padding:.95rem 1.1rem;font-size:1.05rem;font-weight:650;border-radius:12px}
   .consent{display:flex;gap:.5rem;align-items:flex-start;font-size:.82rem;color:var(--dim);line-height:1.4;margin-top:.2rem}
   .consent input{margin-top:.15rem;flex:none}
+  .dslink{margin-top:.35rem;font-size:.78rem}
+  .dslink a{color:var(--accent);text-decoration:underline}
   .linklike{display:block;margin:.9rem auto 0;background:none;border:0;box-shadow:none;color:var(--dim);font-size:.82rem;text-decoration:underline;padding:.3rem}
   .linklike:hover:not(:disabled){color:var(--ink);transform:none;border:0;box-shadow:none}
   .hint{font-size:.78rem;color:var(--dim);margin-top:1rem;line-height:1.55;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:.6rem .75rem}
@@ -169,7 +171,7 @@
     <h1>ident <small>Agentur 4ever1</small></h1>
   </div>
   <div style="display:flex;gap:.6rem;align-items:center">
-    <div id="okBadge" class="badge ok">✓ Verifiziert</div>
+    <div id="okBadge" class="badge ok">✓ Freigegeben</div>
     <div id="recBadge" class="badge rec"><span class="dot"></span><span id="recTime">00:00</span></div>
   </div>
 </header>
@@ -182,9 +184,9 @@
 
     <div id="applicantFields">
       <div class="steps">
-        <div class="step"><span class="si">🪪</span><div class="st"><b>Ausweis fotografieren</b><span>Vorder- & Rückseite</span></div></div>
+        <div class="step"><span class="si">🪪</span><div class="st"><b>Ausweis fotografieren</b><span>Altersnachweis (18+), Vorder- & Rückseite</span></div></div>
         <div class="step"><span class="si">🤳</span><div class="st"><b>Selfie mit Ausweis</b><span>Ausweis neben dein Gesicht halten</span></div></div>
-        <div class="step"><span class="si">🎥</span><div class="st"><b>Kurzes Video-Gespräch</b><span>mit einem Prüfer der Agentur</span></div></div>
+        <div class="step"><span class="si">🎥</span><div class="st"><b>Deine Audition</b><span>kurzes Video-Gespräch mit der Agentur 4EVER1</span></div></div>
       </div>
       <div class="field">
         <label for="codeInput">Zugangsnummer</label>
@@ -196,7 +198,8 @@
         gesprächs (Audition) zum Zweck meiner Bewerbung als Streamer:in bei BIGO Live
         verarbeitet, verschlüsselt speichert und zur Bearbeitung meiner Bewerbung an den
         BIGO-Support weiterleitet. Diese Einwilligung ist freiwillig und kann jederzeit mit
-        Wirkung für die Zukunft widerrufen werden. Es gelten die Datenschutzhinweise der Agentur 4EVER1.</label>
+        Wirkung für die Zukunft widerrufen werden.</label>
+      <div class="dslink"><a href="https://4ever1.tv" target="_blank" rel="noopener">Datenschutzhinweise &amp; Impressum der Agentur 4EVER1</a></div>
     </div>
 
     <div id="staffFields" style="display:none">
@@ -275,9 +278,11 @@
         <button id="snapFace">🙂 Gesicht abfotografieren</button>
       </div>
       <div class="shots" id="snapShots"></div>
-      <div class="sect">Geprüfte Angaben</div>
+      <div class="sect">Angaben für die Akte</div>
+      <input id="vBigoName" placeholder="BIGO-Name">
+      <input id="vAge" inputmode="numeric" placeholder="Alter (Jahre)">
       <input id="vName" placeholder="Name laut Ausweis">
-      <input id="vDocNumber" placeholder="Ausweis-Nr.">
+      <input id="vDocNumber" placeholder="Ausweis-Nr. (Altersnachweis)">
       <input id="vDocType" placeholder="Ausweisart (z. B. Personalausweis)">
       <div class="sect">Prüf-Checkliste</div>
       <div class="checklist" id="checklist">

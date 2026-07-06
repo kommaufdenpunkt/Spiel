@@ -180,6 +180,8 @@ function saveCase(data) {
     ? data.docs.map((d) => writeDoc(id, d.label, d.dataUrl)).filter(Boolean) : [];
   const rec = {
     id, code: String(data.code || '').toUpperCase(),
+    bigoName: String(data.bigoName || '').slice(0, 80),
+    age: String(data.age || '').slice(0, 10),
     verifiedName: String(data.verifiedName || '').slice(0, 120),
     docType: String(data.docType || '').slice(0, 40),
     docNumber: String(data.docNumber || '').slice(0, 60),
