@@ -118,6 +118,11 @@
   .status.ok{background:#e7f6ec;border-color:#9fd8b0;color:#1a7a3c}
   .status.pending{background:#fff4e0;border-color:#f0d199;color:#9a6a00}
   .status.bad{background:#fdecec;border-color:#f3c4c2;color:#c23b37}
+  .qhint{font-size:.68rem;font-weight:500;color:#9a6a00;background:#fff4e0;border:1px solid #f0d199;padding:.1rem .45rem;border-radius:999px;margin-left:.4rem;white-space:nowrap}
+  .qintro{background:#eef3ff;border:1px solid #c9d8ff;border-left:3px solid var(--accent);border-radius:10px;padding:.6rem .7rem;font-size:.83rem;line-height:1.4;color:var(--ink)}
+  .qintro small{color:var(--dim)}
+  #questions label{padding:.5rem .6rem;border:1px solid var(--line);border-radius:10px;background:var(--panel2)}
+  #questions input:checked + *,#questions label:has(input:checked){opacity:.62}
   .gstep{display:flex;gap:.7rem;align-items:center;padding:.6rem .7rem;border:1px solid var(--line);border-radius:12px;background:var(--panel2)}
   .gstep.done{border-color:#9fd8b0;background:#e7f6ec}
   .gstep .gn{width:30px;height:30px;flex:none;border-radius:8px;display:grid;place-items:center;font-size:.9rem;font-weight:700;background:#e7eeff;color:var(--accent)}
@@ -186,8 +191,12 @@
         <input id="codeInput" placeholder="z. B. ABC123XY" autocapitalize="characters">
       </div>
       <label class="consent"><input type="checkbox" id="consent">
-        Ich willige ein, dass meine Angaben, Ausweis- und Gesichtsbilder sowie die
-        Videoaufzeichnung zum Zweck der Identitätsprüfung verarbeitet und verschlüsselt gespeichert werden.</label>
+        Ich willige ausdrücklich und freiwillig ein, dass die Agentur 4EVER1 meine Angaben,
+        Ausweis- und Gesichtsbilder sowie die Bild- und Tonaufzeichnung dieses Bewerbungs-
+        gesprächs (Audition) zum Zweck meiner Bewerbung als Streamer:in bei BIGO Live
+        verarbeitet, verschlüsselt speichert und zur Bearbeitung meiner Bewerbung an den
+        BIGO-Support weiterleitet. Diese Einwilligung ist freiwillig und kann jederzeit mit
+        Wirkung für die Zukunft widerrufen werden. Es gelten die Datenschutzhinweise der Agentur 4EVER1.</label>
     </div>
 
     <div id="staffFields" style="display:none">
@@ -244,6 +253,20 @@
     <!-- PRÜFER -->
     <div class="pane sel" data-pane="main" id="reviewPane" style="display:none">
       <div class="status pending" id="reviewStatus">Warte auf die Bilder des Bewerbers …</div>
+
+      <div class="sect">🎤 Fragen (Audition) <span class="qhint">nur für dich sichtbar – nicht im Video</span></div>
+      <div class="qintro">Vorab vorlesen: „Bist du damit einverstanden, dass wir deine Daten speichern und zur Bearbeitung an den <b>BIGO-Support</b> weiterleiten dürfen? Unser 4ever1-Support nimmt deine Daten selbstverständlich sehr ernst." <br><small>Antwort des Bewerbers abwarten – sie wird im Video mit aufgezeichnet.</small></div>
+      <div class="checklist" id="questions">
+        <label><input type="checkbox"> Sag mir bitte deinen <b>BIGO-Namen</b>.</label>
+        <label><input type="checkbox"> Wie <b>alt</b> bist du?</label>
+        <label><input type="checkbox"> Ist dir bewusst, dass du dieses Video als <b>Audition</b> für die Bewerbung bei der Agentur 4EVER1 auf BIGO Live aufnimmst?</label>
+        <label><input type="checkbox"> Möchtest du dem <b>V-System</b> beitreten und kennst du die dazugehörigen Regeln?</label>
+        <label><input type="checkbox"> Ist dir bewusst, dass du dich in deinen Streams zeigen und die allgemeinen <b>BIGO-Regeln</b> einhalten musst – keine verbotenen Inhalte, kein Parallelstreaming und kein Streaming auf Konkurrenz-Apps?</label>
+        <label><input type="checkbox"> Wurdest du über die <b>Transferregeln</b> (Freigabe und Freikauf) informiert?</label>
+        <label><input type="checkbox"> Erklärst du mit diesem Video deinen <b>Wunsch, der Agentur 4EVER1 beizutreten</b>?</label>
+        <label><input type="checkbox"> Für welche <b>Agentur</b> möchtest du Streamer:in werden?</label>
+      </div>
+
       <div class="sect">Vom Bewerber erhalten</div>
       <div class="shots" id="hostShots"></div>
       <div class="sect">Live-Fotos aus dem Video</div>
