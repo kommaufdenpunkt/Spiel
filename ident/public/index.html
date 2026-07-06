@@ -14,17 +14,18 @@
 <meta name="apple-mobile-web-app-title" content="4EVER1">
 <style>
   :root{
-    --bg:#eef3fa; --panel:#fff; --panel2:#f3f6fb; --line:#e3e9f2; --line2:#d3dcea;
-    --ink:#1b2738; --dim:#6b7a90; --accent:#3b6ef0; --accent2:#2a55c8;
+    --bg:#f4f1ec; --panel:#fff; --panel2:#faf6f0; --line:#ece5db; --line2:#ddd3c5;
+    --ink:#20293a; --dim:#79808d; --accent:#3b6ef0; --accent2:#2a55c8;
+    --warm:#e2894f; --warm-soft:#fbeede;
     --good:#1a9e4b; --bad:#e0443f; --rec:#ef4444; --warn:#c98a00;
-    --shadow:0 14px 38px -16px rgba(31,64,135,.20), 0 2px 8px rgba(20,40,80,.06);
+    --shadow:0 20px 50px -22px rgba(74,58,42,.30), 0 3px 12px rgba(74,58,42,.07);
   }
   *{box-sizing:border-box}
   html,body{margin:0;height:100%}
   body{color:var(--ink);-webkit-font-smoothing:antialiased;min-height:100%;display:flex;flex-direction:column;
     font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
-    background:radial-gradient(1100px 560px at 78% -12%,#cfddff80,transparent 60%),
-      radial-gradient(820px 480px at -5% 108%,#d9e7ff70,transparent 55%),var(--bg)}
+    background:radial-gradient(1100px 580px at 82% -12%,#ffe3c266,transparent 60%),
+      radial-gradient(880px 520px at -6% 108%,#d3e0ff66,transparent 55%),var(--bg)}
   button{font-family:inherit;cursor:pointer;border:1px solid var(--line);background:#fff;color:var(--ink);
     padding:.62rem 1.05rem;border-radius:10px;font-size:.9rem;font-weight:550;
     transition:transform .12s,border-color .12s,filter .12s,box-shadow .12s;box-shadow:0 1px 2px rgba(20,40,80,.05)}
@@ -60,14 +61,14 @@
 
   /* Lobby */
   .lobby{flex:1;display:flex;align-items:center;justify-content:center;padding:1.5rem}
-  .card{width:100%;max-width:460px;background:#fff;border:1px solid var(--line);border-radius:18px;
-    padding:2rem 1.8rem;box-shadow:var(--shadow);position:relative;overflow:hidden}
-  .card::before{content:"";position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,#5b8cff,#3b6ef0 55%,#22d3ee)}
+  .card{width:100%;max-width:468px;background:var(--panel);border:1px solid var(--line);border-radius:24px;
+    padding:2.2rem 2rem;box-shadow:var(--shadow);position:relative;overflow:hidden}
+  .card::before{content:"";position:absolute;top:0;left:0;right:0;height:4px;background:linear-gradient(90deg,#5b8cff,#6f7bef 48%,var(--warm))}
   .card h2{margin:.2rem 0 .3rem;font-size:1.5rem;font-weight:700}
   .card p.sub{margin:0 0 1.3rem;color:var(--dim);font-size:.95rem;line-height:1.55}
   .steps{display:flex;flex-direction:column;gap:.6rem;margin:.2rem 0 1.3rem}
-  .step{display:flex;gap:.75rem;align-items:center;padding:.65rem .75rem;border:1px solid var(--line);border-radius:13px;background:var(--panel2)}
-  .step .si{width:40px;height:40px;flex:none;border-radius:11px;display:grid;place-items:center;font-size:1.2rem;background:#e7eeff;color:var(--accent)}
+  .step{display:flex;gap:.8rem;align-items:center;padding:.7rem .8rem;border:1px solid var(--line);border-radius:15px;background:var(--panel2)}
+  .step .si{width:42px;height:42px;flex:none;border-radius:13px;display:grid;place-items:center;font-size:1.2rem;background:linear-gradient(135deg,#fff2e4,var(--warm-soft));color:#c67833;box-shadow:inset 0 0 0 1px #f0dcc4}
   .step .st b{display:block;font-size:.9rem}
   .step .st span{font-size:.78rem;color:var(--dim);line-height:1.3}
   .field{margin-bottom:1rem}
