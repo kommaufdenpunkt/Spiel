@@ -47,7 +47,12 @@
   const params = new URLSearchParams(location.search);
   const urlCode = (params.get('code') || params.get('raum') || '').toUpperCase();
   if (urlCode) $('codeInput').value = urlCode;
-  setMode('guest');
+  // Eigener Prüfer-Link (/pruefer, /login, /team, /mitarbeiter oder ?login) ->
+  // die Lobby startet direkt im Mitarbeiter-Login statt in der Bewerber-Ansicht.
+  const staffPaths = ['/pruefer', '/login', '/team', '/mitarbeiter'];
+  const staffHost = location.hostname.toLowerCase().startsWith('pruefer.');
+  if (staffHost || staffPaths.includes(location.pathname.toLowerCase()) || params.has('login') || params.has('staff')) mode = 'host';
+  setMode(mode);
 
   $('staffToggle').addEventListener('click', () => { mode = mode === 'guest' ? 'host' : 'guest'; $('lobbyErr').textContent = ''; setMode(mode); });
   function setMode(m) {

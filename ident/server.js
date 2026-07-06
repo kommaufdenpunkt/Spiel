@@ -293,6 +293,8 @@ const server = http.createServer(async (req, res) => {
 
   // Statische Dateien
   if (urlPath === '/') urlPath = '/index.html';
+  // Eigener Direkt-Link für Prüfer -> Startseite öffnet gleich den Mitarbeiter-Login
+  if (['/pruefer', '/login', '/team', '/mitarbeiter'].includes(urlPath)) urlPath = '/index.html';
   if (urlPath === '/panel' || urlPath === '/admin') urlPath = '/admin.html';
   const filePath = path.normalize(path.join(PUBLIC_DIR, urlPath));
   if (!filePath.startsWith(PUBLIC_DIR)) { res.writeHead(403); res.end('Forbidden'); return; }
