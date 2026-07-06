@@ -1,7 +1,7 @@
 {
-  "name": "ident – Agentur 4ever1",
-  "short_name": "ident",
-  "description": "Video-Identifizierung der Agentur 4ever1",
+  "name": "4EVER1 – Audition für BIGO Live",
+  "short_name": "4EVER1",
+  "description": "Video-Audition/Bewerbung bei der Agentur 4EVER1 für BIGO Live",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
