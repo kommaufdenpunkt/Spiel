@@ -1,0 +1,118 @@
+# 🚗 Fahrschulportal
+
+Ein schlankes Buchungsportal für die Fahrschule: Fahrschüler buchen ihre
+Fahrstunden selbst, tauschen sie bei Bedarf untereinander – und der Fahrlehrer
+sieht per Tacho, ob das Wochenziel erreicht ist. Alles läuft auf **einem eigenen,
+eigenständigen Server** und braucht **keine externen Dienste** (keine Cloud-DB,
+keine fremden Pakete).
+
+---
+
+## Schnellstart
+
+Voraussetzung: **Node.js ab Version 22.5** (bringt SQLite und alles Nötige schon mit).
+
+```bash
+cd fahrschulportal
+npm start          # oder:  node server.js
+```
+
+Dann im Browser öffnen: **http://localhost:3000**
+
+- **Fahrlehrer-Login:** Tab „Fahrlehrer" → Standard-PIN **`1234`**
+  (bitte sofort unter *Einstellungen → Zugang* ändern).
+- **Fahrschüler:** bekommen vom Fahrlehrer einen Zugangscode und legen damit
+  unter „Neu (mit Code)" ihr Konto an.
+
+Der Server legt beim ersten Start automatisch die Datenbankdatei
+`fahrschule.db` an. Diese Datei enthält alle Daten – einfach mitsichern, wenn
+du ein Backup willst.
+
+> Anderer Port? `PORT=8080 node server.js`
+> Anderer DB-Ort? `FSP_DB=/pfad/zu/daten.db node server.js`
+
+---
+
+## Was das Portal kann
+
+### Für Fahrschüler
+- **Einloggen** mit E-Mail + Passwort, Registrierung **einmalig über einen Code**.
+- **Fahrstunden buchen** – standardmäßig **80-Minuten-Slots** mit **15 Min Pause**
+  dazwischen.
+- **Max. 2 Fahrstunden pro Woche** (einstellbar).
+- **Vorausbuchung bis 14 Tage** (einstellbar) – weiter im Voraus plant nur der
+  Fahrlehrer (z. B. Sonderfahrten).
+- **Verbindliche Buchung** mit Sicherheitsabfrage („Bist du wirklich sicher?").
+- **Stornieren** kostenlos bis **48 Std.** vorher.
+- **Übernahme-Marktplatz:** Wer kurzfristig nicht kann, bietet die Stunde den
+  anderen Fahrschülern an. Ein anderer Schüler kann sie übernehmen – so bleibt
+  der Slot lückenlos belegt.
+- **Sperrfrist 36 Std.:** Ab dann steht der Termin fest (kein Absagen/Abgeben mehr).
+
+### Für den Fahrlehrer
+- **Tacho / Drehzahlmesser:** zeigt dynamisch die Stunden dieser Woche gegen das
+  **Wochenziel** (Standard 25 h) – rot = weit weg, gelb = fast dran, grün =
+  Ziel erreicht 🎯. Dazu ein Tages-Tacho und eine Wochen-Balkenübersicht.
+- **Kalender:** Tagesansicht aller Termine, eigene Termine frei anlegen.
+- **Stunde abschließen:** pro Fahrstunde **Schalter/Automatik** wählen und
+  optional das **Kennzeichen** eintragen; Dauer anpassbar (z. B. letzte Stunde
+  nur 20 statt 80 Min).
+- **Termine verschieben** (vorziehen/zurückziehen) für nahtlose Übergänge.
+- **Zugangscodes** erzeugen und an neue Fahrschüler weitergeben.
+- **Theorie & Ausnahmen:** Zeiten blockieren (z. B. Theorieunterricht 17–20 Uhr,
+  Urlaub, Sonderfahrten). Blockzeiten können wahlweise als Arbeitszeit zählen.
+- **Alles einstellbar:** Arbeitsbeginn/-ende, Slot-Dauer, Pause, Arbeitstage
+  (Mo–Sa), Wochen-/Tagesziel, Stornofristen, Vorausbuchungsfenster, PIN.
+
+---
+
+## Voreinstellungen (alle im Menü änderbar)
+
+| Einstellung | Standard | Bedeutung |
+|---|---|---|
+| Arbeitsbeginn | 12:00 | frühester Slot |
+| Letzter Slot | 16:45 | letzter buchbarer Start → ergibt **4 Slots/Tag** |
+| Fahrstunde | 80 Min | Dauer einer Stunde |
+| Pause | 15 Min | Puffer zwischen zwei Stunden |
+| Arbeitstage | Mo–Sa | wählbar |
+| Wochenziel | 25 h | Tacho-Ziel |
+| Max/Woche | 2 | Fahrstunden je Schüler & Woche |
+| Vorausbuchung | 14 Tage | Buchungsfenster der Schüler |
+| Kostenlos stornieren | 48 h vorher | danach nur noch anbieten |
+| Sperrfrist | 36 h vorher | Termin steht fest |
+
+**Rechnung dahinter:** 4 Slots × 80 Min = 320 Min = **5,3 h/Tag**.
+Bei 6 Arbeitstagen sind das rund **32 h/Woche** – dein Ziel von 25–30 h ist damit
+gut erreichbar. Über die Slot-Vorschau in den Einstellungen siehst du sofort,
+wie viele Slots deine Zeiten ergeben; einfach `Letzter Slot` anpassen, wenn du
+mal einen Slot mehr oder weniger willst.
+
+---
+
+## Technik (kurz)
+
+- **Backend:** ein einziger Node-Prozess (`server.js`) – HTTP-Server + JSON-API,
+  Datenbank über das in Node eingebaute SQLite (`node:sqlite`), Passwörter/PIN
+  sicher gehasht (scrypt). **Keine npm-Abhängigkeiten**, kein `npm install` nötig.
+- **Frontend:** statische Dateien im Ordner `public/` (eine SPA aus `index.html`,
+  `styles.css`, `app.js`) im dunklen Design.
+- **Datenhaltung:** alles in `fahrschule.db` (SQLite-Datei im Projektordner).
+
+```
+fahrschulportal/
+├── server.js        # Server + komplette API
+├── db.js            # Datenbank-Schema, Einstellungen, Passwort-Hashing
+├── package.json
+└── public/
+    ├── index.html
+    ├── styles.css
+    └── app.js
+```
+
+### Hinweis zum Betrieb
+Damit Fahrschüler von zu Hause zugreifen können, muss der Server dauerhaft
+erreichbar laufen (z. B. auf einem kleinen Server/VPS, hinter HTTPS). Lokal zum
+Ausprobieren reicht `node server.js` und der Aufruf über `localhost`.
+Die automatischen Benachrichtigungen beim Anbieten einer Stunde laufen aktuell
+**im Portal selbst** (der andere Schüler sieht das Angebot beim nächsten Login).
+E-Mail-/Push-Benachrichtigung lässt sich als nächster Schritt ergänzen.

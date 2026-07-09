@@ -1,0 +1,13 @@
+{
+  "name": "fahrschulportal",
+  "version": "1.0.0",
+  "description": "Buchungsportal fuer die Fahrschule - Fahrstunden buchen, Ziele im Blick",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=22.5.0"
+  }
+}
