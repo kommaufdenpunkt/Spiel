@@ -14,7 +14,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const PUBLIC = join(__dirname, 'public');
 const PORT = Number(process.env.PORT || 3000);
 const SESSION_DAYS = 30;
-const APP_VERSION = "2.1.1";
+const APP_VERSION = "2.1.2";
 // Einstellungen, die Schueler/Oeffentlichkeit sehen duerfen (Rest bleibt beim Fahrlehrer)
 const PUBLIC_SETTINGS = ['instructor_name', 'instructor_phone', 'policy_text',
   'cancel_hours', 'lock_hours', 'booking_horizon_days', 'booking_horizon_days_rank2',
@@ -99,7 +99,7 @@ function addDays(dateStr, n) {
   d.setDate(d.getDate() + n);
   return d.toISOString().slice(0, 10);
 }
-function todayStr() { return new Date().toISOString().slice(0, 10); }
+function todayStr() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
 function nowHHMM() { const d = new Date(); return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; }
 // Stunden von jetzt bis zum Termin (date=YYYY-MM-DD, start=HH:MM)
 function hoursUntil(date, start) {
@@ -126,6 +126,7 @@ function getOverride(date) {
 function slotGrid(date) {
   const s = getSettings();
   const step = s.lesson_min + s.break_min;
+  if (!(step > 0) || !(s.lesson_min > 0)) return []; // Schutz vor Endlosschleife bei Fehlwerten
   const ov = date ? getOverride(date) : null;
   if (ov && ov.closed) return [];
   const start = toMin((ov && ov.start_time) || getSettingRaw('start_time'));
@@ -252,6 +253,7 @@ async function handleApi(req, res, url) {
     if (sess && sess.kind === 'instructor') return ok(res, { settings: full });
     const pub = {};
     for (const k of PUBLIC_SETTINGS) if (k in full) pub[k] = full[k];
+    if (!sess) delete pub.instructor_phone; // Handynummer nur fuer eingeloggte Nutzer
     return ok(res, { settings: pub });
   }
   // Version / Health (fuer native App und Monitoring)
@@ -276,8 +278,9 @@ async function handleApi(req, res, url) {
       progress: { ...studentRank(sess.student_id), sonder: sonderCounts(sess.student_id), req: sonderReq() } });
   }
 
-  // Abwesenheit des Fahrlehrers (Urlaub / freie Tage) – fuer Schueler sichtbar
+  // Abwesenheit des Fahrlehrers (Urlaub / freie Tage) – nur fuer eingeloggte Nutzer
   if (p === '/api/away' && method === 'GET') {
+    if (!sess) return bad(res, 'Bitte anmelden', 401);
     const rows = db.prepare(
       "SELECT date,type FROM day_overrides WHERE closed = 1 AND date >= ? ORDER BY date LIMIT 60").all(todayStr());
     return ok(res, { away: rows });
@@ -309,7 +312,9 @@ async function handleApi(req, res, url) {
   if (bm) {
     const id = Number(bm[1]);
     const bk = db.prepare('SELECT * FROM bookings WHERE id = ?').get(id);
-    if (!bk) return bad(res, 'Buchung nicht gefunden', 404);
+    // Nicht vorhanden ODER fremde Buchung eines Schuelers -> identische 404 (keine ID-Enumeration)
+    const mayAccess = bk && (requireInstructor() || (requireStudent() && bk.student_id === sess.student_id));
+    if (!mayAccess) return bad(res, 'Buchung nicht gefunden', 404);
 
     if (method === 'DELETE') {
       if (requireInstructor()) {
@@ -489,7 +494,10 @@ async function handleApi(req, res, url) {
       if (overlaps(ns, ne + s.break_min, ms, me + s.break_min))
         return bad(res, 'Du hast an dem Tag schon einen Termin zu dieser Zeit.');
     }
-    db.prepare("UPDATE bookings SET student_id = ?, status='booked' WHERE id = ?").run(sess.student_id, bk.id);
+    // Beim Uebernehmen persoenliche Daten des Vorbesitzers entfernen (Treffpunkt/Notiz)
+    // -> sonst saehe der Uebernehmer ueber /api/my/live bzw. /api/my/bookings dessen Adresse.
+    db.prepare("UPDATE bookings SET student_id = ?, status='booked', meet_label=NULL, meet_lat=NULL, meet_lng=NULL, note=NULL WHERE id = ?")
+      .run(sess.student_id, bk.id);
     db.prepare('DELETE FROM offer_declines WHERE booking_id = ?').run(bk.id);
     // urspruenglichen Schueler informieren, dass er frei ist (anonym, wenn aktiviert)
     const taker = db.prepare('SELECT name FROM students WHERE id = ?').get(sess.student_id);
@@ -798,6 +806,9 @@ async function handleApi(req, res, url) {
   if (p === '/api/instructor/settings' && method === 'PUT') {
     if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
     const b = await readBody(req);
+    // Plausibilitaet: Fahrstundenlaenge/Pause muessen sinnvoll sein (sonst Endlosschleife im Raster)
+    if ('lesson_min' in b && !(Number(b.lesson_min) >= 10)) return bad(res, 'Fahrstunde muss mind. 10 Minuten sein');
+    if ('break_min' in b && !(Number(b.break_min) >= 0)) return bad(res, 'Pause darf nicht negativ sein');
     const allowed = ['instructor_name', 'start_time', 'last_start', 'lesson_min', 'break_min',
       'weekly_target_h', 'daily_target_h', 'weekly_lo_h', 'workdays', 'max_per_week',
       'booking_horizon_days', 'cancel_hours', 'lock_hours', 'release_time', 'short_day_last_start',

@@ -86,7 +86,7 @@ async function api(path, opts = {}) {
 }
 
 // ---------- Datum ----------
-function todayStr() { return new Date().toISOString().slice(0, 10); }
+function todayStr() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
 function parseD(s) { return new Date(s + 'T00:00:00'); }
 function isoDow(s) { const d = parseD(s).getDay(); return d === 0 ? 7 : d; }
 function addDays(s, n) { const d = parseD(s); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); }
@@ -309,9 +309,8 @@ async function renderStudent() {
   $('#horizon-note').textContent = `(bis ${horizon} Tage im Voraus)`;
   wireLogout();
   $('#dpick').value = state.date;
-  $('#prev').onclick = () => { state.date = addDays(state.date, 1); syncStudent(); };
-  $('#next').onclick = () => { state.date = addDays(state.date, 1); syncStudent(); };
   $('#prev').onclick = () => { state.date = addDays(state.date, -1); syncStudent(); };
+  $('#next').onclick = () => { state.date = addDays(state.date, 1); syncStudent(); };
   $('#dpick').onchange = (e) => { state.date = e.target.value; syncStudent(); };
   syncStudent();
 }
