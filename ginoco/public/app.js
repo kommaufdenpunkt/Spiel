@@ -1270,14 +1270,19 @@ async function tabSchueler() {
       return `<span class="pill" style="${done ? 'background:var(--good-bg);color:var(--good)' : ''}">${TYPE_ICON[k]} ${have}/${need}</span>`;
     }).join(' ');
     $('#s-list').innerHTML = `<table>
-      <tr><th>Name</th><th>Login-Name</th><th>Kontakt</th><th>Gefahren / Rang</th><th>Sonderfahrten</th><th>Erlaubte Längen (Min)</th></tr>
+      <tr><th>Name</th><th>Login-Name</th><th>Kontakt</th><th>Treffpunkt</th><th>Gefahren / Rang</th><th>Sonderfahrten</th><th>Erlaubte Längen (Min)</th></tr>
       ${students.map((s) => {
         const durs = String(s.allowed_durations || '80').split(',').map(Number);
         const boxes = [40, 80, 120].map((d) => `<label style="margin:0;font-weight:600"><input type="checkbox" data-sdur="${s.id}" value="${d}" ${durs.includes(d) ? 'checked' : ''} style="width:auto"> ${d}</label>`).join(' ');
+        const hasHome = s.home_label || s.home_lat != null;
+        const homeCell = hasHome
+          ? `<span class="pill" style="background:var(--good-bg);color:var(--good)">📍 ${esc(s.home_label || 'gesetzt')}</span>`
+          : `<span class="muted">– nicht vereinbart –</span>`;
         return `<tr>
           <td><strong>${esc(s.name)}</strong>${s.birth_year ? ` <span class="muted">(${s.birth_year})</span>` : ''}</td>
           <td><span class="codechip">${esc(s.username || '–')}</span><br><button class="ghost sm" data-reset="${s.id}" data-uname="${esc(s.username || '')}" data-sname="${esc(s.name)}" style="margin-top:.3rem">Passwort zurücksetzen</button></td>
           <td>${esc(s.email || '')}<br><span class="muted">${esc(s.phone || '–')}</span>${s.phone ? '<br>' + contactButtons(s.phone, `Hallo ${s.name.split(' ')[0]}, hier ${state.settings?.instructor_name || 'deine Fahrschule'}:`) : ''}</td>
+          <td>${homeCell}<br><button class="ghost sm" data-home="${s.id}" data-sname="${esc(s.name)}" data-hlabel="${esc(s.home_label || '')}" data-hlat="${s.home_lat != null ? s.home_lat : ''}" data-hlng="${s.home_lng != null ? s.home_lng : ''}" style="margin-top:.3rem">Treffpunkt festlegen</button></td>
           <td>${s.done_count} Std.<br><span class="pill" style="background:${s.rank >= 2 ? 'var(--good-bg);color:var(--good)' : ''}">Rang ${s.rank} · ${s.horizon} Tage</span></td>
           <td>${sonderCell(s)}</td>
           <td><div class="inline">${boxes} <button class="sec sm" data-savedur="${s.id}">Speichern</button></div></td>
@@ -1293,7 +1298,39 @@ async function tabSchueler() {
     });
     $('#s-list').querySelectorAll('[data-reset]').forEach((btn) => btn.onclick = () =>
       openResetModal(btn.dataset.reset, btn.dataset.sname, btn.dataset.uname));
+    $('#s-list').querySelectorAll('[data-home]').forEach((btn) => btn.onclick = () =>
+      openStandortModal(btn.dataset.home, btn.dataset.sname, btn.dataset.hlabel, btn.dataset.hlat, btn.dataset.hlng));
   } catch (e) { toast(e.message, 'err'); }
+}
+
+// Festen Treffpunkt (Standort) eines Schuelers festlegen – wird als Standard fuer dessen Fahrstunden genutzt
+function openStandortModal(id, name, label, lat, lng) {
+  modal(`<h3>Treffpunkt für ${esc(name)}</h3>
+    <p class="hint">Der Ort, an dem du ${esc((name || '').split(' ')[0])} normalerweise abholst. Er wird bei jeder Fahrstunde automatisch als Treffpunkt genutzt – du musst ihn dann nicht mehr einzeln eintragen.</p>
+    <div class="field"><label>Adresse / Beschreibung</label>
+      <input id="st-label" value="${esc(label || '')}" placeholder="z.B. Bahnhof Musterstadt, Gleis-Eingang"></div>
+    <div class="inline">
+      <div class="field" style="flex:1"><label>Breitengrad (optional)</label><input id="st-lat" value="${esc(lat || '')}" placeholder="z.B. 52.5200"></div>
+      <div class="field" style="flex:1"><label>Längengrad (optional)</label><input id="st-lng" value="${esc(lng || '')}" placeholder="z.B. 13.4050"></div>
+    </div>
+    <p class="hint" style="margin-top:-.4rem">Koordinaten sind optional – nur damit im Live-Modus die Ankunftszeit (ETA) berechnet werden kann. Findest du z.B. in Google Maps per Rechtsklick auf den Ort. Ohne Koordinaten reicht die Adresse als Text.</p>
+    <div class="actions">
+      <button class="ghost" id="st-clear" type="button">Treffpunkt entfernen</button>
+      <button class="sec" onclick="window.__closeModal()">Abbrechen</button>
+      <button id="st-save">Speichern</button>
+    </div>`);
+  const save = async (body, msg) => {
+    try { await api('/api/students/' + id, { method: 'PATCH', body }); toast(msg, 'ok'); closeModal(); tabSchueler(); }
+    catch (e) { toast(e.message, 'err'); }
+  };
+  $('#st-save').onclick = () => {
+    const l = $('#st-label').value.trim();
+    const la = $('#st-lat').value.trim(), lo = $('#st-lng').value.trim();
+    if (!l && !la) { toast('Bitte eine Adresse eingeben', 'err'); return; }
+    if ((la && !lo) || (!la && lo)) { toast('Bitte Breiten- UND Längengrad eingeben (oder beide leer)', 'err'); return; }
+    save({ home_label: l, home_lat: la || null, home_lng: lo || null }, 'Treffpunkt gespeichert ✓');
+  };
+  $('#st-clear').onclick = () => save({ home_label: null, home_lat: null, home_lng: null }, 'Treffpunkt entfernt');
 }
 
 // Starkes, aber lesbares Zufallspasswort: Buchstaben + Zahl + Sonderzeichen

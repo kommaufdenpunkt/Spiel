@@ -667,10 +667,12 @@ async function handleApi(req, res, url) {
       .sort((a, z) => a.h - z.h)[0];
     if (!upcoming) return ok(res, { window: false });
     const bk = upcoming.b;
+    // Treffpunkt: 1. an der Stunde hinterlegt  2. fester Standort des Schuelers  3. globaler Standard
+    const home = db.prepare('SELECT home_label,home_lat,home_lng FROM students WHERE id=?').get(bk.student_id) || {};
     const meet = {
-      label: bk.meet_label || getSettingRaw('meet_default_label') || null,
-      lat: bk.meet_lat != null ? bk.meet_lat : (getSettingRaw('meet_default_lat') ? Number(getSettingRaw('meet_default_lat')) : null),
-      lng: bk.meet_lng != null ? bk.meet_lng : (getSettingRaw('meet_default_lng') ? Number(getSettingRaw('meet_default_lng')) : null),
+      label: bk.meet_label || home.home_label || getSettingRaw('meet_default_label') || null,
+      lat: bk.meet_lat != null ? bk.meet_lat : (home.home_lat != null ? home.home_lat : (getSettingRaw('meet_default_lat') ? Number(getSettingRaw('meet_default_lat')) : null)),
+      lng: bk.meet_lng != null ? bk.meet_lng : (home.home_lng != null ? home.home_lng : (getSettingRaw('meet_default_lng') ? Number(getSettingRaw('meet_default_lng')) : null)),
     };
     const live = db.prepare('SELECT * FROM live_location WHERE id=1').get();
     const staleMs = live.updated_at ? Date.now() - new Date(live.updated_at).getTime() : Infinity;
@@ -763,6 +765,7 @@ async function handleApi(req, res, url) {
     if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
     const rows = db.prepare(
       `SELECT s.id,s.name,s.email,s.phone,s.username,s.birth_year,s.allowed_durations,s.created_at,
+        s.home_label,s.home_lat,s.home_lng,
         (SELECT COUNT(*) FROM bookings b WHERE b.student_id=s.id AND b.status='done') AS done_count
        FROM students s ORDER BY s.name`
     ).all().map((s) => ({ ...s, ...studentRank(s.id), sonder: sonderCounts(s.id) }));
@@ -773,10 +776,23 @@ async function handleApi(req, res, url) {
   if (stm && method === 'PATCH') {
     if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
     const b = await readBody(req);
+    const sid = Number(stm[1]);
+    // Festen Standort/Treffpunkt setzen (mit dem Schueler abgesprochen)
+    if ('home_label' in b || 'home_lat' in b || 'home_lng' in b) {
+      const st = db.prepare('SELECT id FROM students WHERE id=?').get(sid);
+      if (!st) return bad(res, 'Schueler nicht gefunden', 404);
+      const label = b.home_label ? String(b.home_label).trim() : null;
+      const lat = b.home_lat == null || b.home_lat === '' ? null : Number(b.home_lat);
+      const lng = b.home_lng == null || b.home_lng === '' ? null : Number(b.home_lng);
+      db.prepare('UPDATE students SET home_label=?, home_lat=?, home_lng=? WHERE id=?').run(label, lat, lng, sid);
+      logEvent('info', { actor: 'instructor', studentId: sid, detail: label ? `Standort gesetzt: ${label}` : 'Standort entfernt' });
+      return ok(res, { home_label: label, home_lat: lat, home_lng: lng });
+    }
+    // Erlaubte Slot-Laengen setzen
     const durs = Array.isArray(b.allowed_durations) ? b.allowed_durations : String(b.allowed_durations || '').split(',');
     const clean = [...new Set(durs.map(Number).filter((n) => n > 0))].sort((a, z) => a - z);
     if (!clean.length) return bad(res, 'Mindestens eine Dauer noetig');
-    db.prepare('UPDATE students SET allowed_durations = ? WHERE id = ?').run(clean.join(','), Number(stm[1]));
+    db.prepare('UPDATE students SET allowed_durations = ? WHERE id = ?').run(clean.join(','), sid);
     return ok(res, { allowed_durations: clean.join(',') });
   }
   // Passwort eines Schuelers zuruecksetzen (Fahrlehrer teilt es dem Schueler mit)

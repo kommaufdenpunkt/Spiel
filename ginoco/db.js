@@ -143,6 +143,12 @@ if (emailCol && emailCol.notnull === 1) {
 db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_students_username ON students(username) WHERE username IS NOT NULL');
 db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_students_email ON students(email) WHERE email IS NOT NULL');
 
+// Fester Treffpunkt/Standort pro Schueler (mit dem Schueler abgesprochen) – NACH der
+// evtl. Tabellen-Neuanlage oben, damit die Spalten nicht wieder verloren gehen.
+ensureColumn('students', 'home_label', 'home_label TEXT');
+ensureColumn('students', 'home_lat', 'home_lat REAL');
+ensureColumn('students', 'home_lng', 'home_lng REAL');
+
 // Absagen ("keine Zeit") auf ein Uebernahme-Angebot
 db.exec(`CREATE TABLE IF NOT EXISTS offer_declines (
   booking_id INTEGER NOT NULL,
