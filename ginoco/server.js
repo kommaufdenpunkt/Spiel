@@ -15,7 +15,7 @@ const PUBLIC = join(__dirname, 'public');
 const PORT = Number(process.env.PORT || 3000);
 const HOST = process.env.HOST || '0.0.0.0'; // hinter Caddy: HOST=127.0.0.1 (nur Proxy erreicht Node)
 const SESSION_DAYS = 30;
-const APP_VERSION = "2.4.3";
+const APP_VERSION = "2.4.4";
 // Einstellungen, die Schueler/Oeffentlichkeit sehen duerfen (Rest bleibt beim Fahrlehrer)
 const PUBLIC_SETTINGS = ['instructor_name', 'instructor_phone', 'policy_text',
   'cancel_hours', 'lock_hours', 'booking_horizon_days', 'booking_horizon_days_rank2',
@@ -1147,6 +1147,11 @@ function createBooking(res, sess, body) {
     const lastSlotEnd = toMin((ov && ov.last_start) || getSettingRaw('last_start')) + s.lesson_min;
     if (toMin(start) + duration > lastSlotEnd)
       return bad(res, `Diese Länge passt an diesem Slot nicht mehr in den Tag (Ende spätestens ${toHHMM(lastSlotEnd)} Uhr). Wähle einen früheren Slot.`);
+
+    // Der letzte Slot des Tages nur als volle Stunde (>= 80 Min), keine 40-Min-Kurzstunde
+    const lastGridStart = grid.length ? grid[grid.length - 1].start : null;
+    if (start === lastGridStart && duration < 80)
+      return bad(res, 'Der letzte Slot des Tages ist nur als 80- oder 120-Minuten-Stunde buchbar. Wähle einen früheren Slot für eine kürzere Stunde.');
   }
 
   const newStart = toMin(start);

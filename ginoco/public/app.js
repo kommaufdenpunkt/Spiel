@@ -410,6 +410,7 @@ async function syncStudent() {
     renderWeekCard(mine.weekInfo, mine.bookings, mine.progress);
     { const hn = $('#horizon-note'); if (hn && mine.progress) hn.textContent = `(bis ${mine.progress.horizon} Tage im Voraus · Rang ${mine.progress.rank})`; }
     renderOffers(off.offers, mine.weekInfo);
+    state.lastSlotStart = day.slots.length ? day.slots[day.slots.length - 1].start : null;
     renderSlots(day.slots, mine.bookings);
   } catch (e) { toast(e.message, 'err'); }
 }
@@ -675,15 +676,26 @@ function renderSlots(slots, mine) {
 function bookSlot(start, dur) {
   const cancelH = state.settings?.cancel_hours || 48;
   const lockH = state.settings?.lock_hours || 36;
-  const allowed = String(state.user?.allowed_durations || '80').split(',').map(Number).sort((a, b) => a - b);
+  let allowed = String(state.user?.allowed_durations || '80').split(',').map(Number).filter((n) => n > 0).sort((a, b) => a - b);
+  // Der letzte Slot des Tages ist nur als volle Stunde (>= 80 Min) buchbar.
+  const isLast = state.lastSlotStart && start === state.lastSlotStart;
+  if (isLast) allowed = allowed.filter((d) => d >= 80);
+  if (!allowed.length) {
+    modal(`<h3>Termin buchen</h3>
+      <div class="warnbox">Der letzte Slot des Tages ist nur als 80- oder 120-Minuten-Stunde buchbar – dafür bist du nicht freigeschaltet. Bitte wähle einen früheren Slot.</div>
+      <div class="actions"><button class="sec" onclick="window.__closeModal()">Schließen</button></div>`);
+    return;
+  }
+  const defDur = allowed.includes(80) ? 80 : allowed[0];
   const durSelect = allowed.length > 1
-    ? `<div class="field"><label>Dauer wählen</label><select id="bk-dur">${allowed.map((d) => `<option value="${d}" ${d === 80 ? 'selected' : ''}>${d} Minuten</option>`).join('')}</select></div>`
+    ? `<div class="field"><label>Dauer wählen</label><select id="bk-dur">${allowed.map((d) => `<option value="${d}" ${d === defDur ? 'selected' : ''}>${d} Minuten</option>`).join('')}</select></div>`
     : '';
   modal(`<h3>Termin verbindlich buchen?</h3>
     <div class="warnbox">
       Bist du wirklich sicher, dass du diesen Termin nehmen willst?
     </div>
-    <p style="margin:.6rem 0 .2rem"><strong>${WD_LONG[isoDow(state.date) - 1]}, ${fmtShort(state.date)} um ${start} Uhr</strong>${allowed.length > 1 ? '' : ` · ${dur} Min`}</p>
+    <p style="margin:.6rem 0 .2rem"><strong>${WD_LONG[isoDow(state.date) - 1]}, ${fmtShort(state.date)} um ${start} Uhr</strong>${allowed.length > 1 ? '' : ` · ${allowed[0]} Min`}</p>
+    ${isLast ? '<div class="hint" style="margin:.2rem 0 .3rem">Letzter Slot des Tages – nur als volle Stunde (80 oder 120 Min).</div>' : ''}
     ${durSelect}
     <ul class="hint" style="margin:.4rem 0 .4rem;padding-left:1.1rem">
       <li>Kostenfrei stornieren nur bis <strong>${cancelH} Std.</strong> vorher.</li>
@@ -696,7 +708,7 @@ function bookSlot(start, dur) {
       <button id="bk-confirm">Ja, verbindlich buchen</button>
     </div>`);
   $('#bk-confirm').onclick = async () => {
-    const chosen = $('#bk-dur') ? Number($('#bk-dur').value) : dur;
+    const chosen = $('#bk-dur') ? Number($('#bk-dur').value) : allowed[0];
     try {
       await api('/api/bookings', { method: 'POST', body: { date: state.date, start_time: start, duration_min: chosen } });
       closeModal(); toast('Termin gebucht ✓', 'ok'); syncStudent();
