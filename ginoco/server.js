@@ -14,11 +14,45 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const PUBLIC = join(__dirname, 'public');
 const PORT = Number(process.env.PORT || 3000);
 const SESSION_DAYS = 30;
-const APP_VERSION = "2.1.3";
+const APP_VERSION = "2.2.0";
 // Einstellungen, die Schueler/Oeffentlichkeit sehen duerfen (Rest bleibt beim Fahrlehrer)
 const PUBLIC_SETTINGS = ['instructor_name', 'instructor_phone', 'policy_text',
   'cancel_hours', 'lock_hours', 'booking_horizon_days', 'booking_horizon_days_rank2',
   'live_lead_min', 'lesson_min', 'break_min', 'start_time', 'last_start', 'max_per_week', 'release_time'];
+
+// ---------- Passwort-Richtlinie (stark, mit Sonderzeichen) ----------
+// Gibt null zurueck, wenn ok, sonst die fehlende Anforderung.
+function passwordProblem(pw) {
+  pw = String(pw || '');
+  if (pw.length < 8) return 'mindestens 8 Zeichen';
+  if (!/[A-Za-zÄÖÜäöüß]/.test(pw)) return 'mindestens einen Buchstaben';
+  if (!/[0-9]/.test(pw)) return 'mindestens eine Zahl';
+  if (!/[^A-Za-z0-9ÄÖÜäöüß]/.test(pw)) return 'mindestens ein Sonderzeichen (z. B. ! ? # @ % + *)';
+  return null;
+}
+
+// ---------- Einfacher Login-Ratenbegrenzer (im Speicher, gegen Brute-Force) ----------
+const loginAttempts = new Map(); // ip -> { count, until }
+const LOGIN_MAX = 8;             // erlaubte Fehlversuche
+const LOGIN_WINDOW_MS = 15 * 60 * 1000;
+function clientIp(req) {
+  return (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.socket.remoteAddress || 'unknown';
+}
+function loginBlocked(req) {
+  const e = loginAttempts.get(clientIp(req));
+  return e && e.until > Date.now() && e.count >= LOGIN_MAX;
+}
+function noteLoginFail(req) {
+  const ip = clientIp(req);
+  const now = Date.now();
+  const e = loginAttempts.get(ip);
+  if (!e || e.until < now) loginAttempts.set(ip, { count: 1, until: now + LOGIN_WINDOW_MS });
+  else { e.count++; e.until = now + LOGIN_WINDOW_MS; }
+}
+function noteLoginOk(req) { loginAttempts.delete(clientIp(req)); }
+function isHttps(req) {
+  return req.headers['x-forwarded-proto'] === 'https' || !!req.socket.encrypted || process.env.FSP_HTTPS === '1';
+}
 
 // ---------- kleine Helfer ----------
 const json = (res, code, data) => {
@@ -53,13 +87,13 @@ function parseCookies(req) {
 
 function newToken() { return randomBytes(24).toString('hex'); }
 
-function createSession(res, kind, studentId = null) {
+function createSession(res, kind, studentId = null, secure = false) {
   const token = newToken();
   const expires = Date.now() + SESSION_DAYS * 864e5;
   db.prepare('INSERT INTO sessions(token,kind,student_id,expires) VALUES(?,?,?,?)')
     .run(token, kind, studentId, expires);
   res.setHeader('Set-Cookie',
-    `fsp=${token}; HttpOnly; Path=/; Max-Age=${SESSION_DAYS * 86400}; SameSite=Lax`);
+    `fsp=${token}; HttpOnly; Path=/; Max-Age=${SESSION_DAYS * 86400}; SameSite=Lax${secure ? '; Secure' : ''}`);
   return token;
 }
 
@@ -208,16 +242,19 @@ async function handleApi(req, res, url) {
   }
 
   if (p === '/api/auth/instructor' && method === 'POST') {
+    if (loginBlocked(req)) return bad(res, 'Zu viele Fehlversuche. Bitte in ein paar Minuten erneut versuchen.', 429);
     const { pin } = await readBody(req);
-    if (!verifyPassword(pin || '', getSettingRaw('instructor_pin'))) return bad(res, 'Falsche PIN', 401);
-    const token = createSession(res, 'instructor');
+    if (!verifyPassword(pin || '', getSettingRaw('instructor_pin'))) { noteLoginFail(req); return bad(res, 'Falsche PIN', 401); }
+    noteLoginOk(req);
+    const token = createSession(res, 'instructor', null, isHttps(req));
     return ok(res, { role: 'instructor', name: getSettingRaw('instructor_name'), token });
   }
 
   if (p === '/api/auth/register' && method === 'POST') {
     const { code, name, email, phone, password, birth_year } = await readBody(req);
     if (!code || !name || !password) return bad(res, 'Bitte Name, Code und Passwort ausfuellen');
-    if (String(password).length < 6) return bad(res, 'Passwort muss mind. 6 Zeichen haben');
+    const prob = passwordProblem(password);
+    if (prob) return bad(res, 'Passwort braucht ' + prob + '.');
     const by = Number(birth_year);
     if (!by || by < 1930 || by > 2015) return bad(res, 'Bitte gueltigen Jahrgang angeben');
     const c = db.prepare('SELECT * FROM codes WHERE code = ?').get(String(code).trim().toUpperCase());
@@ -232,18 +269,20 @@ async function handleApi(req, res, url) {
     const sid = Number(info.lastInsertRowid);
     db.prepare('UPDATE codes SET used = 1, student_id = ? WHERE code = ?').run(sid, c.code);
     logEvent('info', { actor: 'student', studentId: sid, detail: `Konto erstellt (Login: ${username})` });
-    const token = createSession(res, 'student', sid);
+    const token = createSession(res, 'student', sid, isHttps(req));
     return ok(res, { role: 'student', id: sid, name, username, token });
   }
 
   if (p === '/api/auth/login' && method === 'POST') {
+    if (loginBlocked(req)) return bad(res, 'Zu viele Fehlversuche. Bitte in ein paar Minuten erneut versuchen.', 429);
     const b = await readBody(req);
     const handle = String(b.login || b.email || '').trim();
     const key = handle.toLowerCase();
     // per Login-Name (Initialen+Jahrgang) ODER E-Mail
     const st = db.prepare('SELECT * FROM students WHERE username = ? COLLATE NOCASE OR email = ?').get(handle, key);
-    if (!st || !verifyPassword(b.password || '', st.pass)) return bad(res, 'Login-Name/E-Mail oder Passwort falsch', 401);
-    const token = createSession(res, 'student', st.id);
+    if (!st || !verifyPassword(b.password || '', st.pass)) { noteLoginFail(req); return bad(res, 'Login-Name/E-Mail oder Passwort falsch', 401); }
+    noteLoginOk(req);
+    const token = createSession(res, 'student', st.id, isHttps(req));
     return ok(res, { role: 'student', id: st.id, name: st.name, token });
   }
 
@@ -743,7 +782,8 @@ async function handleApi(req, res, url) {
     if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
     const b = await readBody(req);
     const pw = String(b.new_password || '').trim();
-    if (pw.length < 6) return bad(res, 'Neues Passwort muss mind. 6 Zeichen haben');
+    const prob = passwordProblem(pw);
+    if (prob) return bad(res, 'Passwort braucht ' + prob + '.');
     const st = db.prepare('SELECT id,name FROM students WHERE id = ?').get(Number(rpm[1]));
     if (!st) return bad(res, 'Schueler nicht gefunden', 404);
     db.prepare('UPDATE students SET pass = ? WHERE id = ?').run(hashPassword(pw), st.id);
@@ -830,7 +870,8 @@ async function handleApi(req, res, url) {
       setSettingRaw(k, b[k]);
     }
     if (b.new_pin) {
-      if (String(b.new_pin).length < 4) return bad(res, 'PIN muss mind. 4 Zeichen haben');
+      const prob = passwordProblem(b.new_pin);
+      if (prob) return bad(res, 'Fahrlehrer-Passwort braucht ' + prob + '.');
       setSettingRaw('instructor_pin', hashPassword(String(b.new_pin)));
     }
     return ok(res, { settings: getSettings(), misaligned: misalignedDays() });
@@ -1222,8 +1263,17 @@ async function serveStatic(req, res, url) {
 }
 
 // ---------- Server ----------
+function setSecurityHeaders(req, res) {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');          // Schutz gegen Clickjacking
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'geolocation=(self)'); // Standort nur fuer die eigene App
+  if (isHttps(req)) res.setHeader('Strict-Transport-Security', 'max-age=15552000; includeSubDomains');
+}
+
 const server = createServer(async (req, res) => {
   try {
+    setSecurityHeaders(req, res);
     const url = new URL(req.url, `http://${req.headers.host}`);
     if (url.pathname.startsWith('/api/')) return await handleApi(req, res, url);
     return await serveStatic(req, res, url);

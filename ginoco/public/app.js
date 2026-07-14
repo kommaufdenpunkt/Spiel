@@ -241,7 +241,7 @@ function registerForm() {
       <div class="field"><label>E-Mail (optional)</label><input id="r-email" type="email"></div>
       <div class="field"><label>Telefon (optional)</label><input id="r-phone"></div>
     </div>
-    <div class="field"><label>Passwort (mind. 6 Zeichen)</label><input id="r-pw" type="password"></div>
+    <div class="field"><label>Passwort</label><input id="r-pw" type="password"><div class="hint" style="margin:.3rem 0 0">Mind. 8 Zeichen, mit Buchstabe, Zahl und Sonderzeichen (z. B. ! ? # @).</div></div>
     <div class="form-actions"><button id="r-go">Konto erstellen</button></div>`;
 }
 function instrForm() {
@@ -265,6 +265,8 @@ function wireAuth(tab) {
     };
   } else if (tab === 'register') {
     $('#r-go').onclick = async () => {
+      const prob = pwProblem($('#r-pw').value);
+      if (prob) { showErr('Passwort braucht ' + prob + '.'); return; }
       try {
         const r = await api('/api/auth/register', { method: 'POST', body: {
           code: $('#r-code').value, name: $('#r-name').value, email: $('#r-email').value,
@@ -1216,20 +1218,34 @@ async function tabSchueler() {
   } catch (e) { toast(e.message, 'err'); }
 }
 
-// Leicht lesbares Zufallspasswort (ohne verwechselbare Zeichen)
-function randomPassword(len = 8) {
-  const cs = 'abcdefghijkmnpqrstuvwxyz23456789';
-  const buf = new Uint8Array(len);
-  crypto.getRandomValues(buf);
-  let out = '';
-  for (let i = 0; i < len; i++) out += cs[buf[i] % cs.length];
-  return out;
+// Starkes, aber lesbares Zufallspasswort: Buchstaben + Zahl + Sonderzeichen
+function randomPassword() {
+  const lower = 'abcdefghijkmnpqrstuvwxyz';   // ohne l/o
+  const upper = 'ABCDEFGHJKLMNPQRSTUVWXYZ';   // ohne I/O
+  const digit = '23456789';
+  const special = '!?#@%+*';
+  const pick = (set) => { const b = new Uint8Array(1); crypto.getRandomValues(b); return set[b[0] % set.length]; };
+  // je Kategorie mind. eins, dann auffuellen, dann mischen
+  const chars = [pick(lower), pick(upper), pick(digit), pick(special)];
+  const all = lower + upper + digit + special;
+  while (chars.length < 10) chars.push(pick(all));
+  for (let i = chars.length - 1; i > 0; i--) { const b = new Uint8Array(1); crypto.getRandomValues(b); const j = b[0] % (i + 1); [chars[i], chars[j]] = [chars[j], chars[i]]; }
+  return chars.join('');
+}
+// Client-seitige Passwort-Pruefung (Server prueft nochmal)
+function pwProblem(pw) {
+  pw = String(pw || '');
+  if (pw.length < 8) return 'mindestens 8 Zeichen';
+  if (!/[A-Za-zÄÖÜäöüß]/.test(pw)) return 'einen Buchstaben';
+  if (!/[0-9]/.test(pw)) return 'eine Zahl';
+  if (!/[^A-Za-z0-9ÄÖÜäöüß]/.test(pw)) return 'ein Sonderzeichen (z. B. ! ? # @)';
+  return null;
 }
 
 function openResetModal(id, name, username) {
   modal(`<h3>Passwort für ${esc(name)}</h3>
     <p class="hint">Vergib ein neues Passwort und gib es dem Fahrschüler weiter (z.B. per WhatsApp). Der Login-Name bleibt <span class="codechip">${esc(username || '–')}</span>.</p>
-    <div class="field"><label>Neues Passwort (mind. 6 Zeichen)</label>
+    <div class="field"><label>Neues Passwort (mind. 8 Zeichen, mit Zahl & Sonderzeichen)</label>
       <div class="inline"><input id="rs-pw" value="${randomPassword()}" style="flex:1"><button class="sec sm" id="rs-gen" type="button">🎲 Neu</button></div>
     </div>
     <div id="rs-done" class="hidden"></div>
@@ -1240,7 +1256,8 @@ function openResetModal(id, name, username) {
   $('#rs-gen').onclick = () => { $('#rs-pw').value = randomPassword(); };
   $('#rs-save').onclick = async () => {
     const pw = $('#rs-pw').value.trim();
-    if (pw.length < 6) { toast('Mind. 6 Zeichen', 'err'); return; }
+    const prob = pwProblem(pw);
+    if (prob) { toast('Passwort braucht ' + prob, 'err'); return; }
     try {
       await api('/api/students/' + id + '/reset-password', { method: 'POST', body: { new_password: pw } });
       const share = `Hallo ${name}, dein Zugang zu ginoco (Fahrschule):\nLogin-Name: ${username}\nPasswort: ${pw}`;
@@ -1514,7 +1531,7 @@ function tabEinstellungen() {
         <h2 style="font-size:.95rem;margin-top:1.4rem">Zugang</h2>
         <div class="field"><label>Angezeigter Name</label><input id="e-name" value="${esc(s.instructor_name)}"></div>
         <div class="field"><label>Deine Handynummer (Schüler können anrufen/schreiben)</label><input id="e-phone" value="${esc(s.instructor_phone || '')}" placeholder="z.B. 0151 23456789"></div>
-        <div class="field"><label>Neue PIN (leer lassen = unverändert)</label><input id="e-pin" type="password" placeholder="mind. 4 Zeichen"></div>
+        <div class="field"><label>Neues Fahrlehrer-Passwort (leer lassen = unverändert)</label><input id="e-pin" type="password" placeholder="mind. 8 Zeichen, mit Zahl & Sonderzeichen"></div>
 
         <h2 style="font-size:.95rem;margin-top:1.4rem">Live-Standort</h2>
         <div class="row">

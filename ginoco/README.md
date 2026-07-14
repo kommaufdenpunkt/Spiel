@@ -141,6 +141,16 @@ du ein Backup willst.
     Die Karte nutzt OpenStreetMap (braucht Internet), die ETA ist eine Schätzung
     (Luftlinie ÷ Ø-Tempo, einstellbar).
 
+### Sicherheit
+- **Starke Passwörter (mit Sonderzeichen):** Schüler-Passwörter und das
+  Fahrlehrer-Passwort brauchen mind. 8 Zeichen mit Buchstabe, Zahl und
+  Sonderzeichen. Der Passwort-Reset erzeugt auf Wunsch ein starkes Zufallspasswort.
+- **Brute-Force-Schutz:** nach mehreren Fehlversuchen wird der Login kurz gesperrt.
+- **Sichere Cookies:** HttpOnly + SameSite; hinter HTTPS zusätzlich Secure.
+- **Sicherheits-Header:** nosniff, X-Frame-Options (Clickjacking-Schutz),
+  Referrer-Policy, HSTS (bei HTTPS).
+- Passwörter/PIN sind mit scrypt + Salt gehasht; die PIN wird nie ausgeliefert.
+
 ### Passwort vergessen?
 Bewusst **kein E-Mail-Reset** (viele Schüler haben keine E-Mail hinterlegt).
 Stattdessen: Der Schüler meldet sich beim Fahrlehrer (z. B. per WhatsApp), und
