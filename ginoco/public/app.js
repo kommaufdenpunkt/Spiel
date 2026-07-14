@@ -211,16 +211,24 @@ function wireLogout() {
 // ---------- Edge-Menüs (links: Navigation, rechts: Aktionen) ----------
 // Wie die Kantenleisten am Samsung-Edge: kleiner Griff am Bildschirmrand,
 // antippen -> Leiste fährt herein. Große Tap-Flächen, ideal am Handy.
+// Logisch gruppiert: Übersicht → Fahrschüler → Planung → System.
+// Einträge mit '__group' sind nur Überschriften (nicht anklickbar).
 const INSTR_NAV = [
+  ['__group', 'Übersicht'],
   ['heute', '📊 Heute & Ziele'], ['kalender', '📅 Kalender'],
-  ['codes', '🔑 Zugangscodes'], ['schueler', '🧑‍🎓 Fahrschüler'],
-  ['theorie', '📚 Theorie & Ausnahmen'], ['arbeitszeiten', '🕒 Arbeitszeiten'],
+  ['__group', 'Fahrschüler'],
+  ['schueler', '🧑‍🎓 Fahrschüler'], ['codes', '🔑 Zugangscodes'],
+  ['__group', 'Planung'],
+  ['arbeitszeiten', '🕒 Arbeitszeiten'], ['theorie', '📚 Theorie & Ausnahmen'],
+  ['__group', 'System'],
   ['protokoll', '📋 Protokoll'], ['einstellungen', '⚙️ Einstellungen'],
 ];
 function mountEdgeMenus(role) {
   document.querySelectorAll('.edge-root').forEach((n) => n.remove());
   const leftItems = role === 'instructor'
-    ? INSTR_NAV.map(([tab, l]) => `<button data-nav="${tab}">${l}${tab === 'protokoll' ? ' <span id="ev-badge"></span>' : ''}</button>`).join('')
+    ? INSTR_NAV.map(([tab, l]) => tab === '__group'
+        ? `<div class="edge-group">${l}</div>`
+        : `<button data-nav="${tab}">${l}${tab === 'protokoll' ? ' <span id="ev-badge"></span>' : ''}</button>`).join('')
     : [['week-card', '📅 Meine Woche'], ['notif-card', '🔔 Mitteilungen'],
        ['offers-card', '🎁 Angebote'], ['slots', '🚗 Termin buchen']]
         .map(([id, l]) => `<button data-scroll="${id}">${l}</button>`).join('');

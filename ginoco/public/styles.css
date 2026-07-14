@@ -217,6 +217,9 @@ th{color:var(--muted);font-weight:600;font-size:.78rem;text-transform:uppercase;
   text-align:left;padding:.85rem .9rem;border-radius:11px;font-size:.95rem;font-weight:600}
 .edge-panel button:hover{background:#26313f}
 .edge-panel button.active{background:var(--brand);color:#fff;border-color:var(--brand)}
+.edge-panel .edge-group{font-size:.68rem;font-weight:700;letter-spacing:.09em;text-transform:uppercase;
+  color:var(--muted);margin:.9rem .3rem .1rem;opacity:.75}
+.edge-panel .edge-group:first-child{margin-top:.2rem}
 .edge-panel.left{left:0;transform:translateX(-102%);border-radius:0 16px 16px 0}
 .edge-panel.right{right:0;transform:translateX(102%);border-radius:16px 0 0 16px}
 .edge-root.open-left .edge-panel.left{transform:translateX(0)}
