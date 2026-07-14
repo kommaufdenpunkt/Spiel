@@ -690,7 +690,7 @@ function bookSlot(start, dur) {
       <li>Ab <strong>${lockH} Std.</strong> vorher steht der Termin fest – dann keine Absage mehr.</li>
       <li>Im Zeitfenster dazwischen kannst du die Stunde anderen zur Übernahme anbieten.</li>
     </ul>
-    ${state.settings?.policy_text ? `<div class="hint" style="border-top:1px solid var(--line);padding-top:.5rem">${esc(state.settings.policy_text)}</div>` : ''}
+    ${state.settings?.policy_text ? `<div class="hint" style="border-top:1px solid var(--line);padding-top:.5rem;white-space:pre-line">${esc(state.settings.policy_text)}</div>` : ''}
     <div class="actions">
       <button class="sec" onclick="window.__closeModal()">Abbrechen</button>
       <button id="bk-confirm">Ja, verbindlich buchen</button>
@@ -1696,7 +1696,7 @@ function tabEinstellungen() {
           <div class="field"><label>Resturlaub (Tage)</label><input id="e-vacdays" type="number" value="${s.vacation_days_left}" step="1"></div>
           <div class="field"><label>Toleranz Verspätung (Min)</label><input id="e-grace" type="number" value="${s.late_grace_min}" step="5"></div>
         </div>
-        <div class="field"><label>Aufklärungstext (wird beim Buchen gezeigt)</label><input id="e-policy" value="${esc(s.policy_text || '')}"></div>
+        <div class="field"><label>Aufklärungstext (wird beim Buchen gezeigt)</label><textarea id="e-policy" rows="4" style="resize:vertical">${esc(s.policy_text || '')}</textarea></div>
         <div class="row">
           <div class="field"><label>Kostenlos stornieren bis (Std. vorher)</label><input id="e-cancel" type="number" value="${s.cancel_hours}" min="0"></div>
           <div class="field"><label>Sperrfrist – fest ab (Std. vorher)</label><input id="e-lock" type="number" value="${s.lock_hours}" min="0"></div>

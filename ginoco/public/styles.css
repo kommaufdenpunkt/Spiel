@@ -28,9 +28,10 @@ button.sec{background:#26313f;color:var(--ink)}
 button.sec:hover{background:#2f3c4d}
 button.danger{background:var(--bad)}button.danger:hover{background:#c94a49}
 button.sm{padding:.35rem .7rem;font-size:.82rem}
-input,select{font-family:inherit;font-size:.95rem;padding:.55rem .7rem;border:1px solid var(--line);
+input,select,textarea{font-family:inherit;font-size:.95rem;padding:.55rem .7rem;border:1px solid var(--line);
   border-radius:9px;background:#0f151d;color:var(--ink);width:100%}
-input:focus,select:focus{outline:2px solid rgba(77,141,255,.4);border-color:var(--brand)}
+textarea{line-height:1.4}
+input:focus,select:focus,textarea:focus{outline:2px solid rgba(77,141,255,.4);border-color:var(--brand)}
 input[type=date]{color-scheme:dark}
 label{font-size:.82rem;font-weight:600;color:var(--muted);display:block;margin:0 0 .3rem}
 a{color:var(--brand)}
