@@ -462,10 +462,13 @@ async function refreshStudentLive() {
   const phone = state.settings?.instructor_phone;
   const contact = phone ? `<div class="inline" style="margin-top:.6rem">${contactButtons(phone, 'Hallo, ich warte am Treffpunkt auf dich.')}</div>` : '';
   if (!d.active) {
+    const note = d.busy
+      ? 'Dein Fahrlehrer ist gerade noch in einer Fahrstunde. Sein Standort wird geteilt, sobald er unterwegs zu dir ist.'
+      : `Sobald dein Fahrlehrer seinen Standort teilt (ca. ${d.lead} Min vorher), kannst du hier live sehen, wo er ist und wann er da ist.`;
     card.innerHTML = `<h2>📍 Treffpunkt</h2>
       <p>Deine Fahrstunde beginnt in <strong>${d.booking.minutesToStart} Min</strong> (${d.booking.start_time} Uhr).</p>
       ${d.meet?.label ? `<p class="meta">Treffpunkt: <strong>${esc(d.meet.label)}</strong></p>` : ''}
-      <p class="hint">Sobald dein Fahrlehrer seinen Standort teilt (ca. ${d.lead} Min vorher), kannst du hier live sehen, wo er ist und wann er da ist.</p>${contact}`;
+      <p class="hint">${note}</p>${contact}`;
   } else {
     const loc = d.location;
     const dd = 0.008, bbox = [loc.lng - dd, loc.lat - dd, loc.lng + dd, loc.lat + dd].join(',');

@@ -14,7 +14,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const PUBLIC = join(__dirname, 'public');
 const PORT = Number(process.env.PORT || 3000);
 const SESSION_DAYS = 30;
-const APP_VERSION = "2.1.2";
+const APP_VERSION = "2.1.3";
 // Einstellungen, die Schueler/Oeffentlichkeit sehen duerfen (Rest bleibt beim Fahrlehrer)
 const PUBLIC_SETTINGS = ['instructor_name', 'instructor_phone', 'policy_text',
   'cancel_hours', 'lock_hours', 'booking_horizon_days', 'booking_horizon_days_rank2',
@@ -632,7 +632,13 @@ async function handleApi(req, res, url) {
     };
     const live = db.prepare('SELECT * FROM live_location WHERE id=1').get();
     const staleMs = live.updated_at ? Date.now() - new Date(live.updated_at).getTime() : Infinity;
-    const active = !!live.active && staleMs < 3 * 60 * 1000; // aelter als 3 Min => nicht mehr live
+    // Datenschutz: laeuft gerade eine ANDERE Fahrstunde, wird der Standort noch nicht
+    // geteilt (sonst saehe der naechste Schueler den Aufenthaltsort der vorigen Stunde).
+    const nowM = toMin(nowHHMM());
+    const otherInProgress = db.prepare(
+      "SELECT start_time,duration_min,id FROM bookings WHERE date=? AND status IN ('booked','done','offered')").all(bk.date)
+      .some((o) => o.id !== bk.id && toMin(o.start_time) <= nowM && nowM < toMin(o.start_time) + o.duration_min);
+    const active = !!live.active && staleMs < 3 * 60 * 1000 && !otherInProgress;
     let distanceKm = null, etaMin = null;
     if (active && meet.lat != null && meet.lng != null) {
       distanceKm = haversineKm(live.lat, live.lng, meet.lat, meet.lng);
@@ -640,7 +646,7 @@ async function handleApi(req, res, url) {
       etaMin = Math.max(1, Math.ceil((distanceKm / speed) * 60));
     }
     return ok(res, {
-      window: true, active,
+      window: true, active, busy: otherInProgress,
       booking: { date: bk.date, start_time: bk.start_time, minutesToStart: Math.round(upcoming.h * 60) },
       location: active ? { lat: live.lat, lng: live.lng, updated_at: live.updated_at } : null,
       meet, distanceKm, etaMin, lead,
@@ -1064,6 +1070,11 @@ function createBooking(res, sess, body) {
     const allowed = (stu?.allowed_durations || '80').split(',').map(Number);
     if (!allowed.includes(duration))
       return bad(res, `Fuer dich sind nur ${allowed.join('/')} Minuten freigegeben.`);
+
+    // Nicht ueber das regulaere Arbeitsende hinaus (z.B. 120 Min am letzten Slot)
+    const lastSlotEnd = toMin((ov && ov.last_start) || getSettingRaw('last_start')) + s.lesson_min;
+    if (toMin(start) + duration > lastSlotEnd)
+      return bad(res, `Diese Länge passt an diesem Slot nicht mehr in den Tag (Ende spätestens ${toHHMM(lastSlotEnd)} Uhr). Wähle einen früheren Slot.`);
   }
 
   const newStart = toMin(start);
@@ -1164,18 +1175,23 @@ function sendDueReminders() {
   const rows = db.prepare(
     "SELECT * FROM bookings WHERE status='booked' AND student_id IS NOT NULL AND date >= ?").all(todayStr());
   let sent = 0;
+  // Stufen von "weit weg" nach "nah"; pro Buchung wird nur die naheste faellige
+  // gesendet, aeltere faellige Stufen werden nur als erledigt markiert (kein Spam).
+  const stages = [
+    { flag: 'reminded_1d', h: 24, label: '1 Tag vorher' },
+    { flag: 'reminded_3h', h: 3, label: '3 Stunden vorher' },
+    { flag: 'reminded_30m', h: 0.5, label: '30 Minuten vorher' },
+  ];
   for (const b of rows) {
     const h = hoursUntil(b.date, b.start_time);
     if (h <= 0) continue;
-    const fire = (flag, label) => {
-      db.prepare(`UPDATE bookings SET ${flag} = 1 WHERE id = ?`).run(b.id);
-      notify(b.student_id, 'reminder',
-        `Erinnerung (${label}): Fahrstunde am ${wdShort(b.date)} ${dmy(b.date)} um ${b.start_time} Uhr.`, b.date, b.id);
-      sent++;
-    };
-    if (!b.reminded_1d && h <= 24) fire('reminded_1d', '1 Tag vorher');
-    if (!b.reminded_3h && h <= 3) fire('reminded_3h', '3 Stunden vorher');
-    if (!b.reminded_30m && h <= 0.5) fire('reminded_30m', '30 Minuten vorher');
+    const due = stages.filter((s) => !b[s.flag] && h <= s.h);
+    if (!due.length) continue;
+    const toSend = due[due.length - 1]; // die naheste (kleinste) Stufe
+    for (const s of due) db.prepare(`UPDATE bookings SET ${s.flag} = 1 WHERE id = ?`).run(b.id);
+    notify(b.student_id, 'reminder',
+      `Erinnerung (${toSend.label}): Fahrstunde am ${wdShort(b.date)} ${dmy(b.date)} um ${b.start_time} Uhr.`, b.date, b.id);
+    sent++;
   }
   return sent;
 }
