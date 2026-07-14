@@ -142,28 +142,31 @@ function instrForm() {
 }
 
 function wireAuth(tab) {
-  const done = (u) => { state.user = u; api('/api/settings').then((s) => { state.settings = s.settings; render(); }); };
+  const done = async () => {
+    const [me, s] = await Promise.all([api('/api/auth/me'), api('/api/settings')]);
+    state.user = me.user; state.settings = s.settings; render();
+  };
   if (tab === 'login') {
     $('#l-go').onclick = async () => {
       try {
-        const r = await api('/api/auth/login', { method: 'POST', body: { email: $('#l-email').value, password: $('#l-pw').value } });
-        done({ role: 'student', name: r.name, id: r.id });
+        await api('/api/auth/login', { method: 'POST', body: { email: $('#l-email').value, password: $('#l-pw').value } });
+        done();
       } catch (e) { showErr(e.message); }
     };
   } else if (tab === 'register') {
     $('#r-go').onclick = async () => {
       try {
-        const r = await api('/api/auth/register', { method: 'POST', body: {
+        await api('/api/auth/register', { method: 'POST', body: {
           code: $('#r-code').value, name: $('#r-name').value, email: $('#r-email').value,
           phone: $('#r-phone').value, password: $('#r-pw').value } });
-        done({ role: 'student', name: r.name, id: r.id });
+        done();
       } catch (e) { showErr(e.message); }
     };
   } else {
     $('#i-go').onclick = async () => {
       try {
-        const r = await api('/api/auth/instructor', { method: 'POST', body: { pin: $('#i-pin').value } });
-        done({ role: 'instructor', name: r.name });
+        await api('/api/auth/instructor', { method: 'POST', body: { pin: $('#i-pin').value } });
+        done();
       } catch (e) { showErr(e.message); }
     };
   }
@@ -335,11 +338,16 @@ function renderSlots(slots, mine) {
 function bookSlot(start, dur) {
   const cancelH = state.settings?.cancel_hours || 48;
   const lockH = state.settings?.lock_hours || 36;
+  const allowed = String(state.user?.allowed_durations || '80').split(',').map(Number).sort((a, b) => a - b);
+  const durSelect = allowed.length > 1
+    ? `<div class="field"><label>Dauer wählen</label><select id="bk-dur">${allowed.map((d) => `<option value="${d}" ${d === 80 ? 'selected' : ''}>${d} Minuten</option>`).join('')}</select></div>`
+    : '';
   modal(`<h3>Termin verbindlich buchen?</h3>
     <div class="warnbox">
       Bist du wirklich sicher, dass du diesen Termin nehmen willst?
     </div>
-    <p style="margin:.6rem 0 .2rem"><strong>${WD_LONG[isoDow(state.date) - 1]}, ${fmtShort(state.date)} um ${start} Uhr</strong> · ${dur} Min</p>
+    <p style="margin:.6rem 0 .2rem"><strong>${WD_LONG[isoDow(state.date) - 1]}, ${fmtShort(state.date)} um ${start} Uhr</strong>${allowed.length > 1 ? '' : ` · ${dur} Min`}</p>
+    ${durSelect}
     <ul class="hint" style="margin:.4rem 0 0;padding-left:1.1rem">
       <li>Kostenfrei stornieren nur bis <strong>${cancelH} Std.</strong> vorher.</li>
       <li>Ab <strong>${lockH} Std.</strong> vorher steht der Termin fest – dann keine Absage mehr.</li>
@@ -350,8 +358,9 @@ function bookSlot(start, dur) {
       <button id="bk-confirm">Ja, verbindlich buchen</button>
     </div>`);
   $('#bk-confirm').onclick = async () => {
+    const chosen = $('#bk-dur') ? Number($('#bk-dur').value) : dur;
     try {
-      await api('/api/bookings', { method: 'POST', body: { date: state.date, start_time: start, duration_min: dur } });
+      await api('/api/bookings', { method: 'POST', body: { date: state.date, start_time: start, duration_min: chosen } });
       closeModal(); toast('Termin gebucht ✓', 'ok'); syncStudent();
     } catch (e) { toast(e.message, 'err'); }
   };
@@ -371,6 +380,7 @@ function renderInstructor() {
       <button data-tab="codes">Zugangscodes</button>
       <button data-tab="schueler">Fahrschüler</button>
       <button data-tab="theorie">Theorie & Ausnahmen</button>
+      <button data-tab="arbeitszeiten">Arbeitszeiten</button>
       <button data-tab="einstellungen">Einstellungen</button>
     </div>
     <div id="itab"></div>
@@ -389,6 +399,7 @@ function drawInstrTab() {
   if (t === 'codes') return tabCodes();
   if (t === 'schueler') return tabSchueler();
   if (t === 'theorie') return tabTheorie();
+  if (t === 'arbeitszeiten') return tabArbeitszeiten();
   if (t === 'einstellungen') return tabEinstellungen();
 }
 
@@ -679,16 +690,100 @@ async function loadCodes() {
 // ---- Tab: Schüler ----
 async function tabSchueler() {
   const box = $('#itab');
-  box.innerHTML = `<div class="card"><h2>Fahrschüler</h2><div id="s-list"></div></div>`;
+  box.innerHTML = `<div class="card"><h2>Fahrschüler <span class="sub">erlaubte Stundenlängen zuweisen</span></h2>
+    <p class="hint">Standard sind 80-Minuten-Stunden. Wenn ein Schüler ausnahmsweise auch 40 oder 120 Minuten fahren darf, hier freischalten – nur dann kann er das im Buchen-Dialog wählen.</p>
+    <div id="s-list"></div></div>`;
   try {
     const { students } = await api('/api/students');
-    $('#s-list').innerHTML = students.length ? `<table>
-      <tr><th>Name</th><th>E-Mail</th><th>Telefon</th><th>Gefahren</th></tr>
-      ${students.map((s) => `<tr>
-        <td><strong>${esc(s.name)}</strong></td><td>${esc(s.email)}</td>
-        <td>${esc(s.phone || '–')}</td><td>${s.done_count} Std.</td>
-      </tr>`).join('')}
-    </table>` : '<p class="muted">Noch keine Fahrschüler registriert. Erzeuge im Tab „Zugangscodes“ einen Code.</p>';
+    if (!students.length) { $('#s-list').innerHTML = '<p class="muted">Noch keine Fahrschüler registriert. Erzeuge im Tab „Zugangscodes“ einen Code.</p>'; return; }
+    $('#s-list').innerHTML = `<table>
+      <tr><th>Name</th><th>Kontakt</th><th>Gefahren</th><th>Erlaubte Längen (Min)</th></tr>
+      ${students.map((s) => {
+        const durs = String(s.allowed_durations || '80').split(',').map(Number);
+        const boxes = [40, 80, 120].map((d) => `<label style="margin:0;font-weight:600"><input type="checkbox" data-sdur="${s.id}" value="${d}" ${durs.includes(d) ? 'checked' : ''} style="width:auto"> ${d}</label>`).join(' ');
+        return `<tr>
+          <td><strong>${esc(s.name)}</strong></td>
+          <td>${esc(s.email)}<br><span class="muted">${esc(s.phone || '')}</span></td>
+          <td>${s.done_count} Std.</td>
+          <td><div class="inline">${boxes} <button class="sec sm" data-savedur="${s.id}">Speichern</button></div></td>
+        </tr>`;
+      }).join('')}
+    </table>`;
+    $('#s-list').querySelectorAll('[data-savedur]').forEach((btn) => btn.onclick = async () => {
+      const id = btn.dataset.savedur;
+      const vals = [...$('#s-list').querySelectorAll(`[data-sdur="${id}"]`)].filter((c) => c.checked).map((c) => Number(c.value));
+      if (!vals.length) { toast('Mindestens eine Länge wählen', 'err'); return; }
+      try { await api('/api/students/' + id, { method: 'PATCH', body: { allowed_durations: vals } }); toast('Gespeichert ✓', 'ok'); }
+      catch (e) { toast(e.message, 'err'); }
+    });
+  } catch (e) { toast(e.message, 'err'); }
+}
+
+// ---- Tab: Arbeitszeiten / Dienstplan (kurze Tage, freie Tage) ----
+async function tabArbeitszeiten() {
+  const s = state.settings;
+  const box = $('#itab');
+  box.innerHTML = `<div class="card">
+    <h2>Arbeitszeiten & Dienstplan</h2>
+    <p class="hint">Trage hier ein, wenn ein Tag <strong>kürzer</strong> sein soll (z.B. wenn deine Frau frei hat – früher Feierabend) oder du ganz <strong>frei</strong> hast. Die buchbaren Slots passen sich für Schüler automatisch an.</p>
+    <div class="row">
+      <div class="field"><label>Datum</label><input type="date" id="w-date" value="${state.date}"></div>
+      <div class="field" style="max-width:210px"><label>Art</label>
+        <select id="w-type">
+          <option value="short">Kurzer Tag (früher Feierabend)</option>
+          <option value="free">Ganzer Tag frei</option>
+          <option value="custom">Eigene Zeiten</option>
+        </select></div>
+    </div>
+    <div class="row" id="w-times">
+      <div class="field"><label>Arbeitsbeginn</label><input id="w-start" value="${s.start_time}"></div>
+      <div class="field"><label>Letzter Slot</label><input id="w-last" value="${s.short_day_last_start || '13:35'}"></div>
+    </div>
+    <div class="inline" style="margin:.2rem 0 1rem"><button id="w-add">Eintragen</button>
+      <span class="hint" style="margin:0" id="w-preview"></span></div>
+    <div id="w-list"></div>
+  </div>`;
+  const typeSel = $('#w-type');
+  const times = $('#w-times');
+  const syncType = () => {
+    const t = typeSel.value;
+    times.style.display = t === 'free' ? 'none' : 'flex';
+    if (t === 'short') { $('#w-start').value = s.start_time; $('#w-last').value = s.short_day_last_start || '13:35'; }
+    updateWPreview();
+  };
+  const updateWPreview = () => {
+    if (typeSel.value === 'free') { $('#w-preview').textContent = 'Ganzer Tag frei – keine Slots.'; return; }
+    const step = s.lesson_min + s.break_min;
+    const toM = (t) => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
+    const times2 = [];
+    for (let t = toM($('#w-start').value); t <= toM($('#w-last').value); t += step) times2.push(`${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`);
+    $('#w-preview').textContent = `${times2.length} Slots: ${times2.join(', ') || '–'}`;
+  };
+  typeSel.onchange = syncType;
+  ['w-start', 'w-last'].forEach((id) => $('#' + id).oninput = updateWPreview);
+  syncType();
+  $('#w-add').onclick = async () => {
+    const t = typeSel.value;
+    const body = { date: $('#w-date').value };
+    if (t === 'free') body.closed = true;
+    else { body.start_time = $('#w-start').value; body.last_start = $('#w-last').value; }
+    try { await api('/api/day-overrides', { method: 'POST', body }); toast('Eingetragen ✓', 'ok'); loadOverrides(); }
+    catch (e) { toast(e.message, 'err'); }
+  };
+  loadOverrides();
+}
+async function loadOverrides() {
+  try {
+    const { overrides } = await api('/api/day-overrides');
+    $('#w-list').innerHTML = overrides.length ? `<h2 style="font-size:.95rem">Eingetragene Tage</h2><div class="blist">${
+      overrides.map((o) => `<div class="bitem warm">
+        <div><div class="when">${WD[isoDow(o.date) - 1]} ${fmtShort(o.date)}</div>
+        <div class="meta">${o.closed ? '🌴 ganzer Tag frei' : `✂️ kurzer Tag · ${o.start_time || state.settings.start_time}–letzter Slot ${o.last_start || '?'}`}</div></div>
+        <button class="ghost sm" data-delov="${o.date}">Löschen</button></div>`).join('')
+    }</div>` : '<p class="muted">Keine besonderen Tage eingetragen.</p>';
+    $('#w-list').querySelectorAll('[data-delov]').forEach((b) => b.onclick = async () => {
+      try { await api('/api/day-overrides/' + b.dataset.delov, { method: 'DELETE' }); loadOverrides(); } catch (e) { toast(e.message, 'err'); }
+    });
   } catch (e) { toast(e.message, 'err'); }
 }
 
@@ -765,6 +860,10 @@ function tabEinstellungen() {
           <div class="field"><label>Vorausbuchung (Tage)</label><input id="e-horizon" type="number" value="${s.booking_horizon_days}" min="1"></div>
         </div>
         <div class="row">
+          <div class="field"><label>Tägliche Freigabe-Uhrzeit</label><input id="e-release" value="${s.release_time || '10:00'}"></div>
+          <div class="field"><label>Letzter Slot an kurzen Tagen</label><input id="e-shortlast" value="${s.short_day_last_start || '13:35'}"></div>
+        </div>
+        <div class="row">
           <div class="field"><label>Kostenlos stornieren bis (Std. vorher)</label><input id="e-cancel" type="number" value="${s.cancel_hours}" min="0"></div>
           <div class="field"><label>Sperrfrist – fest ab (Std. vorher)</label><input id="e-lock" type="number" value="${s.lock_hours}" min="0"></div>
         </div>
@@ -805,6 +904,7 @@ function tabEinstellungen() {
         max_per_week: Number($('#e-max').value), instructor_name: $('#e-name').value,
         booking_horizon_days: Number($('#e-horizon').value), cancel_hours: Number($('#e-cancel').value),
         lock_hours: Number($('#e-lock').value),
+        release_time: $('#e-release').value, short_day_last_start: $('#e-shortlast').value,
         new_pin: $('#e-pin').value || undefined } });
       state.settings = r.settings; state.user.name = r.settings.instructor_name;
       toast('Einstellungen gespeichert ✓', 'ok'); $('#e-msg').textContent = 'Gespeichert.';

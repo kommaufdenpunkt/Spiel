@@ -25,6 +25,17 @@ db.exec(`
     email      TEXT NOT NULL UNIQUE,
     phone      TEXT,
     pass       TEXT NOT NULL,
+    allowed_durations TEXT NOT NULL DEFAULT '80',  -- erlaubte Slot-Laengen (Komma), z.B. '40,80,120'
+    created_at TEXT NOT NULL
+  );
+
+  -- Tages-Ausnahmen: kurzer Tag (frueherer Feierabend) oder ganz frei
+  CREATE TABLE IF NOT EXISTS day_overrides (
+    date       TEXT PRIMARY KEY,     -- YYYY-MM-DD
+    start_time TEXT,                 -- abweichender Arbeitsbeginn (NULL = Standard)
+    last_start TEXT,                 -- abweichender letzter Slot (NULL = Standard)
+    closed     INTEGER NOT NULL DEFAULT 0,  -- 1 = ganzer Tag frei
+    note       TEXT,
     created_at TEXT NOT NULL
   );
 
@@ -72,6 +83,12 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_blocks_date   ON blocks(date);
 `);
 
+// ---- Migrationen fuer bestehende Datenbanken ----
+const cols = db.prepare('PRAGMA table_info(students)').all().map((c) => c.name);
+if (!cols.includes('allowed_durations')) {
+  db.exec("ALTER TABLE students ADD COLUMN allowed_durations TEXT NOT NULL DEFAULT '80'");
+}
+
 // ---- Voreinstellungen (einmalig setzen) ----
 const DEFAULTS = {
   instructor_name: 'Fahrlehrer',
@@ -87,6 +104,8 @@ const DEFAULTS = {
   booking_horizon_days: '14',// so viele Tage im Voraus duerfen Schueler buchen
   cancel_hours: '48',        // bis so viele Std. vorher kostenlose Stornierung
   lock_hours: '36',          // ab so viel Std. vorher ist der Termin gesperrt (kein Absagen/Abgeben)
+  release_time: '10:00',     // Uhrzeit, zu der taeglich der neue Tag am Horizont oeffnet
+  short_day_last_start: '13:35', // letzter Slot an "kurzen Tagen" (frueher Feierabend)
 };
 
 const getSetting = db.prepare('SELECT value FROM settings WHERE key = ?');

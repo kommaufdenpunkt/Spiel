@@ -103,17 +103,37 @@ function daysAhead(date) {
   return Math.round((new Date(date + 'T00:00:00').getTime() - new Date(todayStr() + 'T00:00:00').getTime()) / 864e5);
 }
 
-// Slot-Raster fuer ein Datum erzeugen (nur Zeiten, ohne Buchungsstatus)
-function slotGrid() {
+function getOverride(date) {
+  return db.prepare('SELECT * FROM day_overrides WHERE date = ?').get(date) || null;
+}
+
+// Slot-Raster fuer ein Datum erzeugen (beruecksichtigt Tages-Ausnahmen / kurze Tage)
+function slotGrid(date) {
   const s = getSettings();
   const step = s.lesson_min + s.break_min;
-  const start = toMin(getSettingRaw('start_time'));
-  const last = toMin(getSettingRaw('last_start'));
+  const ov = date ? getOverride(date) : null;
+  if (ov && ov.closed) return [];
+  const start = toMin((ov && ov.start_time) || getSettingRaw('start_time'));
+  const last = toMin((ov && ov.last_start) || getSettingRaw('last_start'));
   const slots = [];
   for (let t = start; t <= last; t += step) {
     slots.push({ start: toHHMM(t), duration: s.lesson_min, end: toHHMM(t + s.lesson_min) });
   }
   return slots;
+}
+
+// Ist ein Datum fuer Schueler buchbar? Beruecksichtigt Horizont + taegliche Freigabe-Uhrzeit.
+function dateOpenForStudents(date) {
+  const horizon = Number(getSettingRaw('booking_horizon_days'));
+  const ahead = daysAhead(date);
+  if (ahead < 0) return false;
+  if (ahead > horizon) return false;
+  // Der aeusserste Tag (genau am Horizont) oeffnet erst ab der Freigabe-Uhrzeit
+  if (ahead === horizon) {
+    const release = getSettingRaw('release_time') || '10:00';
+    if (nowHHMM() < release) return false;
+  }
+  return true;
 }
 
 // Ueberlappen zwei Zeitintervalle [a1,a2) und [b1,b2)?
@@ -133,7 +153,7 @@ async function handleApi(req, res, url) {
     if (sess.kind === 'instructor') {
       return ok(res, { user: { role: 'instructor', name: getSettingRaw('instructor_name') } });
     }
-    const st = db.prepare('SELECT id,name,email,phone FROM students WHERE id = ?').get(sess.student_id);
+    const st = db.prepare('SELECT id,name,email,phone,allowed_durations FROM students WHERE id = ?').get(sess.student_id);
     if (!st) return ok(res, { user: null });
     return ok(res, { user: { role: 'student', ...st } });
   }
@@ -343,7 +363,8 @@ async function handleApi(req, res, url) {
        ORDER BY b.date, b.start_time`
     ).all(from, to);
     const blocks = db.prepare('SELECT * FROM blocks WHERE date BETWEEN ? AND ? ORDER BY date, start_time').all(from, to);
-    return ok(res, { from, to, bookings: rows, blocks });
+    const overrides = db.prepare('SELECT * FROM day_overrides WHERE date BETWEEN ? AND ?').all(from, to);
+    return ok(res, { from, to, bookings: rows, blocks, overrides });
   }
 
   if (p === '/api/instructor/stats' && method === 'GET') {
@@ -381,11 +402,50 @@ async function handleApi(req, res, url) {
   if (p === '/api/students' && method === 'GET') {
     if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
     const rows = db.prepare(
-      `SELECT s.id,s.name,s.email,s.phone,s.created_at,
+      `SELECT s.id,s.name,s.email,s.phone,s.allowed_durations,s.created_at,
         (SELECT COUNT(*) FROM bookings b WHERE b.student_id=s.id AND b.status='done') AS done_count
        FROM students s ORDER BY s.name`
     ).all();
     return ok(res, { students: rows });
+  }
+  // Erlaubte Slot-Laengen eines Schuelers setzen (z.B. 40-Min-Ausnahme)
+  const stm = p.match(/^\/api\/students\/(\d+)$/);
+  if (stm && method === 'PATCH') {
+    if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
+    const b = await readBody(req);
+    const durs = Array.isArray(b.allowed_durations) ? b.allowed_durations : String(b.allowed_durations || '').split(',');
+    const clean = [...new Set(durs.map(Number).filter((n) => n > 0))].sort((a, z) => a - z);
+    if (!clean.length) return bad(res, 'Mindestens eine Dauer noetig');
+    db.prepare('UPDATE students SET allowed_durations = ? WHERE id = ?').run(clean.join(','), Number(stm[1]));
+    return ok(res, { allowed_durations: clean.join(',') });
+  }
+
+  // -- Tages-Ausnahmen (kurzer Tag / frei) --
+  if (p === '/api/day-overrides' && method === 'GET') {
+    if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
+    const rows = db.prepare('SELECT * FROM day_overrides WHERE date >= ? ORDER BY date').all(todayStr());
+    return ok(res, { overrides: rows });
+  }
+  if (p === '/api/day-overrides' && method === 'POST') {
+    if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
+    const b = await readBody(req);
+    if (!b.date) return bad(res, 'Datum noetig');
+    const closed = b.closed ? 1 : 0;
+    let lastStart = b.last_start || null;
+    if (b.short && !lastStart) lastStart = getSettingRaw('short_day_last_start'); // Schnell-Aktion "kurzer Tag"
+    if (!closed && lastStart && b.start_time && toMin(lastStart) < toMin(b.start_time))
+      return bad(res, 'Letzter Slot darf nicht vor dem Arbeitsbeginn liegen');
+    db.prepare(`INSERT INTO day_overrides(date,start_time,last_start,closed,note,created_at)
+      VALUES(?,?,?,?,?,?)
+      ON CONFLICT(date) DO UPDATE SET start_time=excluded.start_time,last_start=excluded.last_start,closed=excluded.closed,note=excluded.note`)
+      .run(b.date, closed ? null : (b.start_time || null), closed ? null : lastStart, closed, b.note ? String(b.note).trim() : null, new Date().toISOString());
+    return ok(res);
+  }
+  const dom = p.match(/^\/api\/day-overrides\/(\d{4}-\d{2}-\d{2})$/);
+  if (dom && method === 'DELETE') {
+    if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
+    db.prepare('DELETE FROM day_overrides WHERE date = ?').run(dom[1]);
+    return ok(res);
   }
 
   // -- Bloecke / Ausnahmen (Theorie etc.) --
@@ -412,7 +472,7 @@ async function handleApi(req, res, url) {
     const b = await readBody(req);
     const allowed = ['instructor_name', 'start_time', 'last_start', 'lesson_min', 'break_min',
       'weekly_target_h', 'daily_target_h', 'weekly_lo_h', 'workdays', 'max_per_week',
-      'booking_horizon_days', 'cancel_hours', 'lock_hours'];
+      'booking_horizon_days', 'cancel_hours', 'lock_hours', 'release_time', 'short_day_last_start'];
     for (const k of allowed) {
       if (k in b && b[k] !== '' && b[k] != null) setSettingRaw(k, b[k]);
     }
@@ -442,10 +502,10 @@ function genCode() {
 // Slots eines Tages inkl. Status (frei / gebucht / geblockt)
 function buildDaySlots(date) {
   const workdays = getSettingRaw('workdays').split(',').map(Number);
-  const isWorkday = workdays.includes(isoDow(date));
-  const horizon = Number(getSettingRaw('booking_horizon_days'));
-  const tooFar = daysAhead(date) > horizon;
-  const grid = slotGrid();
+  const ov = getOverride(date);
+  const isWorkday = !(ov && ov.closed) && workdays.includes(isoDow(date));
+  const notOpenYet = !dateOpenForStudents(date);
+  const grid = slotGrid(date);
   const bookings = db.prepare(
     "SELECT * FROM bookings WHERE date = ? AND status != 'cancelled'").all(date);
   const blocks = db.prepare('SELECT * FROM blocks WHERE date = ?').all(date);
@@ -462,14 +522,14 @@ function buildDaySlots(date) {
     else if (blocked) state = 'blocked';
     else if (!isWorkday) state = 'closed';
     else if (past) state = 'past';
-    else if (tooFar) state = 'toofar';
+    else if (notOpenYet) state = 'toofar';
     return {
       start: g.start, end: g.end, duration: g.duration, state,
       blockTitle: blocked ? blocked.title : null,
       bookedByMe: false, // wird clientseitig anhand my/bookings gesetzt
     };
   });
-  return { slots, isWorkday, blocks };
+  return { slots, isWorkday, blocks, override: ov, shortDay: !!(ov && ov.last_start && !ov.closed) };
 }
 
 function weekStartEnd(dateStr) {
@@ -501,23 +561,31 @@ function createBooking(res, sess, body) {
   if (date < todayStr() || (date === todayStr() && toMin(start) <= toMin(nowHHMM())))
     return bad(res, 'Dieser Termin liegt in der Vergangenheit');
 
-  // Arbeitstag?
-  const workdays = getSettingRaw('workdays').split(',').map(Number);
-  if (!isInstructor && !workdays.includes(isoDow(date)))
-    return bad(res, 'An diesem Tag werden keine Fahrstunden angeboten');
+  const ov = getOverride(date);
 
-  // 14-Tage-Fenster (nur Schueler; der Fahrlehrer darf weiter voraus planen)
   if (!isInstructor) {
-    const horizon = Number(getSettingRaw('booking_horizon_days'));
-    if (daysAhead(date) > horizon)
-      return bad(res, `Fahrstunden sind nur bis ${horizon} Tage im Voraus buchbar.`);
-  }
+    // Arbeitstag / Tages-Ausnahme?
+    const workdays = getSettingRaw('workdays').split(',').map(Number);
+    if ((ov && ov.closed) || !workdays.includes(isoDow(date)))
+      return bad(res, 'An diesem Tag werden keine Fahrstunden angeboten');
 
-  // Passt der Start ins Raster? (Fahrlehrer darf frei, Schueler nur Rasterzeiten)
-  if (!isInstructor) {
-    const grid = slotGrid();
+    // 14-Tage-Fenster + taegliche Freigabe (der Fahrlehrer darf weiter voraus planen)
+    if (!dateOpenForStudents(date)) {
+      const horizon = Number(getSettingRaw('booking_horizon_days'));
+      const rel = getSettingRaw('release_time');
+      return bad(res, `Dieser Tag ist noch nicht buchbar (Freigabe bis ${horizon} Tage im Voraus, taeglich ab ${rel} Uhr).`);
+    }
+
+    // Passt der Start ins (tagesabhaengige) Raster?
+    const grid = slotGrid(date);
     if (!grid.some((g) => g.start === start))
       return bad(res, 'Ungueltige Uhrzeit');
+
+    // Erlaubte Dauer fuer diesen Schueler?
+    const stu = db.prepare('SELECT allowed_durations FROM students WHERE id = ?').get(sess.student_id);
+    const allowed = (stu?.allowed_durations || '80').split(',').map(Number);
+    if (!allowed.includes(duration))
+      return bad(res, `Fuer dich sind nur ${allowed.join('/')} Minuten freigegeben.`);
   }
 
   const newStart = toMin(start);

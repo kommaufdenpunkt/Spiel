@@ -41,7 +41,10 @@ du ein Backup willst.
   dazwischen.
 - **Max. 2 Fahrstunden pro Woche** (einstellbar).
 - **Vorausbuchung bis 14 Tage** (einstellbar) – weiter im Voraus plant nur der
-  Fahrlehrer (z. B. Sonderfahrten).
+  Fahrlehrer (z. B. Sonderfahrten). Der jeweils äußerste Tag öffnet **täglich zu
+  einer festen Uhrzeit** (Standard 10:00), so rollt das Fenster automatisch weiter.
+- **Variable Stundenlängen (40 / 80 / 120 Min):** Standard 80 Min; einzelne
+  Schüler kann der Fahrlehrer für kürzere/längere Stunden freischalten.
 - **Verbindliche Buchung** mit Sicherheitsabfrage („Bist du wirklich sicher?").
 - **Stornieren** kostenlos bis **48 Std.** vorher.
 - **Übernahme-Marktplatz:** Wer kurzfristig nicht kann, bietet die Stunde den
@@ -61,6 +64,9 @@ du ein Backup willst.
 - **Zugangscodes** erzeugen und an neue Fahrschüler weitergeben.
 - **Theorie & Ausnahmen:** Zeiten blockieren (z. B. Theorieunterricht 17–20 Uhr,
   Urlaub, Sonderfahrten). Blockzeiten können wahlweise als Arbeitszeit zählen.
+- **Arbeitszeiten / Dienstplan:** einzelne Tage als **kurzen Tag** (früher
+  Feierabend, z. B. wenn die Frau frei hat) oder als **ganzen freien Tag**
+  markieren. Die buchbaren Slots passen sich für die Schüler automatisch an.
 - **Alles einstellbar:** Arbeitsbeginn/-ende, Slot-Dauer, Pause, Arbeitstage
   (Mo–Sa), Wochen-/Tagesziel, Stornofristen, Vorausbuchungsfenster, PIN.
 
@@ -78,8 +84,10 @@ du ein Backup willst.
 | Wochenziel | 25 h | Tacho-Ziel |
 | Max/Woche | 2 | Fahrstunden je Schüler & Woche |
 | Vorausbuchung | 14 Tage | Buchungsfenster der Schüler |
+| Tägliche Freigabe | 10:00 | ab wann der äußerste Tag öffnet |
 | Kostenlos stornieren | 48 h vorher | danach nur noch anbieten |
 | Sperrfrist | 36 h vorher | Termin steht fest |
+| Kurzer Tag – letzter Slot | 13:35 | Feierabend an markierten Tagen |
 
 **Rechnung dahinter:** 4 Slots × 80 Min = 320 Min = **5,3 h/Tag**.
 Bei 6 Arbeitstagen sind das rund **32 h/Woche** – dein Ziel von 25–30 h ist damit
