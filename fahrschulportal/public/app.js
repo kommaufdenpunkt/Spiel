@@ -178,6 +178,7 @@ function wireAuth(tab) {
 // ====================== FAHRSCHÜLER ======================
 async function renderStudent() {
   app.innerHTML = header() + `<main>
+    <div class="card hidden" id="notif-card"></div>
     <div class="card" id="week-card"></div>
     <div class="card hidden" id="offers-card"></div>
     <div class="card">
@@ -207,9 +208,11 @@ async function syncStudent() {
   $('#dlabel').textContent = fmtDay(state.date);
   $('#dpick').value = state.date;
   try {
-    const [mine, day, off] = await Promise.all([
-      api('/api/my/bookings'), api('/api/slots?date=' + state.date), api('/api/offers')]);
+    const [mine, day, off, notif] = await Promise.all([
+      api('/api/my/bookings'), api('/api/slots?date=' + state.date),
+      api('/api/offers'), api('/api/my/notifications')]);
     myBookingsCache = mine.bookings;
+    renderNotifications(notif.notifications, notif.unread);
     renderWeekCard(mine.weekInfo, mine.bookings);
     renderOffers(off.offers, mine.weekInfo);
     renderSlots(day.slots, mine.bookings);
@@ -267,6 +270,21 @@ function studentBookingItem(b) {
     </div>
     <div class="inline">${actions}</div>
   </div>`;
+}
+
+function renderNotifications(notifs, unread) {
+  const card = $('#notif-card');
+  if (!notifs || !notifs.length) { card.classList.add('hidden'); return; }
+  card.classList.remove('hidden');
+  const icon = (k) => k === 'offer' ? '🔄' : k === 'shift' ? '🕐' : 'ℹ️';
+  card.innerHTML = `<h2>🔔 Benachrichtigungen ${unread ? `<span class="badge offer">${unread} neu</span>` : ''}</h2>
+    <div class="blist">${notifs.map((n) => `<div class="bitem ${n.read ? '' : 'warm'}">
+      <div><div class="meta" style="font-size:.9rem;color:var(--ink)">${icon(n.kind)} ${esc(n.message)}</div>
+      <div class="meta">${new Date(n.created_at).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</div></div>
+    </div>`).join('')}</div>
+    ${unread ? '<div style="margin-top:.8rem"><button class="sec sm" id="notif-read">Als gelesen markieren</button></div>' : ''}`;
+  const b = $('#notif-read');
+  if (b) b.onclick = async () => { try { await api('/api/my/notifications/read', { method: 'POST' }); syncStudent(); } catch (e) { toast(e.message, 'err'); } };
 }
 
 function renderOffers(offers, wi) {
@@ -595,7 +613,8 @@ async function tabKalender() {
       <span class="day" id="k-label"></span>
       <button class="sec sm" id="k-next">›</button>
       <input type="date" id="k-date" style="max-width:170px">
-      <button class="sm" id="k-add" style="margin-left:auto">+ Eigener Termin</button>
+      <button class="ghost sm" id="k-gap" style="margin-left:auto">🧩 Lücken schließen</button>
+      <button class="sm" id="k-add">+ Eigener Termin</button>
     </div>
     <div id="k-list"></div>
   </div>`;
@@ -604,6 +623,7 @@ async function tabKalender() {
   $('#k-next').onclick = () => { state.date = addDays(state.date, 1); loadK(); };
   $('#k-date').onchange = (e) => { state.date = e.target.value; loadK(); };
   $('#k-add').onclick = () => openAddBooking();
+  $('#k-gap').onclick = () => openGapModal();
   loadK();
 }
 async function loadK() {
@@ -614,6 +634,35 @@ async function loadK() {
     window.__instrBookings = ov.bookings;
     renderInstrDay($('#k-list'), state.date, ov.bookings, ov.blocks);
   } catch (e) { toast(e.message, 'err'); }
+}
+
+async function openGapModal() {
+  let plan;
+  try { plan = await api('/api/instructor/gap-proposal?date=' + state.date); }
+  catch (e) { toast(e.message, 'err'); return; }
+  const changes = plan.moves.filter((m) => m.from !== m.to);
+  if (!plan.hasGap) {
+    modal(`<h3>Lücken schließen</h3>
+      <p class="hint">Für ${fmtDay(state.date)} gibt es keine Lücke – die Fahrstunden liegen bereits lückenlos hintereinander. 👍</p>
+      <div class="actions"><button class="sec" onclick="window.__closeModal()">Schließen</button></div>`);
+    return;
+  }
+  modal(`<h3>Lücken schließen – Vorschlag</h3>
+    <p class="hint">Damit der Tag lückenlos ist, würden diese Fahrstunden nach vorne rücken. Die betroffenen Fahrschüler werden automatisch benachrichtigt.</p>
+    <div class="blist">${changes.map((m) => `<div class="bitem warm">
+      <div><div class="when">${esc(m.student_name || 'Termin')} <span class="muted" style="font-weight:400">(${m.duration} Min)</span></div>
+      <div class="meta">${m.from} Uhr &nbsp;→&nbsp; <strong style="color:var(--good)">${m.to} Uhr</strong></div></div>
+    </div>`).join('')}</div>
+    <div class="actions">
+      <button class="sec" onclick="window.__closeModal()">Abbrechen</button>
+      <button id="gap-apply">${changes.length} Verschiebung${changes.length > 1 ? 'en' : ''} anwenden</button>
+    </div>`);
+  $('#gap-apply').onclick = async () => {
+    try {
+      const r = await api('/api/instructor/apply-shift', { method: 'POST', body: { date: state.date } });
+      closeModal(); toast(`${r.moved} Termin(e) verschoben ✓`, 'ok'); loadK();
+    } catch (e) { toast(e.message, 'err'); }
+  };
 }
 
 async function openAddBooking() {

@@ -219,6 +219,21 @@ async function handleApi(req, res, url) {
     return ok(res, { bookings: rows, weekInfo: weekInfoForStudent(sess.student_id) });
   }
 
+  // Benachrichtigungen (Portal-Postfach)
+  if (p === '/api/my/notifications' && method === 'GET') {
+    if (!requireStudent()) return bad(res, 'Bitte anmelden', 401);
+    const rows = db.prepare(
+      `SELECT id,kind,message,date,ref_booking_id,read,created_at FROM notifications
+       WHERE student_id = ? ORDER BY read, created_at DESC LIMIT 30`).all(sess.student_id);
+    const unread = db.prepare('SELECT COUNT(*) AS n FROM notifications WHERE student_id = ? AND read = 0').get(sess.student_id).n;
+    return ok(res, { notifications: rows, unread });
+  }
+  if (p === '/api/my/notifications/read' && method === 'POST') {
+    if (!requireStudent()) return bad(res, 'Bitte anmelden', 401);
+    db.prepare('UPDATE notifications SET read = 1 WHERE student_id = ?').run(sess.student_id);
+    return ok(res);
+  }
+
   if (p === '/api/bookings' && method === 'POST') {
     if (!requireStudent() && !requireInstructor()) return bad(res, 'Bitte anmelden', 401);
     const body = await readBody(req);
@@ -304,6 +319,10 @@ async function handleApi(req, res, url) {
     if (hoursUntil(bk.date, bk.start_time) < lockH)
       return bad(res, `Ab ${lockH} Std. vorher steht der Termin fest und kann nicht mehr abgegeben werden.`);
     db.prepare("UPDATE bookings SET status='offered' WHERE id = ?").run(bk.id);
+    // andere Schueler informieren
+    const wd = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'][isoDow(bk.date) - 1];
+    const msg = `Eine Fahrstunde am ${wd} ${bk.date.slice(8)}.${bk.date.slice(5, 7)}. um ${bk.start_time} Uhr ist frei geworden – möchtest du sie übernehmen?`;
+    for (const sid of otherStudentIds(sess.student_id)) notify(sid, 'offer', msg, bk.date, bk.id);
     return ok(res);
   }
   // Angebot zuruecknehmen
@@ -348,6 +367,9 @@ async function handleApi(req, res, url) {
         return bad(res, 'Du hast an dem Tag schon einen Termin zu dieser Zeit.');
     }
     db.prepare("UPDATE bookings SET student_id = ?, status='booked' WHERE id = ?").run(sess.student_id, bk.id);
+    // urspruenglichen Schueler informieren, dass er frei ist
+    const taker = db.prepare('SELECT name FROM students WHERE id = ?').get(sess.student_id);
+    notify(bk.student_id, 'info', `Deine angebotene Fahrstunde am ${bk.date.slice(8)}.${bk.date.slice(5, 7)}. um ${bk.start_time} Uhr wurde von ${taker?.name || 'jemandem'} übernommen – du bist frei.`, bk.date);
     return ok(res);
   }
 
@@ -371,6 +393,31 @@ async function handleApi(req, res, url) {
     if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
     const ref = url.searchParams.get('date') || todayStr();
     return ok(res, statsFor(ref));
+  }
+
+  // Lücken-Vorschlag: contigierter Tagesplan (Stunden nach vorne ziehen)
+  if (p === '/api/instructor/gap-proposal' && method === 'GET') {
+    if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
+    const date = url.searchParams.get('date') || todayStr();
+    return ok(res, packDay(date));
+  }
+  // Vorschlag anwenden: Stunden verschieben + betroffene Schueler benachrichtigen
+  if (p === '/api/instructor/apply-shift' && method === 'POST') {
+    if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
+    const { date } = await readBody(req);
+    if (!date) return bad(res, 'Datum noetig');
+    const plan = packDay(date);
+    if (!plan.hasGap) return bad(res, 'Keine Lücke zu schließen.');
+    const wd = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'][isoDow(date) - 1];
+    for (const m of plan.moves) {
+      if (m.from === m.to) continue;
+      db.prepare('UPDATE bookings SET start_time = ? WHERE id = ?').run(m.to, m.id);
+      if (m.student_id) {
+        notify(m.student_id, 'shift',
+          `Dein Termin am ${wd} ${date.slice(8)}.${date.slice(5, 7)}. wurde von ${m.from} auf ${m.to} Uhr verschoben.`, date, m.id);
+      }
+    }
+    return ok(res, { moved: plan.moves.filter((m) => m.from !== m.to).length });
   }
 
   // -- Codes --
@@ -546,6 +593,77 @@ function weekInfoForStudent(studentId, ref = todayStr()) {
      WHERE student_id = ? AND date BETWEEN ? AND ? AND status != 'cancelled'`
   ).get(studentId, from, to).n;
   return { from, to, count, max, remaining: Math.max(0, max - count) };
+}
+
+// Eine Benachrichtigung fuer einen Schueler anlegen (Portal-Postfach)
+// und zusaetzlich an externe Kanaele (E-Mail/Push) uebergeben, sofern konfiguriert.
+function notify(studentId, kind, message, date = null, refBookingId = null) {
+  db.prepare(`INSERT INTO notifications(student_id,kind,message,date,ref_booking_id,created_at)
+    VALUES(?,?,?,?,?,?)`).run(studentId, kind, message, date, refBookingId, new Date().toISOString());
+  dispatchExternal(studentId, message);
+}
+
+// Haken fuer E-Mail / Push. Standardmaessig aus – aktivierbar ueber Umgebungs-
+// variablen, ohne dass das Portal sonst etwas braucht. (Details siehe README.)
+function dispatchExternal(studentId, message) {
+  if (!process.env.FSP_NOTIFY) return; // nicht konfiguriert -> nur Portal-Postfach
+  try {
+    const st = db.prepare('SELECT name,email FROM students WHERE id = ?').get(studentId);
+    // Platzhalter: hier wuerde der echte Versand (SMTP / Web-Push) eingehaengt.
+    console.log(`[notify:${process.env.FSP_NOTIFY}] -> ${st?.email}: ${message}`);
+  } catch (e) { console.error('notify dispatch', e); }
+}
+
+// Alle Schueler ausser einem (fuer Angebots-Benachrichtigungen)
+function otherStudentIds(exceptId) {
+  return db.prepare('SELECT id FROM students WHERE id != ?').all(exceptId).map((r) => r.id);
+}
+
+// Contigierter Tagesplan: zukuenftige Fahrstunden lueckenlos nach vorne ziehen,
+// an Bloecken und bereits gefahrenen/laufenden Stunden vorbei.
+function packDay(date) {
+  const s = getSettings();
+  const brk = s.break_min;
+  const ov = getOverride(date);
+  if (ov && ov.closed) return { date, moves: [], hasGap: false };
+  let start = toMin((ov && ov.start_time) || getSettingRaw('start_time'));
+  const isToday = date === todayStr();
+  const nowM = toMin(nowHHMM());
+  if (isToday) start = Math.max(start, nowM);
+
+  const blocks = db.prepare('SELECT start_time,end_time FROM blocks WHERE date = ?').all(date)
+    .map((b) => ({ s: toMin(b.start_time), e: toMin(b.end_time) }));
+  const all = db.prepare(
+    `SELECT b.*, st.name AS student_name FROM bookings b
+     LEFT JOIN students st ON st.id = b.student_id
+     WHERE b.date = ? AND b.status IN ('booked','done')`).all(date);
+
+  const fixed = [];      // feste, belegte Intervalle (gefahren oder schon begonnen)
+  const movable = [];    // verschiebbare zukuenftige Stunden
+  for (const b of all) {
+    const bs = toMin(b.start_time);
+    if (b.status === 'done' || (isToday && bs <= nowM)) fixed.push({ s: bs, e: bs + b.duration_min });
+    else movable.push(b);
+  }
+  const obstacles = [...blocks, ...fixed];
+  movable.sort((a, z) => a.start_time.localeCompare(z.start_time));
+
+  let cursor = start;
+  const moves = [];
+  for (const b of movable) {
+    let t = cursor;
+    let changed = true;
+    while (changed) {   // an Hindernissen vorbeischieben (inkl. Pause)
+      changed = false;
+      for (const o of obstacles) {
+        if (overlaps(t, t + b.duration_min, o.s, o.e)) { t = o.e + brk; changed = true; }
+      }
+    }
+    moves.push({ id: b.id, from: b.start_time, to: toHHMM(t),
+      student_name: b.student_name, student_id: b.student_id, duration: b.duration_min });
+    cursor = t + b.duration_min + brk;
+  }
+  return { date, moves, hasGap: moves.some((m) => m.from !== m.to) };
 }
 
 function createBooking(res, sess, body) {

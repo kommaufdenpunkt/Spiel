@@ -48,8 +48,11 @@ du ein Backup willst.
 - **Verbindliche Buchung** mit Sicherheitsabfrage („Bist du wirklich sicher?").
 - **Stornieren** kostenlos bis **48 Std.** vorher.
 - **Übernahme-Marktplatz:** Wer kurzfristig nicht kann, bietet die Stunde den
-  anderen Fahrschülern an. Ein anderer Schüler kann sie übernehmen – so bleibt
-  der Slot lückenlos belegt.
+  anderen Fahrschülern an. Alle anderen bekommen eine **Benachrichtigung im
+  Portal-Postfach** („möchtest du sie übernehmen?"); wer sie übernimmt, bekommt
+  den Slot – der Anbieter wird informiert, dass er frei ist.
+- **Postfach / Benachrichtigungen:** Glocke mit ungelesenen Meldungen (Angebot
+  frei, Termin verschoben, …).
 - **Sperrfrist 36 Std.:** Ab dann steht der Termin fest (kein Absagen/Abgeben mehr).
 
 ### Für den Fahrlehrer
@@ -61,6 +64,11 @@ du ein Backup willst.
   optional das **Kennzeichen** eintragen; Dauer anpassbar (z. B. letzte Stunde
   nur 20 statt 80 Min).
 - **Termine verschieben** (vorziehen/zurückziehen) für nahtlose Übergänge.
+- **Lücken schließen (ein Klick):** Entsteht durch eine Absage eine Lücke,
+  erkennt das Portal sie und schlägt eine **Verschiebe-Kette** vor (z. B.
+  13:35→12:00, 16:45→13:35), damit der Tag lückenlos ist. Du bestätigst per
+  Klick – die betroffenen Fahrschüler werden automatisch benachrichtigt.
+  Theorie-/Blockzeiten werden dabei übersprungen.
 - **Zugangscodes** erzeugen und an neue Fahrschüler weitergeben.
 - **Theorie & Ausnahmen:** Zeiten blockieren (z. B. Theorieunterricht 17–20 Uhr,
   Urlaub, Sonderfahrten). Blockzeiten können wahlweise als Arbeitszeit zählen.
@@ -121,6 +129,9 @@ fahrschulportal/
 Damit Fahrschüler von zu Hause zugreifen können, muss der Server dauerhaft
 erreichbar laufen (z. B. auf einem kleinen Server/VPS, hinter HTTPS). Lokal zum
 Ausprobieren reicht `node server.js` und der Aufruf über `localhost`.
-Die automatischen Benachrichtigungen beim Anbieten einer Stunde laufen aktuell
-**im Portal selbst** (der andere Schüler sieht das Angebot beim nächsten Login).
-E-Mail-/Push-Benachrichtigung lässt sich als nächster Schritt ergänzen.
+Die Benachrichtigungen laufen aktuell **im Portal-Postfach** (die Schüler sehen
+sie beim nächsten Login inkl. Glocke). **E-Mail und Push sind bereits
+vorbereitet**: Im Code gibt es dafür den Haken `dispatchExternal()`; er wird
+aktiv, sobald die Umgebungsvariable `FSP_NOTIFY` gesetzt und der eigentliche
+Versand (SMTP für E-Mail bzw. Web-Push) dort eingehängt ist. Ohne Konfiguration
+bleibt alles beim Portal-Postfach – nichts muss eingerichtet werden.

@@ -79,8 +79,20 @@ db.exec(`
     created_at  TEXT NOT NULL
   );
 
+  CREATE TABLE IF NOT EXISTS notifications (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    student_id     INTEGER NOT NULL,
+    kind           TEXT NOT NULL,        -- 'offer' | 'shift' | 'info'
+    message        TEXT NOT NULL,
+    date           TEXT,                 -- betroffener Tag (optional)
+    ref_booking_id INTEGER,
+    read           INTEGER NOT NULL DEFAULT 0,
+    created_at     TEXT NOT NULL
+  );
+
   CREATE INDEX IF NOT EXISTS idx_bookings_date ON bookings(date);
   CREATE INDEX IF NOT EXISTS idx_blocks_date   ON blocks(date);
+  CREATE INDEX IF NOT EXISTS idx_notif_student ON notifications(student_id, read);
 `);
 
 // ---- Migrationen fuer bestehende Datenbanken ----
