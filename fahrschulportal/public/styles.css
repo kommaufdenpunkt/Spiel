@@ -1,5 +1,5 @@
 :root{
-  --bg:#0e131a; --bg2:#0a0e14; --card:#161d27; --card2:#1c2531;
+  --bg:#0e131a; --bg2:#0a0e14; --bg-glow:#182233; --card:#161d27; --card2:#1c2531;
   --ink:#e7edf5; --muted:#93a1b3; --line:#28323f;
   --brand:#4d8dff; --brand-dark:#3a6fd4;
   --good:#35c07d; --good-bg:rgba(53,192,125,.14);
@@ -13,7 +13,7 @@
 *{box-sizing:border-box}
 html,body{margin:0;height:100%}
 body{background:
-    radial-gradient(120% 90% at 50% -10%,#182233,transparent 55%),var(--bg);
+    radial-gradient(120% 90% at 50% -10%,var(--bg-glow),transparent 55%),var(--bg);
   color:var(--ink);
   font-family:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
   -webkit-font-smoothing:antialiased;line-height:1.5;min-height:100%}
@@ -144,6 +144,13 @@ th{color:var(--muted);font-weight:600;font-size:.78rem;text-transform:uppercase;
 .navtabs button.active{background:var(--brand);color:#fff;border-color:var(--brand)}
 .hint{font-size:.82rem;color:var(--muted);margin:.3rem 0 .8rem}
 .inline{display:flex;gap:.5rem;align-items:center;flex-wrap:wrap}
+
+/* ---- Kennzahl-Kacheln ---- */
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:.7rem;margin-top:1rem}
+.tile{background:var(--card2);border:1px solid var(--line);border-radius:11px;padding:.8rem .9rem}
+.tile .n{font-size:1.5rem;font-weight:800}
+.tile .l{font-size:.76rem;color:var(--muted);margin-top:.1rem}
+.tile.good .n{color:var(--good)} .tile.bad .n{color:var(--bad)} .tile.brand .n{color:var(--brand)}
 
 /* ---- Wochen-Zeitachse ---- */
 .viewtoggle{display:inline-flex;background:#0f151d;border-radius:9px;padding:.2rem;gap:.2rem}

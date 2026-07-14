@@ -8,6 +8,54 @@ const MON = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Ok
 
 const state = { user: null, settings: null, date: todayStr(), instrTab: 'heute' };
 
+// ---------- Farb-Themes (dunkel, augenschonend) ----------
+// Kein reines Schwarz (weniger Halo/Blendung), Text kontrastreich (>= WCAG AA).
+const THEMES = {
+  nachtblau: { label: 'Nachtblau', dot: '#4d8dff', vars: {
+    '--bg': '#0e131a', '--bg2': '#0a0e14', '--bg-glow': '#182233', '--card': '#161d27', '--card2': '#1c2531',
+    '--line': '#28323f', '--brand': '#4d8dff', '--brand-dark': '#3a6fd4', '--ink': '#e7edf5', '--muted': '#93a1b3' } },
+  aubergine: { label: 'Aubergine (Lila)', dot: '#a877f0', vars: {
+    '--bg': '#14101c', '--bg2': '#0f0b16', '--bg-glow': '#2c2042', '--card': '#1e1830', '--card2': '#251d3a',
+    '--line': '#352a4a', '--brand': '#a877f0', '--brand-dark': '#8f5fe0', '--ink': '#ece7f5', '--muted': '#a79bbb' } },
+  beere: { label: 'Beere (Pink)', dot: '#ec6ba6', vars: {
+    '--bg': '#190f15', '--bg2': '#130a10', '--bg-glow': '#3d1e30', '--card': '#271722', '--card2': '#301c29',
+    '--line': '#472c3c', '--brand': '#ec6ba6', '--brand-dark': '#d64f8d', '--ink': '#f3e7ee', '--muted': '#bd9aaa' } },
+  waldgruen: { label: 'Waldgrün', dot: '#35c07d', vars: {
+    '--bg': '#0b1512', '--bg2': '#08100d', '--bg-glow': '#153025', '--card': '#13201b', '--card2': '#182821',
+    '--line': '#26382f', '--brand': '#35c07d', '--brand-dark': '#2aa568', '--ink': '#e6f0ea', '--muted': '#8fa99b' } },
+  graphit: { label: 'Graphit', dot: '#8a93a6', vars: {
+    '--bg': '#121316', '--bg2': '#0d0e11', '--bg-glow': '#24262c', '--card': '#1b1d22', '--card2': '#22242a',
+    '--line': '#32353d', '--brand': '#7c8cf0', '--brand-dark': '#6172e0', '--ink': '#e8eaef', '--muted': '#9a9fab' } },
+  mitternacht: { label: 'Mitternacht', dot: '#5aa0ff', vars: {
+    '--bg': '#08090c', '--bg2': '#050609', '--bg-glow': '#141821', '--card': '#111319', '--card2': '#161922',
+    '--line': '#262a34', '--brand': '#5aa0ff', '--brand-dark': '#3f7fd6', '--ink': '#e9edf3', '--muted': '#8b93a2' } },
+};
+function applyTheme(key) {
+  const t = THEMES[key] || THEMES.nachtblau;
+  for (const [k, v] of Object.entries(t.vars)) document.documentElement.style.setProperty(k, v);
+  try { localStorage.setItem('fsp-theme', key); } catch {}
+  state.theme = THEMES[key] ? key : 'nachtblau';
+}
+function loadTheme() {
+  let key = 'nachtblau';
+  try { key = localStorage.getItem('fsp-theme') || 'nachtblau'; } catch {}
+  applyTheme(key);
+}
+loadTheme();
+
+function openThemePicker() {
+  const cur = state.theme || 'nachtblau';
+  modal(`<h3>Farbe wählen</h3>
+    <p class="hint">Alle Themes sind dunkel und augenschonend (kein grelles Weiß, guter Kontrast). Deine Wahl wird auf diesem Gerät gespeichert.</p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem">
+      ${Object.entries(THEMES).map(([k, t]) => `<button class="sec" data-theme="${k}" style="justify-content:flex-start;display:flex;align-items:center;gap:.5rem;${k === cur ? 'outline:2px solid ' + t.dot : ''}">
+        <span style="width:16px;height:16px;border-radius:50%;background:${t.dot};display:inline-block"></span>${t.label}${k === cur ? ' ✓' : ''}</button>`).join('')}
+    </div>
+    <div class="actions"><button class="sec" onclick="window.__closeModal()">Schließen</button></div>`);
+  document.querySelectorAll('[data-theme]').forEach((b) => b.onclick = () => { applyTheme(b.dataset.theme); toast('Farbe geändert ✓', 'ok'); openThemePicker(); });
+}
+window.__openThemePicker = openThemePicker;
+
 // ---------- API ----------
 async function api(path, opts = {}) {
   const res = await fetch(path, {
@@ -77,6 +125,7 @@ function header() {
     <div class="who">
       <span class="role">${u.role === 'instructor' ? 'Fahrlehrer' : 'Fahrschüler'}</span>
       <strong>${esc(u.name || '')}</strong>${u.username ? `<span class="pill">${esc(u.username)}</span>` : ''}
+      <button class="ghost sm" onclick="window.__openThemePicker()" title="Farbe wählen">🎨</button>
       <button class="ghost sm" id="logout">Abmelden</button>
     </div>
   </header>`;
@@ -102,6 +151,7 @@ function renderAuth() {
         </div>
         <div id="authbody"></div>
       </div>
+      <div class="center"><button class="ghost sm" onclick="window.__openThemePicker()">🎨 Farbe wählen</button></div>
     </div></div>`;
     app.querySelectorAll('.tabs button').forEach((b) => b.onclick = () => { tab = b.dataset.t; draw(); });
     const body = $('#authbody');
@@ -227,14 +277,23 @@ async function syncStudent() {
 }
 
 function renderWeekCard(wi, bookings) {
+  const allUpcoming = bookings.filter((b) => b.date >= todayStr() && b.status !== 'done')
+    .sort((a, b) => (a.date + a.start_time).localeCompare(b.date + b.start_time));
   const upcoming = bookings.filter((b) => b.date >= todayStr()).sort((a, b) => (a.date + a.start_time).localeCompare(b.date + b.start_time));
   const remainColor = wi.remaining > 0 ? 'good' : 'bad';
+  const next = allUpcoming.find((b) => b.status === 'booked');
   $('#week-card').innerHTML = `
     <h2>Meine Fahrstunden <span class="sub">diese Woche (${fmtShort(wi.from)}–${fmtShort(wi.to)})</span></h2>
+    ${next ? `<div class="bitem" style="background:var(--booked);border-color:var(--booked-b);margin-bottom:.8rem">
+      <div><div class="meta" style="color:var(--muted)">Deine nächste Fahrstunde</div>
+      <div class="when" style="font-size:1.05rem">${WD_LONG[isoDow(next.date) - 1]}, ${fmtShort(next.date)} · ${next.start_time} Uhr</div></div>
+      <div class="pill" style="background:var(--brand);color:#fff">${countdownLabel(next.date, next.start_time)}</div>
+    </div>` : ''}
     <div class="inline" style="margin-bottom:1rem">
       <span class="pill" style="background:${wi.remaining > 0 ? 'var(--good-bg)' : 'var(--bad-bg)'};color:var(--${remainColor})">
         ${wi.count} von ${wi.max} gebucht · noch ${wi.remaining} frei
       </span>
+      ${upcoming.length ? '<button class="ghost sm" id="ical-btn">📅 Zum Kalender hinzufügen</button>' : ''}
     </div>
     ${upcoming.length ? `<div class="blist">${upcoming.map(studentBookingItem).join('')}</div>`
       : '<p class="muted">Noch keine kommenden Termine gebucht.</p>'}`;
@@ -242,6 +301,41 @@ function renderWeekCard(wi, bookings) {
   c.querySelectorAll('[data-cancel]').forEach((b) => b.onclick = () => cancelBooking(b.dataset.cancel));
   c.querySelectorAll('[data-offer]').forEach((b) => b.onclick = () => offerBooking(b.dataset.offer));
   c.querySelectorAll('[data-withdraw]').forEach((b) => b.onclick = () => withdrawOffer(b.dataset.withdraw));
+  const ic = $('#ical-btn');
+  if (ic) ic.onclick = () => exportICS(upcoming);
+}
+
+function countdownLabel(date, start) {
+  const h = hoursUntil(date, start);
+  if (h <= 0) return 'jetzt';
+  const days = Math.floor(h / 24);
+  if (days >= 1) { const rh = Math.round(h - days * 24); return `in ${days} Tag${days > 1 ? 'en' : ''}${rh ? ` ${rh} Std` : ''}`; }
+  if (h >= 1) return `in ${Math.round(h)} Std`;
+  return `in ${Math.max(1, Math.round(h * 60))} Min`;
+}
+
+// ---------- Datei-Download / iCal ----------
+function downloadFile(name, content, mime) {
+  const blob = new Blob([content], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = name; document.body.appendChild(a); a.click();
+  a.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+function icsDate(date, hhmm) { return date.replace(/-/g, '') + 'T' + hhmm.replace(':', '') + '00'; }
+function exportICS(bookings) {
+  const stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d+/, ''); // YYYYMMDDTHHMMSSZ
+  const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Fahrschulportal//DE', 'CALSCALE:GREGORIAN'];
+  for (const b of bookings) {
+    const end = addMin(b.start_time, b.duration_min);
+    lines.push('BEGIN:VEVENT', `UID:fsp-${b.id}@fahrschulportal`, `DTSTAMP:${stamp}`,
+      `DTSTART:${icsDate(b.date, b.start_time)}`, `DTEND:${icsDate(b.date, end)}`,
+      'SUMMARY:Fahrstunde 🚗', `DESCRIPTION:Fahrstunde (${b.duration_min} Min)`, 'BEGIN:VALARM',
+      'TRIGGER:-PT3H', 'ACTION:DISPLAY', 'DESCRIPTION:Fahrstunde in 3 Stunden', 'END:VALARM', 'END:VEVENT');
+  }
+  lines.push('END:VCALENDAR');
+  downloadFile('fahrstunden.ics', lines.join('\r\n'), 'text/calendar');
+  toast('Kalenderdatei heruntergeladen ✓', 'ok');
 }
 
 function studentBookingItem(b) {
@@ -461,15 +555,29 @@ function drawInstrTab() {
 // ---- Tab: Heute & Ziele (Tacho) ----
 async function tabHeute() {
   const box = $('#itab');
-  box.innerHTML = `<div class="card"><h2>Wochenziel</h2><div id="gauge"></div></div>
+  box.innerHTML = `<div class="card"><h2>Wochenziel</h2><div id="gauge"></div><div id="tiles"></div></div>
     <div class="card"><h2>Heute <span class="sub" id="today-sub"></span></h2><div id="today-list"></div></div>`;
   try {
     const stats = await api('/api/instructor/stats?date=' + todayStr());
     renderGauge($('#gauge'), stats);
+    renderTiles($('#tiles'), stats);
     const ov = await api('/api/instructor/overview?from=' + todayStr() + '&to=' + todayStr());
     $('#today-sub').textContent = fmtDay(todayStr());
     renderInstrDay($('#today-list'), todayStr(), ov.bookings, ov.blocks);
   } catch (e) { toast(e.message, 'err'); }
+}
+
+function renderTiles(el, stats) {
+  const c = stats.counts || {};
+  const targetMin = (stats.weekly.targetH || 0) * 60;
+  const pct = targetMin > 0 ? Math.round((stats.weekly.minutes / targetMin) * 100) : 0;
+  el.innerHTML = `<div class="tiles">
+    <div class="tile brand"><div class="n">${c.lessons || 0}</div><div class="l">Fahrstunden diese Woche</div></div>
+    <div class="tile good"><div class="n">${c.driven || 0}</div><div class="l">davon gefahren</div></div>
+    <div class="tile ${c.noshow ? 'bad' : ''}"><div class="n">${c.noshow || 0}</div><div class="l">nicht erschienen</div></div>
+    <div class="tile"><div class="n">${pct}%</div><div class="l">vom Wochenziel</div></div>
+    ${c.vacationDays ? `<div class="tile"><div class="n">🌴 ${c.vacationDays}</div><div class="l">Urlaubstage (Woche)</div></div>` : ''}
+  </div>`;
 }
 
 function gaugeSVG(minutes, targetH, loH) {
@@ -1083,10 +1191,12 @@ async function tabProtokoll() {
       <input type="date" id="pr-from" style="max-width:160px">
       <input type="date" id="pr-to" style="max-width:160px">
       <button class="sec sm" id="pr-go">Filtern</button>
+      <button class="ghost sm" id="pr-csv" style="margin-left:auto">⬇️ Als CSV (Excel)</button>
     </div>
     <div id="pr-list"></div>
   </div>`;
   $('#pr-go').onclick = loadProtokoll;
+  $('#pr-csv').onclick = exportProtokollCSV;
   await loadProtokoll();
   // als gesehen markieren + Glocke zuruecksetzen
   try { await api('/api/instructor/events/seen', { method: 'POST' }); refreshEventBadge(); } catch {}
@@ -1112,6 +1222,24 @@ async function loadProtokoll() {
         </tr>`;
       }).join('')}
     </table>`;
+  } catch (e) { toast(e.message, 'err'); }
+}
+
+async function exportProtokollCSV() {
+  const q = new URLSearchParams();
+  if ($('#pr-student').value) q.set('student_id', $('#pr-student').value);
+  if ($('#pr-from').value) q.set('from', $('#pr-from').value);
+  if ($('#pr-to').value) q.set('to', $('#pr-to').value);
+  try {
+    const { events } = await api('/api/instructor/events?' + q.toString());
+    const cell = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    const rows = [['Datum/Zeit', 'Vorgang', 'Fahrschüler', 'Details'].map(cell).join(';')];
+    for (const e of events) {
+      const [, lbl] = EV_META[e.type] || ['', e.type];
+      rows.push([new Date(e.at).toLocaleString('de-DE'), lbl, e.student_name || '', e.detail || ''].map(cell).join(';'));
+    }
+    downloadFile('protokoll.csv', '﻿' + rows.join('\r\n'), 'text/csv;charset=utf-8');
+    toast('Protokoll als CSV heruntergeladen ✓', 'ok');
   } catch (e) { toast(e.message, 'err'); }
 }
 

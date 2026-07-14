@@ -956,11 +956,20 @@ function statsFor(ref) {
     perDay.push({ date: d, minutes: sumMinutes('date = ?', [d]) });
   }
 
+  // Kennzahlen der Woche
+  const cq = (sql) => db.prepare(sql).get(from, to).n;
+  const counts = {
+    lessons: cq("SELECT COUNT(*) AS n FROM bookings WHERE date BETWEEN ? AND ? AND status IN ('booked','offered','done') AND student_id IS NOT NULL"),
+    driven: cq("SELECT COUNT(*) AS n FROM bookings WHERE date BETWEEN ? AND ? AND status='done' AND (attended IS NULL OR attended=1)"),
+    noshow: cq("SELECT COUNT(*) AS n FROM bookings WHERE date BETWEEN ? AND ? AND status='done' AND attended=0"),
+    vacationDays: cq("SELECT COUNT(*) AS n FROM day_overrides WHERE date BETWEEN ? AND ? AND type='vacation'"),
+  };
+
   return {
     day, from, to,
     daily: { minutes: dayMin, doneMinutes: dayDone, targetH: s.daily_target_h },
     weekly: { minutes: weekMin, doneMinutes: weekDone, targetH: s.weekly_target_h, loH: s.weekly_lo_h },
-    perDay,
+    perDay, counts,
     settings: s,
   };
 }

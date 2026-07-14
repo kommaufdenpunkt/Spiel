@@ -97,8 +97,18 @@ du ein Backup willst.
 - **Arbeitszeiten / Dienstplan:** einzelne Tage als **kurzen Tag** (früher
   Feierabend, z. B. wenn die Frau frei hat) oder als **ganzen freien Tag**
   markieren. Die buchbaren Slots passen sich für die Schüler automatisch an.
+- **Wochen-Kennzahlen:** Kacheln über dem Tacho (Fahrstunden, gefahren,
+  nicht erschienen, % vom Wochenziel).
+- **Protokoll als CSV** exportieren (öffnet in Excel) – für die Unterlagen.
 - **Alles einstellbar:** Arbeitsbeginn/-ende, Slot-Dauer, Pause, Arbeitstage
   (Mo–Sa), Wochen-/Tagesziel, Stornofristen, Vorausbuchungsfenster, PIN.
+
+### Für beide
+- **Farb-Themes (augenschonend):** 6 dunkle Paletten zur Auswahl – Nachtblau,
+  Aubergine (Lila), Beere (Pink), Waldgrün, Graphit, Mitternacht. Über den
+  🎨-Knopf; die Wahl wird pro Gerät gespeichert.
+- **Nächste Fahrstunde** mit Countdown (Schüler) und **„Zum Kalender
+  hinzufügen"** (iCal-Datei für Handy/PC-Kalender, mit Erinnerung 3 Std vorher).
 
 ---
 
