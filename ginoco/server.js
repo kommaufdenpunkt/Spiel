@@ -14,7 +14,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const PUBLIC = join(__dirname, 'public');
 const PORT = Number(process.env.PORT || 3000);
 const SESSION_DAYS = 30;
-const APP_VERSION = "2.2.1";
+const APP_VERSION = "2.2.2";
 // Einstellungen, die Schueler/Oeffentlichkeit sehen duerfen (Rest bleibt beim Fahrlehrer)
 const PUBLIC_SETTINGS = ['instructor_name', 'instructor_phone', 'policy_text',
   'cancel_hours', 'lock_hours', 'booking_horizon_days', 'booking_horizon_days_rank2',
@@ -791,6 +791,18 @@ async function handleApi(req, res, url) {
     db.prepare('UPDATE students SET pass = ? WHERE id = ?').run(hashPassword(pw), st.id);
     logEvent('info', { actor: 'instructor', studentId: st.id, detail: 'Passwort zurückgesetzt' });
     return ok(res);
+  }
+  // Test-/Demo-Schueler mit einem Klick anlegen (zum Ausprobieren der Schueler-Ansicht)
+  if (p === '/api/instructor/test-student' && method === 'POST') {
+    if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
+    const n = db.prepare("SELECT COUNT(*) AS c FROM students WHERE name LIKE 'Testschüler%'").get().c + 1;
+    const name = `Testschüler ${n}`;
+    const username = genUsername('Test Schueler', 2000);
+    const password = 'Test1234!'; // erfuellt die Passwort-Richtlinie
+    const info = db.prepare('INSERT INTO students(name,pass,username,birth_year,allowed_durations,created_at) VALUES(?,?,?,?,?,?)')
+      .run(name, hashPassword(password), username, 2000, '40,80,120', new Date().toISOString());
+    logEvent('info', { actor: 'instructor', studentId: Number(info.lastInsertRowid), detail: `Testschüler angelegt (${username})` });
+    return ok(res, { name, username, password });
   }
 
   // -- Tages-Ausnahmen (kurzer Tag / frei) --

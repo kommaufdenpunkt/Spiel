@@ -1076,10 +1076,12 @@ function renderWeek(el, monday, ov) {
     <div class="wk-times">${hourLabels.join('')}</div>
     ${days.map(dayCol).join('')}
   </div></div>
-  <p class="hint" style="margin-top:.7rem">Tipp: auf einen Termin tippen zum Bearbeiten/Abschließen. Farbe = Fahrschüler (bzw. Fahrt-Art), 🔄 = wird abgegeben, ✓ = gefahren.
-    &nbsp; <span class="pill" style="background:${TYPE_COLORS.ueberland};color:#fff">🌄 Überland</span>
-    <span class="pill" style="background:${TYPE_COLORS.autobahn};color:#fff">🛣️ Autobahn</span>
-    <span class="pill" style="background:${TYPE_COLORS.nacht};color:#fff">🌙 Nacht</span></p>`;
+  <div class="hint" style="margin-top:.7rem">Tipp: auf einen Termin tippen zum Bearbeiten/Abschließen. Farbe = Fahrschüler (bzw. Fahrt-Art), 🔄 = wird abgegeben, ✓ = gefahren.</div>
+  <div class="legend"><span class="muted">Fahrt-Arten:</span>
+    <span class="legend-chip"><span class="sw" style="background:${TYPE_COLORS.ueberland}"></span>Überland</span>
+    <span class="legend-chip"><span class="sw" style="background:${TYPE_COLORS.autobahn}"></span>Autobahn</span>
+    <span class="legend-chip"><span class="sw" style="background:${TYPE_COLORS.nacht}"></span>Nachtfahrt</span>
+  </div>`;
   el.querySelectorAll('[data-wk]').forEach((b) => b.onclick = () => openMarkModal(b.dataset.wk));
 }
 
@@ -1209,13 +1211,27 @@ async function tabCodes() {
     <div class="inline" style="margin-bottom:1rem">
       <input id="c-note" placeholder="Notiz, z.B. Name des Schülers" style="max-width:260px">
       <button id="c-gen">+ Code erzeugen</button>
+      <button class="ghost" id="c-test" style="margin-left:auto">🧪 Testschüler anlegen</button>
     </div>
+    <p class="hint" style="margin-top:-.5rem">Mit „Testschüler" legst du sofort ein fertiges Demo-Konto an – zum Ausprobieren der Schüler-Ansicht (z. B. in einem zweiten/privaten Browserfenster).</p>
     <div id="c-list"></div>
   </div>`;
   $('#c-gen').onclick = async () => {
     try { const r = await api('/api/codes', { method: 'POST', body: { note: $('#c-note').value } });
       $('#c-note').value = ''; toast('Code ' + r.code + ' erstellt', 'ok'); loadCodes(); }
     catch (e) { toast(e.message, 'err'); }
+  };
+  $('#c-test').onclick = async () => {
+    try {
+      const r = await api('/api/instructor/test-student', { method: 'POST' });
+      const share = `${r.name} – Login zum Testen:\nLogin-Name: ${r.username}\nPasswort: ${r.password}`;
+      modal(`<h3>🧪 Testschüler angelegt</h3>
+        <p class="hint">So kannst du die Schüler-Ansicht ausprobieren: öffne ein <strong>zweites (oder privates) Browserfenster</strong> auf dieselbe Adresse und melde dich mit diesen Daten an.</p>
+        <pre style="background:#0f151d;border:1px solid var(--line);border-radius:8px;padding:.7rem;white-space:pre-wrap;font-size:.9rem">${esc(share)}</pre>
+        <div class="actions"><button class="sec" id="ts-copy">📋 Kopieren</button><button onclick="window.__closeModal()">Fertig</button></div>`);
+      $('#ts-copy').onclick = () => { navigator.clipboard?.writeText(share); toast('Kopiert', 'ok'); };
+      toast('Testschüler ' + r.username + ' angelegt', 'ok');
+    } catch (e) { toast(e.message, 'err'); }
   };
   loadCodes();
 }
