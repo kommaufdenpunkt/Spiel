@@ -15,7 +15,7 @@ keine fremden Pakete).
 Voraussetzung: **Node.js ab Version 22.5** (bringt SQLite und alles Nötige schon mit).
 
 ```bash
-cd fahrschulportal
+cd ginoco
 npm start          # oder:  node server.js
 ```
 
@@ -195,7 +195,7 @@ mal einen Slot mehr oder weniger willst.
 - **Datenhaltung:** alles in `fahrschule.db` (SQLite-Datei im Projektordner).
 
 ```
-fahrschulportal/
+ginoco/
 ├── server.js        # Server + komplette API
 ├── db.js            # Datenbank-Schema, Einstellungen, Passwort-Hashing
 ├── package.json

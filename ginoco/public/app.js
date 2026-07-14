@@ -402,7 +402,7 @@ function exportICS(bookings) {
   const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//ginoco//DE', 'CALSCALE:GREGORIAN'];
   for (const b of bookings) {
     const end = addMin(b.start_time, b.duration_min);
-    lines.push('BEGIN:VEVENT', `UID:fsp-${b.id}@fahrschulportal`, `DTSTAMP:${stamp}`,
+    lines.push('BEGIN:VEVENT', `UID:fsp-${b.id}@ginoco`, `DTSTAMP:${stamp}`,
       `DTSTART:${icsDate(b.date, b.start_time)}`, `DTEND:${icsDate(b.date, end)}`,
       'SUMMARY:Fahrstunde 🚗', `DESCRIPTION:Fahrstunde (${b.duration_min} Min)`, 'BEGIN:VALARM',
       'TRIGGER:-PT3H', 'ACTION:DISPLAY', 'DESCRIPTION:Fahrstunde in 3 Stunden', 'END:VALARM', 'END:VEVENT');
