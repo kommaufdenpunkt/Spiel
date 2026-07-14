@@ -1382,16 +1382,23 @@ async function tabSchueler() {
       const have = s.sonder?.[k] || 0, need = req[k]; const done = have >= need;
       return `<span class="pill" style="${done ? 'background:var(--good-bg);color:var(--good)' : ''}">${TYPE_ICON[k]} ${have}/${need}</span>`;
     }).join(' ');
-    $('#s-list').innerHTML = `<table>
+    $('#s-list').innerHTML = `
+      <div class="inline" style="margin-bottom:.7rem;gap:.5rem">
+        <input id="s-search" placeholder="🔍 Suchen: Name, Login-Name, Telefon oder E-Mail …" style="flex:1" autocomplete="off">
+        <span class="pill" id="s-count">${students.length}</span>
+      </div>
+      <p class="muted hidden" id="s-noresult">Keine Treffer.</p>
+      <table>
       <tr><th>Name</th><th>Login-Name</th><th>Kontakt</th><th>Treffpunkt</th><th>Gefahren / Rang</th><th>Sonderfahrten</th><th>Erlaubte Längen (Min)</th></tr>
       ${students.map((s) => {
+        const searchStr = [s.name, s.username, s.email, s.phone].filter(Boolean).join(' ').toLowerCase();
         const durs = String(s.allowed_durations || '80').split(',').map(Number);
         const boxes = [40, 80, 120].map((d) => `<label style="margin:0;font-weight:600"><input type="checkbox" data-sdur="${s.id}" value="${d}" ${durs.includes(d) ? 'checked' : ''} style="width:auto"> ${d}</label>`).join(' ');
         const hasHome = s.home_label || s.home_lat != null;
         const homeCell = hasHome
           ? `<span class="pill" style="background:var(--good-bg);color:var(--good)">📍 ${esc(s.home_label || 'gesetzt')}</span>`
           : `<span class="muted">– nicht vereinbart –</span>`;
-        return `<tr>
+        return `<tr data-search="${esc(searchStr)}">
           <td><strong>${esc(s.name)}</strong>${s.birth_year ? ` <span class="muted">(${s.birth_year})</span>` : ''}
             <div class="inline" style="margin-top:.3rem;gap:.3rem">
               <button class="ghost sm" data-edit="${s.id}">✏️ Bearbeiten</button>
@@ -1421,6 +1428,19 @@ async function tabSchueler() {
       openEditStudentModal(students.find((x) => x.id === Number(btn.dataset.edit))));
     $('#s-list').querySelectorAll('[data-del]').forEach((btn) => btn.onclick = () =>
       deleteStudent(btn.dataset.del, btn.dataset.dname));
+    // Suche: filtert die Zeilen nach Name / Login / Telefon / E-Mail
+    const search = $('#s-search');
+    if (search) search.oninput = () => {
+      const q = search.value.trim().toLowerCase();
+      let shown = 0;
+      $('#s-list').querySelectorAll('tr[data-search]').forEach((tr) => {
+        const match = !q || tr.dataset.search.includes(q);
+        tr.style.display = match ? '' : 'none';
+        if (match) shown++;
+      });
+      $('#s-count').textContent = shown;
+      $('#s-noresult').classList.toggle('hidden', shown > 0);
+    };
   } catch (e) { toast(e.message, 'err'); }
 }
 
