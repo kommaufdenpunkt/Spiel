@@ -1801,3 +1801,48 @@ function tabEinstellungen() {
 // Für Kalender-Modal: instrBookings global halten
 window.__instrBookings = [];
 const _origRenderInstrDay = renderInstrDay;
+
+// ====================== PWA: "App installieren"-Angebot ======================
+(function () {
+  const standalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+  if (standalone) return; // laeuft schon als installierte App
+  const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  let deferred = null;
+
+  function ensureBtn() {
+    let b = document.getElementById('pwa-install');
+    if (!b) {
+      b = document.createElement('button');
+      b.id = 'pwa-install';
+      b.className = 'pwa-install';
+      b.innerHTML = '📲 App installieren';
+      b.onclick = onClick;
+      document.body.appendChild(b);
+    }
+    return b;
+  }
+  function hide() { const b = document.getElementById('pwa-install'); if (b) b.remove(); }
+
+  async function onClick() {
+    if (deferred) {
+      deferred.prompt();
+      const res = await deferred.userChoice.catch(() => ({}));
+      deferred = null;
+      if (res && res.outcome === 'accepted') hide();
+    } else if (isIOS && typeof modal === 'function') {
+      modal(`<h3>ginoco als App installieren</h3>
+        <p class="hint">So legst du ginoco wie eine echte App auf deinen Startbildschirm:</p>
+        <ol class="hint" style="padding-left:1.1rem;line-height:1.6">
+          <li>Tippe unten in Safari auf das <strong>Teilen-Symbol</strong> (Viereck mit Pfeil nach oben).</li>
+          <li>Wähle <strong>„Zum Home-Bildschirm"</strong>.</li>
+          <li>Auf <strong>„Hinzufügen"</strong> tippen – fertig. 🚗</li>
+        </ol>
+        <div class="actions"><button onclick="window.__closeModal()">Alles klar</button></div>`);
+    }
+  }
+
+  window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); deferred = e; ensureBtn(); });
+  window.addEventListener('appinstalled', hide);
+  // iOS liefert kein beforeinstallprompt -> Button trotzdem anbieten (fuehrt zur Anleitung)
+  if (isIOS) window.addEventListener('load', ensureBtn);
+})();

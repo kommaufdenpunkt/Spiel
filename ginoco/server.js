@@ -15,7 +15,7 @@ const PUBLIC = join(__dirname, 'public');
 const PORT = Number(process.env.PORT || 3000);
 const HOST = process.env.HOST || '0.0.0.0'; // hinter Caddy: HOST=127.0.0.1 (nur Proxy erreicht Node)
 const SESSION_DAYS = 30;
-const APP_VERSION = "2.4.4";
+const APP_VERSION = "2.5.0";
 // Einstellungen, die Schueler/Oeffentlichkeit sehen duerfen (Rest bleibt beim Fahrlehrer)
 const PUBLIC_SETTINGS = ['instructor_name', 'instructor_phone', 'policy_text',
   'cancel_hours', 'lock_hours', 'booking_horizon_days', 'booking_horizon_days_rank2',
@@ -1278,6 +1278,8 @@ const MIME = {
   '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8', '.svg': 'image/svg+xml',
   '.ico': 'image/x-icon', '.json': 'application/json',
+  '.webmanifest': 'application/manifest+json; charset=utf-8',
+  '.png': 'image/png', '.jpg': 'image/jpeg', '.webp': 'image/webp',
 };
 async function serveStatic(req, res, url) {
   let path = decodeURIComponent(url.pathname);

@@ -222,3 +222,10 @@ th{color:var(--muted);font-weight:600;font-size:.78rem;text-transform:uppercase;
 .edge-root.open-left .edge-panel.left{transform:translateX(0)}
 .edge-root.open-right .edge-panel.right{transform:translateX(0)}
 .edge-root.open-left .edge-handle,.edge-root.open-right .edge-handle{opacity:0;pointer-events:none}
+
+/* PWA: schwebender "App installieren"-Button */
+.pwa-install{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(1rem + env(safe-area-inset-bottom));
+  z-index:60;background:var(--brand);color:#fff;border:none;border-radius:999px;
+  padding:.7rem 1.2rem;font-weight:600;font-size:.95rem;width:auto;
+  box-shadow:0 8px 24px rgba(0,0,0,.4);cursor:pointer}
+.pwa-install:hover{background:var(--brand-dark)}
