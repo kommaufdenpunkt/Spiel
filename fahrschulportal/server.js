@@ -14,7 +14,11 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const PUBLIC = join(__dirname, 'public');
 const PORT = Number(process.env.PORT || 3000);
 const SESSION_DAYS = 30;
-const APP_VERSION = "2.1.0";
+const APP_VERSION = "2.1.1";
+// Einstellungen, die Schueler/Oeffentlichkeit sehen duerfen (Rest bleibt beim Fahrlehrer)
+const PUBLIC_SETTINGS = ['instructor_name', 'instructor_phone', 'policy_text',
+  'cancel_hours', 'lock_hours', 'booking_horizon_days', 'booking_horizon_days_rank2',
+  'live_lead_min', 'lesson_min', 'break_min', 'start_time', 'last_start', 'max_per_week', 'release_time'];
 
 // ---------- kleine Helfer ----------
 const json = (res, code, data) => {
@@ -242,9 +246,13 @@ async function handleApi(req, res, url) {
     return ok(res, { role: 'student', id: st.id, name: st.name, token });
   }
 
-  // ===== Oeffentliche Einstellungen (Slot-Laenge etc. fuer Anzeige) =====
+  // ===== Einstellungen: Fahrlehrer sieht alles, andere nur eine unbedenkliche Teilmenge =====
   if (p === '/api/settings' && method === 'GET') {
-    return ok(res, { settings: getSettings() });
+    const full = getSettings();
+    if (sess && sess.kind === 'instructor') return ok(res, { settings: full });
+    const pub = {};
+    for (const k of PUBLIC_SETTINGS) if (k in full) pub[k] = full[k];
+    return ok(res, { settings: pub });
   }
   // Version / Health (fuer native App und Monitoring)
   if (p === '/api/version' && method === 'GET') {
