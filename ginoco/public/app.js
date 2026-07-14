@@ -1397,7 +1397,7 @@ async function tabSchueler() {
               <button class="ghost sm" data-edit="${s.id}">✏️ Bearbeiten</button>
               <button class="ghost sm" data-del="${s.id}" data-dname="${esc(s.name)}" style="color:var(--bad)">🗑️</button>
             </div></td>
-          <td><span class="codechip">${esc(s.username || '–')}</span><br><button class="ghost sm" data-reset="${s.id}" data-uname="${esc(s.username || '')}" data-sname="${esc(s.name)}" style="margin-top:.3rem">Passwort zurücksetzen</button></td>
+          <td><span class="codechip">${esc(s.username || '–')}</span><br><button class="ghost sm" data-reset="${s.id}" data-uname="${esc(s.username || '')}" data-sname="${esc(s.name)}" style="margin-top:.3rem">🔑 Zugangsdaten</button></td>
           <td>${esc(s.email || '')}<br><span class="muted">${esc(s.phone || '–')}</span>${s.phone ? '<br>' + contactButtons(s.phone, `Hallo ${s.name.split(' ')[0]}, hier ${state.settings?.instructor_name || 'deine Fahrschule'}:`) : ''}</td>
           <td>${homeCell}<br><button class="ghost sm" data-home="${s.id}" data-sname="${esc(s.name)}" data-hlabel="${esc(s.home_label || '')}" data-hlat="${s.home_lat != null ? s.home_lat : ''}" data-hlng="${s.home_lng != null ? s.home_lng : ''}" style="margin-top:.3rem">Treffpunkt festlegen</button></td>
           <td>${s.done_count} Std.<br><span class="pill" style="background:${s.rank >= 2 ? 'var(--good-bg);color:var(--good)' : ''}">Rang ${s.rank} · ${s.horizon} Tage</span></td>
@@ -1615,8 +1615,10 @@ function pwProblem(pw) {
 }
 
 function openResetModal(id, name, username) {
-  modal(`<h3>Passwort für ${esc(name)}</h3>
-    <p class="hint">Vergib ein neues Passwort und gib es dem Fahrschüler weiter (z.B. per WhatsApp). Der Login-Name bleibt <span class="codechip">${esc(username || '–')}</span>.</p>
+  modal(`<h3>Zugangsdaten für ${esc(name)}</h3>
+    <div class="field"><label>Login-Name (bleibt immer gleich)</label>
+      <div class="inline"><input id="rs-user" value="${esc(username || '–')}" readonly style="flex:1"><button class="sec sm" id="rs-ucopy" type="button">📋 Login</button></div></div>
+    <p class="hint">Das Passwort ist verschlüsselt gespeichert und lässt sich aus Sicherheitsgründen nicht anzeigen. Zum Weitergeben erzeugst du hier ein <strong>neues</strong> Passwort (das alte wird dann ungültig).</p>
     <div class="field"><label>Neues Passwort (mind. 8 Zeichen, mit Zahl & Sonderzeichen)</label>
       <div class="inline"><input id="rs-pw" value="${randomPassword()}" style="flex:1"><button class="sec sm" id="rs-gen" type="button">🎲 Neu</button></div>
     </div>
@@ -1626,6 +1628,7 @@ function openResetModal(id, name, username) {
       <button id="rs-save">Passwort setzen</button>
     </div>`);
   $('#rs-gen').onclick = () => { $('#rs-pw').value = randomPassword(); };
+  $('#rs-ucopy').onclick = () => { navigator.clipboard?.writeText(username || ''); toast('Login kopiert', 'ok'); };
   $('#rs-save').onclick = async () => {
     const pw = $('#rs-pw').value.trim();
     const prob = pwProblem(pw);
