@@ -15,7 +15,7 @@ const PUBLIC = join(__dirname, 'public');
 const PORT = Number(process.env.PORT || 3000);
 const HOST = process.env.HOST || '0.0.0.0'; // hinter Caddy: HOST=127.0.0.1 (nur Proxy erreicht Node)
 const SESSION_DAYS = 30;
-const APP_VERSION = "2.7.1";
+const APP_VERSION = "2.8.0";
 // Einstellungen, die Schueler/Oeffentlichkeit sehen duerfen (Rest bleibt beim Fahrlehrer)
 const PUBLIC_SETTINGS = ['instructor_name', 'instructor_phone', 'policy_text',
   'cancel_hours', 'lock_hours', 'booking_horizon_days', 'booking_horizon_days_rank2',
@@ -841,7 +841,7 @@ async function handleApi(req, res, url) {
     if (username) {
       if (db.prepare('SELECT 1 FROM students WHERE username = ?').get(username)) return bad(res, 'Dieser Login-Name ist schon vergeben');
     } else {
-      username = genUsername(name, by || new Date().getFullYear());
+      username = genUsername(name, by);
     }
     const password = b.password ? String(b.password) : genStudentPassword();
     const prob = passwordProblem(password);
@@ -852,6 +852,38 @@ async function handleApi(req, res, url) {
       .run(name, email, phone, hashPassword(password), username, by, (clean.length ? clean : [80]).join(','), new Date().toISOString());
     logEvent('info', { actor: 'instructor', studentId: Number(info.lastInsertRowid), detail: `Fahrschüler angelegt (${username})` });
     return ok(res, { id: Number(info.lastInsertRowid), name, username, password });
+  }
+
+  // Mehrere Fahrschüler auf einmal anlegen (Liste "Nachname, Vorname" pro Zeile)
+  if (p === '/api/students/bulk' && method === 'POST') {
+    if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
+    const b = await readBody(req);
+    const lines = String(b.text || '').split('\n').map((l) => l.trim()).filter(Boolean);
+    if (!lines.length) return bad(res, 'Bitte eine Namensliste einfügen');
+    if (lines.length > 200) return bad(res, 'Maximal 200 Zeilen auf einmal');
+    const created = [], errors = [];
+    for (const line of lines) {
+      try {
+        // "Nachname, Vorname" -> "Vorname Nachname"; optionaler Jahrgang am Ende
+        let rest = line, by = null;
+        const ym = rest.match(/(?:^|[\s,;])((?:19|20)\d{2})\s*$/);
+        if (ym) { by = Number(ym[1]); rest = rest.slice(0, ym.index).trim().replace(/[;,]\s*$/, ''); }
+        let name = rest;
+        if (rest.includes(',')) {
+          const [last, first] = rest.split(',');
+          name = `${(first || '').trim()} ${(last || '').trim()}`.trim();
+        }
+        name = name.replace(/\s+/g, ' ').trim();
+        if (!name) { errors.push({ line, error: 'kein Name' }); continue; }
+        const username = genUsername(name, by);
+        const password = genStudentPassword();
+        const info = db.prepare('INSERT INTO students(name,pass,username,birth_year,allowed_durations,created_at) VALUES(?,?,?,?,?,?)')
+          .run(name, hashPassword(password), username, by, '80', new Date().toISOString());
+        logEvent('info', { actor: 'instructor', studentId: Number(info.lastInsertRowid), detail: `Fahrschüler angelegt (${username})` });
+        created.push({ name, username, password });
+      } catch (e) { errors.push({ line, error: e.message }); }
+    }
+    return ok(res, { created, errors });
   }
 
   // Fahrschüler löschen (Fahrlehrer) – inkl. seiner Buchungen
@@ -1003,9 +1035,9 @@ function genUsername(name, year) {
     ? clean(parts[0][0]) + clean(parts[parts.length - 1][0])
     : clean((parts[0] || 'XX').slice(0, 2));
   if (ini.length < 2) ini = (ini + 'XX').slice(0, 2);
-  const base = `${ini}${year}`;
+  const base = year ? `${ini}${year}` : ini; // ohne Jahrgang: nur Initialen
   let handle = base, n = 1;
-  while (db.prepare('SELECT 1 FROM students WHERE username = ?').get(handle)) { n++; handle = `${base}-${n}`; }
+  while (db.prepare('SELECT 1 FROM students WHERE username = ?').get(handle)) { n++; handle = `${base}${year ? '-' : ''}${n}`; }
   return handle;
 }
 

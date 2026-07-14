@@ -1366,11 +1366,15 @@ async function tabSchueler() {
   box.innerHTML = `<div class="card">
     <div class="inline" style="justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:.6rem">
       <h2 style="margin:.1rem 0">Fahrschüler <span class="sub">anlegen & verwalten</span></h2>
-      <button class="sm" id="s-add">➕ Fahrschüler anlegen</button>
+      <div class="inline" style="gap:.4rem">
+        <button class="sm sec" id="s-bulk">📋 Liste einfügen</button>
+        <button class="sm" id="s-add">➕ Fahrschüler anlegen</button>
+      </div>
     </div>
     <p class="hint">Lege hier deine Fahrschüler an – jeder bekommt automatisch einen Login-Namen und ein Startpasswort, das du ihm weitergibst. Über die Zeilen kannst du Daten bearbeiten, Stundenlängen freischalten (40/80/120), Treffpunkt festlegen, Passwort zurücksetzen oder den Schüler löschen.</p>
     <div id="s-list"></div></div>`;
   $('#s-add').onclick = () => openCreateStudentModal();
+  $('#s-bulk').onclick = () => openBulkStudentModal();
   try {
     const { students, req } = await api('/api/students');
     if (!students.length) { $('#s-list').innerHTML = '<p class="muted">Noch keine Fahrschüler registriert. Erzeuge im Tab „Zugangscodes“ einen Code.</p>'; return; }
@@ -1447,6 +1451,49 @@ function openCreateStudentModal() {
       showCredentials(r, `Fahrschüler „${r.name}" angelegt`);
       tabSchueler();
     } catch (e) { showErr(e.message); }
+  };
+}
+
+// Mehrere Fahrschüler auf einmal anlegen (Liste einfügen)
+function openBulkStudentModal() {
+  modal(`<h3>Mehrere Fahrschüler anlegen</h3>
+    ${errBox()}
+    <p class="hint">Füge deine Namensliste ein – <strong>eine Person pro Zeile</strong>, als „Nachname, Vorname". Ein Jahrgang am Zeilenende ist optional (fließt in den Login ein).</p>
+    <div class="field"><textarea id="bulk-text" rows="9" placeholder="Bieber, Maria&#10;Christke, Jason&#10;Franke, Lea-Michelle 2001&#10;…"></textarea></div>
+    <p class="hint">Jeder bekommt automatisch einen Login (Initialen, ggf. + Jahrgang) und ein Startpasswort. Danach kannst du alle Zugangsdaten kopieren.</p>
+    <div class="actions">
+      <button class="sec" onclick="window.__closeModal()">Abbrechen</button>
+      <button id="bulk-go">Alle anlegen</button>
+    </div>`);
+  $('#bulk-go').onclick = async () => {
+    const text = $('#bulk-text').value.trim();
+    if (!text) { showErr('Bitte eine Namensliste einfügen.'); return; }
+    try {
+      const r = await api('/api/students/bulk', { method: 'POST', body: { text } });
+      showBulkResults(r);
+      tabSchueler();
+    } catch (e) { showErr(e.message); }
+  };
+}
+
+function showBulkResults(r) {
+  const rows = (r.created || []).map((c) => `${c.name}\t${c.username}\t${c.password}`).join('\n');
+  const errList = (r.errors || []).length
+    ? `<p class="hint" style="color:var(--warn)">${r.errors.length} Zeile(n) übersprungen: ${r.errors.map((e) => esc(e.line)).join('; ')}</p>` : '';
+  modal(`<h3>${(r.created || []).length} Fahrschüler angelegt ✓</h3>
+    <p class="hint">Alle Zugangsdaten – kopiere sie dir weg (jede Zeile: Name · Login · Passwort). Passwörter sind nur jetzt sichtbar.</p>
+    ${errList}
+    <div style="max-height:46vh;overflow:auto;border:1px solid var(--line);border-radius:10px">
+    <table><tr><th>Name</th><th>Login</th><th>Passwort</th></tr>
+    ${(r.created || []).map((c) => `<tr><td>${esc(c.name)}</td><td><span class="codechip">${esc(c.username)}</span></td><td><span class="codechip">${esc(c.password)}</span></td></tr>`).join('')}
+    </table></div>
+    <div class="actions">
+      <button class="sec" id="bulk-copy">📋 Alle kopieren</button>
+      <button onclick="window.__closeModal()">Fertig</button>
+    </div>`);
+  $('#bulk-copy').onclick = () => {
+    const txt = 'Name\tLogin\tPasswort\n' + rows;
+    navigator.clipboard.writeText(txt).then(() => toast('Alle Zugangsdaten kopiert ✓', 'ok')).catch(() => toast('Kopieren nicht möglich', 'err'));
   };
 }
 
