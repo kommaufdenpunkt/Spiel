@@ -32,6 +32,15 @@ du ein Backup willst.
 
 > Anderer Port? `PORT=8080 node server.js`
 > Anderer DB-Ort? `FSP_DB=/pfad/zu/daten.db node server.js`
+> Nur lokal binden (hinter Proxy)? `HOST=127.0.0.1 node server.js`
+
+---
+
+## Online stellen (ginoco.de)
+
+Komplette Schritt-für-Schritt-Anleitung für einen deutschen Server mit
+automatischem HTTPS: **[deploy/DEPLOY.md](deploy/DEPLOY.md)**.
+Fertige Konfig-Dateien liegen im Ordner `deploy/` (Caddyfile, systemd-Dienst).
 
 ---
 
