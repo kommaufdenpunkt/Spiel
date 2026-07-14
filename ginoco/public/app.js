@@ -118,6 +118,19 @@ function getPosOnce() {
     navigator.geolocation.getCurrentPosition((p) => resolve(p.coords), (e) => reject(new Error(e.message)), { enableHighAccuracy: true, timeout: 12000 });
   });
 }
+// Adresse aus Koordinaten (OpenStreetMap/Nominatim). Fehler werden still verschluckt.
+async function reverseGeocode(lat, lng) {
+  try {
+    const u = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`;
+    const r = await fetch(u, { headers: { 'Accept-Language': 'de' } });
+    if (!r.ok) return null;
+    const a = (await r.json()).address || {};
+    const street = [a.road, a.house_number].filter(Boolean).join(' ');
+    const city = a.city || a.town || a.village || a.suburb || '';
+    const out = [street, [a.postcode, city].filter(Boolean).join(' ')].filter(Boolean).join(', ');
+    return out || null;
+  } catch { return null; }
+}
 // Live-Standort teilen (Fahrlehrer)
 let liveWatchId = null;
 function startLiveShare() {
@@ -1342,9 +1355,14 @@ async function loadCodes() {
 // ---- Tab: Schüler ----
 async function tabSchueler() {
   const box = $('#itab');
-  box.innerHTML = `<div class="card"><h2>Fahrschüler <span class="sub">erlaubte Stundenlängen zuweisen</span></h2>
-    <p class="hint">Standard sind 80-Minuten-Stunden. Wenn ein Schüler ausnahmsweise auch 40 oder 120 Minuten fahren darf, hier freischalten – nur dann kann er das im Buchen-Dialog wählen.</p>
+  box.innerHTML = `<div class="card">
+    <div class="inline" style="justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:.6rem">
+      <h2 style="margin:.1rem 0">Fahrschüler <span class="sub">anlegen & verwalten</span></h2>
+      <button class="sm" id="s-add">➕ Fahrschüler anlegen</button>
+    </div>
+    <p class="hint">Lege hier deine Fahrschüler an – jeder bekommt automatisch einen Login-Namen und ein Startpasswort, das du ihm weitergibst. Über die Zeilen kannst du Daten bearbeiten, Stundenlängen freischalten (40/80/120), Treffpunkt festlegen, Passwort zurücksetzen oder den Schüler löschen.</p>
     <div id="s-list"></div></div>`;
+  $('#s-add').onclick = () => openCreateStudentModal();
   try {
     const { students, req } = await api('/api/students');
     if (!students.length) { $('#s-list').innerHTML = '<p class="muted">Noch keine Fahrschüler registriert. Erzeuge im Tab „Zugangscodes“ einen Code.</p>'; return; }
@@ -1362,7 +1380,11 @@ async function tabSchueler() {
           ? `<span class="pill" style="background:var(--good-bg);color:var(--good)">📍 ${esc(s.home_label || 'gesetzt')}</span>`
           : `<span class="muted">– nicht vereinbart –</span>`;
         return `<tr>
-          <td><strong>${esc(s.name)}</strong>${s.birth_year ? ` <span class="muted">(${s.birth_year})</span>` : ''}</td>
+          <td><strong>${esc(s.name)}</strong>${s.birth_year ? ` <span class="muted">(${s.birth_year})</span>` : ''}
+            <div class="inline" style="margin-top:.3rem;gap:.3rem">
+              <button class="ghost sm" data-edit="${s.id}">✏️ Bearbeiten</button>
+              <button class="ghost sm" data-del="${s.id}" data-dname="${esc(s.name)}" style="color:var(--bad)">🗑️</button>
+            </div></td>
           <td><span class="codechip">${esc(s.username || '–')}</span><br><button class="ghost sm" data-reset="${s.id}" data-uname="${esc(s.username || '')}" data-sname="${esc(s.name)}" style="margin-top:.3rem">Passwort zurücksetzen</button></td>
           <td>${esc(s.email || '')}<br><span class="muted">${esc(s.phone || '–')}</span>${s.phone ? '<br>' + contactButtons(s.phone, `Hallo ${s.name.split(' ')[0]}, hier ${state.settings?.instructor_name || 'deine Fahrschule'}:`) : ''}</td>
           <td>${homeCell}<br><button class="ghost sm" data-home="${s.id}" data-sname="${esc(s.name)}" data-hlabel="${esc(s.home_label || '')}" data-hlat="${s.home_lat != null ? s.home_lat : ''}" data-hlng="${s.home_lng != null ? s.home_lng : ''}" style="margin-top:.3rem">Treffpunkt festlegen</button></td>
@@ -1383,7 +1405,88 @@ async function tabSchueler() {
       openResetModal(btn.dataset.reset, btn.dataset.sname, btn.dataset.uname));
     $('#s-list').querySelectorAll('[data-home]').forEach((btn) => btn.onclick = () =>
       openStandortModal(btn.dataset.home, btn.dataset.sname, btn.dataset.hlabel, btn.dataset.hlat, btn.dataset.hlng));
+    $('#s-list').querySelectorAll('[data-edit]').forEach((btn) => btn.onclick = () =>
+      openEditStudentModal(students.find((x) => x.id === Number(btn.dataset.edit))));
+    $('#s-list').querySelectorAll('[data-del]').forEach((btn) => btn.onclick = () =>
+      deleteStudent(btn.dataset.del, btn.dataset.dname));
   } catch (e) { toast(e.message, 'err'); }
+}
+
+// Neuen Fahrschüler anlegen – zeigt danach Login + Startpasswort zum Weitergeben
+function openCreateStudentModal() {
+  modal(`<h3>Fahrschüler anlegen</h3>
+    ${errBox()}
+    <div class="field"><label>Name *</label><input id="cs-name" placeholder="Vor- und Nachname" autocomplete="off"></div>
+    <div class="row">
+      <div class="field" style="max-width:130px"><label>Jahrgang (optional)</label><input id="cs-year" type="number" placeholder="1997" min="1930" max="2015"></div>
+      <div class="field"><label>Telefon (optional)</label><input id="cs-phone" placeholder="0151 …"></div>
+    </div>
+    <div class="field"><label>Login-Name (optional – sonst automatisch)</label><input id="cs-user" placeholder="z.B. MB1997" style="text-transform:uppercase"></div>
+    <div class="field"><label>Erlaubte Stundenlängen</label>
+      <div class="inline">${[40, 80, 120].map((d) => `<label style="margin:0;font-weight:600"><input type="checkbox" class="cs-dur" value="${d}" ${d === 80 ? 'checked' : ''} style="width:auto"> ${d} Min</label>`).join(' ')}</div></div>
+    <div class="actions">
+      <button class="sec" onclick="window.__closeModal()">Abbrechen</button>
+      <button id="cs-go">Anlegen</button>
+    </div>`);
+  $('#cs-go').onclick = async () => {
+    const name = $('#cs-name').value.trim();
+    if (!name) { showErr('Bitte einen Namen eingeben.'); return; }
+    const durs = [...document.querySelectorAll('.cs-dur')].filter((c) => c.checked).map((c) => Number(c.value));
+    const body = { name, birth_year: $('#cs-year').value || undefined, phone: $('#cs-phone').value || undefined,
+      username: $('#cs-user').value.trim() || undefined, allowed_durations: durs.length ? durs : [80] };
+    try {
+      const r = await api('/api/students', { method: 'POST', body });
+      showCredentials(r, `Fahrschüler „${r.name}" angelegt`);
+      tabSchueler();
+    } catch (e) { showErr(e.message); }
+  };
+}
+
+// Stammdaten bearbeiten
+function openEditStudentModal(s) {
+  if (!s) return;
+  modal(`<h3>${esc(s.name)} bearbeiten</h3>
+    ${errBox()}
+    <div class="field"><label>Name</label><input id="es-name" value="${esc(s.name)}"></div>
+    <div class="row">
+      <div class="field" style="max-width:130px"><label>Jahrgang</label><input id="es-year" type="number" value="${s.birth_year || ''}" min="1930" max="2015"></div>
+      <div class="field"><label>Telefon</label><input id="es-phone" value="${esc(s.phone || '')}"></div>
+    </div>
+    <div class="field"><label>E-Mail</label><input id="es-email" type="email" value="${esc(s.email || '')}"></div>
+    <div class="actions">
+      <button class="sec" onclick="window.__closeModal()">Abbrechen</button>
+      <button id="es-go">Speichern</button>
+    </div>`);
+  $('#es-go').onclick = async () => {
+    try {
+      await api('/api/students/' + s.id, { method: 'PATCH', body: {
+        name: $('#es-name').value, birth_year: $('#es-year').value || null,
+        phone: $('#es-phone').value || null, email: $('#es-email').value || null } });
+      closeModal(); toast('Gespeichert ✓', 'ok'); tabSchueler();
+    } catch (e) { showErr(e.message); }
+  };
+}
+
+async function deleteStudent(id, name) {
+  if (!confirm(`„${name}" wirklich löschen? Alle Buchungen dieses Schülers werden mitgelöscht. Das kann nicht rückgängig gemacht werden.`)) return;
+  try { await api('/api/students/' + id, { method: 'DELETE' }); toast('Fahrschüler gelöscht', 'ok'); tabSchueler(); }
+  catch (e) { toast(e.message, 'err'); }
+}
+
+// Zugangsdaten-Anzeige mit Kopier-Funktion (nach Anlegen)
+function showCredentials(r, title) {
+  modal(`<h3>${esc(title)}</h3>
+    <p class="hint">Gib diese Zugangsdaten an den Fahrschüler weiter. Das Passwort ist nur jetzt sichtbar – du kannst es später aber jederzeit zurücksetzen.</p>
+    <div class="field"><label>Login-Name</label><input id="cr-user" value="${esc(r.username)}" readonly></div>
+    <div class="field"><label>Passwort</label><input id="cr-pw" value="${esc(r.password)}" readonly></div>
+    <div class="actions">
+      <button class="sec" id="cr-copy">📋 Kopieren</button>
+      <button onclick="window.__closeModal()">Fertig</button>
+    </div>`);
+  $('#cr-copy').onclick = () => {
+    const txt = `ginoco Login\nAdresse: https://ginoco.de\nLogin-Name: ${r.username}\nPasswort: ${r.password}`;
+    navigator.clipboard.writeText(txt).then(() => toast('Kopiert ✓', 'ok')).catch(() => toast('Kopieren nicht möglich', 'err'));
+  };
 }
 
 // Festen Treffpunkt (Standort) eines Schuelers festlegen – wird als Standard fuer dessen Fahrstunden genutzt
@@ -1392,11 +1495,13 @@ function openStandortModal(id, name, label, lat, lng) {
     <p class="hint">Der Ort, an dem du ${esc((name || '').split(' ')[0])} normalerweise abholst. Er wird bei jeder Fahrstunde automatisch als Treffpunkt genutzt – du musst ihn dann nicht mehr einzeln eintragen.</p>
     <div class="field"><label>Adresse / Beschreibung</label>
       <input id="st-label" value="${esc(label || '')}" placeholder="z.B. Bahnhof Musterstadt, Gleis-Eingang"></div>
+    <div style="margin:.2rem 0 .7rem"><button class="sec sm" id="st-here" type="button">📍 Aktueller Standort übernehmen</button>
+      <span class="hint" id="st-here-info" style="margin-left:.5rem"></span></div>
     <div class="inline">
       <div class="field" style="flex:1"><label>Breitengrad (optional)</label><input id="st-lat" value="${esc(lat || '')}" placeholder="z.B. 52.5200"></div>
       <div class="field" style="flex:1"><label>Längengrad (optional)</label><input id="st-lng" value="${esc(lng || '')}" placeholder="z.B. 13.4050"></div>
     </div>
-    <p class="hint" style="margin-top:-.4rem">Koordinaten sind optional – nur damit im Live-Modus die Ankunftszeit (ETA) berechnet werden kann. Findest du z.B. in Google Maps per Rechtsklick auf den Ort. Ohne Koordinaten reicht die Adresse als Text.</p>
+    <p class="hint" style="margin-top:-.4rem">Tipp: Wenn du gerade beim Treffpunkt stehst, tippe oben auf „Aktueller Standort übernehmen“ – Koordinaten und Adresse werden automatisch ausgefüllt. Alternativ Koordinaten aus Google Maps per Rechtsklick.</p>
     <div class="actions">
       <button class="ghost" id="st-clear" type="button">Treffpunkt entfernen</button>
       <button class="sec" onclick="window.__closeModal()">Abbrechen</button>
@@ -1414,6 +1519,20 @@ function openStandortModal(id, name, label, lat, lng) {
     save({ home_label: l, home_lat: la || null, home_lng: lo || null }, 'Treffpunkt gespeichert ✓');
   };
   $('#st-clear').onclick = () => save({ home_label: null, home_lat: null, home_lng: null }, 'Treffpunkt entfernt');
+  $('#st-here').onclick = async () => {
+    const info = $('#st-here-info');
+    info.textContent = 'GPS wird ermittelt …';
+    try {
+      const c = await getPosOnce();
+      $('#st-lat').value = c.latitude.toFixed(6);
+      $('#st-lng').value = c.longitude.toFixed(6);
+      info.textContent = '✓ Koordinaten übernommen';
+      if (!$('#st-label').value.trim()) {
+        const addr = await reverseGeocode(c.latitude, c.longitude);
+        if (addr) { $('#st-label').value = addr; info.textContent = '✓ Standort & Adresse übernommen'; }
+      }
+    } catch (e) { info.textContent = ''; toast(e.message || 'GPS nicht verfügbar', 'err'); }
+  };
 }
 
 // Starkes, aber lesbares Zufallspasswort: Buchstaben + Zahl + Sonderzeichen

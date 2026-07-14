@@ -15,7 +15,7 @@ const PUBLIC = join(__dirname, 'public');
 const PORT = Number(process.env.PORT || 3000);
 const HOST = process.env.HOST || '0.0.0.0'; // hinter Caddy: HOST=127.0.0.1 (nur Proxy erreicht Node)
 const SESSION_DAYS = 30;
-const APP_VERSION = "2.6.0";
+const APP_VERSION = "2.7.0";
 // Einstellungen, die Schueler/Oeffentlichkeit sehen duerfen (Rest bleibt beim Fahrlehrer)
 const PUBLIC_SETTINGS = ['instructor_name', 'instructor_phone', 'policy_text',
   'cancel_hours', 'lock_hours', 'booking_horizon_days', 'booking_horizon_days_rank2',
@@ -777,6 +777,23 @@ async function handleApi(req, res, url) {
     if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
     const b = await readBody(req);
     const sid = Number(stm[1]);
+    // Stammdaten bearbeiten (Name / Telefon / E-Mail / Jahrgang)
+    if ('name' in b || 'phone' in b || 'email' in b || 'birth_year' in b) {
+      const st = db.prepare('SELECT id FROM students WHERE id=?').get(sid);
+      if (!st) return bad(res, 'Schueler nicht gefunden', 404);
+      const fields = [], vals = [];
+      if ('name' in b) { const nm = String(b.name || '').trim(); if (!nm) return bad(res, 'Name darf nicht leer sein'); fields.push('name=?'); vals.push(nm); }
+      if ('phone' in b) { fields.push('phone=?'); vals.push(b.phone ? String(b.phone).trim() : null); }
+      if ('email' in b) {
+        const em = b.email ? String(b.email).trim() : null;
+        if (em && db.prepare('SELECT 1 FROM students WHERE email=? AND id<>?').get(em, sid)) return bad(res, 'Diese E-Mail ist schon vergeben');
+        fields.push('email=?'); vals.push(em);
+      }
+      if ('birth_year' in b) { fields.push('birth_year=?'); vals.push(b.birth_year ? Number(b.birth_year) : null); }
+      db.prepare(`UPDATE students SET ${fields.join(', ')} WHERE id=?`).run(...vals, sid);
+      logEvent('info', { actor: 'instructor', studentId: sid, detail: 'Stammdaten bearbeitet' });
+      return ok(res, { updated: true });
+    }
     // Festen Standort/Treffpunkt setzen (mit dem Schueler abgesprochen)
     if ('home_label' in b || 'home_lat' in b || 'home_lng' in b) {
       const st = db.prepare('SELECT id FROM students WHERE id=?').get(sid);
@@ -810,6 +827,46 @@ async function handleApi(req, res, url) {
     return ok(res);
   }
   // Test-/Demo-Schueler mit einem Klick anlegen (zum Ausprobieren der Schueler-Ansicht)
+  // Fahrschüler direkt anlegen (Fahrlehrer) – erzeugt Login + Startpasswort zum Weitergeben
+  if (p === '/api/students' && method === 'POST') {
+    if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
+    const b = await readBody(req);
+    const name = String(b.name || '').trim();
+    if (!name) return bad(res, 'Bitte einen Namen angeben');
+    const by = b.birth_year ? Number(b.birth_year) : null;
+    const email = b.email ? String(b.email).trim() : null;
+    const phone = b.phone ? String(b.phone).trim() : null;
+    if (email && db.prepare('SELECT 1 FROM students WHERE email = ?').get(email)) return bad(res, 'Diese E-Mail ist schon vergeben');
+    let username = b.username ? String(b.username).trim().replace(/\s+/g, '') : '';
+    if (username) {
+      if (db.prepare('SELECT 1 FROM students WHERE username = ?').get(username)) return bad(res, 'Dieser Login-Name ist schon vergeben');
+    } else {
+      username = genUsername(name, by || new Date().getFullYear());
+    }
+    const password = b.password ? String(b.password) : genStudentPassword();
+    const prob = passwordProblem(password);
+    if (prob) return bad(res, 'Passwort braucht ' + prob + '.');
+    const durs = Array.isArray(b.allowed_durations) ? b.allowed_durations : String(b.allowed_durations || '80').split(',');
+    const clean = [...new Set(durs.map(Number).filter((n) => n > 0))].sort((a, z) => a - z);
+    const info = db.prepare('INSERT INTO students(name,email,phone,pass,username,birth_year,allowed_durations,created_at) VALUES(?,?,?,?,?,?,?,?)')
+      .run(name, email, phone, hashPassword(password), username, by, (clean.length ? clean : [80]).join(','), new Date().toISOString());
+    logEvent('info', { actor: 'instructor', studentId: Number(info.lastInsertRowid), detail: `Fahrschüler angelegt (${username})` });
+    return ok(res, { id: Number(info.lastInsertRowid), name, username, password });
+  }
+
+  // Fahrschüler löschen (Fahrlehrer) – inkl. seiner Buchungen
+  const delm = p.match(/^\/api\/students\/(\d+)$/);
+  if (delm && method === 'DELETE') {
+    if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
+    const sid = Number(delm[1]);
+    const st = db.prepare('SELECT id,name,username FROM students WHERE id = ?').get(sid);
+    if (!st) return bad(res, 'Schüler nicht gefunden', 404);
+    db.prepare('DELETE FROM bookings WHERE student_id = ?').run(sid);
+    db.prepare('DELETE FROM students WHERE id = ?').run(sid);
+    logEvent('info', { actor: 'instructor', detail: `Fahrschüler gelöscht (${st.username || st.name})` });
+    return ok(res, { deleted: true });
+  }
+
   if (p === '/api/instructor/test-student' && method === 'POST') {
     if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
     const n = db.prepare("SELECT COUNT(*) AS c FROM students WHERE name LIKE 'Testschüler%'").get().c + 1;
@@ -925,6 +982,17 @@ function genCode() {
     code = `${s.slice(0, 4)}-${s.slice(4)}`;
   } while (db.prepare('SELECT 1 FROM codes WHERE code = ?').get(code));
   return code;
+}
+
+// Merkbares, richtlinien-konformes Startpasswort, z.B. "Ampel482!"
+function genStudentPassword() {
+  const words = ['Auto', 'Fahrt', 'Motor', 'Ampel', 'Kreisel', 'Spur', 'Gang', 'Blinker', 'Tempo', 'Route'];
+  const specials = '!?#@';
+  const b = randomBytes(4);
+  const w = words[b[0] % words.length];
+  const num = 100 + ((b[1] << 8 | b[2]) % 900); // dreistellig
+  const sp = specials[b[3] % specials.length];
+  return `${w}${num}${sp}`;
 }
 
 // Login-Handle aus Initialen + Jahrgang, z.B. "Max Mustermann" 1997 -> "MM1997"
