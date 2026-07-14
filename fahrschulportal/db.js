@@ -156,6 +156,16 @@ ensureColumn('bookings', 'reminded_1d', 'reminded_1d INTEGER NOT NULL DEFAULT 0'
 ensureColumn('bookings', 'reminded_3h', 'reminded_3h INTEGER NOT NULL DEFAULT 0');
 ensureColumn('bookings', 'reminded_30m', 'reminded_30m INTEGER NOT NULL DEFAULT 0');
 ensureColumn('day_overrides', 'type', "type TEXT NOT NULL DEFAULT 'short'");  // short | free | vacation
+ensureColumn('bookings', 'meet_label', 'meet_label TEXT');   // Treffpunkt (Text)
+ensureColumn('bookings', 'meet_lat', 'meet_lat REAL');       // Treffpunkt-Koordinaten (optional)
+ensureColumn('bookings', 'meet_lng', 'meet_lng REAL');
+
+// Live-Standort des Fahrlehrers (genau eine Zeile)
+db.exec(`CREATE TABLE IF NOT EXISTS live_location (
+  id INTEGER PRIMARY KEY CHECK(id = 1),
+  lat REAL, lng REAL, updated_at TEXT, active INTEGER NOT NULL DEFAULT 0
+);`);
+db.exec('INSERT OR IGNORE INTO live_location(id,active) VALUES(1,0)');
 
 // ---- Voreinstellungen (einmalig setzen) ----
 const DEFAULTS = {
@@ -177,6 +187,12 @@ const DEFAULTS = {
   vacation_credit_min: '240',// Minuten, die ein Urlaubstag als Arbeitszeit zaehlt
   vacation_days_left: '30',  // verbleibende Urlaubstage (nur zur Anzeige)
   late_grace_min: '20',      // bis so viele Min Verspaetung ok; danach zaehlt die Zeit ab
+  instructor_phone: '',      // Handynummer des Fahrlehrers (fuer Anruf/WhatsApp)
+  avg_speed_kmh: '30',       // angenommene Durchschnittsgeschwindigkeit fuer die ETA
+  live_lead_min: '20',       // so viele Min vor Beginn wird der Live-Standort geteilt
+  meet_default_label: '',    // Standard-Treffpunkt (Text)
+  meet_default_lat: '',      // Standard-Treffpunkt-Koordinaten (optional)
+  meet_default_lng: '',
   policy_text: 'Gebuchte Termine sind verbindlich. Kostenfrei stornieren nur bis '
     + '48 Std. vorher; ab 36 Std. vorher steht der Termin fest. Bei Nichterscheinen '
     + 'werden bis zu 75 % berechnet. Ab 20 Min Verspätung verkürzt sich die Fahrstunde '
@@ -205,7 +221,7 @@ export function getSettings() {
   // Zahlen als Zahlen liefern
   for (const n of ['lesson_min', 'break_min', 'weekly_target_h', 'daily_target_h', 'weekly_lo_h',
     'max_per_week', 'booking_horizon_days', 'cancel_hours', 'lock_hours',
-    'vacation_credit_min', 'vacation_days_left', 'late_grace_min']) {
+    'vacation_credit_min', 'vacation_days_left', 'late_grace_min', 'avg_speed_kmh', 'live_lead_min']) {
     out[n] = Number(out[n]);
   }
   return out;

@@ -56,6 +56,22 @@ function openThemePicker() {
 }
 window.__openThemePicker = openThemePicker;
 
+function openPhoneModal() {
+  const phone = state.user?.phone || '';
+  const ip = state.settings?.instructor_phone;
+  modal(`<h3>Handynummer</h3>
+    <p class="hint">Deine Nummer, damit dein Fahrlehrer dich erreichen kann (z.B. bei Verspätung).</p>
+    <div class="field"><label>Deine Handynummer</label><input id="ph-in" value="${esc(phone)}" placeholder="z.B. 0151 23456789"></div>
+    ${ip ? `<div class="field"><label>Fahrschule erreichen</label><div class="inline">${contactButtons(ip)}</div></div>` : ''}
+    <div class="actions"><button class="sec" onclick="window.__closeModal()">Schließen</button><button id="ph-save">Speichern</button></div>`);
+  $('#ph-save').onclick = async () => {
+    try { await api('/api/my/profile', { method: 'PATCH', body: { phone: $('#ph-in').value } });
+      state.user.phone = $('#ph-in').value.trim(); closeModal(); toast('Gespeichert ✓', 'ok'); }
+    catch (e) { toast(e.message, 'err'); }
+  };
+}
+window.__openPhone = openPhoneModal;
+
 // ---------- API ----------
 async function api(path, opts = {}) {
   const res = await fetch(path, {
@@ -81,6 +97,44 @@ function hoursUntil(date, start) { return (new Date(`${date}T${start}:00`).getTi
 function daysAhead(date) { return Math.round((parseD(date).getTime() - parseD(todayStr()).getTime()) / 864e5); }
 function minToH(m) { return (m / 60); }
 function hLabel(m) { const h = Math.floor(m / 60), mm = m % 60; return mm ? `${h}:${String(mm).padStart(2, '0')} h` : `${h} h`; }
+
+// ---------- Kontakt / Geo ----------
+function telLink(p) { return 'tel:' + String(p || '').replace(/[^+\d]/g, ''); }
+function waNumber(p) { let d = String(p || '').replace(/\D/g, ''); if (d.startsWith('0')) d = '49' + d.slice(1); return d; }
+function waLink(p) { return 'https://wa.me/' + waNumber(p); }
+function contactButtons(phone, waText) {
+  if (!phone) return '';
+  const t = waText ? '?text=' + encodeURIComponent(waText) : '';
+  return `<a class="pill" href="${telLink(phone)}" style="text-decoration:none">📞 Anrufen</a>
+    <a class="pill" href="${waLink(phone)}${t}" target="_blank" rel="noopener" style="text-decoration:none">💬 WhatsApp</a>`;
+}
+function getPosOnce() {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) return reject(new Error('Kein GPS verfügbar'));
+    navigator.geolocation.getCurrentPosition((p) => resolve(p.coords), (e) => reject(new Error(e.message)), { enableHighAccuracy: true, timeout: 12000 });
+  });
+}
+// Live-Standort teilen (Fahrlehrer)
+let liveWatchId = null;
+function startLiveShare() {
+  if (!navigator.geolocation) { toast('GPS nicht verfügbar', 'err'); return; }
+  liveWatchId = navigator.geolocation.watchPosition(async (p) => {
+    try { await api('/api/instructor/location', { method: 'POST', body: { lat: p.coords.latitude, lng: p.coords.longitude } }); } catch {}
+    if (state.instrTab === 'heute') { const el = $('#live-instr'); if (el) el.dataset.ts = new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }); }
+  }, (e) => { toast('Standort-Fehler: ' + e.message, 'err'); stopLiveShare(); },
+    { enableHighAccuracy: true, maximumAge: 8000, timeout: 20000 });
+  state.liveSharing = true;
+  if (state.user?.role === 'instructor') renderInstructor();
+  toast('Standort wird geteilt 🛰️', 'ok');
+}
+function stopLiveShare() {
+  if (liveWatchId != null) navigator.geolocation.clearWatch(liveWatchId);
+  liveWatchId = null; state.liveSharing = false;
+  api('/api/instructor/location/stop', { method: 'POST' }).catch(() => {});
+  if (state.user?.role === 'instructor') renderInstructor();
+}
+window.__startLive = startLiveShare;
+window.__stopLive = stopLiveShare;
 
 // ---------- UI-Helfer ----------
 let toastTimer;
@@ -125,6 +179,8 @@ function header() {
     <div class="who">
       <span class="role">${u.role === 'instructor' ? 'Fahrlehrer' : 'Fahrschüler'}</span>
       <strong>${esc(u.name || '')}</strong>${u.username ? `<span class="pill">${esc(u.username)}</span>` : ''}
+      ${state.liveSharing ? '<button class="ghost sm" onclick="window.__stopLive()" title="Standort-Teilen beenden" style="color:var(--good)">🛰️ Live · Stopp</button>' : ''}
+      ${u.role === 'student' ? '<button class="ghost sm" onclick="window.__openPhone()" title="Handynummer">📱</button>' : ''}
       <button class="ghost sm" onclick="window.__openThemePicker()" title="Farbe wählen">🎨</button>
       <button class="ghost sm" id="logout">Abmelden</button>
     </div>
@@ -233,6 +289,7 @@ function wireAuth(tab) {
 // ====================== FAHRSCHÜLER ======================
 async function renderStudent() {
   app.innerHTML = header() + `<main>
+    <div class="card hidden" id="live-card"></div>
     <div class="card hidden" id="notif-card"></div>
     <div class="card" id="week-card"></div>
     <div class="card hidden" id="offers-card"></div>
@@ -270,6 +327,7 @@ async function syncStudent() {
     myBookingsCache = mine.bookings;
     renderAway(away.away);
     renderNotifications(notif.notifications, notif.unread);
+    refreshStudentLive();
     renderWeekCard(mine.weekInfo, mine.bookings);
     renderOffers(off.offers, mine.weekInfo);
     renderSlots(day.slots, mine.bookings);
@@ -371,6 +429,49 @@ function studentBookingItem(b) {
     </div>
     <div class="inline">${actions}</div>
   </div>`;
+}
+
+// ---------- Live-Verfolgung (Schüler) ----------
+let studentLivePoll = null;
+async function refreshStudentLive() {
+  const card = $('#live-card'); if (!card) return;
+  let d;
+  try { d = await api('/api/my/live'); } catch { return; }
+  if (!d.window) {
+    card.classList.add('hidden');
+    if (studentLivePoll) { clearInterval(studentLivePoll); studentLivePoll = null; }
+    return;
+  }
+  card.classList.remove('hidden');
+  const phone = state.settings?.instructor_phone;
+  const contact = phone ? `<div class="inline" style="margin-top:.6rem">${contactButtons(phone, 'Hallo, ich warte am Treffpunkt auf dich.')}</div>` : '';
+  if (!d.active) {
+    card.innerHTML = `<h2>📍 Treffpunkt</h2>
+      <p>Deine Fahrstunde beginnt in <strong>${d.booking.minutesToStart} Min</strong> (${d.booking.start_time} Uhr).</p>
+      ${d.meet?.label ? `<p class="meta">Treffpunkt: <strong>${esc(d.meet.label)}</strong></p>` : ''}
+      <p class="hint">Sobald dein Fahrlehrer seinen Standort teilt (ca. ${d.lead} Min vorher), kannst du hier live sehen, wo er ist und wann er da ist.</p>${contact}`;
+  } else {
+    const loc = d.location;
+    const dd = 0.008, bbox = [loc.lng - dd, loc.lat - dd, loc.lng + dd, loc.lat + dd].join(',');
+    const mapSrc = `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${loc.lat},${loc.lng}`;
+    const route = d.meet?.lat != null
+      ? `https://www.google.com/maps/dir/?api=1&origin=${loc.lat},${loc.lng}&destination=${d.meet.lat},${d.meet.lng}`
+      : `https://www.google.com/maps/search/?api=1&query=${loc.lat},${loc.lng}`;
+    const upd = new Date(loc.updated_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+    card.innerHTML = `<h2>🛰️ Dein Fahrlehrer ist unterwegs</h2>
+      <div class="inline" style="margin-bottom:.6rem">
+        ${d.etaMin != null ? `<span class="pill" style="background:var(--good-bg);color:var(--good);font-size:.95rem">🚗 ca. ${d.etaMin} Min</span>` : ''}
+        ${d.distanceKm != null ? `<span class="pill">${d.distanceKm < 1 ? Math.round(d.distanceKm * 1000) + ' m' : d.distanceKm.toFixed(1) + ' km'} entfernt</span>` : ''}
+        <span class="pill">aktualisiert ${upd}</span>
+      </div>
+      <iframe title="Karte" src="${mapSrc}" style="width:100%;height:300px;border:1px solid var(--line);border-radius:10px" loading="lazy"></iframe>
+      <div class="inline" style="margin-top:.6rem">
+        ${d.meet?.label ? `<span class="pill">📍 ${esc(d.meet.label)}</span>` : ''}
+        <a class="pill" href="${route}" target="_blank" rel="noopener" style="text-decoration:none;background:var(--brand);color:#fff">🧭 Route öffnen</a>
+      </div>
+      <p class="hint" style="margin-top:.4rem">Entfernung ist Luftlinie, ETA eine Schätzung.</p>${contact}`;
+  }
+  if (!studentLivePoll) studentLivePoll = setInterval(refreshStudentLive, 15000);
 }
 
 function renderAway(away) {
@@ -555,9 +656,11 @@ function drawInstrTab() {
 // ---- Tab: Heute & Ziele (Tacho) ----
 async function tabHeute() {
   const box = $('#itab');
-  box.innerHTML = `<div class="card"><h2>Wochenziel</h2><div id="gauge"></div><div id="tiles"></div></div>
+  box.innerHTML = `<div class="card hidden" id="live-card"></div>
+    <div class="card"><h2>Wochenziel</h2><div id="gauge"></div><div id="tiles"></div></div>
     <div class="card"><h2>Heute <span class="sub" id="today-sub"></span></h2><div id="today-list"></div></div>`;
   try {
+    renderLiveInstr();
     const stats = await api('/api/instructor/stats?date=' + todayStr());
     renderGauge($('#gauge'), stats);
     renderTiles($('#tiles'), stats);
@@ -565,6 +668,26 @@ async function tabHeute() {
     $('#today-sub').textContent = fmtDay(todayStr());
     renderInstrDay($('#today-list'), todayStr(), ov.bookings, ov.blocks);
   } catch (e) { toast(e.message, 'err'); }
+}
+
+async function renderLiveInstr() {
+  const card = $('#live-card'); if (!card) return;
+  let st;
+  try { st = await api('/api/instructor/live-status'); } catch { return; }
+  const sharing = state.liveSharing;
+  const soon = st.upcoming[0];
+  if (!sharing && !soon) { card.classList.add('hidden'); return; }
+  card.classList.remove('hidden');
+  card.innerHTML = `<h2>🛰️ Live-Standort</h2>
+    ${soon ? `<p class="hint">In <strong>${soon.minutes} Min</strong> beginnt die Fahrstunde mit <strong>${esc(soon.student_name)}</strong> (${soon.start_time} Uhr). Teile deinen Standort, damit ${esc(soon.student_name.split(' ')[0])} sieht, wann du da bist.</p>`
+      : '<p class="hint">Du kannst deinen Standort mit dem nächsten Fahrschüler teilen.</p>'}
+    ${sharing
+      ? `<div class="inline"><span class="pill" style="background:var(--good-bg);color:var(--good)" id="live-instr" data-ts="">📍 Standort wird geteilt …</span>
+         <button class="danger sm" id="live-stop">Teilen beenden</button></div>`
+      : `<button id="live-start">🛰️ Standort jetzt teilen</button>
+         <p class="hint" style="margin-top:.5rem">Dein Browser fragt einmal nach der Standort-Erlaubnis. Läuft, solange die App offen ist.</p>`}`;
+  if (sharing) $('#live-stop').onclick = () => stopLiveShare();
+  else $('#live-start').onclick = () => startLiveShare();
 }
 
 function renderTiles(el, stats) {
@@ -670,8 +793,8 @@ function instrBookingItem(b) {
   return `<div class="bitem">
     <div>
       <div class="when">${b.start_time}–${end} <span class="muted" style="font-weight:400">(${b.duration_min} Min)</span></div>
-      <div class="meta"><strong>${who}</strong> ${b.student_phone ? '· ' + esc(b.student_phone) : ''}</div>
-      <div class="meta">${st} ${gear} ${b.plate ? '· 🚘 ' + esc(b.plate) : ''} ${b.note ? '· ' + esc(b.note) : ''}</div>
+      <div class="meta"><strong>${who}</strong> ${b.student_phone ? '· ' + esc(b.student_phone) + ' ' + contactButtons(b.student_phone, `Hallo ${(b.student_name || '').split(' ')[0]}, wegen deiner Fahrstunde am ${fmtShort(b.date)} um ${b.start_time} Uhr:`) : ''}</div>
+      <div class="meta">${st} ${gear} ${b.plate ? '· 🚘 ' + esc(b.plate) : ''} ${b.meet_label ? '· 📍 ' + esc(b.meet_label) : ''} ${b.note ? '· ' + esc(b.note) : ''}</div>
     </div>
     <div class="inline">
       <button class="sec sm" data-mark="${b.id}">Bearbeiten</button>
@@ -731,11 +854,22 @@ function openMarkModal(id) {
     </div>
     <div class="field"><label>Grund (bei Absage/Nichterscheinen, optional)</label><input id="m-reason" value="${esc(b.reason || '')}"></div>
     <div class="field"><label>Notiz (optional)</label><input id="m-note" value="${esc(b.note || '')}"></div>
+    <div class="field"><label>Treffpunkt (für Live-Standort & Navigation)</label>
+      <div class="inline"><input id="m-meet" value="${esc(b.meet_label || '')}" placeholder="z.B. vor der Schule" style="flex:1">
+        <button class="sec sm" id="m-meet-here" type="button">📍 Standort</button></div>
+      <div class="hint" id="m-meet-info" style="margin:.3rem 0 0">${b.meet_lat != null ? '✓ Koordinaten hinterlegt (ETA möglich)' : 'Ohne Koordinaten nur als Text.'}</div>
+    </div>
     <div class="hint" id="m-hint"></div>
     <div class="actions">
       <button class="sec" onclick="window.__closeModal()">Abbrechen</button>
       <button id="m-save">Speichern</button>
     </div>`);
+  let meetLat = b.meet_lat, meetLng = b.meet_lng;
+  $('#m-meet-here').onclick = async () => {
+    try { const c = await getPosOnce(); meetLat = c.latitude; meetLng = c.longitude;
+      $('#m-meet-info').innerHTML = `✓ Koordinaten übernommen (${meetLat.toFixed(4)}, ${meetLng.toFixed(4)})`; toast('Treffpunkt gesetzt', 'ok'); }
+    catch (e) { toast(e.message, 'err'); }
+  };
   const grace = state.settings?.late_grace_min || 20;
   const baseDur = b.duration_min;
   const recalc = () => {
@@ -753,7 +887,8 @@ function openMarkModal(id) {
       const att = $('#m-att').value;
       const body = { gearbox: $('#m-gear').value, plate: $('#m-plate').value, duration_min: Number($('#m-dur').value),
         status: $('#m-status').value, note: $('#m-note').value, reason: $('#m-reason').value,
-        late_minutes: Number($('#m-late').value) || 0, attended: att === '' ? null : (att === '1') };
+        late_minutes: Number($('#m-late').value) || 0, attended: att === '' ? null : (att === '1'),
+        meet_label: $('#m-meet').value, meet_lat: meetLat ?? '', meet_lng: meetLng ?? '' };
       if ($('#m-date').value !== b.date) body.date = $('#m-date').value;
       if ($('#m-time').value !== b.start_time) body.start_time = $('#m-time').value;
       await api('/api/bookings/' + id, { method: 'PATCH', body });
@@ -1023,7 +1158,7 @@ async function tabSchueler() {
         return `<tr>
           <td><strong>${esc(s.name)}</strong>${s.birth_year ? ` <span class="muted">(${s.birth_year})</span>` : ''}</td>
           <td><span class="codechip">${esc(s.username || '–')}</span><br><button class="ghost sm" data-reset="${s.id}" data-uname="${esc(s.username || '')}" data-sname="${esc(s.name)}" style="margin-top:.3rem">Passwort zurücksetzen</button></td>
-          <td>${esc(s.email || '')}<br><span class="muted">${esc(s.phone || '')}</span></td>
+          <td>${esc(s.email || '')}<br><span class="muted">${esc(s.phone || '–')}</span>${s.phone ? '<br>' + contactButtons(s.phone, `Hallo ${s.name.split(' ')[0]}, hier ${state.settings?.instructor_name || 'deine Fahrschule'}:`) : ''}</td>
           <td>${s.done_count} Std.</td>
           <td><div class="inline">${boxes} <button class="sec sm" data-savedur="${s.id}">Speichern</button></div></td>
         </tr>`;
@@ -1322,7 +1457,19 @@ function tabEinstellungen() {
         <div class="hint" id="e-preview"></div>
         <h2 style="font-size:.95rem;margin-top:1.4rem">Zugang</h2>
         <div class="field"><label>Angezeigter Name</label><input id="e-name" value="${esc(s.instructor_name)}"></div>
+        <div class="field"><label>Deine Handynummer (Schüler können anrufen/schreiben)</label><input id="e-phone" value="${esc(s.instructor_phone || '')}" placeholder="z.B. 0151 23456789"></div>
         <div class="field"><label>Neue PIN (leer lassen = unverändert)</label><input id="e-pin" type="password" placeholder="mind. 4 Zeichen"></div>
+
+        <h2 style="font-size:.95rem;margin-top:1.4rem">Live-Standort</h2>
+        <div class="row">
+          <div class="field"><label>Standort teilen ab (Min vorher)</label><input id="e-lead" type="number" value="${s.live_lead_min}" min="1"></div>
+          <div class="field"><label>Ø Tempo für ETA (km/h)</label><input id="e-speed" type="number" value="${s.avg_speed_kmh}" min="5"></div>
+        </div>
+        <div class="field"><label>Standard-Treffpunkt (Text)</label>
+          <div class="inline"><input id="e-meet" value="${esc(s.meet_default_label || '')}" placeholder="z.B. Fahrschule / Bahnhof" style="flex:1">
+            <button class="sec sm" id="e-meet-here" type="button">📍 Standort</button></div>
+          <div class="hint" id="e-meet-info" style="margin:.3rem 0 0">${s.meet_default_lat ? '✓ Koordinaten hinterlegt' : 'Ohne Koordinaten nur als Text.'}</div>
+        </div>
       </div>
     </div>
     <div class="inline" style="margin-top:.6rem"><button id="e-save">Speichern</button><span id="e-msg" class="muted"></span></div>
@@ -1339,6 +1486,12 @@ function tabEinstellungen() {
   };
   ['e-start', 'e-last', 'e-lesson', 'e-break'].forEach((id) => $('#' + id).oninput = updatePreview);
   updatePreview();
+  let meetLat = s.meet_default_lat || '', meetLng = s.meet_default_lng || '';
+  $('#e-meet-here').onclick = async () => {
+    try { const c = await getPosOnce(); meetLat = c.latitude; meetLng = c.longitude;
+      $('#e-meet-info').innerHTML = `✓ Koordinaten übernommen (${meetLat.toFixed(4)}, ${meetLng.toFixed(4)})`; toast('Treffpunkt gesetzt', 'ok'); }
+    catch (e) { toast(e.message, 'err'); }
+  };
   $('#e-save').onclick = async () => {
     const workdays = [...box.querySelectorAll('[data-day]')].filter((c) => c.checked).map((c) => c.dataset.day).join(',');
     try {
@@ -1353,6 +1506,9 @@ function tabEinstellungen() {
         release_time: $('#e-release').value, short_day_last_start: $('#e-shortlast').value,
         vacation_credit_min: Number($('#e-vaccredit').value), vacation_days_left: Number($('#e-vacdays').value),
         late_grace_min: Number($('#e-grace').value), policy_text: $('#e-policy').value,
+        instructor_phone: $('#e-phone').value, live_lead_min: Number($('#e-lead').value),
+        avg_speed_kmh: Number($('#e-speed').value), meet_default_label: $('#e-meet').value,
+        meet_default_lat: meetLat === '' ? '' : String(meetLat), meet_default_lng: meetLng === '' ? '' : String(meetLng),
         new_pin: $('#e-pin').value || undefined } });
       state.settings = r.settings; state.user.name = r.settings.instructor_name;
       toast('Einstellungen gespeichert ✓', 'ok'); $('#e-msg').textContent = 'Gespeichert.';

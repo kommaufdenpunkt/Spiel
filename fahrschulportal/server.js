@@ -102,6 +102,13 @@ function hoursUntil(date, start) {
 function daysAhead(date) {
   return Math.round((new Date(date + 'T00:00:00').getTime() - new Date(todayStr() + 'T00:00:00').getTime()) / 864e5);
 }
+// Luftlinie in km zwischen zwei Koordinaten
+function haversineKm(aLat, aLng, bLat, bLng) {
+  const R = 6371, rad = (d) => d * Math.PI / 180;
+  const dLat = rad(bLat - aLat), dLng = rad(bLng - aLng);
+  const s = Math.sin(dLat / 2) ** 2 + Math.cos(rad(aLat)) * Math.cos(rad(bLat)) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(s), Math.sqrt(1 - s));
+}
 
 function getOverride(date) {
   return db.prepare('SELECT * FROM day_overrides WHERE date = ?').get(date) || null;
@@ -321,6 +328,9 @@ async function handleApi(req, res, url) {
       if ('plate' in b) { fields.push('plate=?'); vals.push(b.plate ? String(b.plate).trim() : null); }
       if ('note' in b) { fields.push('note=?'); vals.push(b.note ? String(b.note).trim() : null); }
       if ('reason' in b) { fields.push('reason=?'); vals.push(b.reason ? String(b.reason).trim() : null); }
+      if ('meet_label' in b) { fields.push('meet_label=?'); vals.push(b.meet_label ? String(b.meet_label).trim() : null); }
+      if ('meet_lat' in b) { fields.push('meet_lat=?'); vals.push(b.meet_lat == null || b.meet_lat === '' ? null : Number(b.meet_lat)); }
+      if ('meet_lng' in b) { fields.push('meet_lng=?'); vals.push(b.meet_lng == null || b.meet_lng === '' ? null : Number(b.meet_lng)); }
       if ('attended' in b) { fields.push('attended=?'); vals.push(b.attended == null ? null : (b.attended ? 1 : 0)); }
       if ('late_minutes' in b) { fields.push('late_minutes=?'); vals.push(Math.max(0, Number(b.late_minutes) || 0)); }
       if ('duration_min' in b && Number(b.duration_min) > 0) { fields.push('duration_min=?'); vals.push(newDur); }
@@ -517,6 +527,77 @@ async function handleApi(req, res, url) {
     return ok(res, { sent: sendDueReminders() });
   }
 
+  // ===== Live-Standort =====
+  // Fahrlehrer sendet seine aktuelle Position (waehrend die App offen ist)
+  if (p === '/api/instructor/location' && method === 'POST') {
+    if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
+    const b = await readBody(req);
+    const lat = Number(b.lat), lng = Number(b.lng);
+    if (!isFinite(lat) || !isFinite(lng)) return bad(res, 'Ungueltige Koordinaten');
+    db.prepare('UPDATE live_location SET lat=?, lng=?, updated_at=?, active=1 WHERE id=1')
+      .run(lat, lng, new Date().toISOString());
+    return ok(res);
+  }
+  if (p === '/api/instructor/location/stop' && method === 'POST') {
+    if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
+    db.prepare('UPDATE live_location SET active=0 WHERE id=1').run();
+    return ok(res);
+  }
+  // Fahrlehrer sieht, ob eine Stunde ansteht (fuer den Start-Hinweis)
+  if (p === '/api/instructor/live-status' && method === 'GET') {
+    if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
+    const lead = Number(getSettingRaw('live_lead_min'));
+    const soon = db.prepare(
+      `SELECT b.*, s.name AS student_name FROM bookings b LEFT JOIN students s ON s.id=b.student_id
+       WHERE b.date = ? AND b.status='booked' AND b.student_id IS NOT NULL ORDER BY b.start_time`).all(todayStr())
+      .map((b) => ({ ...b, h: hoursUntil(b.date, b.start_time) }))
+      .filter((b) => b.h > -0.5 && b.h * 60 <= lead)
+      .map((b) => ({ id: b.id, student_name: b.student_name, start_time: b.start_time, minutes: Math.round(b.h * 60) }));
+    const live = db.prepare('SELECT active,updated_at FROM live_location WHERE id=1').get();
+    return ok(res, { lead, upcoming: soon, active: !!live.active });
+  }
+
+  // Schueler verfolgt den Live-Standort (nur im Zeitfenster vor der eigenen Stunde)
+  if (p === '/api/my/live' && method === 'GET') {
+    if (!requireStudent()) return bad(res, 'Bitte anmelden', 401);
+    const lead = Number(getSettingRaw('live_lead_min'));
+    const upcoming = db.prepare(
+      "SELECT * FROM bookings WHERE student_id=? AND date=? AND status='booked' ORDER BY start_time").all(sess.student_id, todayStr())
+      .map((b) => ({ b, h: hoursUntil(b.date, b.start_time) }))
+      .filter((x) => x.h > -0.25 && x.h * 60 <= lead)
+      .sort((a, z) => a.h - z.h)[0];
+    if (!upcoming) return ok(res, { window: false });
+    const bk = upcoming.b;
+    const meet = {
+      label: bk.meet_label || getSettingRaw('meet_default_label') || null,
+      lat: bk.meet_lat != null ? bk.meet_lat : (getSettingRaw('meet_default_lat') ? Number(getSettingRaw('meet_default_lat')) : null),
+      lng: bk.meet_lng != null ? bk.meet_lng : (getSettingRaw('meet_default_lng') ? Number(getSettingRaw('meet_default_lng')) : null),
+    };
+    const live = db.prepare('SELECT * FROM live_location WHERE id=1').get();
+    const staleMs = live.updated_at ? Date.now() - new Date(live.updated_at).getTime() : Infinity;
+    const active = !!live.active && staleMs < 3 * 60 * 1000; // aelter als 3 Min => nicht mehr live
+    let distanceKm = null, etaMin = null;
+    if (active && meet.lat != null && meet.lng != null) {
+      distanceKm = haversineKm(live.lat, live.lng, meet.lat, meet.lng);
+      const speed = Math.max(5, Number(getSettingRaw('avg_speed_kmh')) || 30);
+      etaMin = Math.max(1, Math.ceil((distanceKm / speed) * 60));
+    }
+    return ok(res, {
+      window: true, active,
+      booking: { date: bk.date, start_time: bk.start_time, minutesToStart: Math.round(upcoming.h * 60) },
+      location: active ? { lat: live.lat, lng: live.lng, updated_at: live.updated_at } : null,
+      meet, distanceKm, etaMin, lead,
+    });
+  }
+
+  // Schueler aktualisiert eigene Handynummer
+  if (p === '/api/my/profile' && method === 'PATCH') {
+    if (!requireStudent()) return bad(res, 'Bitte anmelden', 401);
+    const b = await readBody(req);
+    if ('phone' in b) db.prepare('UPDATE students SET phone=? WHERE id=?').run(b.phone ? String(b.phone).trim() : null, sess.student_id);
+    return ok(res);
+  }
+
   // Lücken-Vorschlag: contigierter Tagesplan (Stunden nach vorne ziehen)
   if (p === '/api/instructor/gap-proposal' && method === 'GET') {
     if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
@@ -669,7 +750,9 @@ async function handleApi(req, res, url) {
     const allowed = ['instructor_name', 'start_time', 'last_start', 'lesson_min', 'break_min',
       'weekly_target_h', 'daily_target_h', 'weekly_lo_h', 'workdays', 'max_per_week',
       'booking_horizon_days', 'cancel_hours', 'lock_hours', 'release_time', 'short_day_last_start',
-      'vacation_credit_min', 'vacation_days_left', 'late_grace_min', 'policy_text'];
+      'vacation_credit_min', 'vacation_days_left', 'late_grace_min', 'policy_text',
+      'instructor_phone', 'avg_speed_kmh', 'live_lead_min',
+      'meet_default_label', 'meet_default_lat', 'meet_default_lng'];
     for (const k of allowed) {
       if (k in b && b[k] !== '' && b[k] != null) setSettingRaw(k, b[k]);
     }

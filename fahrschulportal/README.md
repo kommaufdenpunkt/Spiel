@@ -110,6 +110,20 @@ du ein Backup willst.
 - **Nächste Fahrstunde** mit Countdown (Schüler) und **„Zum Kalender
   hinzufügen"** (iCal-Datei für Handy/PC-Kalender, mit Erinnerung 3 Std vorher).
 
+### Kontakt & Live-Standort
+- **Handynummern:** Schüler hinterlegen ihre Nummer (📱 im Kopf), der Fahrlehrer
+  seine in den Einstellungen. Überall gibt es **📞 Anrufen** und **💬 WhatsApp**
+  (mit vorbereitetem Text) – kein Abtippen nötig.
+- **Live-Standort mit ETA:** Der Fahrlehrer teilt (ab ~20 Min vor der Stunde, per
+  Tipp) seinen Standort. Der Schüler sieht ihn **live auf der Karte**, dazu
+  **Entfernung und geschätzte Ankunftszeit** zum Treffpunkt und einen
+  **„Route öffnen"**-Link. Treffpunkt wird pro Termin oder als Standard gesetzt
+  (per „📍 Standort"-Knopf mit den aktuellen Koordinaten).
+  - *Technik-Hinweis:* Standort-Teilen läuft, solange die App offen ist (Web-App);
+    echtes Hintergrund-Tracking bei geschlossener App kann nur eine native App.
+    Die Karte nutzt OpenStreetMap (braucht Internet), die ETA ist eine Schätzung
+    (Luftlinie ÷ Ø-Tempo, einstellbar).
+
 ### Passwort vergessen?
 Bewusst **kein E-Mail-Reset** (viele Schüler haben keine E-Mail hinterlegt).
 Stattdessen: Der Schüler meldet sich beim Fahrlehrer (z. B. per WhatsApp), und
