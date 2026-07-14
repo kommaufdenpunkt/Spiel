@@ -14,6 +14,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const PUBLIC = join(__dirname, 'public');
 const PORT = Number(process.env.PORT || 3000);
 const SESSION_DAYS = 30;
+const APP_VERSION = '2.0.0';
 
 // ---------- kleine Helfer ----------
 const json = (res, code, data) => {
@@ -59,7 +60,10 @@ function createSession(res, kind, studentId = null) {
 }
 
 function getSession(req) {
-  const token = parseCookies(req).fsp;
+  // Cookie (Web) ODER Authorization: Bearer <token> (native App / API-Clients)
+  const auth = req.headers.authorization;
+  const token = parseCookies(req).fsp
+    || (auth && auth.startsWith('Bearer ') ? auth.slice(7).trim() : null);
   if (!token) return null;
   const s = db.prepare('SELECT * FROM sessions WHERE token = ?').get(token);
   if (!s) return null;
@@ -175,8 +179,8 @@ async function handleApi(req, res, url) {
   if (p === '/api/auth/instructor' && method === 'POST') {
     const { pin } = await readBody(req);
     if (!verifyPassword(pin || '', getSettingRaw('instructor_pin'))) return bad(res, 'Falsche PIN', 401);
-    createSession(res, 'instructor');
-    return ok(res, { role: 'instructor', name: getSettingRaw('instructor_name') });
+    const token = createSession(res, 'instructor');
+    return ok(res, { role: 'instructor', name: getSettingRaw('instructor_name'), token });
   }
 
   if (p === '/api/auth/register' && method === 'POST') {
@@ -197,8 +201,8 @@ async function handleApi(req, res, url) {
     const sid = Number(info.lastInsertRowid);
     db.prepare('UPDATE codes SET used = 1, student_id = ? WHERE code = ?').run(sid, c.code);
     logEvent('info', { actor: 'student', studentId: sid, detail: `Konto erstellt (Login: ${username})` });
-    createSession(res, 'student', sid);
-    return ok(res, { role: 'student', id: sid, name, username });
+    const token = createSession(res, 'student', sid);
+    return ok(res, { role: 'student', id: sid, name, username, token });
   }
 
   if (p === '/api/auth/login' && method === 'POST') {
@@ -208,13 +212,17 @@ async function handleApi(req, res, url) {
     // per Login-Name (Initialen+Jahrgang) ODER E-Mail
     const st = db.prepare('SELECT * FROM students WHERE username = ? COLLATE NOCASE OR email = ?').get(handle, key);
     if (!st || !verifyPassword(b.password || '', st.pass)) return bad(res, 'Login-Name/E-Mail oder Passwort falsch', 401);
-    createSession(res, 'student', st.id);
-    return ok(res, { role: 'student', id: st.id, name: st.name });
+    const token = createSession(res, 'student', st.id);
+    return ok(res, { role: 'student', id: st.id, name: st.name, token });
   }
 
   // ===== Oeffentliche Einstellungen (Slot-Laenge etc. fuer Anzeige) =====
   if (p === '/api/settings' && method === 'GET') {
     return ok(res, { settings: getSettings() });
+  }
+  // Version / Health (fuer native App und Monitoring)
+  if (p === '/api/version' && method === 'GET') {
+    return ok(res, { name: 'Fahrschulportal', version: APP_VERSION, auth: ['cookie', 'bearer-token'], ok: true });
   }
 
   // ===== STUDENT: Slots ansehen & buchen =====
@@ -807,12 +815,15 @@ function buildDaySlots(date) {
   const now = nowHHMM();
 
   const slots = grid.map((g) => {
-    const gEnd = toMin(g.start) + g.duration;
+    const gStart = toMin(g.start), gEnd = gStart + g.duration;
     const booking = bookings.find((b) => b.start_time === g.start);
-    const blocked = blocks.find((bl) => overlaps(toMin(g.start), gEnd, toMin(bl.start_time), toMin(bl.end_time)));
-    const past = isToday && toMin(g.start) <= toMin(now);
+    // auch von einer laengeren Buchung (z.B. 120 Min) ueberlappte Slots sind belegt
+    const overlapBooking = booking || bookings.find((b) => overlaps(gStart, gEnd, toMin(b.start_time), toMin(b.start_time) + b.duration_min));
+    const blocked = blocks.find((bl) => overlaps(gStart, gEnd, toMin(bl.start_time), toMin(bl.end_time)));
+    const past = isToday && gStart <= toMin(now);
     let state = 'free';
     if (booking) state = booking.status === 'offered' ? 'offered' : 'booked';
+    else if (overlapBooking) state = 'booked';
     else if (blocked) state = 'blocked';
     else if (!isWorkday) state = 'closed';
     else if (past) state = 'past';

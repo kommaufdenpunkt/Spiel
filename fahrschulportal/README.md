@@ -1,4 +1,4 @@
-# 🚗 Fahrschulportal
+# 🚗 Fahrschulportal — Version 2.0
 
 Ein schlankes Buchungsportal für die Fahrschule: Fahrschüler buchen ihre
 Fahrstunden selbst, tauschen sie bei Bedarf untereinander – und der Fahrlehrer
@@ -189,3 +189,40 @@ vorbereitet**: Im Code gibt es dafür den Haken `dispatchExternal()`; er wird
 aktiv, sobald die Umgebungsvariable `FSP_NOTIFY` gesetzt und der eigentliche
 Versand (SMTP für E-Mail bzw. Web-Push) dort eingehängt ist. Ohne Konfiguration
 bleibt alles beim Portal-Postfach – nichts muss eingerichtet werden.
+
+---
+
+## Vorbereitet für eine native App (iOS/Android)
+
+Die komplette Funktionalität steckt in einer sauberen **JSON-API** – eine native
+App kann dieselben Endpunkte nutzen. Damit das ohne Browser-Cookies geht, gibt es
+**Token-Login**:
+
+- **Login** (`POST /api/auth/login`, `/api/auth/register`, `/api/auth/instructor`)
+  liefert im JSON ein Feld **`token`**.
+- Alle weiteren Aufrufe können den Token per Header senden:
+  `Authorization: Bearer <token>` (statt Cookie). Der Web-Client nutzt weiter
+  Cookies – beides funktioniert parallel.
+- `GET /api/version` liefert Version und unterstützte Auth-Verfahren.
+
+**Wichtigste Endpunkte** (alle unter `/api`):
+
+| Zweck | Methode & Pfad |
+|---|---|
+| Version/Health | `GET /version` |
+| Anmelden / Registrieren | `POST /auth/login · /auth/register · /auth/instructor` |
+| Wer bin ich | `GET /auth/me` |
+| Einstellungen (öffentlich) | `GET /settings` |
+| Freie Slots eines Tages | `GET /slots?date=YYYY-MM-DD` |
+| Eigene Buchungen | `GET /my/bookings` · `POST /bookings` · `DELETE /bookings/:id` |
+| Tauschen | `POST /bookings/:id/offer · /take · /decline · /withdraw` · `GET /offers` |
+| Postfach | `GET /my/notifications` · `POST /my/notifications/read` |
+| Handynummer | `PATCH /my/profile` |
+| Live-Standort (Schüler) | `GET /my/live` |
+| Live-Standort (Fahrlehrer) | `POST /instructor/location` · `/location/stop` |
+| Übersicht/Statistik/Protokoll | `GET /instructor/overview · /stats · /events` |
+
+**Background-Standort:** Der Endpunkt `POST /api/instructor/location {lat,lng}`
+ist schon da – eine native App kann genau hier ihre Hintergrund-Position
+hinschicken (was der Web-App bei geschlossener App verwehrt bleibt). Der Rest
+(Karte, ETA, Anzeige beim Schüler) funktioniert dann unverändert weiter.
