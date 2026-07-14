@@ -82,9 +82,10 @@ du ein Backup willst.
 - **Tacho / Drehzahlmesser:** zeigt dynamisch die Stunden dieser Woche gegen das
   **Wochenziel** (Standard 25 h) – rot = weit weg, gelb = fast dran, grün =
   Ziel erreicht 🎯. Dazu ein Tages-Tacho und eine Wochen-Balkenübersicht.
-- **Kalender – Tag & Woche:** Tagesliste oder **Wochen-Zeitachse Mo–Sa** mit
-  farbigen Terminblöcken (Farbe je Fahrschüler), Theoriezeiten schraffiert,
-  Tages-Tags für kurze/freie/Urlaubstage. Termin antippen zum Bearbeiten.
+- **Kalender – Tag / Woche / Monat:** Tagesliste, **Wochen-Zeitachse Mo–Sa** mit
+  farbigen Terminblöcken (Farbe je Fahrschüler/Fahrt-Art) oder **Monatsübersicht**
+  (Anzahl Fahrstunden pro Tag + farbige Punkte, Theorie/Urlaub-Tags, heute
+  markiert; Tag antippen öffnet die Tagesansicht). Theoriezeiten schraffiert.
 - **Stunde abschließen:** pro Fahrstunde **Schalter/Automatik** wählen und
   optional das **Kennzeichen** eintragen; Dauer anpassbar (z. B. letzte Stunde
   nur 20 statt 80 Min).

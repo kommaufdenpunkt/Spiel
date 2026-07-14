@@ -14,7 +14,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const PUBLIC = join(__dirname, 'public');
 const PORT = Number(process.env.PORT || 3000);
 const SESSION_DAYS = 30;
-const APP_VERSION = "2.2.0";
+const APP_VERSION = "2.2.1";
 // Einstellungen, die Schueler/Oeffentlichkeit sehen duerfen (Rest bleibt beim Fahrlehrer)
 const PUBLIC_SETTINGS = ['instructor_name', 'instructor_phone', 'policy_text',
   'cancel_hours', 'lock_hours', 'booking_horizon_days', 'booking_horizon_days_rank2',
@@ -121,17 +121,19 @@ function isoDow(dateStr) {
   const d = new Date(dateStr + 'T00:00:00');
   return d.getDay() === 0 ? 7 : d.getDay();
 }
+// Lokale YYYY-MM-DD-Ausgabe (nie toISOString -> sonst Zeitzonen-Versatz)
+function ymd(d) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
 // Montag der Woche zu einem Datum
 function mondayOf(dateStr) {
   const d = new Date(dateStr + 'T00:00:00');
   const dow = d.getDay() === 0 ? 7 : d.getDay();
   d.setDate(d.getDate() - (dow - 1));
-  return d.toISOString().slice(0, 10);
+  return ymd(d);
 }
 function addDays(dateStr, n) {
   const d = new Date(dateStr + 'T00:00:00');
   d.setDate(d.getDate() + n);
-  return d.toISOString().slice(0, 10);
+  return ymd(d);
 }
 function todayStr() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
 function nowHHMM() { const d = new Date(); return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; }

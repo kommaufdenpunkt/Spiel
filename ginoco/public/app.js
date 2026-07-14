@@ -5,6 +5,7 @@ const app = $('#app');
 const WD = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
 const WD_LONG = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
 const MON = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
+const MON_LONG = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
 
 const state = { user: null, settings: null, date: todayStr(), instrTab: 'heute' };
 
@@ -85,11 +86,14 @@ async function api(path, opts = {}) {
   return data;
 }
 
-// ---------- Datum ----------
-function todayStr() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
+// ---------- Datum (durchgehend LOKALE Zeit, nie toISOString -> sonst TZ-Versatz) ----------
+function ymd(d) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
+function todayStr() { return ymd(new Date()); }
 function parseD(s) { return new Date(s + 'T00:00:00'); }
 function isoDow(s) { const d = parseD(s).getDay(); return d === 0 ? 7 : d; }
-function addDays(s, n) { const d = parseD(s); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); }
+function addDays(s, n) { const d = parseD(s); d.setDate(d.getDate() + n); return ymd(d); }
+function addMonths(s, n) { const d = parseD(s); d.setMonth(d.getMonth() + n); return ymd(d); }
+function firstOfMonth(s) { const d = parseD(s); return ymd(new Date(d.getFullYear(), d.getMonth(), 1)); }
 function mondayOf(s) { return addDays(s, -(isoDow(s) - 1)); }
 function fmtDay(s) { const d = parseD(s); return `${WD_LONG[isoDow(s) - 1]}, ${d.getDate()}. ${MON[d.getMonth()]} ${d.getFullYear()}`; }
 function fmtShort(s) { const d = parseD(s); return `${d.getDate()}.${d.getMonth() + 1}.`; }
@@ -949,6 +953,7 @@ async function tabKalender() {
       <div class="viewtoggle">
         <button data-mode="tag" class="${mode === 'tag' ? 'active' : ''}">Tag</button>
         <button data-mode="woche" class="${mode === 'woche' ? 'active' : ''}">Woche</button>
+        <button data-mode="monat" class="${mode === 'monat' ? 'active' : ''}">Monat</button>
       </div>
       <button class="sec sm" id="k-prev">‹</button>
       <span class="day" id="k-label"></span>
@@ -961,10 +966,14 @@ async function tabKalender() {
     <div id="k-list"></div>
   </div>`;
   box.querySelectorAll('[data-mode]').forEach((b) => b.onclick = () => { state.calMode = b.dataset.mode; tabKalender(); });
-  const step = mode === 'woche' ? 7 : 1;
   $('#k-date').value = state.date;
-  $('#k-prev').onclick = () => { state.date = addDays(state.date, -step); loadK(); };
-  $('#k-next').onclick = () => { state.date = addDays(state.date, step); loadK(); };
+  const shift = (dir) => {
+    if (mode === 'monat') state.date = addMonths(state.date, dir);
+    else state.date = addDays(state.date, dir * (mode === 'woche' ? 7 : 1));
+    loadK();
+  };
+  $('#k-prev').onclick = () => shift(-1);
+  $('#k-next').onclick = () => shift(1);
   $('#k-date').onchange = (e) => { state.date = e.target.value; loadK(); };
   $('#k-add').onclick = () => openAddBooking();
   $('#k-gap').onclick = () => openGapModal();
@@ -982,6 +991,18 @@ async function loadK() {
       const ov = await api(`/api/instructor/overview?from=${mon}&to=${sat}`);
       window.__instrBookings = ov.bookings;
       renderWeek($('#k-list'), mon, ov);
+    } catch (e) { toast(e.message, 'err'); }
+    return;
+  }
+  if (mode === 'monat') {
+    const first = firstOfMonth(state.date);
+    const gridStart = mondayOf(first);
+    const gridEnd = addDays(gridStart, 41); // 6 Wochen
+    $('#k-label').textContent = `${MON_LONG[parseD(first).getMonth()]} ${parseD(first).getFullYear()}`;
+    try {
+      const ov = await api(`/api/instructor/overview?from=${gridStart}&to=${gridEnd}`);
+      window.__instrBookings = ov.bookings;
+      renderMonth($('#k-list'), first, gridStart, ov);
     } catch (e) { toast(e.message, 'err'); }
     return;
   }
@@ -1060,6 +1081,47 @@ function renderWeek(el, monday, ov) {
     <span class="pill" style="background:${TYPE_COLORS.autobahn};color:#fff">🛣️ Autobahn</span>
     <span class="pill" style="background:${TYPE_COLORS.nacht};color:#fff">🌙 Nacht</span></p>`;
   el.querySelectorAll('[data-wk]').forEach((b) => b.onclick = () => openMarkModal(b.dataset.wk));
+}
+
+// ---- Monatsansicht ----
+function renderMonth(el, firstDay, gridStart, ov) {
+  const monthIdx = parseD(firstDay).getMonth();
+  const today = todayStr();
+  const workdays = (state.settings?.workdays || '1,2,3,4,5,6').split(',').map(Number);
+  // Termine/Bloecke/Overrides nach Datum sammeln
+  const byDate = {};
+  for (const b of ov.bookings) (byDate[b.date] ||= { books: [], blocks: [] }).books.push(b);
+  for (const bl of ov.blocks) (byDate[bl.date] ||= { books: [], blocks: [] }).blocks.push(bl);
+  const ovByDate = {}; for (const o of ov.overrides) ovByDate[o.date] = o;
+
+  const heads = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'].map((d) => `<div class="m-head">${d}</div>`).join('');
+  let cells = '';
+  for (let i = 0; i < 42; i++) {
+    const d = addDays(gridStart, i);
+    const inMonth = parseD(d).getMonth() === monthIdx;
+    const info = byDate[d] || { books: [], blocks: [] };
+    const ovd = ovByDate[d];
+    const dn = parseD(d).getDate();
+    const isWorkday = workdays.includes(isoDow(d)) && !(ovd && ovd.closed);
+    const cnt = info.books.length;
+    const dots = info.books.slice(0, 8).map((b) => {
+      const c = b.status === 'offered' ? '#e6b23a' : (TYPE_COLORS[b.lesson_type] || studentColor(b.student_id));
+      return `<span class="m-dot" style="background:${c}" title="${b.start_time} ${esc(b.student_name || b.title || '')}"></span>`;
+    }).join('');
+    let tag = '';
+    if (ovd && ovd.type === 'vacation') tag = '🌴 Urlaub';
+    else if (ovd && ovd.closed) tag = '🏖️ frei';
+    else if (ovd && ovd.last_start) tag = '✂️ kurz';
+    else if (info.blocks.some((b) => b.type === 'theorie')) tag = '📚 Theorie';
+    cells += `<div class="m-cell ${inMonth ? '' : 'out'} ${d === today ? 'today' : ''} ${isWorkday ? '' : 'off'}" data-day="${d}">
+      <div class="m-day"><span>${dn}</span>${cnt ? `<span class="cnt">${cnt}</span>` : ''}</div>
+      ${tag ? `<div class="m-tag">${tag}</div>` : ''}
+      <div class="m-dots">${dots}</div>
+    </div>`;
+  }
+  el.innerHTML = `<div class="monthgrid">${heads}${cells}</div>
+    <p class="hint" style="margin-top:.7rem">Tipp: auf einen Tag tippen öffnet die Tagesansicht. Zahl = Anzahl Fahrstunden, Punkte = Fahrschüler/Fahrt-Art.</p>`;
+  el.querySelectorAll('[data-day]').forEach((c) => c.onclick = () => { state.date = c.dataset.day; state.calMode = 'tag'; tabKalender(); });
 }
 
 function openLateModal() {
