@@ -254,19 +254,34 @@ function mountEdgeMenus(role) {
 }
 
 // ====================== LOGIN ======================
+// Portal-Modus je nach Adresse:
+//  mcp.ginoco.de      -> nur Fahrlehrer-Zugang
+//  ginoco.de / www    -> nur Fahrschüler (Anmelden + Registrieren)
+//  sonst (localhost, neu., IP) -> alles (zum Testen)
+function portalMode() {
+  const h = location.hostname;
+  if (h === 'mcp.ginoco.de' || h.startsWith('mcp.')) return 'admin';
+  if (h === 'ginoco.de' || h === 'www.ginoco.de') return 'student';
+  return 'all';
+}
 function renderAuth() {
-  let tab = 'login';
+  const mode = portalMode();
+  const TABS = mode === 'admin'
+    ? [['instr', 'Fahrlehrer']]
+    : mode === 'student'
+      ? [['login', 'Anmelden'], ['register', 'Neu (mit Code)']]
+      : [['login', 'Anmelden'], ['register', 'Neu (mit Code)'], ['instr', 'Fahrlehrer']];
+  let tab = TABS[0][0];
+  const tagline = mode === 'admin' ? 'Fahrlehrer-Bereich' : 'Fahrstunden einfach online buchen';
   const draw = () => {
     app.innerHTML = `<div class="auth-wrap"><div class="auth">
       <div class="logo-big">🚗</div>
       <h1>ginoco</h1>
-      <div class="tag">Fahrstunden einfach online buchen</div>
+      <div class="tag">${tagline}</div>
       <div class="card">
-        <div class="tabs">
-          <button data-t="login" class="${tab === 'login' ? 'active' : ''}">Anmelden</button>
-          <button data-t="register" class="${tab === 'register' ? 'active' : ''}">Neu (mit Code)</button>
-          <button data-t="instr" class="${tab === 'instr' ? 'active' : ''}">Fahrlehrer</button>
-        </div>
+        ${TABS.length > 1 ? `<div class="tabs">
+          ${TABS.map(([t, l]) => `<button data-t="${t}" class="${tab === t ? 'active' : ''}">${l}</button>`).join('')}
+        </div>` : ''}
         <div id="authbody"></div>
       </div>
       <div class="center"><button class="ghost sm" onclick="window.__openThemePicker()">🎨 Farbe wählen</button></div>

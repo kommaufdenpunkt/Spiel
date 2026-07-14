@@ -36,6 +36,20 @@ du ein Backup willst.
 
 ---
 
+## Getrennte Portale je Adresse
+
+Die App zeigt je nach aufgerufener Domain automatisch den passenden Zugang:
+
+| Adresse | Zeigt |
+|---|---|
+| `ginoco.de` / `www.ginoco.de` | nur **Fahrschüler** (Anmelden + Registrieren) |
+| `mcp.ginoco.de` | nur **Fahrlehrer** (privater PIN-Zugang) |
+| `localhost`, `neu.…`, IP | **alles** (zum Testen) |
+
+Gesteuert über `location.hostname` (Funktion `portalMode()` in `app.js`).
+Ein und derselbe Server bedient beide Domains – die Trennung ist die
+Login-Ansicht, nicht der Datenbestand.
+
 ## Online stellen (ginoco.de)
 
 Komplette Schritt-für-Schritt-Anleitung für einen deutschen Server mit
