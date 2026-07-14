@@ -207,7 +207,7 @@ const INSTR_NAV = [
 function mountEdgeMenus(role) {
   document.querySelectorAll('.edge-root').forEach((n) => n.remove());
   const leftItems = role === 'instructor'
-    ? INSTR_NAV.map(([tab, l]) => `<button data-nav="${tab}">${l}</button>`).join('')
+    ? INSTR_NAV.map(([tab, l]) => `<button data-nav="${tab}">${l}${tab === 'protokoll' ? ' <span id="ev-badge"></span>' : ''}</button>`).join('')
     : [['week-card', '📅 Meine Woche'], ['notif-card', '🔔 Mitteilungen'],
        ['offers-card', '🎁 Angebote'], ['slots', '🚗 Termin buchen']]
         .map(([id, l]) => `<button data-scroll="${id}">${l}</button>`).join('');
@@ -711,25 +711,15 @@ async function cancelBooking(id) {
 
 // ====================== FAHRLEHRER ======================
 function renderInstructor() {
+  // Navigation läuft über das linke Edge-Menü (☰ am Bildschirmrand) –
+  // daher keine obere Tab-Leiste mehr.
   app.innerHTML = header() + `<main>
-    <div class="navtabs">
-      <button data-tab="heute">Heute & Ziele</button>
-      <button data-tab="kalender">Kalender</button>
-      <button data-tab="codes">Zugangscodes</button>
-      <button data-tab="schueler">Fahrschüler</button>
-      <button data-tab="theorie">Theorie & Ausnahmen</button>
-      <button data-tab="arbeitszeiten">Arbeitszeiten</button>
-      <button data-tab="protokoll">Protokoll <span id="ev-badge"></span></button>
-      <button data-tab="einstellungen">Einstellungen</button>
-    </div>
     <div id="itab"></div>
   </main>`;
   wireLogout();
-  const tabs = app.querySelectorAll('.navtabs button');
-  tabs.forEach((b) => b.onclick = () => { state.instrTab = b.dataset.tab; drawInstrTab(); mountEdgeMenus('instructor'); });
-  refreshEventBadge();
   drawInstrTab();
   mountEdgeMenus('instructor');
+  refreshEventBadge();
 }
 
 async function refreshEventBadge() {
