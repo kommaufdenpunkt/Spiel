@@ -76,7 +76,7 @@ function header() {
     <div class="brand"><span class="logo">🚗</span> Fahrschulportal</div>
     <div class="who">
       <span class="role">${u.role === 'instructor' ? 'Fahrlehrer' : 'Fahrschüler'}</span>
-      <strong>${esc(u.name || '')}</strong>
+      <strong>${esc(u.name || '')}</strong>${u.username ? `<span class="pill">${esc(u.username)}</span>` : ''}
       <button class="ghost sm" id="logout">Abmelden</button>
     </div>
   </header>`;
@@ -118,17 +118,21 @@ function showErr(msg) { const e = $('#autherr'); if (e) { e.textContent = msg; e
 
 function loginForm() {
   return `${errBox()}
-    <div class="field"><label>E-Mail</label><input id="l-email" type="email" autocomplete="username"></div>
+    <div class="field"><label>Login-Name oder E-Mail</label><input id="l-email" autocomplete="username" placeholder="z.B. MM1997"></div>
     <div class="field"><label>Passwort</label><input id="l-pw" type="password" autocomplete="current-password"></div>
-    <div class="form-actions"><button id="l-go">Anmelden</button></div>`;
+    <div class="form-actions"><button id="l-go">Anmelden</button></div>
+    <p class="hint" style="margin-top:.6rem">Passwort vergessen? Melde dich bei deinem Fahrlehrer – er setzt dir ein neues.</p>`;
 }
 function registerForm() {
   return `${errBox()}
-    <p class="hint">Du hast von deinem Fahrlehrer einen Zugangscode bekommen? Damit legst du hier einmalig dein Konto an.</p>
+    <p class="hint">Du hast von deinem Fahrlehrer einen Zugangscode bekommen? Damit legst du hier einmalig dein Konto an. Deinen Login-Namen bekommst du danach angezeigt.</p>
     <div class="field"><label>Zugangscode</label><input id="r-code" placeholder="XXXX-XXXX" style="text-transform:uppercase"></div>
-    <div class="field"><label>Name</label><input id="r-name" autocomplete="name"></div>
     <div class="row">
-      <div class="field"><label>E-Mail</label><input id="r-email" type="email"></div>
+      <div class="field"><label>Name</label><input id="r-name" autocomplete="name" placeholder="Vor- und Nachname"></div>
+      <div class="field" style="max-width:130px"><label>Jahrgang</label><input id="r-year" type="number" placeholder="1997" min="1930" max="2015"></div>
+    </div>
+    <div class="row">
+      <div class="field"><label>E-Mail (optional)</label><input id="r-email" type="email"></div>
       <div class="field"><label>Telefon (optional)</label><input id="r-phone"></div>
     </div>
     <div class="field"><label>Passwort (mind. 6 Zeichen)</label><input id="r-pw" type="password"></div>
@@ -149,16 +153,17 @@ function wireAuth(tab) {
   if (tab === 'login') {
     $('#l-go').onclick = async () => {
       try {
-        await api('/api/auth/login', { method: 'POST', body: { email: $('#l-email').value, password: $('#l-pw').value } });
+        await api('/api/auth/login', { method: 'POST', body: { login: $('#l-email').value, password: $('#l-pw').value } });
         done();
       } catch (e) { showErr(e.message); }
     };
   } else if (tab === 'register') {
     $('#r-go').onclick = async () => {
       try {
-        await api('/api/auth/register', { method: 'POST', body: {
+        const r = await api('/api/auth/register', { method: 'POST', body: {
           code: $('#r-code').value, name: $('#r-name').value, email: $('#r-email').value,
-          phone: $('#r-phone').value, password: $('#r-pw').value } });
+          phone: $('#r-phone').value, password: $('#r-pw').value, birth_year: $('#r-year').value } });
+        if (r.username) toast('Konto erstellt · Dein Login-Name: ' + r.username, 'ok');
         done();
       } catch (e) { showErr(e.message); }
     };
@@ -309,8 +314,12 @@ function renderOffers(offers, wi) {
     <div class="blist">${offers.map((o) => `<div class="bitem warm">
       <div><div class="when">${WD[isoDow(o.date) - 1]} ${fmtShort(o.date)} · ${o.start_time} <span class="muted" style="font-weight:400">(${o.duration_min} Min)</span></div>
       <div class="meta">Möchtest du diese Fahrstunde übernehmen?</div></div>
-      ${canTake ? `<button class="sm" data-take="${o.id}">Übernehmen</button>` : ''}</div>`).join('')}</div>`;
+      <div class="inline">
+        ${canTake ? `<button class="sm" data-take="${o.id}">Übernehmen</button>` : ''}
+        <button class="ghost sm" data-decline="${o.id}">Keine Zeit</button>
+      </div></div>`).join('')}</div>`;
   card.querySelectorAll('[data-take]').forEach((b) => b.onclick = () => takeOffer(b.dataset.take));
+  card.querySelectorAll('[data-decline]').forEach((b) => b.onclick = () => declineOffer(b.dataset.decline));
 }
 
 async function offerBooking(id) {
@@ -324,6 +333,10 @@ async function withdrawOffer(id) {
 }
 async function takeOffer(id) {
   try { await api('/api/bookings/' + id + '/take', { method: 'POST' }); toast('Fahrstunde übernommen ✓', 'ok'); syncStudent(); }
+  catch (e) { toast(e.message, 'err'); }
+}
+async function declineOffer(id) {
+  try { await api('/api/bookings/' + id + '/decline', { method: 'POST' }); toast('Abgelehnt', 'ok'); syncStudent(); }
   catch (e) { toast(e.message, 'err'); }
 }
 
@@ -815,13 +828,14 @@ async function tabSchueler() {
     const { students } = await api('/api/students');
     if (!students.length) { $('#s-list').innerHTML = '<p class="muted">Noch keine Fahrschüler registriert. Erzeuge im Tab „Zugangscodes“ einen Code.</p>'; return; }
     $('#s-list').innerHTML = `<table>
-      <tr><th>Name</th><th>Kontakt</th><th>Gefahren</th><th>Erlaubte Längen (Min)</th></tr>
+      <tr><th>Name</th><th>Login-Name</th><th>Kontakt</th><th>Gefahren</th><th>Erlaubte Längen (Min)</th></tr>
       ${students.map((s) => {
         const durs = String(s.allowed_durations || '80').split(',').map(Number);
         const boxes = [40, 80, 120].map((d) => `<label style="margin:0;font-weight:600"><input type="checkbox" data-sdur="${s.id}" value="${d}" ${durs.includes(d) ? 'checked' : ''} style="width:auto"> ${d}</label>`).join(' ');
         return `<tr>
-          <td><strong>${esc(s.name)}</strong></td>
-          <td>${esc(s.email)}<br><span class="muted">${esc(s.phone || '')}</span></td>
+          <td><strong>${esc(s.name)}</strong>${s.birth_year ? ` <span class="muted">(${s.birth_year})</span>` : ''}</td>
+          <td><span class="codechip">${esc(s.username || '–')}</span><br><button class="ghost sm" data-reset="${s.id}" style="margin-top:.3rem">Passwort zurücksetzen</button></td>
+          <td>${esc(s.email || '')}<br><span class="muted">${esc(s.phone || '')}</span></td>
           <td>${s.done_count} Std.</td>
           <td><div class="inline">${boxes} <button class="sec sm" data-savedur="${s.id}">Speichern</button></div></td>
         </tr>`;
@@ -832,6 +846,12 @@ async function tabSchueler() {
       const vals = [...$('#s-list').querySelectorAll(`[data-sdur="${id}"]`)].filter((c) => c.checked).map((c) => Number(c.value));
       if (!vals.length) { toast('Mindestens eine Länge wählen', 'err'); return; }
       try { await api('/api/students/' + id, { method: 'PATCH', body: { allowed_durations: vals } }); toast('Gespeichert ✓', 'ok'); }
+      catch (e) { toast(e.message, 'err'); }
+    });
+    $('#s-list').querySelectorAll('[data-reset]').forEach((btn) => btn.onclick = async () => {
+      const pw = prompt('Neues Passwort für diesen Fahrschüler (mind. 6 Zeichen) – teile es ihm dann z.B. per WhatsApp mit:');
+      if (!pw) return;
+      try { await api('/api/students/' + btn.dataset.reset + '/reset-password', { method: 'POST', body: { new_password: pw } }); toast('Passwort gesetzt ✓', 'ok'); }
       catch (e) { toast(e.message, 'err'); }
     });
   } catch (e) { toast(e.message, 'err'); }

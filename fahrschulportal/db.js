@@ -116,6 +116,39 @@ function ensureColumn(table, col, ddl) {
   if (!has) db.exec(`ALTER TABLE ${table} ADD COLUMN ${ddl}`);
 }
 ensureColumn('students', 'allowed_durations', "allowed_durations TEXT NOT NULL DEFAULT '80'");
+ensureColumn('students', 'username', 'username TEXT');       // Login-Handle (Initialen+Jahrgang), zusaetzlich zur E-Mail
+ensureColumn('students', 'birth_year', 'birth_year INTEGER');
+
+// E-Mail optional machen: falls die Spalte noch NOT NULL ist, Tabelle einmalig umbauen.
+const emailCol = db.prepare('PRAGMA table_info(students)').all().find((c) => c.name === 'email');
+if (emailCol && emailCol.notnull === 1) {
+  db.exec(`
+    CREATE TABLE students_new (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      email TEXT,
+      phone TEXT,
+      pass TEXT NOT NULL,
+      allowed_durations TEXT NOT NULL DEFAULT '80',
+      username TEXT,
+      birth_year INTEGER,
+      created_at TEXT NOT NULL
+    );
+    INSERT INTO students_new (id,name,email,phone,pass,allowed_durations,username,birth_year,created_at)
+      SELECT id,name,email,phone,pass,allowed_durations,username,birth_year,created_at FROM students;
+    DROP TABLE students;
+    ALTER TABLE students_new RENAME TO students;
+  `);
+}
+db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_students_username ON students(username) WHERE username IS NOT NULL');
+db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_students_email ON students(email) WHERE email IS NOT NULL');
+
+// Absagen ("keine Zeit") auf ein Uebernahme-Angebot
+db.exec(`CREATE TABLE IF NOT EXISTS offer_declines (
+  booking_id INTEGER NOT NULL,
+  student_id INTEGER NOT NULL,
+  PRIMARY KEY (booking_id, student_id)
+);`);
 ensureColumn('bookings', 'attended', 'attended INTEGER');            // 1 = da, 0 = nicht erschienen, NULL = offen
 ensureColumn('bookings', 'late_minutes', 'late_minutes INTEGER NOT NULL DEFAULT 0');
 ensureColumn('bookings', 'reason', 'reason TEXT');

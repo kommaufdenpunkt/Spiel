@@ -153,7 +153,7 @@ async function handleApi(req, res, url) {
     if (sess.kind === 'instructor') {
       return ok(res, { user: { role: 'instructor', name: getSettingRaw('instructor_name') } });
     }
-    const st = db.prepare('SELECT id,name,email,phone,allowed_durations FROM students WHERE id = ?').get(sess.student_id);
+    const st = db.prepare('SELECT id,name,email,phone,username,allowed_durations FROM students WHERE id = ?').get(sess.student_id);
     if (!st) return ok(res, { user: null });
     return ok(res, { user: { role: 'student', ...st } });
   }
@@ -173,27 +173,34 @@ async function handleApi(req, res, url) {
   }
 
   if (p === '/api/auth/register' && method === 'POST') {
-    const { code, name, email, phone, password } = await readBody(req);
-    if (!code || !name || !email || !password) return bad(res, 'Bitte alle Pflichtfelder ausfuellen');
+    const { code, name, email, phone, password, birth_year } = await readBody(req);
+    if (!code || !name || !password) return bad(res, 'Bitte Name, Code und Passwort ausfuellen');
     if (String(password).length < 6) return bad(res, 'Passwort muss mind. 6 Zeichen haben');
+    const by = Number(birth_year);
+    if (!by || by < 1930 || by > 2015) return bad(res, 'Bitte gueltigen Jahrgang angeben');
     const c = db.prepare('SELECT * FROM codes WHERE code = ?').get(String(code).trim().toUpperCase());
     if (!c) return bad(res, 'Ungueltiger Code');
     if (c.used) return bad(res, 'Dieser Code wurde bereits verwendet');
-    const mail = String(email).trim().toLowerCase();
-    if (db.prepare('SELECT 1 FROM students WHERE email = ?').get(mail))
+    const mail = email && String(email).trim() ? String(email).trim().toLowerCase() : null;
+    if (mail && db.prepare('SELECT 1 FROM students WHERE email = ?').get(mail))
       return bad(res, 'E-Mail ist bereits registriert');
-    const info = db.prepare('INSERT INTO students(name,email,phone,pass,created_at) VALUES(?,?,?,?,?)')
-      .run(String(name).trim(), mail, phone ? String(phone).trim() : null, hashPassword(password), new Date().toISOString());
+    const username = genUsername(String(name).trim(), by);
+    const info = db.prepare('INSERT INTO students(name,email,phone,pass,username,birth_year,created_at) VALUES(?,?,?,?,?,?,?)')
+      .run(String(name).trim(), mail, phone ? String(phone).trim() : null, hashPassword(password), username, by, new Date().toISOString());
     const sid = Number(info.lastInsertRowid);
     db.prepare('UPDATE codes SET used = 1, student_id = ? WHERE code = ?').run(sid, c.code);
+    logEvent('info', { actor: 'student', studentId: sid, detail: `Konto erstellt (Login: ${username})` });
     createSession(res, 'student', sid);
-    return ok(res, { role: 'student', id: sid, name });
+    return ok(res, { role: 'student', id: sid, name, username });
   }
 
   if (p === '/api/auth/login' && method === 'POST') {
-    const { email, password } = await readBody(req);
-    const st = db.prepare('SELECT * FROM students WHERE email = ?').get(String(email || '').trim().toLowerCase());
-    if (!st || !verifyPassword(password || '', st.pass)) return bad(res, 'E-Mail oder Passwort falsch', 401);
+    const b = await readBody(req);
+    const handle = String(b.login || b.email || '').trim();
+    const key = handle.toLowerCase();
+    // per Login-Name (Initialen+Jahrgang) ODER E-Mail
+    const st = db.prepare('SELECT * FROM students WHERE username = ? COLLATE NOCASE OR email = ?').get(handle, key);
+    if (!st || !verifyPassword(b.password || '', st.pass)) return bad(res, 'Login-Name/E-Mail oder Passwort falsch', 401);
     createSession(res, 'student', st.id);
     return ok(res, { role: 'student', id: st.id, name: st.name });
   }
@@ -356,6 +363,7 @@ async function handleApi(req, res, url) {
     if (hoursUntil(bk.date, bk.start_time) < lockH)
       return bad(res, `Ab ${lockH} Std. vorher steht der Termin fest und kann nicht mehr abgegeben werden.`);
     db.prepare("UPDATE bookings SET status='offered' WHERE id = ?").run(bk.id);
+    db.prepare('DELETE FROM offer_declines WHERE booking_id = ?').run(bk.id); // frische Runde
     // andere Schueler informieren
     const msg = `Eine Fahrstunde am ${wdShort(bk.date)} ${dmy(bk.date)} um ${bk.start_time} Uhr ist frei geworden – möchtest du sie übernehmen?`;
     for (const sid of otherStudentIds(sess.student_id)) notify(sid, 'offer', msg, bk.date, bk.id);
@@ -371,16 +379,38 @@ async function handleApi(req, res, url) {
     if (!bk || bk.student_id !== sess.student_id) return bad(res, 'Keine Berechtigung', 403);
     if (bk.status !== 'offered') return bad(res, 'Diese Stunde ist nicht angeboten');
     db.prepare("UPDATE bookings SET status='booked' WHERE id = ?").run(bk.id);
+    db.prepare('DELETE FROM offer_declines WHERE booking_id = ?').run(bk.id);
     return ok(res);
   }
-  // Angebotene Stunden anderer Schueler ansehen
+  // "Keine Zeit" auf ein Angebot – wenn alle ablehnen, geht die Stunde zurueck an den Anbieter
+  const decm = p.match(/^\/api\/bookings\/(\d+)\/decline$/);
+  if (decm && method === 'POST') {
+    if (!requireStudent()) return bad(res, 'Bitte anmelden', 401);
+    const bk = db.prepare('SELECT * FROM bookings WHERE id = ?').get(Number(decm[1]));
+    if (!bk || bk.status !== 'offered') return bad(res, 'Diese Stunde ist nicht mehr verfuegbar');
+    if (bk.student_id === sess.student_id) return bad(res, 'Das ist deine eigene Stunde');
+    db.prepare('INSERT OR IGNORE INTO offer_declines(booking_id,student_id) VALUES(?,?)').run(bk.id, sess.student_id);
+    // Haben ALLE anderen abgelehnt? -> Stunde bleibt beim Anbieter (zahlungspflichtig)
+    const others = otherStudentIds(bk.student_id);
+    const declined = db.prepare('SELECT COUNT(*) AS n FROM offer_declines WHERE booking_id = ?').get(bk.id).n;
+    if (others.length > 0 && declined >= others.length) {
+      db.prepare("UPDATE bookings SET status='booked' WHERE id = ?").run(bk.id);
+      db.prepare('DELETE FROM offer_declines WHERE booking_id = ?').run(bk.id);
+      notify(bk.student_id, 'info',
+        `Niemand konnte deine Fahrstunde am ${wdShort(bk.date)} ${dmy(bk.date)} um ${bk.start_time} Uhr übernehmen. Sie bleibt fest bei dir (zahlungspflichtig).`, bk.date, bk.id);
+      logEvent('info', { actor: 'system', studentId: bk.student_id, bookingId: bk.id, date: bk.date,
+        detail: `Angebot ${wdShort(bk.date)} ${dmy(bk.date)} ${bk.start_time} – alle haben abgelehnt, bleibt beim Schüler` });
+    }
+    return ok(res, { closed: others.length > 0 && declined >= others.length });
+  }
+  // Angebotene Stunden anderer Schueler ansehen (ohne die bereits abgelehnten)
   if (p === '/api/offers' && method === 'GET') {
     if (!requireStudent()) return bad(res, 'Bitte anmelden', 401);
     const rows = db.prepare(
       `SELECT id,date,start_time,duration_min FROM bookings
        WHERE status='offered' AND student_id != ? AND date >= ?
-       ORDER BY date, start_time`).all(sess.student_id, todayStr());
-    // nur zukuenftige und Stunden, die der Schueler ueberhaupt nehmen koennte
+         AND id NOT IN (SELECT booking_id FROM offer_declines WHERE student_id = ?)
+       ORDER BY date, start_time`).all(sess.student_id, todayStr(), sess.student_id);
     const offers = rows.filter((r) => hoursUntil(r.date, r.start_time) > 0);
     return ok(res, { offers });
   }
@@ -405,6 +435,7 @@ async function handleApi(req, res, url) {
         return bad(res, 'Du hast an dem Tag schon einen Termin zu dieser Zeit.');
     }
     db.prepare("UPDATE bookings SET student_id = ?, status='booked' WHERE id = ?").run(sess.student_id, bk.id);
+    db.prepare('DELETE FROM offer_declines WHERE booking_id = ?').run(bk.id);
     // urspruenglichen Schueler informieren, dass er frei ist
     const taker = db.prepare('SELECT name FROM students WHERE id = ?').get(sess.student_id);
     notify(bk.student_id, 'info', `Deine angebotene Fahrstunde am ${dmy(bk.date)} um ${bk.start_time} Uhr wurde von ${taker?.name || 'jemandem'} übernommen – du bist frei.`, bk.date);
@@ -543,7 +574,7 @@ async function handleApi(req, res, url) {
   if (p === '/api/students' && method === 'GET') {
     if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
     const rows = db.prepare(
-      `SELECT s.id,s.name,s.email,s.phone,s.allowed_durations,s.created_at,
+      `SELECT s.id,s.name,s.email,s.phone,s.username,s.birth_year,s.allowed_durations,s.created_at,
         (SELECT COUNT(*) FROM bookings b WHERE b.student_id=s.id AND b.status='done') AS done_count
        FROM students s ORDER BY s.name`
     ).all();
@@ -559,6 +590,19 @@ async function handleApi(req, res, url) {
     if (!clean.length) return bad(res, 'Mindestens eine Dauer noetig');
     db.prepare('UPDATE students SET allowed_durations = ? WHERE id = ?').run(clean.join(','), Number(stm[1]));
     return ok(res, { allowed_durations: clean.join(',') });
+  }
+  // Passwort eines Schuelers zuruecksetzen (Fahrlehrer teilt es dem Schueler mit)
+  const rpm = p.match(/^\/api\/students\/(\d+)\/reset-password$/);
+  if (rpm && method === 'POST') {
+    if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
+    const b = await readBody(req);
+    const pw = String(b.new_password || '').trim();
+    if (pw.length < 6) return bad(res, 'Neues Passwort muss mind. 6 Zeichen haben');
+    const st = db.prepare('SELECT id,name FROM students WHERE id = ?').get(Number(rpm[1]));
+    if (!st) return bad(res, 'Schueler nicht gefunden', 404);
+    db.prepare('UPDATE students SET pass = ? WHERE id = ?').run(hashPassword(pw), st.id);
+    logEvent('info', { actor: 'instructor', studentId: st.id, detail: 'Passwort zurückgesetzt' });
+    return ok(res);
   }
 
   // -- Tages-Ausnahmen (kurzer Tag / frei) --
@@ -650,6 +694,20 @@ function genCode() {
     code = `${s.slice(0, 4)}-${s.slice(4)}`;
   } while (db.prepare('SELECT 1 FROM codes WHERE code = ?').get(code));
   return code;
+}
+
+// Login-Handle aus Initialen + Jahrgang, z.B. "Max Mustermann" 1997 -> "MM1997"
+function genUsername(name, year) {
+  const parts = name.split(/\s+/).filter(Boolean);
+  const clean = (ch) => (ch || '').replace(/[^A-Za-zÄÖÜäöü]/g, '').toUpperCase();
+  let ini = parts.length >= 2
+    ? clean(parts[0][0]) + clean(parts[parts.length - 1][0])
+    : clean((parts[0] || 'XX').slice(0, 2));
+  if (ini.length < 2) ini = (ini + 'XX').slice(0, 2);
+  const base = `${ini}${year}`;
+  let handle = base, n = 1;
+  while (db.prepare('SELECT 1 FROM students WHERE username = ?').get(handle)) { n++; handle = `${base}-${n}`; }
+  return handle;
 }
 
 // Slots eines Tages inkl. Status (frei / gebucht / geblockt)

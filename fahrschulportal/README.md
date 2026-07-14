@@ -36,7 +36,10 @@ du ein Backup willst.
 ## Was das Portal kann
 
 ### Für Fahrschüler
-- **Einloggen** mit E-Mail + Passwort, Registrierung **einmalig über einen Code**.
+- **Einloggen** mit **Login-Namen (Initialen + Jahrgang, z. B. `MM1997`)** oder
+  E-Mail + Passwort. Registrierung **einmalig über einen Code**; die E-Mail ist
+  optional. Passwort vergessen? Der Fahrlehrer setzt ein neues (Reset-Button
+  im Fahrschüler-Tab).
 - **Fahrstunden buchen** – standardmäßig **80-Minuten-Slots** mit **15 Min Pause**
   dazwischen.
 - **Max. 2 Fahrstunden pro Woche** (einstellbar).
@@ -53,6 +56,9 @@ du ein Backup willst.
   den Slot – der Anbieter wird informiert, dass er frei ist.
 - **Postfach / Benachrichtigungen:** Glocke mit ungelesenen Meldungen (Angebot
   frei, Termin verschoben, …).
+- **„Keine Zeit" auf ein Angebot:** wer nicht kann, klickt es weg. Lehnen **alle**
+  anderen ab, wird die Stunde wieder fest dem Anbieter zugeordnet
+  (zahlungspflichtig) – er wird benachrichtigt.
 - **Sperrfrist 36 Std.:** Ab dann steht der Termin fest (kein Absagen/Abgeben mehr).
 
 ### Für den Fahrlehrer
