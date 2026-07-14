@@ -15,7 +15,7 @@ const PUBLIC = join(__dirname, 'public');
 const PORT = Number(process.env.PORT || 3000);
 const HOST = process.env.HOST || '0.0.0.0'; // hinter Caddy: HOST=127.0.0.1 (nur Proxy erreicht Node)
 const SESSION_DAYS = 30;
-const APP_VERSION = "2.5.0";
+const APP_VERSION = "2.6.0";
 // Einstellungen, die Schueler/Oeffentlichkeit sehen duerfen (Rest bleibt beim Fahrlehrer)
 const PUBLIC_SETTINGS = ['instructor_name', 'instructor_phone', 'policy_text',
   'cancel_hours', 'lock_hours', 'booking_horizon_days', 'booking_horizon_days_rank2',
@@ -886,8 +886,11 @@ async function handleApi(req, res, url) {
     // Plausibilitaet: Fahrstundenlaenge/Pause muessen sinnvoll sein (sonst Endlosschleife im Raster)
     if ('lesson_min' in b && !(Number(b.lesson_min) >= 10)) return bad(res, 'Fahrstunde muss mind. 10 Minuten sein');
     if ('break_min' in b && !(Number(b.break_min) >= 0)) return bad(res, 'Pause darf nicht negativ sein');
+    if ('monthly_target_h' in b && !(Number(b.monthly_target_h) >= 80)) return bad(res, 'Das Monatsziel muss mindestens 80 Stunden sein');
+    if ('monthly_max_h' in b && 'monthly_target_h' in b && Number(b.monthly_max_h) < Number(b.monthly_target_h))
+      return bad(res, 'Das Skala-Ende (höchstens) darf nicht kleiner als das Monatsziel sein');
     const allowed = ['instructor_name', 'start_time', 'last_start', 'lesson_min', 'break_min',
-      'weekly_target_h', 'daily_target_h', 'weekly_lo_h', 'workdays', 'max_per_week',
+      'weekly_target_h', 'daily_target_h', 'weekly_lo_h', 'monthly_target_h', 'monthly_max_h', 'workdays', 'max_per_week',
       'booking_horizon_days', 'cancel_hours', 'lock_hours', 'release_time', 'short_day_last_start',
       'vacation_credit_min', 'vacation_days_left', 'late_grace_min', 'policy_text',
       'instructor_phone', 'avg_speed_kmh', 'live_lead_min',
@@ -977,6 +980,12 @@ function buildDaySlots(date, studentId = null) {
 function weekStartEnd(dateStr) {
   const mon = mondayOf(dateStr);
   return { from: mon, to: addDays(mon, 6) };
+}
+function monthStartEnd(dateStr) {
+  const [y, m] = dateStr.split('-').map(Number);
+  const last = new Date(y, m, 0).getDate(); // Tag 0 des Folgemonats = letzter Tag dieses Monats
+  const p2 = (n) => String(n).padStart(2, '0');
+  return { from: `${y}-${p2(m)}-01`, to: `${y}-${p2(m)}-${p2(last)}` };
 }
 
 // Wie viele Stunden hat ein Schueler in der Woche schon gebucht?
@@ -1217,10 +1226,13 @@ function statsFor(ref) {
 
   const dayMin = sumMinutes('date = ?', [day]);
   const weekMin = sumMinutes('date BETWEEN ? AND ?', [from, to]);
+  const mo = monthStartEnd(ref);
+  const monthMin = sumMinutes('date BETWEEN ? AND ?', [mo.from, mo.to]);
 
   // gefahren (done) getrennt ausweisen
   const dayDone = db.prepare("SELECT COALESCE(SUM(duration_min),0) AS m FROM bookings WHERE date = ? AND status='done'").get(day).m;
   const weekDone = db.prepare("SELECT COALESCE(SUM(duration_min),0) AS m FROM bookings WHERE date BETWEEN ? AND ? AND status='done'").get(from, to).m;
+  const monthDone = db.prepare("SELECT COALESCE(SUM(duration_min),0) AS m FROM bookings WHERE date BETWEEN ? AND ? AND status='done'").get(mo.from, mo.to).m;
 
   // pro Wochentag (fuer kleines Balken-Bild)
   const perDay = [];
@@ -1242,6 +1254,7 @@ function statsFor(ref) {
     day, from, to,
     daily: { minutes: dayMin, doneMinutes: dayDone, targetH: s.daily_target_h },
     weekly: { minutes: weekMin, doneMinutes: weekDone, targetH: s.weekly_target_h, loH: s.weekly_lo_h },
+    monthly: { minutes: monthMin, doneMinutes: monthDone, targetH: s.monthly_target_h, maxH: s.monthly_max_h, from: mo.from, to: mo.to },
     perDay, counts,
     settings: s,
   };

@@ -805,9 +805,9 @@ function renderTiles(el, stats) {
   </div>`;
 }
 
-function gaugeSVG(minutes, targetH, loH) {
+function gaugeSVG(minutes, targetH, loH, maxHFixed) {
   const value = minutes / 60;
-  const maxH = Math.max(targetH * 1.4, value * 1.05, targetH + 2);
+  const maxH = maxHFixed ? Math.max(maxHFixed, value * 1.02) : Math.max(targetH * 1.4, value * 1.05, targetH + 2);
   const R = 74, cx = 100, cy = 96, sw = 15;
   // f in [0,1]: 0 = links, 1 = rechts, Bogen ueber oben
   const P = (f) => {
@@ -853,6 +853,12 @@ function renderGauge(el, stats) {
       <div class="val">${minToH(d.minutes).toFixed(1).replace('.0', '')} h</div>
       <div class="cap">heute · Ziel ${d.targetH} h</div>
     </div>
+    ${stats.monthly ? `<div class="gauge">
+      ${gaugeSVG(stats.monthly.minutes, stats.monthly.targetH, stats.monthly.targetH * 0.75, stats.monthly.maxH)}
+      <div class="val">${minToH(stats.monthly.minutes).toFixed(1).replace('.0', '')} h</div>
+      <div class="cap">dieser Monat · Ziel ${stats.monthly.targetH} h</div>
+      <div class="goal">${stats.monthly.minutes / 60 >= stats.monthly.targetH ? '✅ Ziel erreicht!' : `noch ${((stats.monthly.targetH * 60 - stats.monthly.minutes) / 60).toFixed(1)} h`} · davon gefahren ${minToH(stats.monthly.doneMinutes).toFixed(1)} h</div>
+    </div>` : ''}
     <div style="flex:1;min-width:260px">
       <div class="cap muted" style="margin-bottom:.3rem">Woche im Überblick</div>
       <div class="weekbars">${weekBars(stats)}</div>
@@ -1719,6 +1725,10 @@ function tabEinstellungen() {
         <div class="field"><label>Wochenziel (Stunden)</label><input id="e-wt" type="number" value="${s.weekly_target_h}" step="0.5"></div>
         <div class="field"><label>Untere Zielspanne (Stunden)</label><input id="e-wlo" type="number" value="${s.weekly_lo_h}" step="0.5"></div>
         <div class="field"><label>Tagesziel (Stunden)</label><input id="e-dt" type="number" value="${s.daily_target_h}" step="0.5"></div>
+        <div class="row">
+          <div class="field"><label>Monatsziel (Std, mind. 80)</label><input id="e-mt" type="number" value="${s.monthly_target_h}" min="80" step="1"></div>
+          <div class="field"><label>Monat Skala-Ende (höchstens)</label><input id="e-mmax" type="number" value="${s.monthly_max_h}" min="80" step="1"></div>
+        </div>
         <div class="hint" id="e-preview"></div>
         <h2 style="font-size:.95rem;margin-top:1.4rem">Zugang</h2>
         <div class="field"><label>Angezeigter Name</label><input id="e-name" value="${esc(s.instructor_name)}"></div>
@@ -1777,7 +1787,9 @@ function tabEinstellungen() {
         start_time: $('#e-start').value, last_start: $('#e-last').value,
         lesson_min: Number($('#e-lesson').value), break_min: Number($('#e-break').value),
         weekly_target_h: Number($('#e-wt').value), weekly_lo_h: Number($('#e-wlo').value),
-        daily_target_h: Number($('#e-dt').value), workdays: workdays || '1,2,3,4,5',
+        daily_target_h: Number($('#e-dt').value),
+        monthly_target_h: Number($('#e-mt').value), monthly_max_h: Number($('#e-mmax').value),
+        workdays: workdays || '1,2,3,4,5',
         max_per_week: Number($('#e-max').value), instructor_name: $('#e-name').value,
         booking_horizon_days: Number($('#e-horizon').value), cancel_hours: Number($('#e-cancel').value),
         lock_hours: Number($('#e-lock').value),
