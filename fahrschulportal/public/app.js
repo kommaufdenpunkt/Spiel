@@ -671,21 +671,28 @@ async function delBlock(id) {
 // ---- Tab: Kalender (Tag & eigener Termin) ----
 async function tabKalender() {
   const box = $('#itab');
+  const mode = state.calMode || 'tag';
   box.innerHTML = `<div class="card">
     <div class="dateline">
+      <div class="viewtoggle">
+        <button data-mode="tag" class="${mode === 'tag' ? 'active' : ''}">Tag</button>
+        <button data-mode="woche" class="${mode === 'woche' ? 'active' : ''}">Woche</button>
+      </div>
       <button class="sec sm" id="k-prev">‹</button>
       <span class="day" id="k-label"></span>
       <button class="sec sm" id="k-next">›</button>
-      <input type="date" id="k-date" style="max-width:170px">
+      <input type="date" id="k-date" style="max-width:160px">
       <button class="ghost sm" id="k-late" style="margin-left:auto">⏱️ Ich komme später</button>
       <button class="ghost sm" id="k-gap">🧩 Lücken schließen</button>
       <button class="sm" id="k-add">+ Eigener Termin</button>
     </div>
     <div id="k-list"></div>
   </div>`;
+  box.querySelectorAll('[data-mode]').forEach((b) => b.onclick = () => { state.calMode = b.dataset.mode; tabKalender(); });
+  const step = mode === 'woche' ? 7 : 1;
   $('#k-date').value = state.date;
-  $('#k-prev').onclick = () => { state.date = addDays(state.date, -1); loadK(); };
-  $('#k-next').onclick = () => { state.date = addDays(state.date, 1); loadK(); };
+  $('#k-prev').onclick = () => { state.date = addDays(state.date, -step); loadK(); };
+  $('#k-next').onclick = () => { state.date = addDays(state.date, step); loadK(); };
   $('#k-date').onchange = (e) => { state.date = e.target.value; loadK(); };
   $('#k-add').onclick = () => openAddBooking();
   $('#k-gap').onclick = () => openGapModal();
@@ -693,13 +700,86 @@ async function tabKalender() {
   loadK();
 }
 async function loadK() {
-  $('#k-label').textContent = fmtDay(state.date);
+  const mode = state.calMode || 'tag';
   $('#k-date').value = state.date;
+  if (mode === 'woche') {
+    const mon = mondayOf(state.date);
+    const sat = addDays(mon, 5);
+    $('#k-label').textContent = `Woche ${fmtShort(mon)}–${fmtShort(sat)}`;
+    try {
+      const ov = await api(`/api/instructor/overview?from=${mon}&to=${sat}`);
+      window.__instrBookings = ov.bookings;
+      renderWeek($('#k-list'), mon, ov);
+    } catch (e) { toast(e.message, 'err'); }
+    return;
+  }
+  $('#k-label').textContent = fmtDay(state.date);
   try {
     const ov = await api('/api/instructor/overview?from=' + state.date + '&to=' + state.date);
     window.__instrBookings = ov.bookings;
     renderInstrDay($('#k-list'), state.date, ov.bookings, ov.blocks);
   } catch (e) { toast(e.message, 'err'); }
+}
+
+// Farbe je Fahrschüler (stabil über die id)
+const WK_COLORS = ['#4d8dff', '#35c07d', '#b079f0', '#e6934d', '#e06b9a', '#3fb6c4', '#c9a13b', '#7c8cf0'];
+function studentColor(id) { return id ? WK_COLORS[id % WK_COLORS.length] : '#5a6b80'; }
+
+function renderWeek(el, monday, ov) {
+  const s = state.settings;
+  const toM = (t) => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
+  const days = Array.from({ length: 6 }, (_, i) => addDays(monday, i));
+  // Zeitbereich dynamisch: Standard-Arbeitszeit, erweitert um alle Termine/Blöcke
+  let lo = toM(s.start_time), hi = toM(s.last_start) + s.lesson_min;
+  for (const b of ov.bookings) { lo = Math.min(lo, toM(b.start_time)); hi = Math.max(hi, toM(b.start_time) + b.duration_min); }
+  for (const bl of ov.blocks) { lo = Math.min(lo, toM(bl.start_time)); hi = Math.max(hi, toM(bl.end_time)); }
+  lo = Math.floor(lo / 60) * 60; hi = Math.ceil(hi / 60) * 60;
+  const total = Math.max(60, hi - lo);
+  const HPH = 42; // px pro Stunde
+  const bodyH = total / 60 * HPH;
+  const y = (min) => (min - lo) / total * bodyH;
+  const ovByDate = {}; for (const o of ov.overrides) ovByDate[o.date] = o;
+  const today = todayStr();
+
+  const hourLabels = [];
+  for (let t = lo; t < hi; t += 60) hourLabels.push(`<div class="wk-hour"><span>${String(t / 60).padStart(2, '0')}:00</span></div>`);
+  const hourLines = hourLabels.map(() => '<div class="wk-hour"></div>').join('');
+
+  const dayCol = (d) => {
+    const isToday = d === today;
+    const ovd = ovByDate[d];
+    let inner = '';
+    if (ovd && ovd.closed) {
+      inner += `<div class="wk-block closed">${ovd.type === 'vacation' ? '🌴 Urlaub' : '🏖️ frei'}</div>`;
+    }
+    for (const bl of ov.blocks.filter((x) => x.date === d)) {
+      const top = y(toM(bl.start_time)), h = Math.max(16, y(toM(bl.end_time)) - top);
+      inner += `<div class="wk-block blk" style="top:${top}px;height:${h}px" title="${esc(bl.title)}">
+        <div class="t">${bl.start_time}</div>${esc(bl.title)}</div>`;
+    }
+    for (const b of ov.bookings.filter((x) => x.date === d)) {
+      const top = y(toM(b.start_time)), h = Math.max(20, b.duration_min / total * bodyH);
+      const col = b.status === 'offered' ? '#e6b23a' : studentColor(b.student_id);
+      const who = b.student_name || b.title || 'Termin';
+      const badge = b.status === 'done' ? ' ✓' : b.status === 'offered' ? ' 🔄' : '';
+      inner += `<div class="wk-block" data-wk="${b.id}" style="top:${top}px;height:${h}px;background:${col}"
+        title="${b.start_time} ${esc(who)}"><div class="t">${b.start_time}${badge}</div>${esc(who)}</div>`;
+    }
+    return `<div class="wk-body ${isToday ? 'today' : ''}" style="height:${bodyH}px">${hourLines}${inner}</div>`;
+  };
+
+  el.innerHTML = `<div class="weekwrap"><div class="weekgrid">
+    <div class="wk-corner"></div>
+    ${days.map((d) => {
+      const ovd = ovByDate[d];
+      const tag = ovd ? (ovd.type === 'vacation' ? '🌴 Urlaub' : ovd.closed ? '🏖️ frei' : `✂️ kurz bis ${ovd.last_start || ''}`) : '';
+      return `<div class="wk-head ${d === today ? 'today' : ''}">${WD[isoDow(d) - 1]}<span class="sub">${fmtShort(d)}</span>${tag ? `<span class="daytag">${tag}</span>` : ''}</div>`;
+    }).join('')}
+    <div class="wk-times">${hourLabels.join('')}</div>
+    ${days.map(dayCol).join('')}
+  </div></div>
+  <p class="hint" style="margin-top:.7rem">Tipp: auf einen Termin tippen zum Bearbeiten/Abschließen. Farben = Fahrschüler, 🔄 = wird abgegeben, ✓ = gefahren.</p>`;
+  el.querySelectorAll('[data-wk]').forEach((b) => b.onclick = () => openMarkModal(b.dataset.wk));
 }
 
 function openLateModal() {

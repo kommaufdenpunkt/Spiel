@@ -144,3 +144,26 @@ th{color:var(--muted);font-weight:600;font-size:.78rem;text-transform:uppercase;
 .navtabs button.active{background:var(--brand);color:#fff;border-color:var(--brand)}
 .hint{font-size:.82rem;color:var(--muted);margin:.3rem 0 .8rem}
 .inline{display:flex;gap:.5rem;align-items:center;flex-wrap:wrap}
+
+/* ---- Wochen-Zeitachse ---- */
+.viewtoggle{display:inline-flex;background:#0f151d;border-radius:9px;padding:.2rem;gap:.2rem}
+.viewtoggle button{background:transparent;color:var(--muted);padding:.35rem .8rem;font-size:.85rem;border-radius:7px}
+.viewtoggle button.active{background:#26313f;color:var(--ink)}
+.weekwrap{overflow-x:auto}
+.weekgrid{display:grid;grid-template-columns:46px repeat(6,minmax(96px,1fr));min-width:660px;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.wk-head{padding:.4rem .3rem;text-align:center;font-size:.78rem;font-weight:700;border-bottom:1px solid var(--line);background:#131a23}
+.wk-head.today{background:rgba(77,141,255,.18);color:#8fb4ff}
+.wk-head .sub{display:block;font-weight:500;color:var(--muted);font-size:.68rem}
+.wk-head .daytag{display:block;font-weight:600;font-size:.64rem;margin-top:.1rem}
+.wk-corner{border-bottom:1px solid var(--line);background:#131a23}
+.wk-body{position:relative;border-left:1px solid var(--line)}
+.wk-body.today{background:rgba(77,141,255,.05)}
+.wk-hour{height:42px;border-bottom:1px dashed var(--line)}
+.wk-times .wk-hour{position:relative}
+.wk-times .wk-hour span{position:absolute;top:-7px;right:.3rem;font-size:.66rem;color:var(--muted)}
+.wk-block{position:absolute;left:3px;right:3px;border-radius:6px;padding:.15rem .35rem;font-size:.7rem;
+  overflow:hidden;cursor:pointer;color:#fff;box-shadow:0 1px 3px rgba(0,0,0,.35);line-height:1.15}
+.wk-block .t{font-weight:800;font-variant-numeric:tabular-nums}
+.wk-block.blk{background:repeating-linear-gradient(45deg,#5b4a2a,#5b4a2a 6px,#4d3f24 6px,#4d3f24 12px);cursor:default}
+.wk-block.closed{position:absolute;inset:0;background:rgba(10,14,20,.55);cursor:default;border-radius:0;
+  display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:.72rem;font-weight:700}

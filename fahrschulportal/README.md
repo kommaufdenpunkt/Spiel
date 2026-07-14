@@ -65,7 +65,9 @@ du ein Backup willst.
 - **Tacho / Drehzahlmesser:** zeigt dynamisch die Stunden dieser Woche gegen das
   **Wochenziel** (Standard 25 h) – rot = weit weg, gelb = fast dran, grün =
   Ziel erreicht 🎯. Dazu ein Tages-Tacho und eine Wochen-Balkenübersicht.
-- **Kalender:** Tagesansicht aller Termine, eigene Termine frei anlegen.
+- **Kalender – Tag & Woche:** Tagesliste oder **Wochen-Zeitachse Mo–Sa** mit
+  farbigen Terminblöcken (Farbe je Fahrschüler), Theoriezeiten schraffiert,
+  Tages-Tags für kurze/freie/Urlaubstage. Termin antippen zum Bearbeiten.
 - **Stunde abschließen:** pro Fahrstunde **Schalter/Automatik** wählen und
   optional das **Kennzeichen** eintragen; Dauer anpassbar (z. B. letzte Stunde
   nur 20 statt 80 Min).
