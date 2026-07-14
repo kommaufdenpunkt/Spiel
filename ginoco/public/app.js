@@ -1718,10 +1718,11 @@ function tabEinstellungen() {
           <div class="field"><label>Standort teilen ab (Min vorher)</label><input id="e-lead" type="number" value="${s.live_lead_min}" min="1"></div>
           <div class="field"><label>Ø Tempo für ETA (km/h)</label><input id="e-speed" type="number" value="${s.avg_speed_kmh}" min="5"></div>
         </div>
-        <div class="field"><label>Standard-Treffpunkt (Text)</label>
+        <div class="field"><label>Standard-Treffpunkt (nur Rückfall)</label>
           <div class="inline"><input id="e-meet" value="${esc(s.meet_default_label || '')}" placeholder="z.B. Fahrschule / Bahnhof" style="flex:1">
             <button class="sec sm" id="e-meet-here" type="button">📍 Standort</button></div>
           <div class="hint" id="e-meet-info" style="margin:.3rem 0 0">${s.meet_default_lat ? '✓ Koordinaten hinterlegt' : 'Ohne Koordinaten nur als Text.'}</div>
+          <div class="hint" style="margin:.3rem 0 0">Wird nur genutzt, wenn weder beim Schüler noch bei der Fahrstunde ein Treffpunkt gesetzt ist. Pro Schüler: Reiter „Fahrschüler" → „Treffpunkt festlegen". Pro Termin: Fahrstunde öffnen → Feld „Treffpunkt".</div>
         </div>
 
         <h2 style="font-size:.95rem;margin-top:1.4rem">Datenschutz, Sonderfahrten & Rang</h2>
