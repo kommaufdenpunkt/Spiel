@@ -1022,7 +1022,7 @@ async function tabSchueler() {
         const boxes = [40, 80, 120].map((d) => `<label style="margin:0;font-weight:600"><input type="checkbox" data-sdur="${s.id}" value="${d}" ${durs.includes(d) ? 'checked' : ''} style="width:auto"> ${d}</label>`).join(' ');
         return `<tr>
           <td><strong>${esc(s.name)}</strong>${s.birth_year ? ` <span class="muted">(${s.birth_year})</span>` : ''}</td>
-          <td><span class="codechip">${esc(s.username || '–')}</span><br><button class="ghost sm" data-reset="${s.id}" style="margin-top:.3rem">Passwort zurücksetzen</button></td>
+          <td><span class="codechip">${esc(s.username || '–')}</span><br><button class="ghost sm" data-reset="${s.id}" data-uname="${esc(s.username || '')}" data-sname="${esc(s.name)}" style="margin-top:.3rem">Passwort zurücksetzen</button></td>
           <td>${esc(s.email || '')}<br><span class="muted">${esc(s.phone || '')}</span></td>
           <td>${s.done_count} Std.</td>
           <td><div class="inline">${boxes} <button class="sec sm" data-savedur="${s.id}">Speichern</button></div></td>
@@ -1036,13 +1036,48 @@ async function tabSchueler() {
       try { await api('/api/students/' + id, { method: 'PATCH', body: { allowed_durations: vals } }); toast('Gespeichert ✓', 'ok'); }
       catch (e) { toast(e.message, 'err'); }
     });
-    $('#s-list').querySelectorAll('[data-reset]').forEach((btn) => btn.onclick = async () => {
-      const pw = prompt('Neues Passwort für diesen Fahrschüler (mind. 6 Zeichen) – teile es ihm dann z.B. per WhatsApp mit:');
-      if (!pw) return;
-      try { await api('/api/students/' + btn.dataset.reset + '/reset-password', { method: 'POST', body: { new_password: pw } }); toast('Passwort gesetzt ✓', 'ok'); }
-      catch (e) { toast(e.message, 'err'); }
-    });
+    $('#s-list').querySelectorAll('[data-reset]').forEach((btn) => btn.onclick = () =>
+      openResetModal(btn.dataset.reset, btn.dataset.sname, btn.dataset.uname));
   } catch (e) { toast(e.message, 'err'); }
+}
+
+// Leicht lesbares Zufallspasswort (ohne verwechselbare Zeichen)
+function randomPassword(len = 8) {
+  const cs = 'abcdefghijkmnpqrstuvwxyz23456789';
+  const buf = new Uint8Array(len);
+  crypto.getRandomValues(buf);
+  let out = '';
+  for (let i = 0; i < len; i++) out += cs[buf[i] % cs.length];
+  return out;
+}
+
+function openResetModal(id, name, username) {
+  modal(`<h3>Passwort für ${esc(name)}</h3>
+    <p class="hint">Vergib ein neues Passwort und gib es dem Fahrschüler weiter (z.B. per WhatsApp). Der Login-Name bleibt <span class="codechip">${esc(username || '–')}</span>.</p>
+    <div class="field"><label>Neues Passwort (mind. 6 Zeichen)</label>
+      <div class="inline"><input id="rs-pw" value="${randomPassword()}" style="flex:1"><button class="sec sm" id="rs-gen" type="button">🎲 Neu</button></div>
+    </div>
+    <div id="rs-done" class="hidden"></div>
+    <div class="actions">
+      <button class="sec" onclick="window.__closeModal()">Abbrechen</button>
+      <button id="rs-save">Passwort setzen</button>
+    </div>`);
+  $('#rs-gen').onclick = () => { $('#rs-pw').value = randomPassword(); };
+  $('#rs-save').onclick = async () => {
+    const pw = $('#rs-pw').value.trim();
+    if (pw.length < 6) { toast('Mind. 6 Zeichen', 'err'); return; }
+    try {
+      await api('/api/students/' + id + '/reset-password', { method: 'POST', body: { new_password: pw } });
+      const share = `Hallo ${name}, dein Zugang zum Fahrschulportal:\nLogin-Name: ${username}\nPasswort: ${pw}`;
+      $('#rs-done').classList.remove('hidden');
+      $('#rs-done').innerHTML = `<div class="warnbox" style="margin-top:.4rem">✓ Passwort gesetzt. Diese Zugangsdaten weitergeben:</div>
+        <pre style="background:#0f151d;border:1px solid var(--line);border-radius:8px;padding:.7rem;white-space:pre-wrap;font-size:.85rem;margin:.5rem 0">${esc(share)}</pre>
+        <button class="sec sm" id="rs-copy">📋 Kopieren</button>`;
+      $('#rs-save').textContent = 'Fertig'; $('#rs-save').onclick = closeModal;
+      $('#rs-copy').onclick = () => { navigator.clipboard?.writeText(share); toast('Zugangsdaten kopiert', 'ok'); };
+      toast('Passwort gesetzt ✓', 'ok');
+    } catch (e) { toast(e.message, 'err'); }
+  };
 }
 
 // ---- Tab: Arbeitszeiten / Dienstplan (kurze Tage, freie Tage) ----

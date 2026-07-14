@@ -110,6 +110,14 @@ du ein Backup willst.
 - **Nächste Fahrstunde** mit Countdown (Schüler) und **„Zum Kalender
   hinzufügen"** (iCal-Datei für Handy/PC-Kalender, mit Erinnerung 3 Std vorher).
 
+### Passwort vergessen?
+Bewusst **kein E-Mail-Reset** (viele Schüler haben keine E-Mail hinterlegt).
+Stattdessen: Der Schüler meldet sich beim Fahrlehrer (z. B. per WhatsApp), und
+der Fahrlehrer vergibt im **Fahrschüler-Tab → „Passwort zurücksetzen"** ein
+neues Passwort (per Knopf zufällig erzeugbar). Das Portal zeigt danach eine
+fertige Weitergabe-Info (Login-Name + Passwort) mit Kopier-Knopf. Der
+Login-Name bleibt unverändert.
+
 ---
 
 ## Voreinstellungen (alle im Menü änderbar)
