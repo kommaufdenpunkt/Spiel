@@ -219,6 +219,13 @@ async function handleApi(req, res, url) {
     return ok(res, { bookings: rows, weekInfo: weekInfoForStudent(sess.student_id) });
   }
 
+  // Abwesenheit des Fahrlehrers (Urlaub / freie Tage) – fuer Schueler sichtbar
+  if (p === '/api/away' && method === 'GET') {
+    const rows = db.prepare(
+      "SELECT date,type FROM day_overrides WHERE closed = 1 AND date >= ? ORDER BY date LIMIT 60").all(todayStr());
+    return ok(res, { away: rows });
+  }
+
   // Benachrichtigungen (Portal-Postfach)
   if (p === '/api/my/notifications' && method === 'GET') {
     if (!requireStudent()) return bad(res, 'Bitte anmelden', 401);
@@ -249,7 +256,12 @@ async function handleApi(req, res, url) {
 
     if (method === 'DELETE') {
       if (requireInstructor()) {
+        const reason = url.searchParams.get('reason');
         db.prepare("UPDATE bookings SET status='cancelled' WHERE id = ?").run(id);
+        logEvent('cancel_instr', { actor: 'instructor', studentId: bk.student_id, bookingId: id, date: bk.date,
+          detail: `${wdShort(bk.date)} ${dmy(bk.date)} ${bk.start_time} Uhr abgesagt vom Fahrlehrer${reason ? ' – ' + reason : ''}` });
+        if (bk.student_id) notify(bk.student_id, 'info',
+          `Deine Fahrstunde am ${wdShort(bk.date)} ${dmy(bk.date)} um ${bk.start_time} Uhr wurde vom Fahrlehrer abgesagt${reason ? ' (' + reason + ')' : ''}.`, bk.date);
         return ok(res);
       }
       if (requireStudent() && bk.student_id === sess.student_id) {
@@ -265,6 +277,8 @@ async function handleApi(req, res, url) {
             + `Du kannst die Stunde aber zur Uebernahme anbieten – uebernimmt sie jemand, bist du frei.`);
         }
         db.prepare("UPDATE bookings SET status='cancelled' WHERE id = ?").run(id);
+        logEvent('cancel_student', { actor: 'student', studentId: bk.student_id, bookingId: id, date: bk.date,
+          detail: `${wdShort(bk.date)} ${dmy(bk.date)} ${bk.start_time} Uhr storniert (rechtzeitig)` });
         return ok(res);
       }
       return bad(res, 'Keine Berechtigung', 403);
@@ -299,10 +313,33 @@ async function handleApi(req, res, url) {
       if ('gearbox' in b) { fields.push('gearbox=?'); vals.push(b.gearbox || null); }
       if ('plate' in b) { fields.push('plate=?'); vals.push(b.plate ? String(b.plate).trim() : null); }
       if ('note' in b) { fields.push('note=?'); vals.push(b.note ? String(b.note).trim() : null); }
+      if ('reason' in b) { fields.push('reason=?'); vals.push(b.reason ? String(b.reason).trim() : null); }
+      if ('attended' in b) { fields.push('attended=?'); vals.push(b.attended == null ? null : (b.attended ? 1 : 0)); }
+      if ('late_minutes' in b) { fields.push('late_minutes=?'); vals.push(Math.max(0, Number(b.late_minutes) || 0)); }
       if ('duration_min' in b && Number(b.duration_min) > 0) { fields.push('duration_min=?'); vals.push(newDur); }
       if (!fields.length) return bad(res, 'Nichts zu aendern');
       vals.push(id);
       db.prepare(`UPDATE bookings SET ${fields.join(',')} WHERE id = ?`).run(...vals);
+
+      // Protokoll: Verschieben / Abschluss
+      if ((b.date && newDate !== bk.date) || (b.start_time && newStart !== bk.start_time)) {
+        logEvent('shift', { actor: 'instructor', studentId: bk.student_id, bookingId: id, date: newDate,
+          detail: `verschoben: ${wdShort(bk.date)} ${dmy(bk.date)} ${bk.start_time} → ${wdShort(newDate)} ${dmy(newDate)} ${newStart} Uhr` });
+        if (bk.student_id) notify(bk.student_id, 'shift',
+          `Dein Termin wurde auf ${wdShort(newDate)} ${dmy(newDate)} ${newStart} Uhr verschoben.`, newDate, id);
+      }
+      if (b.status === 'done' || b.status === 'cancelled' || 'attended' in b) {
+        const fresh = db.prepare('SELECT * FROM bookings WHERE id = ?').get(id);
+        const who = fresh.student_id ? '' : (fresh.title ? fresh.title + ' – ' : '');
+        if (fresh.status === 'done' && fresh.attended === 0) {
+          logEvent('noshow', { actor: 'instructor', studentId: fresh.student_id, bookingId: id, date: fresh.date,
+            detail: `${who}nicht erschienen am ${wdShort(fresh.date)} ${dmy(fresh.date)} ${fresh.start_time}${fresh.reason ? ' – ' + fresh.reason : ''}` });
+        } else if (fresh.status === 'done') {
+          const car = fresh.gearbox === 'schalt' ? 'Schalter' : fresh.gearbox === 'automatik' ? 'Automatik' : '–';
+          logEvent('done', { actor: 'instructor', studentId: fresh.student_id, bookingId: id, date: fresh.date,
+            detail: `${who}gefahren ${wdShort(fresh.date)} ${dmy(fresh.date)} ${fresh.start_time} · ${fresh.duration_min} Min · ${car}${fresh.plate ? ' · ' + fresh.plate : ''}${fresh.late_minutes ? ' · ' + fresh.late_minutes + ' Min zu spät' : ''}` });
+        }
+      }
       return ok(res, { booking: db.prepare('SELECT * FROM bookings WHERE id = ?').get(id) });
     }
   }
@@ -320,9 +357,10 @@ async function handleApi(req, res, url) {
       return bad(res, `Ab ${lockH} Std. vorher steht der Termin fest und kann nicht mehr abgegeben werden.`);
     db.prepare("UPDATE bookings SET status='offered' WHERE id = ?").run(bk.id);
     // andere Schueler informieren
-    const wd = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'][isoDow(bk.date) - 1];
-    const msg = `Eine Fahrstunde am ${wd} ${bk.date.slice(8)}.${bk.date.slice(5, 7)}. um ${bk.start_time} Uhr ist frei geworden – möchtest du sie übernehmen?`;
+    const msg = `Eine Fahrstunde am ${wdShort(bk.date)} ${dmy(bk.date)} um ${bk.start_time} Uhr ist frei geworden – möchtest du sie übernehmen?`;
     for (const sid of otherStudentIds(sess.student_id)) notify(sid, 'offer', msg, bk.date, bk.id);
+    logEvent('offer', { actor: 'student', studentId: bk.student_id, bookingId: bk.id, date: bk.date,
+      detail: `zur Übernahme angeboten: ${wdShort(bk.date)} ${dmy(bk.date)} ${bk.start_time} Uhr` });
     return ok(res);
   }
   // Angebot zuruecknehmen
@@ -369,7 +407,9 @@ async function handleApi(req, res, url) {
     db.prepare("UPDATE bookings SET student_id = ?, status='booked' WHERE id = ?").run(sess.student_id, bk.id);
     // urspruenglichen Schueler informieren, dass er frei ist
     const taker = db.prepare('SELECT name FROM students WHERE id = ?').get(sess.student_id);
-    notify(bk.student_id, 'info', `Deine angebotene Fahrstunde am ${bk.date.slice(8)}.${bk.date.slice(5, 7)}. um ${bk.start_time} Uhr wurde von ${taker?.name || 'jemandem'} übernommen – du bist frei.`, bk.date);
+    notify(bk.student_id, 'info', `Deine angebotene Fahrstunde am ${dmy(bk.date)} um ${bk.start_time} Uhr wurde von ${taker?.name || 'jemandem'} übernommen – du bist frei.`, bk.date);
+    logEvent('take', { actor: 'student', studentId: sess.student_id, bookingId: bk.id, date: bk.date,
+      detail: `${taker?.name || '?'} übernimmt ${wdShort(bk.date)} ${dmy(bk.date)} ${bk.start_time} Uhr` });
     return ok(res);
   }
 
@@ -395,6 +435,57 @@ async function handleApi(req, res, url) {
     return ok(res, statsFor(ref));
   }
 
+  // Protokoll / Fahrlehrer-Benachrichtigungen (Ereignis-Log)
+  if (p === '/api/instructor/events' && method === 'GET') {
+    if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
+    const sid = url.searchParams.get('student_id');
+    const from = url.searchParams.get('from');
+    const to = url.searchParams.get('to');
+    const cond = [], args = [];
+    if (sid) { cond.push('student_id = ?'); args.push(Number(sid)); }
+    if (from) { cond.push('at >= ?'); args.push(from + 'T00:00:00'); }
+    if (to) { cond.push('at <= ?'); args.push(to + 'T23:59:59'); }
+    const where = cond.length ? 'WHERE ' + cond.join(' AND ') : '';
+    const rows = db.prepare(`SELECT * FROM events ${where} ORDER BY at DESC LIMIT 300`).all(...args);
+    const unseen = db.prepare('SELECT COUNT(*) AS n FROM events WHERE seen = 0').get().n;
+    return ok(res, { events: rows, unseen });
+  }
+  if (p === '/api/instructor/events/seen' && method === 'POST') {
+    if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
+    db.prepare('UPDATE events SET seen = 1 WHERE seen = 0').run();
+    return ok(res);
+  }
+
+  // Verspaetungs-Kette: "Ich komme X Min spaeter" -> alle Folgetermine heute nachruecken
+  if (p === '/api/instructor/delay-today' && method === 'POST') {
+    if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
+    const b = await readBody(req);
+    const mins = Math.max(1, Number(b.minutes) || 0);
+    const date = b.date || todayStr();
+    const nowM = date === todayStr() ? toMin(nowHHMM()) : -1;
+    // betroffen: heutige, noch nicht begonnene, gebuchte Stunden
+    const rows = db.prepare("SELECT * FROM bookings WHERE date = ? AND status IN ('booked','offered') ORDER BY start_time").all(date)
+      .filter((r) => toMin(r.start_time) >= nowM);
+    let moved = 0;
+    for (const r of rows) {
+      const nt = toHHMM(toMin(r.start_time) + mins);
+      db.prepare('UPDATE bookings SET start_time = ? WHERE id = ?').run(nt, r.id);
+      moved++;
+      if (r.student_id) {
+        notify(r.student_id, 'shift', `Der Fahrlehrer verspätet sich um ${mins} Min. Dein Termin verschiebt sich auf ${nt} Uhr.`, date, r.id);
+        logEvent('delay', { actor: 'instructor', studentId: r.student_id, bookingId: r.id, date,
+          detail: `Verspätung ${mins} Min: ${r.start_time} → ${nt} Uhr` });
+      }
+    }
+    return ok(res, { moved, minutes: mins });
+  }
+
+  // Erinnerungen jetzt pruefen/versenden (laeuft auch automatisch im Hintergrund)
+  if (p === '/api/instructor/run-reminders' && method === 'POST') {
+    if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
+    return ok(res, { sent: sendDueReminders() });
+  }
+
   // Lücken-Vorschlag: contigierter Tagesplan (Stunden nach vorne ziehen)
   if (p === '/api/instructor/gap-proposal' && method === 'GET') {
     if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
@@ -408,16 +499,19 @@ async function handleApi(req, res, url) {
     if (!date) return bad(res, 'Datum noetig');
     const plan = packDay(date);
     if (!plan.hasGap) return bad(res, 'Keine Lücke zu schließen.');
-    const wd = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'][isoDow(date) - 1];
+    let moved = 0;
     for (const m of plan.moves) {
       if (m.from === m.to) continue;
       db.prepare('UPDATE bookings SET start_time = ? WHERE id = ?').run(m.to, m.id);
+      moved++;
       if (m.student_id) {
         notify(m.student_id, 'shift',
-          `Dein Termin am ${wd} ${date.slice(8)}.${date.slice(5, 7)}. wurde von ${m.from} auf ${m.to} Uhr verschoben.`, date, m.id);
+          `Dein Termin am ${wdShort(date)} ${dmy(date)} wurde von ${m.from} auf ${m.to} Uhr verschoben.`, date, m.id);
+        logEvent('shift', { actor: 'instructor', studentId: m.student_id, bookingId: m.id, date,
+          detail: `Lücke geschlossen: ${m.from} → ${m.to} Uhr (${wdShort(date)} ${dmy(date)})` });
       }
     }
-    return ok(res, { moved: plan.moves.filter((m) => m.from !== m.to).length });
+    return ok(res, { moved });
   }
 
   // -- Codes --
@@ -477,16 +571,27 @@ async function handleApi(req, res, url) {
     if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
     const b = await readBody(req);
     if (!b.date) return bad(res, 'Datum noetig');
-    const closed = b.closed ? 1 : 0;
-    let lastStart = b.last_start || null;
-    if (b.short && !lastStart) lastStart = getSettingRaw('short_day_last_start'); // Schnell-Aktion "kurzer Tag"
+    const type = ['short', 'free', 'vacation'].includes(b.type) ? b.type : (b.closed ? 'free' : 'short');
+    const closed = (type === 'free' || type === 'vacation') ? 1 : 0;
+    let lastStart = closed ? null : (b.last_start || null);
     if (!closed && lastStart && b.start_time && toMin(lastStart) < toMin(b.start_time))
       return bad(res, 'Letzter Slot darf nicht vor dem Arbeitsbeginn liegen');
-    db.prepare(`INSERT INTO day_overrides(date,start_time,last_start,closed,note,created_at)
-      VALUES(?,?,?,?,?,?)
-      ON CONFLICT(date) DO UPDATE SET start_time=excluded.start_time,last_start=excluded.last_start,closed=excluded.closed,note=excluded.note`)
-      .run(b.date, closed ? null : (b.start_time || null), closed ? null : lastStart, closed, b.note ? String(b.note).trim() : null, new Date().toISOString());
-    return ok(res);
+
+    // Kurzer Tag / Schliessung: bestehende Termine, die dadurch heraus fallen, zuerst pruefen
+    const affected = db.prepare("SELECT b.*, s.name AS student_name FROM bookings b LEFT JOIN students s ON s.id=b.student_id WHERE b.date = ? AND b.status IN ('booked','offered')").all(b.date)
+      .filter((bk) => closed || (lastStart && toMin(bk.start_time) > toMin(lastStart)));
+    if (affected.length && !b.force) {
+      return bad(res, `An diesem Tag liegen schon ${affected.length} Termin(e), die dann keinen Platz mehr haben `
+        + `(${affected.map((a) => `${a.start_time} ${a.student_name || a.title || ''}`.trim()).join(', ')}). `
+        + `Verschiebe diese zuerst – oder bestätige mit „trotzdem".`);
+    }
+
+    db.prepare(`INSERT INTO day_overrides(date,start_time,last_start,closed,type,note,created_at)
+      VALUES(?,?,?,?,?,?,?)
+      ON CONFLICT(date) DO UPDATE SET start_time=excluded.start_time,last_start=excluded.last_start,closed=excluded.closed,type=excluded.type,note=excluded.note`)
+      .run(b.date, closed ? null : (b.start_time || null), lastStart, closed, type, b.note ? String(b.note).trim() : null, new Date().toISOString());
+    if (type === 'vacation') logEvent('vacation', { actor: 'instructor', date: b.date, detail: `Urlaub am ${wdShort(b.date)} ${dmy(b.date)}` });
+    return ok(res, { affected: affected.length });
   }
   const dom = p.match(/^\/api\/day-overrides\/(\d{4}-\d{2}-\d{2})$/);
   if (dom && method === 'DELETE') {
@@ -519,7 +624,8 @@ async function handleApi(req, res, url) {
     const b = await readBody(req);
     const allowed = ['instructor_name', 'start_time', 'last_start', 'lesson_min', 'break_min',
       'weekly_target_h', 'daily_target_h', 'weekly_lo_h', 'workdays', 'max_per_week',
-      'booking_horizon_days', 'cancel_hours', 'lock_hours', 'release_time', 'short_day_last_start'];
+      'booking_horizon_days', 'cancel_hours', 'lock_hours', 'release_time', 'short_day_last_start',
+      'vacation_credit_min', 'vacation_days_left', 'late_grace_min', 'policy_text'];
     for (const k of allowed) {
       if (k in b && b[k] !== '' && b[k] != null) setSettingRaw(k, b[k]);
     }
@@ -618,6 +724,17 @@ function dispatchExternal(studentId, message) {
 function otherStudentIds(exceptId) {
   return db.prepare('SELECT id FROM students WHERE id != ?').all(exceptId).map((r) => r.id);
 }
+
+// Protokoll-Eintrag schreiben (dient zugleich als Fahrlehrer-Benachrichtigung)
+function logEvent(type, { actor = 'system', studentId = null, bookingId = null, date = null, detail = null } = {}) {
+  let name = null;
+  if (studentId) { const st = db.prepare('SELECT name FROM students WHERE id = ?').get(studentId); name = st?.name || null; }
+  db.prepare(`INSERT INTO events(at,type,actor,student_id,student_name,booking_id,date,detail)
+    VALUES(?,?,?,?,?,?,?,?)`).run(new Date().toISOString(), type, actor, studentId, name, bookingId, date, detail);
+}
+
+const dmy = (date) => `${date.slice(8)}.${date.slice(5, 7)}.`;
+const wdShort = (date) => ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'][isoDow(date) - 1];
 
 // Contigierter Tagesplan: zukuenftige Fahrstunden lueckenlos nach vorne ziehen,
 // an Bloecken und bereits gefahrenen/laufenden Stunden vorbei.
@@ -741,7 +858,10 @@ function createBooking(res, sess, body) {
   ).run(studentId, date, start, duration, 'booked',
     body.title ? String(body.title).trim() : null,
     body.note ? String(body.note).trim() : null, new Date().toISOString());
-  return ok(res, { id: Number(info.lastInsertRowid) });
+  const bid = Number(info.lastInsertRowid);
+  logEvent('book', { actor: isInstructor ? 'instructor' : 'student', studentId, bookingId: bid, date,
+    detail: `${wdShort(date)} ${dmy(date)} ${start} Uhr (${duration} Min)${isInstructor ? ' – vom Fahrlehrer eingetragen' : ''}` });
+  return ok(res, { id: bid });
 }
 
 // Statistik (Tacho): gefahrene/gebuchte Stunden Tag & Woche
@@ -750,6 +870,7 @@ function statsFor(ref) {
   const day = ref;
   const { from, to } = weekStartEnd(ref);
 
+  const vacCredit = s.vacation_credit_min;
   const sumMinutes = (whereDate, params) => {
     const bk = db.prepare(
       `SELECT COALESCE(SUM(duration_min),0) AS m FROM bookings
@@ -757,7 +878,10 @@ function statsFor(ref) {
     const blk = db.prepare(
       `SELECT COALESCE(SUM((strftime('%s','2000-01-01 '||end_time)-strftime('%s','2000-01-01 '||start_time))/60),0) AS m
        FROM blocks WHERE ${whereDate} AND count_hours = 1`).get(...params).m;
-    return bk + blk;
+    // Urlaubstage zaehlen je vacation_credit_min als Arbeitszeit
+    const vac = db.prepare(
+      `SELECT COUNT(*) AS n FROM day_overrides WHERE ${whereDate} AND type = 'vacation'`).get(...params).n;
+    return bk + blk + vac * vacCredit;
   };
 
   const dayMin = sumMinutes('date = ?', [day]);
@@ -781,6 +905,27 @@ function statsFor(ref) {
     perDay,
     settings: s,
   };
+}
+
+// Faellige Erinnerungen versenden (1 Tag / 3 Std / 30 Min vorher)
+function sendDueReminders() {
+  const rows = db.prepare(
+    "SELECT * FROM bookings WHERE status='booked' AND student_id IS NOT NULL AND date >= ?").all(todayStr());
+  let sent = 0;
+  for (const b of rows) {
+    const h = hoursUntil(b.date, b.start_time);
+    if (h <= 0) continue;
+    const fire = (flag, label) => {
+      db.prepare(`UPDATE bookings SET ${flag} = 1 WHERE id = ?`).run(b.id);
+      notify(b.student_id, 'reminder',
+        `Erinnerung (${label}): Fahrstunde am ${wdShort(b.date)} ${dmy(b.date)} um ${b.start_time} Uhr.`, b.date, b.id);
+      sent++;
+    };
+    if (!b.reminded_1d && h <= 24) fire('reminded_1d', '1 Tag vorher');
+    if (!b.reminded_3h && h <= 3) fire('reminded_3h', '3 Stunden vorher');
+    if (!b.reminded_30m && h <= 0.5) fire('reminded_30m', '30 Minuten vorher');
+  }
+  return sent;
 }
 
 // ---------- statische Dateien ----------
@@ -823,4 +968,7 @@ const server = createServer(async (req, res) => {
 server.listen(PORT, () => {
   console.log(`\n  Fahrschulportal laeuft auf  http://localhost:${PORT}\n`);
   console.log(`  Fahrlehrer-Login: Standard-PIN 1234 (bitte in den Einstellungen aendern)\n`);
+  // Erinnerungen im Hintergrund pruefen (alle 5 Minuten)
+  try { sendDueReminders(); } catch (e) { console.error(e); }
+  setInterval(() => { try { sendDueReminders(); } catch (e) { console.error(e); } }, 5 * 60 * 1000);
 });

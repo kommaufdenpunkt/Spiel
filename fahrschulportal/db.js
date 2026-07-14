@@ -90,16 +90,39 @@ db.exec(`
     created_at     TEXT NOT NULL
   );
 
+  -- Protokoll / Ereignis-Log (dient auch als Fahrlehrer-Benachrichtigungen)
+  CREATE TABLE IF NOT EXISTS events (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    at           TEXT NOT NULL,
+    type         TEXT NOT NULL,   -- book|cancel_student|cancel_instr|offer|take|shift|delay|done|noshow|vacation|reminder
+    actor        TEXT,            -- 'student' | 'instructor' | 'system'
+    student_id   INTEGER,
+    student_name TEXT,            -- denormalisiert (bleibt lesbar im Protokoll)
+    booking_id   INTEGER,
+    date         TEXT,
+    detail       TEXT,
+    seen         INTEGER NOT NULL DEFAULT 0
+  );
+
   CREATE INDEX IF NOT EXISTS idx_bookings_date ON bookings(date);
   CREATE INDEX IF NOT EXISTS idx_blocks_date   ON blocks(date);
   CREATE INDEX IF NOT EXISTS idx_notif_student ON notifications(student_id, read);
+  CREATE INDEX IF NOT EXISTS idx_events_at ON events(at);
 `);
 
 // ---- Migrationen fuer bestehende Datenbanken ----
-const cols = db.prepare('PRAGMA table_info(students)').all().map((c) => c.name);
-if (!cols.includes('allowed_durations')) {
-  db.exec("ALTER TABLE students ADD COLUMN allowed_durations TEXT NOT NULL DEFAULT '80'");
+function ensureColumn(table, col, ddl) {
+  const has = db.prepare(`PRAGMA table_info(${table})`).all().some((c) => c.name === col);
+  if (!has) db.exec(`ALTER TABLE ${table} ADD COLUMN ${ddl}`);
 }
+ensureColumn('students', 'allowed_durations', "allowed_durations TEXT NOT NULL DEFAULT '80'");
+ensureColumn('bookings', 'attended', 'attended INTEGER');            // 1 = da, 0 = nicht erschienen, NULL = offen
+ensureColumn('bookings', 'late_minutes', 'late_minutes INTEGER NOT NULL DEFAULT 0');
+ensureColumn('bookings', 'reason', 'reason TEXT');
+ensureColumn('bookings', 'reminded_1d', 'reminded_1d INTEGER NOT NULL DEFAULT 0');
+ensureColumn('bookings', 'reminded_3h', 'reminded_3h INTEGER NOT NULL DEFAULT 0');
+ensureColumn('bookings', 'reminded_30m', 'reminded_30m INTEGER NOT NULL DEFAULT 0');
+ensureColumn('day_overrides', 'type', "type TEXT NOT NULL DEFAULT 'short'");  // short | free | vacation
 
 // ---- Voreinstellungen (einmalig setzen) ----
 const DEFAULTS = {
@@ -118,6 +141,13 @@ const DEFAULTS = {
   lock_hours: '36',          // ab so viel Std. vorher ist der Termin gesperrt (kein Absagen/Abgeben)
   release_time: '10:00',     // Uhrzeit, zu der taeglich der neue Tag am Horizont oeffnet
   short_day_last_start: '13:35', // letzter Slot an "kurzen Tagen" (frueher Feierabend)
+  vacation_credit_min: '240',// Minuten, die ein Urlaubstag als Arbeitszeit zaehlt
+  vacation_days_left: '30',  // verbleibende Urlaubstage (nur zur Anzeige)
+  late_grace_min: '20',      // bis so viele Min Verspaetung ok; danach zaehlt die Zeit ab
+  policy_text: 'Gebuchte Termine sind verbindlich. Kostenfrei stornieren nur bis '
+    + '48 Std. vorher; ab 36 Std. vorher steht der Termin fest. Bei Nichterscheinen '
+    + 'werden bis zu 75 % berechnet. Ab 20 Min Verspätung verkürzt sich die Fahrstunde '
+    + 'entsprechend (die Zeit läuft ab dem vereinbarten Beginn).',
 };
 
 const getSetting = db.prepare('SELECT value FROM settings WHERE key = ?');
@@ -141,7 +171,8 @@ export function getSettings() {
   delete out.instructor_pin; // niemals nach aussen geben
   // Zahlen als Zahlen liefern
   for (const n of ['lesson_min', 'break_min', 'weekly_target_h', 'daily_target_h', 'weekly_lo_h',
-    'max_per_week', 'booking_horizon_days', 'cancel_hours', 'lock_hours']) {
+    'max_per_week', 'booking_horizon_days', 'cancel_hours', 'lock_hours',
+    'vacation_credit_min', 'vacation_days_left', 'late_grace_min']) {
     out[n] = Number(out[n]);
   }
   return out;

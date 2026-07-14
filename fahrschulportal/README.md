@@ -64,6 +64,20 @@ du ein Backup willst.
   optional das **Kennzeichen** eintragen; Dauer anpassbar (z. B. letzte Stunde
   nur 20 statt 80 Min).
 - **Termine verschieben** (vorziehen/zurückziehen) für nahtlose Übergänge.
+- **Protokoll:** jeder Vorgang wird mitgeloggt (gebucht, storniert – von wem,
+  angeboten, übernommen, verschoben, gefahren/nicht erschienen, Urlaub) – ein
+  eigener Tab, filterbar nach Schüler/Zeitraum, den du deinem Chef vorlegen kannst.
+- **Fahrlehrer-Glocke:** du wirst über jede Schüler-Aktion informiert (bucht,
+  sagt ab, übernimmt) – ungelesen-Zähler am Protokoll-Tab.
+- **3 Erinnerungen** an den Schüler automatisch: 1 Tag / 3 Std / 30 Min vorher.
+- **„Ich komme später":** ein Klick verschiebt alle noch offenen Termine des
+  Tages um X Minuten nach hinten (Verspätungs-Kette) und benachrichtigt alle.
+- **Urlaub:** Urlaubstage zählen je 240 Min als Arbeitszeit, Resturlaub-Zähler,
+  Schüler sehen „Fahrlehrer im Urlaub". Kurzer Tag wird gesperrt, wenn dort
+  schon Termine liegen (mit „trotzdem"-Bestätigung).
+- **Stunde abschließen:** erschienen ja/nein + Grund, Verspätungs-Minuten
+  (ab 20 Min Verspätung schlägt das Portal die verkürzte Fahrzeit vor),
+  Schalter/Automatik, Kennzeichen – alles landet im Protokoll.
 - **Lücken schließen (ein Klick):** Entsteht durch eine Absage eine Lücke,
   erkennt das Portal sie und schlägt eine **Verschiebe-Kette** vor (z. B.
   13:35→12:00, 16:45→13:35), damit der Tag lückenlos ist. Du bestätigst per

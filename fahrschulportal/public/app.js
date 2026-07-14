@@ -183,6 +183,7 @@ async function renderStudent() {
     <div class="card hidden" id="offers-card"></div>
     <div class="card">
       <h2>Termin buchen <span class="sub" id="horizon-note"></span></h2>
+      <div class="hint hidden" id="away-note"></div>
       <div class="dateline">
         <button class="sec sm" id="prev">‹</button>
         <span class="day" id="dlabel"></span>
@@ -208,10 +209,11 @@ async function syncStudent() {
   $('#dlabel').textContent = fmtDay(state.date);
   $('#dpick').value = state.date;
   try {
-    const [mine, day, off, notif] = await Promise.all([
+    const [mine, day, off, notif, away] = await Promise.all([
       api('/api/my/bookings'), api('/api/slots?date=' + state.date),
-      api('/api/offers'), api('/api/my/notifications')]);
+      api('/api/offers'), api('/api/my/notifications'), api('/api/away')]);
     myBookingsCache = mine.bookings;
+    renderAway(away.away);
     renderNotifications(notif.notifications, notif.unread);
     renderWeekCard(mine.weekInfo, mine.bookings);
     renderOffers(off.offers, mine.weekInfo);
@@ -270,6 +272,16 @@ function studentBookingItem(b) {
     </div>
     <div class="inline">${actions}</div>
   </div>`;
+}
+
+function renderAway(away) {
+  const el = $('#away-note');
+  if (!el) return;
+  const vac = (away || []).filter((a) => a.type === 'vacation');
+  if (!vac.length) { el.classList.add('hidden'); return; }
+  el.classList.remove('hidden');
+  const dates = vac.map((a) => `${WD[isoDow(a.date) - 1]} ${fmtShort(a.date)}`).join(', ');
+  el.innerHTML = `🌴 <strong>Fahrlehrer im Urlaub:</strong> ${dates} – an diesen Tagen keine Fahrstunden.`;
 }
 
 function renderNotifications(notifs, unread) {
@@ -366,11 +378,12 @@ function bookSlot(start, dur) {
     </div>
     <p style="margin:.6rem 0 .2rem"><strong>${WD_LONG[isoDow(state.date) - 1]}, ${fmtShort(state.date)} um ${start} Uhr</strong>${allowed.length > 1 ? '' : ` · ${dur} Min`}</p>
     ${durSelect}
-    <ul class="hint" style="margin:.4rem 0 0;padding-left:1.1rem">
+    <ul class="hint" style="margin:.4rem 0 .4rem;padding-left:1.1rem">
       <li>Kostenfrei stornieren nur bis <strong>${cancelH} Std.</strong> vorher.</li>
       <li>Ab <strong>${lockH} Std.</strong> vorher steht der Termin fest – dann keine Absage mehr.</li>
       <li>Im Zeitfenster dazwischen kannst du die Stunde anderen zur Übernahme anbieten.</li>
     </ul>
+    ${state.settings?.policy_text ? `<div class="hint" style="border-top:1px solid var(--line);padding-top:.5rem">${esc(state.settings.policy_text)}</div>` : ''}
     <div class="actions">
       <button class="sec" onclick="window.__closeModal()">Abbrechen</button>
       <button id="bk-confirm">Ja, verbindlich buchen</button>
@@ -399,6 +412,7 @@ function renderInstructor() {
       <button data-tab="schueler">Fahrschüler</button>
       <button data-tab="theorie">Theorie & Ausnahmen</button>
       <button data-tab="arbeitszeiten">Arbeitszeiten</button>
+      <button data-tab="protokoll">Protokoll <span id="ev-badge"></span></button>
       <button data-tab="einstellungen">Einstellungen</button>
     </div>
     <div id="itab"></div>
@@ -406,7 +420,16 @@ function renderInstructor() {
   wireLogout();
   const tabs = app.querySelectorAll('.navtabs button');
   tabs.forEach((b) => b.onclick = () => { state.instrTab = b.dataset.tab; drawInstrTab(); });
+  refreshEventBadge();
   drawInstrTab();
+}
+
+async function refreshEventBadge() {
+  try {
+    const { unseen } = await api('/api/instructor/events');
+    const el = $('#ev-badge');
+    if (el) el.innerHTML = unseen ? `<span class="badge offer">${unseen}</span>` : '';
+  } catch {}
 }
 
 function drawInstrTab() {
@@ -418,6 +441,7 @@ function drawInstrTab() {
   if (t === 'schueler') return tabSchueler();
   if (t === 'theorie') return tabTheorie();
   if (t === 'arbeitszeiten') return tabArbeitszeiten();
+  if (t === 'protokoll') return tabProtokoll();
   if (t === 'einstellungen') return tabEinstellungen();
 }
 
@@ -568,34 +592,61 @@ function openMarkModal(id) {
       </select></div>
     <div class="field"><label>Kennzeichen (optional)</label><input id="m-plate" value="${esc(b.plate || '')}" placeholder="z.B. B-FS 1234"></div>
     <div class="row">
-      <div class="field"><label>Dauer (Min)</label><input id="m-dur" type="number" value="${b.duration_min}" min="10" step="5"></div>
+      <div class="field"><label>Erschienen?</label>
+        <select id="m-att">
+          <option value="" ${b.attended == null ? 'selected' : ''}>– offen –</option>
+          <option value="1" ${b.attended === 1 ? 'selected' : ''}>Ja, da gewesen</option>
+          <option value="0" ${b.attended === 0 ? 'selected' : ''}>Nein, nicht erschienen</option>
+        </select></div>
+      <div class="field"><label>Verspätung (Min)</label><input id="m-late" type="number" value="${b.late_minutes || 0}" min="0" step="5"></div>
+    </div>
+    <div class="row">
+      <div class="field"><label>Dauer (Min)</label><input id="m-dur" type="number" value="${b.duration_min}" min="0" step="5"></div>
       <div class="field"><label>Status</label>
         <select id="m-status">
           <option value="booked" ${b.status === 'booked' ? 'selected' : ''}>gebucht</option>
-          <option value="done" ${b.status === 'done' ? 'selected' : ''}>gefahren ✓</option>
+          <option value="done" ${b.status === 'done' ? 'selected' : ''}>abgeschlossen ✓</option>
         </select></div>
     </div>
+    <div class="field"><label>Grund (bei Absage/Nichterscheinen, optional)</label><input id="m-reason" value="${esc(b.reason || '')}"></div>
     <div class="field"><label>Notiz (optional)</label><input id="m-note" value="${esc(b.note || '')}"></div>
+    <div class="hint" id="m-hint"></div>
     <div class="actions">
       <button class="sec" onclick="window.__closeModal()">Abbrechen</button>
       <button id="m-save">Speichern</button>
     </div>`);
+  const grace = state.settings?.late_grace_min || 20;
+  const baseDur = b.duration_min;
+  const recalc = () => {
+    const late = Number($('#m-late').value) || 0;
+    const hint = $('#m-hint');
+    if (late > grace) {
+      const suggested = Math.max(0, baseDur - late);
+      hint.innerHTML = `Mehr als ${grace} Min zu spät → die Zeit läuft ab dem vereinbarten Beginn. Vorschlag: <strong>${suggested} Min</strong> Fahrzeit. <button class="sec sm" id="m-apply-dur" type="button">übernehmen</button>`;
+      const ab = $('#m-apply-dur'); if (ab) ab.onclick = () => { $('#m-dur').value = suggested; };
+    } else { hint.textContent = ''; }
+  };
+  $('#m-late').oninput = recalc; recalc();
   $('#m-save').onclick = async () => {
     try {
+      const att = $('#m-att').value;
       const body = { gearbox: $('#m-gear').value, plate: $('#m-plate').value, duration_min: Number($('#m-dur').value),
-        status: $('#m-status').value, note: $('#m-note').value };
+        status: $('#m-status').value, note: $('#m-note').value, reason: $('#m-reason').value,
+        late_minutes: Number($('#m-late').value) || 0, attended: att === '' ? null : (att === '1') };
       if ($('#m-date').value !== b.date) body.date = $('#m-date').value;
       if ($('#m-time').value !== b.start_time) body.start_time = $('#m-time').value;
       await api('/api/bookings/' + id, { method: 'PATCH', body });
-      closeModal(); toast('Gespeichert ✓', 'ok'); drawInstrTab();
+      closeModal(); toast('Gespeichert ✓', 'ok'); refreshEventBadge(); drawInstrTab();
     } catch (e) { toast(e.message, 'err'); }
   };
 }
 window.__closeModal = closeModal;
 
 async function instrCancel(id) {
-  if (!confirm('Diesen Termin stornieren?')) return;
-  try { await api('/api/bookings/' + id, { method: 'DELETE' }); toast('Storniert', 'ok'); drawInstrTab(); }
+  const reason = prompt('Grund für die Absage (optional, z.B. Krankheit) – wird dem Schüler mitgeteilt:');
+  if (reason === null) return; // abgebrochen
+  const q = reason.trim() ? '?reason=' + encodeURIComponent(reason.trim()) : '';
+  try { await api('/api/bookings/' + id + q, { method: 'DELETE' }); toast('Abgesagt · Schüler informiert', 'ok'); refreshEventBadge(); drawInstrTab(); }
   catch (e) { toast(e.message, 'err'); }
 }
 async function delBlock(id) {
@@ -613,7 +664,8 @@ async function tabKalender() {
       <span class="day" id="k-label"></span>
       <button class="sec sm" id="k-next">›</button>
       <input type="date" id="k-date" style="max-width:170px">
-      <button class="ghost sm" id="k-gap" style="margin-left:auto">🧩 Lücken schließen</button>
+      <button class="ghost sm" id="k-late" style="margin-left:auto">⏱️ Ich komme später</button>
+      <button class="ghost sm" id="k-gap">🧩 Lücken schließen</button>
       <button class="sm" id="k-add">+ Eigener Termin</button>
     </div>
     <div id="k-list"></div>
@@ -624,6 +676,7 @@ async function tabKalender() {
   $('#k-date').onchange = (e) => { state.date = e.target.value; loadK(); };
   $('#k-add').onclick = () => openAddBooking();
   $('#k-gap').onclick = () => openGapModal();
+  $('#k-late').onclick = () => openLateModal();
   loadK();
 }
 async function loadK() {
@@ -634,6 +687,22 @@ async function loadK() {
     window.__instrBookings = ov.bookings;
     renderInstrDay($('#k-list'), state.date, ov.bookings, ov.blocks);
   } catch (e) { toast(e.message, 'err'); }
+}
+
+function openLateModal() {
+  modal(`<h3>Ich verspäte mich</h3>
+    <p class="hint">Alle noch nicht begonnenen Termine an diesem Tag (${fmtShort(state.date)}) rücken um die angegebene Zeit nach hinten. Die betroffenen Fahrschüler werden automatisch benachrichtigt.</p>
+    <div class="field"><label>Verspätung in Minuten</label><input id="late-min" type="number" value="10" min="1" step="5"></div>
+    <div class="actions">
+      <button class="sec" onclick="window.__closeModal()">Abbrechen</button>
+      <button id="late-go">Termine nachrücken</button>
+    </div>`);
+  $('#late-go').onclick = async () => {
+    try {
+      const r = await api('/api/instructor/delay-today', { method: 'POST', body: { date: state.date, minutes: Number($('#late-min').value) } });
+      closeModal(); toast(`${r.moved} Termin(e) um ${r.minutes} Min verschoben ✓`, 'ok'); loadK();
+    } catch (e) { toast(e.message, 'err'); }
+  };
 }
 
 async function openGapModal() {
@@ -773,15 +842,15 @@ async function tabArbeitszeiten() {
   const s = state.settings;
   const box = $('#itab');
   box.innerHTML = `<div class="card">
-    <h2>Arbeitszeiten & Dienstplan</h2>
-    <p class="hint">Trage hier ein, wenn ein Tag <strong>kürzer</strong> sein soll (z.B. wenn deine Frau frei hat – früher Feierabend) oder du ganz <strong>frei</strong> hast. Die buchbaren Slots passen sich für Schüler automatisch an.</p>
+    <h2>Arbeitszeiten & Dienstplan <span class="sub">Resturlaub: ${s.vacation_days_left ?? '–'} Tage</span></h2>
+    <p class="hint">Trage hier ein, wenn ein Tag <strong>kürzer</strong> sein soll (z.B. wenn deine Frau frei hat – früher Feierabend), du ganz <strong>frei</strong> hast oder <strong>Urlaub</strong> nimmst. Urlaubstage zählen je ${s.vacation_credit_min} Min als Arbeitszeit. Die buchbaren Slots passen sich für Schüler automatisch an.</p>
     <div class="row">
       <div class="field"><label>Datum</label><input type="date" id="w-date" value="${state.date}"></div>
       <div class="field" style="max-width:210px"><label>Art</label>
         <select id="w-type">
           <option value="short">Kurzer Tag (früher Feierabend)</option>
           <option value="free">Ganzer Tag frei</option>
-          <option value="custom">Eigene Zeiten</option>
+          <option value="vacation">Urlaub (${s.vacation_credit_min} Min)</option>
         </select></div>
     </div>
     <div class="row" id="w-times">
@@ -796,12 +865,13 @@ async function tabArbeitszeiten() {
   const times = $('#w-times');
   const syncType = () => {
     const t = typeSel.value;
-    times.style.display = t === 'free' ? 'none' : 'flex';
+    times.style.display = (t === 'free' || t === 'vacation') ? 'none' : 'flex';
     if (t === 'short') { $('#w-start').value = s.start_time; $('#w-last').value = s.short_day_last_start || '13:35'; }
     updateWPreview();
   };
   const updateWPreview = () => {
     if (typeSel.value === 'free') { $('#w-preview').textContent = 'Ganzer Tag frei – keine Slots.'; return; }
+    if (typeSel.value === 'vacation') { $('#w-preview').textContent = `Urlaub – zählt ${s.vacation_credit_min} Min als Arbeitszeit.`; return; }
     const step = s.lesson_min + s.break_min;
     const toM = (t) => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
     const times2 = [];
@@ -813,11 +883,18 @@ async function tabArbeitszeiten() {
   syncType();
   $('#w-add').onclick = async () => {
     const t = typeSel.value;
-    const body = { date: $('#w-date').value };
-    if (t === 'free') body.closed = true;
-    else { body.start_time = $('#w-start').value; body.last_start = $('#w-last').value; }
-    try { await api('/api/day-overrides', { method: 'POST', body }); toast('Eingetragen ✓', 'ok'); loadOverrides(); }
-    catch (e) { toast(e.message, 'err'); }
+    const body = { date: $('#w-date').value, type: t };
+    if (t === 'short') { body.start_time = $('#w-start').value; body.last_start = $('#w-last').value; }
+    try {
+      await api('/api/day-overrides', { method: 'POST', body });
+      toast('Eingetragen ✓', 'ok'); loadOverrides();
+    } catch (e) {
+      // Bei bestehenden Terminen nachfragen, ob trotzdem
+      if (/schon .* Termin/.test(e.message) && confirm(e.message + '\n\nTrotzdem eintragen?')) {
+        try { await api('/api/day-overrides', { method: 'POST', body: { ...body, force: true } }); toast('Eingetragen ✓', 'ok'); loadOverrides(); }
+        catch (e2) { toast(e2.message, 'err'); }
+      } else { toast(e.message, 'err'); }
+    }
   };
   loadOverrides();
 }
@@ -827,7 +904,7 @@ async function loadOverrides() {
     $('#w-list').innerHTML = overrides.length ? `<h2 style="font-size:.95rem">Eingetragene Tage</h2><div class="blist">${
       overrides.map((o) => `<div class="bitem warm">
         <div><div class="when">${WD[isoDow(o.date) - 1]} ${fmtShort(o.date)}</div>
-        <div class="meta">${o.closed ? '🌴 ganzer Tag frei' : `✂️ kurzer Tag · ${o.start_time || state.settings.start_time}–letzter Slot ${o.last_start || '?'}`}</div></div>
+        <div class="meta">${o.type === 'vacation' ? '🌴 Urlaub' : o.closed ? '🏖️ ganzer Tag frei' : `✂️ kurzer Tag · ${o.start_time || state.settings.start_time}–letzter Slot ${o.last_start || '?'}`}</div></div>
         <button class="ghost sm" data-delov="${o.date}">Löschen</button></div>`).join('')
     }</div>` : '<p class="muted">Keine besonderen Tage eingetragen.</p>';
     $('#w-list').querySelectorAll('[data-delov]').forEach((b) => b.onclick = async () => {
@@ -887,6 +964,57 @@ async function loadBlocks() {
   } catch (e) { toast(e.message, 'err'); }
 }
 
+// ---- Tab: Protokoll (Ereignis-Log fuer den Chef) ----
+const EV_META = {
+  book: ['📅', 'Gebucht'], cancel_student: ['❌', 'Storniert (Schüler)'], cancel_instr: ['❌', 'Abgesagt (Fahrlehrer)'],
+  offer: ['🔄', 'Angeboten'], take: ['✅', 'Übernommen'], shift: ['🕐', 'Verschoben'],
+  delay: ['⏱️', 'Verspätung'], done: ['🚗', 'Gefahren'], noshow: ['🚫', 'Nicht erschienen'],
+  vacation: ['🌴', 'Urlaub'], reminder: ['🔔', 'Erinnerung'], info: ['ℹ️', 'Info'],
+};
+async function tabProtokoll() {
+  const box = $('#itab');
+  let students = [];
+  try { students = (await api('/api/students')).students; } catch {}
+  box.innerHTML = `<div class="card">
+    <h2>Protokoll <span class="sub">alle Vorgänge – für deine Unterlagen</span></h2>
+    <div class="inline" style="margin-bottom:1rem">
+      <select id="pr-student" style="max-width:220px"><option value="">Alle Fahrschüler</option>
+        ${students.map((s) => `<option value="${s.id}">${esc(s.name)}</option>`).join('')}</select>
+      <input type="date" id="pr-from" style="max-width:160px">
+      <input type="date" id="pr-to" style="max-width:160px">
+      <button class="sec sm" id="pr-go">Filtern</button>
+    </div>
+    <div id="pr-list"></div>
+  </div>`;
+  $('#pr-go').onclick = loadProtokoll;
+  await loadProtokoll();
+  // als gesehen markieren + Glocke zuruecksetzen
+  try { await api('/api/instructor/events/seen', { method: 'POST' }); refreshEventBadge(); } catch {}
+}
+async function loadProtokoll() {
+  const q = new URLSearchParams();
+  if ($('#pr-student').value) q.set('student_id', $('#pr-student').value);
+  if ($('#pr-from').value) q.set('from', $('#pr-from').value);
+  if ($('#pr-to').value) q.set('to', $('#pr-to').value);
+  try {
+    const { events } = await api('/api/instructor/events?' + q.toString());
+    if (!events.length) { $('#pr-list').innerHTML = '<p class="muted">Keine Einträge.</p>'; return; }
+    $('#pr-list').innerHTML = `<table>
+      <tr><th>Wann</th><th>Vorgang</th><th>Fahrschüler</th><th>Details</th></tr>
+      ${events.map((e) => {
+        const [ic, lbl] = EV_META[e.type] || ['•', e.type];
+        const d = new Date(e.at).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' });
+        return `<tr>
+          <td class="muted" style="white-space:nowrap">${d}</td>
+          <td>${ic} ${lbl}</td>
+          <td>${esc(e.student_name || '–')}</td>
+          <td class="muted">${esc(e.detail || '')}</td>
+        </tr>`;
+      }).join('')}
+    </table>`;
+  } catch (e) { toast(e.message, 'err'); }
+}
+
 // ---- Tab: Einstellungen ----
 function tabEinstellungen() {
   const s = state.settings;
@@ -912,6 +1040,12 @@ function tabEinstellungen() {
           <div class="field"><label>Tägliche Freigabe-Uhrzeit</label><input id="e-release" value="${s.release_time || '10:00'}"></div>
           <div class="field"><label>Letzter Slot an kurzen Tagen</label><input id="e-shortlast" value="${s.short_day_last_start || '13:35'}"></div>
         </div>
+        <div class="row">
+          <div class="field"><label>Urlaubstag zählt (Min)</label><input id="e-vaccredit" type="number" value="${s.vacation_credit_min}" step="10"></div>
+          <div class="field"><label>Resturlaub (Tage)</label><input id="e-vacdays" type="number" value="${s.vacation_days_left}" step="1"></div>
+          <div class="field"><label>Toleranz Verspätung (Min)</label><input id="e-grace" type="number" value="${s.late_grace_min}" step="5"></div>
+        </div>
+        <div class="field"><label>Aufklärungstext (wird beim Buchen gezeigt)</label><input id="e-policy" value="${esc(s.policy_text || '')}"></div>
         <div class="row">
           <div class="field"><label>Kostenlos stornieren bis (Std. vorher)</label><input id="e-cancel" type="number" value="${s.cancel_hours}" min="0"></div>
           <div class="field"><label>Sperrfrist – fest ab (Std. vorher)</label><input id="e-lock" type="number" value="${s.lock_hours}" min="0"></div>
@@ -954,6 +1088,8 @@ function tabEinstellungen() {
         booking_horizon_days: Number($('#e-horizon').value), cancel_hours: Number($('#e-cancel').value),
         lock_hours: Number($('#e-lock').value),
         release_time: $('#e-release').value, short_day_last_start: $('#e-shortlast').value,
+        vacation_credit_min: Number($('#e-vaccredit').value), vacation_days_left: Number($('#e-vacdays').value),
+        late_grace_min: Number($('#e-grace').value), policy_text: $('#e-policy').value,
         new_pin: $('#e-pin').value || undefined } });
       state.settings = r.settings; state.user.name = r.settings.instructor_name;
       toast('Einstellungen gespeichert ✓', 'ok'); $('#e-msg').textContent = 'Gespeichert.';
