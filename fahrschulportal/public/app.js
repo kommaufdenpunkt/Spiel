@@ -175,7 +175,7 @@ function render() {
 function header() {
   const u = state.user;
   return `<header>
-    <div class="brand"><span class="logo">🚗</span> Fahrschulportal</div>
+    <div class="brand"><span class="logo">🚗</span> ginoco</div>
     <div class="who">
       <span class="role">${u.role === 'instructor' ? 'Fahrlehrer' : 'Fahrschüler'}</span>
       <strong>${esc(u.name || '')}</strong>${u.username ? `<span class="pill">${esc(u.username)}</span>` : ''}
@@ -197,7 +197,7 @@ function renderAuth() {
   const draw = () => {
     app.innerHTML = `<div class="auth-wrap"><div class="auth">
       <div class="logo-big">🚗</div>
-      <h1>Fahrschulportal</h1>
+      <h1>ginoco</h1>
       <div class="tag">Fahrstunden einfach online buchen</div>
       <div class="card">
         <div class="tabs">
@@ -383,7 +383,7 @@ function downloadFile(name, content, mime) {
 function icsDate(date, hhmm) { return date.replace(/-/g, '') + 'T' + hhmm.replace(':', '') + '00'; }
 function exportICS(bookings) {
   const stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d+/, ''); // YYYYMMDDTHHMMSSZ
-  const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Fahrschulportal//DE', 'CALSCALE:GREGORIAN'];
+  const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//ginoco//DE', 'CALSCALE:GREGORIAN'];
   for (const b of bookings) {
     const end = addMin(b.start_time, b.duration_min);
     lines.push('BEGIN:VEVENT', `UID:fsp-${b.id}@fahrschulportal`, `DTSTAMP:${stamp}`,
@@ -1203,7 +1203,7 @@ function openResetModal(id, name, username) {
     if (pw.length < 6) { toast('Mind. 6 Zeichen', 'err'); return; }
     try {
       await api('/api/students/' + id + '/reset-password', { method: 'POST', body: { new_password: pw } });
-      const share = `Hallo ${name}, dein Zugang zum Fahrschulportal:\nLogin-Name: ${username}\nPasswort: ${pw}`;
+      const share = `Hallo ${name}, dein Zugang zu ginoco (Fahrschule):\nLogin-Name: ${username}\nPasswort: ${pw}`;
       $('#rs-done').classList.remove('hidden');
       $('#rs-done').innerHTML = `<div class="warnbox" style="margin-top:.4rem">✓ Passwort gesetzt. Diese Zugangsdaten weitergeben:</div>
         <pre style="background:#0f151d;border:1px solid var(--line);border-radius:8px;padding:.7rem;white-space:pre-wrap;font-size:.85rem;margin:.5rem 0">${esc(share)}</pre>
@@ -1413,6 +1413,22 @@ async function exportProtokollCSV() {
   } catch (e) { toast(e.message, 'err'); }
 }
 
+function promptRealign(mis) {
+  modal(`<h3>Termine ans neue Raster anpassen?</h3>
+    <div class="warnbox">Durch die geänderten Zeiten/Pause passen <strong>${mis.total} Termin(e)</strong> an ${mis.days.length} Tag(en) nicht mehr genau ins Raster.</div>
+    <p class="hint">Neue Buchungen nutzen sofort das neue Raster. Bestehende Termine behalten erstmal ihre Zeit. Du kannst sie hier lückenlos ans neue Raster rücken – die betroffenen Fahrschüler werden automatisch benachrichtigt.</p>
+    <div class="blist" style="max-height:180px;overflow:auto">${mis.days.map((d) => `<div class="bitem"><div class="when">${WD[isoDow(d.date) - 1]} ${fmtShort(d.date)}</div><span class="pill">${d.count} Termin(e)</span></div>`).join('')}</div>
+    <div class="actions">
+      <button class="sec" onclick="window.__closeModal()">Später</button>
+      <button id="ra-go">Alle anpassen</button>
+    </div>`);
+  $('#ra-go').onclick = async () => {
+    try { const r = await api('/api/instructor/realign', { method: 'POST', body: {} });
+      closeModal(); toast(`${r.moved} Termin(e) an ${r.days} Tag(en) angepasst ✓`, 'ok'); refreshEventBadge(); }
+    catch (e) { toast(e.message, 'err'); }
+  };
+}
+
 // ---- Tab: Einstellungen ----
 function tabEinstellungen() {
   const s = state.settings;
@@ -1482,7 +1498,7 @@ function tabEinstellungen() {
     const times = [];
     for (let t = toMin(start); t <= toMin(last); t += step) times.push(`${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`);
     const daily = (times.length * lesson) / 60;
-    $('#e-preview').innerHTML = `Ergibt <strong>${times.length} Slots/Tag</strong> um ${times.join(', ') || '–'} (${daily.toFixed(1)} h/Tag).`;
+    $('#e-preview').innerHTML = `Ergibt <strong>${times.length} Slots/Tag</strong> (je ${lesson} Min + ${br} Min Pause) um ${times.join(', ') || '–'} (${daily.toFixed(1)} h/Tag).`;
   };
   ['e-start', 'e-last', 'e-lesson', 'e-break'].forEach((id) => $('#' + id).oninput = updatePreview);
   updatePreview();
@@ -1512,6 +1528,7 @@ function tabEinstellungen() {
         new_pin: $('#e-pin').value || undefined } });
       state.settings = r.settings; state.user.name = r.settings.instructor_name;
       toast('Einstellungen gespeichert ✓', 'ok'); $('#e-msg').textContent = 'Gespeichert.';
+      if (r.misaligned && r.misaligned.total > 0) promptRealign(r.misaligned);
     } catch (e) { toast(e.message, 'err'); }
   };
 }

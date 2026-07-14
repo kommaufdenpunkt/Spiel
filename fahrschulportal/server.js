@@ -222,7 +222,7 @@ async function handleApi(req, res, url) {
   }
   // Version / Health (fuer native App und Monitoring)
   if (p === '/api/version' && method === 'GET') {
-    return ok(res, { name: 'Fahrschulportal', version: APP_VERSION, auth: ['cookie', 'bearer-token'], ok: true });
+    return ok(res, { name: 'ginoco', version: APP_VERSION, auth: ['cookie', 'bearer-token'], ok: true });
   }
 
   // ===== STUDENT: Slots ansehen & buchen =====
@@ -617,21 +617,23 @@ async function handleApi(req, res, url) {
     if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
     const { date } = await readBody(req);
     if (!date) return bad(res, 'Datum noetig');
-    const plan = packDay(date);
-    if (!plan.hasGap) return bad(res, 'Keine Lücke zu schließen.');
+    if (!packDay(date).hasGap) return bad(res, 'Keine Lücke zu schließen.');
+    return ok(res, { moved: applyPack(date, 'Lücke geschlossen') });
+  }
+
+  // Termine, die (z.B. nach geänderter Pause/Slot-Dauer) nicht mehr ins Raster passen
+  if (p === '/api/instructor/misaligned' && method === 'GET') {
+    if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
+    return ok(res, misalignedDays());
+  }
+  // Kommende Termine ans aktuelle Raster rücken (einen Tag oder alle betroffenen)
+  if (p === '/api/instructor/realign' && method === 'POST') {
+    if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
+    const b = await readBody(req);
+    const dates = b.date ? [b.date] : misalignedDays().days.map((d) => d.date);
     let moved = 0;
-    for (const m of plan.moves) {
-      if (m.from === m.to) continue;
-      db.prepare('UPDATE bookings SET start_time = ? WHERE id = ?').run(m.to, m.id);
-      moved++;
-      if (m.student_id) {
-        notify(m.student_id, 'shift',
-          `Dein Termin am ${wdShort(date)} ${dmy(date)} wurde von ${m.from} auf ${m.to} Uhr verschoben.`, date, m.id);
-        logEvent('shift', { actor: 'instructor', studentId: m.student_id, bookingId: m.id, date,
-          detail: `Lücke geschlossen: ${m.from} → ${m.to} Uhr (${wdShort(date)} ${dmy(date)})` });
-      }
-    }
-    return ok(res, { moved });
+    for (const date of dates) moved += applyPack(date, 'ans neue Raster angepasst');
+    return ok(res, { moved, days: dates.length });
   }
 
   // -- Codes --
@@ -761,14 +763,17 @@ async function handleApi(req, res, url) {
       'vacation_credit_min', 'vacation_days_left', 'late_grace_min', 'policy_text',
       'instructor_phone', 'avg_speed_kmh', 'live_lead_min',
       'meet_default_label', 'meet_default_lat', 'meet_default_lng'];
+    const emptyOk = new Set(['instructor_phone', 'meet_default_label', 'meet_default_lat', 'meet_default_lng', 'policy_text']);
     for (const k of allowed) {
-      if (k in b && b[k] !== '' && b[k] != null) setSettingRaw(k, b[k]);
+      if (!(k in b) || b[k] == null) continue;
+      if (b[k] === '' && !emptyOk.has(k)) continue;
+      setSettingRaw(k, b[k]);
     }
     if (b.new_pin) {
       if (String(b.new_pin).length < 4) return bad(res, 'PIN muss mind. 4 Zeichen haben');
       setSettingRaw('instructor_pin', hashPassword(String(b.new_pin)));
     }
-    return ok(res, { settings: getSettings() });
+    return ok(res, { settings: getSettings(), misaligned: misalignedDays() });
   }
 
   return bad(res, 'Unbekannter Endpunkt', 404);
@@ -933,6 +938,38 @@ function packDay(date) {
     cursor = t + b.duration_min + brk;
   }
   return { date, moves, hasGap: moves.some((m) => m.from !== m.to) };
+}
+
+// Tagesplan anwenden (Stunden verschieben + Schueler benachrichtigen). Gibt Anzahl zurueck.
+function applyPack(date, label) {
+  const plan = packDay(date);
+  let moved = 0;
+  for (const m of plan.moves) {
+    if (m.from === m.to) continue;
+    db.prepare('UPDATE bookings SET start_time = ? WHERE id = ?').run(m.to, m.id);
+    moved++;
+    if (m.student_id) {
+      notify(m.student_id, 'shift',
+        `Dein Termin am ${wdShort(date)} ${dmy(date)} wurde von ${m.from} auf ${m.to} Uhr verschoben.`, date, m.id);
+      logEvent('shift', { actor: 'instructor', studentId: m.student_id, bookingId: m.id, date,
+        detail: `${label}: ${m.from} → ${m.to} Uhr (${wdShort(date)} ${dmy(date)})` });
+    }
+  }
+  return moved;
+}
+
+// Kommende Schueler-Termine, die nicht (mehr) auf dem aktuellen Raster liegen
+function misalignedDays() {
+  const rows = db.prepare(
+    "SELECT DISTINCT date FROM bookings WHERE status IN ('booked','offered') AND student_id IS NOT NULL AND date >= ? ORDER BY date").all(todayStr());
+  const days = [];
+  for (const { date } of rows) {
+    const grid = new Set(slotGrid(date).map((g) => g.start));
+    const off = db.prepare("SELECT start_time FROM bookings WHERE date=? AND status IN ('booked','offered') AND student_id IS NOT NULL").all(date)
+      .filter((bk) => !grid.has(bk.start_time));
+    if (off.length) days.push({ date, count: off.length });
+  }
+  return { total: days.reduce((a, d) => a + d.count, 0), days };
 }
 
 function createBooking(res, sess, body) {
@@ -1127,7 +1164,7 @@ const server = createServer(async (req, res) => {
 });
 
 server.listen(PORT, () => {
-  console.log(`\n  Fahrschulportal laeuft auf  http://localhost:${PORT}\n`);
+  console.log(`\n  ginoco laeuft auf  http://localhost:${PORT}\n`);
   console.log(`  Fahrlehrer-Login: Standard-PIN 1234 (bitte in den Einstellungen aendern)\n`);
   // Erinnerungen im Hintergrund pruefen (alle 5 Minuten)
   try { sendDueReminders(); } catch (e) { console.error(e); }

@@ -1,4 +1,6 @@
-# 🚗 Fahrschulportal — Version 2.0
+# 🚗 ginoco — Version 2.0
+
+*Das Fahrschulportal von Gino.*
 
 Ein schlankes Buchungsportal für die Fahrschule: Fahrschüler buchen ihre
 Fahrstunden selbst, tauschen sie bei Bedarf untereinander – und der Fahrlehrer
@@ -149,7 +151,16 @@ Login-Name bleibt unverändert.
 | Tägliche Freigabe | 10:00 | ab wann der äußerste Tag öffnet |
 | Kostenlos stornieren | 48 h vorher | danach nur noch anbieten |
 | Sperrfrist | 36 h vorher | Termin steht fest |
+| Pause zwischen Stunden | 15 Min | frei einstellbar, steuert das ganze Raster |
 | Kurzer Tag – letzter Slot | 13:35 | Feierabend an markierten Tagen |
+
+**Flexible Pausen:** Die Pause zwischen den Fahrstunden ist frei einstellbar
+(Standard 15 Min). Sie steuert automatisch **alles**: die Slot-Zeiten, die
+Vorschau und die Kollisions-/Pausenprüfung beim Buchen. Änderst du die Pause
+(oder Dauer/Start), rechnet das Raster sofort neu. Liegen bereits gebuchte
+Termine dann nicht mehr genau im neuen Raster, meldet das Portal das nach dem
+Speichern und bietet **„Termine ans neue Raster anpassen"** an – die Termine
+rücken lückenlos, die betroffenen Fahrschüler werden benachrichtigt.
 
 **Rechnung dahinter:** 4 Slots × 80 Min = 320 Min = **5,3 h/Tag**.
 Bei 6 Arbeitstagen sind das rund **32 h/Woche** – dein Ziel von 25–30 h ist damit
