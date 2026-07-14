@@ -195,6 +195,64 @@ function wireLogout() {
   if (b) b.onclick = async () => { await api('/api/auth/logout', { method: 'POST' }); state.user = null; render(); };
 }
 
+// ---------- Edge-Menüs (links: Navigation, rechts: Aktionen) ----------
+// Wie die Kantenleisten am Samsung-Edge: kleiner Griff am Bildschirmrand,
+// antippen -> Leiste fährt herein. Große Tap-Flächen, ideal am Handy.
+const INSTR_NAV = [
+  ['heute', '📊 Heute & Ziele'], ['kalender', '📅 Kalender'],
+  ['codes', '🔑 Zugangscodes'], ['schueler', '🧑‍🎓 Fahrschüler'],
+  ['theorie', '📚 Theorie & Ausnahmen'], ['arbeitszeiten', '🕒 Arbeitszeiten'],
+  ['protokoll', '📋 Protokoll'], ['einstellungen', '⚙️ Einstellungen'],
+];
+function mountEdgeMenus(role) {
+  document.querySelectorAll('.edge-root').forEach((n) => n.remove());
+  const leftItems = role === 'instructor'
+    ? INSTR_NAV.map(([tab, l]) => `<button data-nav="${tab}">${l}</button>`).join('')
+    : [['week-card', '📅 Meine Woche'], ['notif-card', '🔔 Mitteilungen'],
+       ['offers-card', '🎁 Angebote'], ['slots', '🚗 Termin buchen']]
+        .map(([id, l]) => `<button data-scroll="${id}">${l}</button>`).join('');
+  const rightItems = [
+    '<button data-act="theme">🎨 Farbe wählen</button>',
+    role === 'student' ? '<button data-act="phone">📱 Handynummer</button>' : '',
+    state.liveSharing ? '<button data-act="live">🛰️ Live-Standort beenden</button>' : '',
+    '<button data-act="reload">🔄 Aktualisieren</button>',
+    '<button data-act="logout">🚪 Abmelden</button>',
+  ].filter(Boolean).join('');
+  const root = document.createElement('div');
+  root.className = 'edge-root';
+  root.innerHTML = `
+    <button class="edge-handle left" aria-label="Menü öffnen">☰</button>
+    <button class="edge-handle right" aria-label="Aktionen öffnen">⋯</button>
+    <div class="edge-overlay"></div>
+    <aside class="edge-panel left"><div class="edge-title">Menü</div>${leftItems}</aside>
+    <aside class="edge-panel right"><div class="edge-title">Aktionen</div>${rightItems}</aside>`;
+  document.body.appendChild(root);
+  const close = () => root.classList.remove('open-left', 'open-right');
+  root.querySelector('.edge-handle.left').onclick = () => { close(); root.classList.add('open-left'); };
+  root.querySelector('.edge-handle.right').onclick = () => { close(); root.classList.add('open-right'); };
+  root.querySelector('.edge-overlay').onclick = close;
+  // aktiven Tab markieren (Fahrlehrer)
+  if (role === 'instructor') root.querySelectorAll('[data-nav]').forEach((b) =>
+    b.classList.toggle('active', b.dataset.nav === state.instrTab));
+  root.querySelectorAll('[data-nav]').forEach((b) => b.onclick = () => {
+    state.instrTab = b.dataset.nav; close(); drawInstrTab();
+    root.querySelectorAll('[data-nav]').forEach((x) => x.classList.toggle('active', x === b));
+  });
+  root.querySelectorAll('[data-scroll]').forEach((b) => b.onclick = () => {
+    close(); const el = document.getElementById(b.dataset.scroll);
+    if (el && !el.classList.contains('hidden')) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    else toast('Dieser Bereich ist gerade nicht verfügbar', 'err');
+  });
+  root.querySelectorAll('[data-act]').forEach((b) => b.onclick = async () => {
+    close(); const a = b.dataset.act;
+    if (a === 'theme') window.__openThemePicker?.();
+    else if (a === 'phone') window.__openPhone?.();
+    else if (a === 'live') window.__stopLive?.();
+    else if (a === 'reload') location.reload();
+    else if (a === 'logout') { await api('/api/auth/logout', { method: 'POST' }); state.user = null; render(); }
+  });
+}
+
 // ====================== LOGIN ======================
 function renderAuth() {
   let tab = 'login';
@@ -318,6 +376,7 @@ async function renderStudent() {
   $('#prev').onclick = () => { state.date = addDays(state.date, -1); syncStudent(); };
   $('#next').onclick = () => { state.date = addDays(state.date, 1); syncStudent(); };
   $('#dpick').onchange = (e) => { state.date = e.target.value; syncStudent(); };
+  mountEdgeMenus('student');
   syncStudent();
 }
 
@@ -652,9 +711,10 @@ function renderInstructor() {
   </main>`;
   wireLogout();
   const tabs = app.querySelectorAll('.navtabs button');
-  tabs.forEach((b) => b.onclick = () => { state.instrTab = b.dataset.tab; drawInstrTab(); });
+  tabs.forEach((b) => b.onclick = () => { state.instrTab = b.dataset.tab; drawInstrTab(); mountEdgeMenus('instructor'); });
   refreshEventBadge();
   drawInstrTab();
+  mountEdgeMenus('instructor');
 }
 
 async function refreshEventBadge() {

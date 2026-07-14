@@ -131,6 +131,11 @@ Fertige Konfig-Dateien liegen im Ordner `deploy/` (Caddyfile, systemd-Dienst).
   (Mo–Sa), Wochen-/Tagesziel, Stornofristen, Vorausbuchungsfenster, PIN.
 
 ### Für beide
+- **Edge-Menüs (Kantenleisten):** Wie beim Samsung-Edge – kleine Griffe am
+  **linken** und **rechten** Bildschirmrand. Antippen, und die Leiste fährt
+  herein: **links die Navigation** (alle Bereiche als große Tap-Flächen),
+  **rechts die Aktionen** (Farbe wählen, Aktualisieren, Handynummer, Abmelden).
+  Besonders praktisch am Handy.
 - **Farb-Themes (augenschonend):** 6 dunkle Paletten zur Auswahl – Nachtblau,
   Aubergine (Lila), Beere (Pink), Waldgrün, Graphit, Mitternacht. Über den
   🎨-Knopf; die Wahl wird pro Gerät gespeichert.
@@ -144,8 +149,13 @@ Fertige Konfig-Dateien liegen im Ordner `deploy/` (Caddyfile, systemd-Dienst).
 - **Live-Standort mit ETA:** Der Fahrlehrer teilt (ab ~20 Min vor der Stunde, per
   Tipp) seinen Standort. Der Schüler sieht ihn **live auf der Karte**, dazu
   **Entfernung und geschätzte Ankunftszeit** zum Treffpunkt und einen
-  **„Route öffnen"**-Link. Treffpunkt wird pro Termin oder als Standard gesetzt
-  (per „📍 Standort"-Knopf mit den aktuellen Koordinaten).
+  **„Route öffnen"**-Link.
+- **Fester Treffpunkt pro Schüler:** Mit jedem Schüler wird ein fester Abhol-/
+  Treffpunkt abgesprochen (Tab *Fahrschüler* → *Treffpunkt festlegen*: Adresse,
+  optional Koordinaten für die ETA). Dieser wird bei **jeder** Fahrstunde des
+  Schülers automatisch als Treffpunkt genutzt – kein erneutes Eintragen.
+  Reihenfolge: an der Stunde hinterlegt → fester Schüler-Standort → globaler
+  Standard.
   - *Technik-Hinweis:* Standort-Teilen läuft, solange die App offen ist (Web-App);
     echtes Hintergrund-Tracking bei geschlossener App kann nur eine native App.
     Die Karte nutzt OpenStreetMap (braucht Internet), die ETA ist eine Schätzung
