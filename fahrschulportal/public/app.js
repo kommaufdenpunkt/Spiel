@@ -328,13 +328,14 @@ async function syncStudent() {
     renderAway(away.away);
     renderNotifications(notif.notifications, notif.unread);
     refreshStudentLive();
-    renderWeekCard(mine.weekInfo, mine.bookings);
+    renderWeekCard(mine.weekInfo, mine.bookings, mine.progress);
+    { const hn = $('#horizon-note'); if (hn && mine.progress) hn.textContent = `(bis ${mine.progress.horizon} Tage im Voraus · Rang ${mine.progress.rank})`; }
     renderOffers(off.offers, mine.weekInfo);
     renderSlots(day.slots, mine.bookings);
   } catch (e) { toast(e.message, 'err'); }
 }
 
-function renderWeekCard(wi, bookings) {
+function renderWeekCard(wi, bookings, progress) {
   const allUpcoming = bookings.filter((b) => b.date >= todayStr() && b.status !== 'done')
     .sort((a, b) => (a.date + a.start_time).localeCompare(b.date + b.start_time));
   const upcoming = bookings.filter((b) => b.date >= todayStr()).sort((a, b) => (a.date + a.start_time).localeCompare(b.date + b.start_time));
@@ -353,6 +354,7 @@ function renderWeekCard(wi, bookings) {
       </span>
       ${upcoming.length ? '<button class="ghost sm" id="ical-btn">📅 Zum Kalender hinzufügen</button>' : ''}
     </div>
+    ${progress ? studentProgress(progress) : ''}
     ${upcoming.length ? `<div class="blist">${upcoming.map(studentBookingItem).join('')}</div>`
       : '<p class="muted">Noch keine kommenden Termine gebucht.</p>'}`;
   const c = $('#week-card');
@@ -361,6 +363,21 @@ function renderWeekCard(wi, bookings) {
   c.querySelectorAll('[data-withdraw]').forEach((b) => b.onclick = () => withdrawOffer(b.dataset.withdraw));
   const ic = $('#ical-btn');
   if (ic) ic.onclick = () => exportICS(upcoming);
+}
+
+function studentProgress(p) {
+  const toRank2 = Math.max(0, p.rank2Min - p.doneCount);
+  const sonder = ['ueberland', 'autobahn', 'nacht'].map((k) => {
+    const have = p.sonder?.[k] || 0, need = p.req[k], done = have >= need;
+    return `<span class="pill" style="${done ? 'background:var(--good-bg);color:var(--good)' : ''}">${TYPE_ICON[k]} ${TYPE_LABEL[k]} ${have}/${need}</span>`;
+  }).join(' ');
+  return `<div style="background:var(--card2);border:1px solid var(--line);border-radius:11px;padding:.7rem .9rem;margin-bottom:1rem">
+    <div class="inline" style="margin-bottom:.4rem">
+      <span class="pill" style="background:${p.rank >= 2 ? 'var(--good-bg);color:var(--good)' : 'var(--brand);color:#fff'}">🏅 Rang ${p.rank}</span>
+      <span class="muted" style="font-size:.82rem">${p.doneCount} Fahrstunden gefahren · ${p.rank >= 2 ? `du siehst ${p.horizon} Tage im Voraus` : `noch ${toRank2} bis Rang 2 (dann ${state.settings?.booking_horizon_days_rank2 || 21} Tage voraus)`}</span>
+    </div>
+    <div class="inline">${sonder}</div>
+  </div>`;
 }
 
 function countdownLabel(date, start) {
@@ -835,6 +852,13 @@ function openMarkModal(id) {
         <option value="automatik" ${b.gearbox === 'automatik' ? 'selected' : ''}>Automatik</option>
       </select></div>
     <div class="field"><label>Kennzeichen (optional)</label><input id="m-plate" value="${esc(b.plate || '')}" placeholder="z.B. B-FS 1234"></div>
+    <div class="field"><label>Fahrt-Art (für Sonderfahrten-Protokoll)</label>
+      <select id="m-type">
+        <option value="">Normal</option>
+        <option value="ueberland" ${b.lesson_type === 'ueberland' ? 'selected' : ''}>🌄 Überland</option>
+        <option value="autobahn" ${b.lesson_type === 'autobahn' ? 'selected' : ''}>🛣️ Autobahn</option>
+        <option value="nacht" ${b.lesson_type === 'nacht' ? 'selected' : ''}>🌙 Nachtfahrt</option>
+      </select></div>
     <div class="row">
       <div class="field"><label>Erschienen?</label>
         <select id="m-att">
@@ -888,6 +912,7 @@ function openMarkModal(id) {
       const body = { gearbox: $('#m-gear').value, plate: $('#m-plate').value, duration_min: Number($('#m-dur').value),
         status: $('#m-status').value, note: $('#m-note').value, reason: $('#m-reason').value,
         late_minutes: Number($('#m-late').value) || 0, attended: att === '' ? null : (att === '1'),
+        lesson_type: $('#m-type').value || 'normal',
         meet_label: $('#m-meet').value, meet_lat: meetLat ?? '', meet_lng: meetLng ?? '' };
       if ($('#m-date').value !== b.date) body.date = $('#m-date').value;
       if ($('#m-time').value !== b.start_time) body.start_time = $('#m-time').value;
@@ -967,6 +992,10 @@ async function loadK() {
 // Farbe je Fahrschüler (stabil über die id)
 const WK_COLORS = ['#4d8dff', '#35c07d', '#b079f0', '#e6934d', '#e06b9a', '#3fb6c4', '#c9a13b', '#7c8cf0'];
 function studentColor(id) { return id ? WK_COLORS[id % WK_COLORS.length] : '#5a6b80'; }
+// Standardfarben je Fahrt-Art (Sonderfahrten)
+const TYPE_COLORS = { ueberland: '#2f9e57', autobahn: '#2f6fd0', nacht: '#6d4bb0' };
+const TYPE_ICON = { ueberland: '🌄', autobahn: '🛣️', nacht: '🌙' };
+const TYPE_LABEL = { ueberland: 'Überland', autobahn: 'Autobahn', nacht: 'Nachtfahrt', normal: 'Normal' };
 
 function renderWeek(el, monday, ov) {
   const s = state.settings;
@@ -1002,11 +1031,12 @@ function renderWeek(el, monday, ov) {
     }
     for (const b of ov.bookings.filter((x) => x.date === d)) {
       const top = y(toM(b.start_time)), h = Math.max(20, b.duration_min / total * bodyH);
-      const col = b.status === 'offered' ? '#e6b23a' : studentColor(b.student_id);
+      const col = b.status === 'offered' ? '#e6b23a' : (TYPE_COLORS[b.lesson_type] || studentColor(b.student_id));
       const who = b.student_name || b.title || 'Termin';
+      const tIco = TYPE_ICON[b.lesson_type] || '';
       const badge = b.status === 'done' ? ' ✓' : b.status === 'offered' ? ' 🔄' : '';
       inner += `<div class="wk-block" data-wk="${b.id}" style="top:${top}px;height:${h}px;background:${col}"
-        title="${b.start_time} ${esc(who)}"><div class="t">${b.start_time}${badge}</div>${esc(who)}</div>`;
+        title="${b.start_time} ${esc(who)}"><div class="t">${b.start_time}${badge} ${tIco}</div>${esc(who)}</div>`;
     }
     return `<div class="wk-body ${isToday ? 'today' : ''}" style="height:${bodyH}px">${hourLines}${inner}</div>`;
   };
@@ -1021,7 +1051,10 @@ function renderWeek(el, monday, ov) {
     <div class="wk-times">${hourLabels.join('')}</div>
     ${days.map(dayCol).join('')}
   </div></div>
-  <p class="hint" style="margin-top:.7rem">Tipp: auf einen Termin tippen zum Bearbeiten/Abschließen. Farben = Fahrschüler, 🔄 = wird abgegeben, ✓ = gefahren.</p>`;
+  <p class="hint" style="margin-top:.7rem">Tipp: auf einen Termin tippen zum Bearbeiten/Abschließen. Farbe = Fahrschüler (bzw. Fahrt-Art), 🔄 = wird abgegeben, ✓ = gefahren.
+    &nbsp; <span class="pill" style="background:${TYPE_COLORS.ueberland};color:#fff">🌄 Überland</span>
+    <span class="pill" style="background:${TYPE_COLORS.autobahn};color:#fff">🛣️ Autobahn</span>
+    <span class="pill" style="background:${TYPE_COLORS.nacht};color:#fff">🌙 Nacht</span></p>`;
   el.querySelectorAll('[data-wk]').forEach((b) => b.onclick = () => openMarkModal(b.dataset.wk));
 }
 
@@ -1148,10 +1181,14 @@ async function tabSchueler() {
     <p class="hint">Standard sind 80-Minuten-Stunden. Wenn ein Schüler ausnahmsweise auch 40 oder 120 Minuten fahren darf, hier freischalten – nur dann kann er das im Buchen-Dialog wählen.</p>
     <div id="s-list"></div></div>`;
   try {
-    const { students } = await api('/api/students');
+    const { students, req } = await api('/api/students');
     if (!students.length) { $('#s-list').innerHTML = '<p class="muted">Noch keine Fahrschüler registriert. Erzeuge im Tab „Zugangscodes“ einen Code.</p>'; return; }
+    const sonderCell = (s) => ['ueberland', 'autobahn', 'nacht'].map((k) => {
+      const have = s.sonder?.[k] || 0, need = req[k]; const done = have >= need;
+      return `<span class="pill" style="${done ? 'background:var(--good-bg);color:var(--good)' : ''}">${TYPE_ICON[k]} ${have}/${need}</span>`;
+    }).join(' ');
     $('#s-list').innerHTML = `<table>
-      <tr><th>Name</th><th>Login-Name</th><th>Kontakt</th><th>Gefahren</th><th>Erlaubte Längen (Min)</th></tr>
+      <tr><th>Name</th><th>Login-Name</th><th>Kontakt</th><th>Gefahren / Rang</th><th>Sonderfahrten</th><th>Erlaubte Längen (Min)</th></tr>
       ${students.map((s) => {
         const durs = String(s.allowed_durations || '80').split(',').map(Number);
         const boxes = [40, 80, 120].map((d) => `<label style="margin:0;font-weight:600"><input type="checkbox" data-sdur="${s.id}" value="${d}" ${durs.includes(d) ? 'checked' : ''} style="width:auto"> ${d}</label>`).join(' ');
@@ -1159,7 +1196,8 @@ async function tabSchueler() {
           <td><strong>${esc(s.name)}</strong>${s.birth_year ? ` <span class="muted">(${s.birth_year})</span>` : ''}</td>
           <td><span class="codechip">${esc(s.username || '–')}</span><br><button class="ghost sm" data-reset="${s.id}" data-uname="${esc(s.username || '')}" data-sname="${esc(s.name)}" style="margin-top:.3rem">Passwort zurücksetzen</button></td>
           <td>${esc(s.email || '')}<br><span class="muted">${esc(s.phone || '–')}</span>${s.phone ? '<br>' + contactButtons(s.phone, `Hallo ${s.name.split(' ')[0]}, hier ${state.settings?.instructor_name || 'deine Fahrschule'}:`) : ''}</td>
-          <td>${s.done_count} Std.</td>
+          <td>${s.done_count} Std.<br><span class="pill" style="background:${s.rank >= 2 ? 'var(--good-bg);color:var(--good)' : ''}">Rang ${s.rank} · ${s.horizon} Tage</span></td>
+          <td>${sonderCell(s)}</td>
           <td><div class="inline">${boxes} <button class="sec sm" data-savedur="${s.id}">Speichern</button></div></td>
         </tr>`;
       }).join('')}
@@ -1486,6 +1524,18 @@ function tabEinstellungen() {
             <button class="sec sm" id="e-meet-here" type="button">📍 Standort</button></div>
           <div class="hint" id="e-meet-info" style="margin:.3rem 0 0">${s.meet_default_lat ? '✓ Koordinaten hinterlegt' : 'Ohne Koordinaten nur als Text.'}</div>
         </div>
+
+        <h2 style="font-size:.95rem;margin-top:1.4rem">Datenschutz, Sonderfahrten & Rang</h2>
+        <div class="field"><label style="font-weight:600;color:var(--ink)"><input type="checkbox" id="e-anon" ${s.anonymous_swaps === '1' ? 'checked' : ''} style="width:auto"> Tausch anonym (Schüler sehen nicht, von wem ein Termin kommt)</label></div>
+        <div class="row">
+          <div class="field"><label>Soll Überland</label><input id="e-req-u" type="number" value="${s.req_ueberland}" min="0"></div>
+          <div class="field"><label>Soll Autobahn</label><input id="e-req-a" type="number" value="${s.req_autobahn}" min="0"></div>
+          <div class="field"><label>Soll Nachtfahrt</label><input id="e-req-n" type="number" value="${s.req_nacht}" min="0"></div>
+        </div>
+        <div class="row">
+          <div class="field"><label>Rang 2 ab (gefahrene Stunden)</label><input id="e-rank2" type="number" value="${s.rank2_min_lessons}" min="1"></div>
+          <div class="field"><label>Rang 2: Vorausbuchung (Tage)</label><input id="e-horizon2" type="number" value="${s.booking_horizon_days_rank2}" min="1"></div>
+        </div>
       </div>
     </div>
     <div class="inline" style="margin-top:.6rem"><button id="e-save">Speichern</button><span id="e-msg" class="muted"></span></div>
@@ -1525,6 +1575,9 @@ function tabEinstellungen() {
         instructor_phone: $('#e-phone').value, live_lead_min: Number($('#e-lead').value),
         avg_speed_kmh: Number($('#e-speed').value), meet_default_label: $('#e-meet').value,
         meet_default_lat: meetLat === '' ? '' : String(meetLat), meet_default_lng: meetLng === '' ? '' : String(meetLng),
+        anonymous_swaps: $('#e-anon').checked ? '1' : '0',
+        req_ueberland: Number($('#e-req-u').value), req_autobahn: Number($('#e-req-a').value), req_nacht: Number($('#e-req-n').value),
+        rank2_min_lessons: Number($('#e-rank2').value), booking_horizon_days_rank2: Number($('#e-horizon2').value),
         new_pin: $('#e-pin').value || undefined } });
       state.settings = r.settings; state.user.name = r.settings.instructor_name;
       toast('Einstellungen gespeichert ✓', 'ok'); $('#e-msg').textContent = 'Gespeichert.';

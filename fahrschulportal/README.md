@@ -1,4 +1,4 @@
-# 🚗 ginoco — Version 2.0
+# 🚗 ginoco — Version 2.1
 
 *Das Fahrschulportal von Gino.*
 
@@ -61,6 +61,21 @@ du ein Backup willst.
 - **„Keine Zeit" auf ein Angebot:** wer nicht kann, klickt es weg. Lehnen **alle**
   anderen ab, wird die Stunde wieder fest dem Anbieter zugeordnet
   (zahlungspflichtig) – er wird benachrichtigt.
+- **Anonymer Tausch (Datenschutz):** Schüler sehen im Feed und in den
+  Benachrichtigungen **nicht**, von wem ein Termin kommt oder wer ihn übernimmt –
+  es ist egal, wichtig ist nur, dass er übernommen wird. Nur der Fahrlehrer sieht
+  im Protokoll die Namen (Nachvollziehbarkeit). Abschaltbar in den Einstellungen.
+- **Rang-System:** Ab X gefahrenen Stunden (Standard 15) wird ein Schüler
+  **Rang 2** und darf **weiter im Voraus** buchen (Standard 21 statt 14 Tage) –
+  so kommen fortgeschrittene Schüler früher an Sonderfahrten, Anfänger sehen die
+  Tage erst nach und nach.
+
+### Sonderfahrten (für die Fahrlehrer-Seite)
+- Beim Abschließen einer Stunde wählst du die **Fahrt-Art**: Normal, 🌄 Überland,
+  🛣️ Autobahn, 🌙 Nachtfahrt. Diese werden **automatisch pro Schüler gezählt**
+  (Soll einstellbar, Standard 5 / 4 / 3) und im Protokoll vermerkt.
+- In der **Wochen-Zeitachse** haben die Fahrt-Arten eigene **Farben**; Schüler und
+  Fahrlehrer sehen den Fortschritt (z. B. „Autobahn 1/4").
 - **Sperrfrist 36 Std.:** Ab dann steht der Termin fest (kein Absagen/Abgeben mehr).
 
 ### Für den Fahrlehrer

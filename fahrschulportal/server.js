@@ -14,7 +14,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const PUBLIC = join(__dirname, 'public');
 const PORT = Number(process.env.PORT || 3000);
 const SESSION_DAYS = 30;
-const APP_VERSION = '2.0.0';
+const APP_VERSION = "2.1.0";
 
 // ---------- kleine Helfer ----------
 const json = (res, code, data) => {
@@ -134,8 +134,34 @@ function slotGrid(date) {
 }
 
 // Ist ein Datum fuer Schueler buchbar? Beruecksichtigt Horizont + taegliche Freigabe-Uhrzeit.
-function dateOpenForStudents(date) {
-  const horizon = Number(getSettingRaw('booking_horizon_days'));
+// Gefahrene (abgeschlossene) Stunden eines Schuelers
+function doneCount(studentId) {
+  return db.prepare("SELECT COUNT(*) AS n FROM bookings WHERE student_id=? AND status='done' AND (attended IS NULL OR attended=1)").get(studentId).n;
+}
+// Rang & Buchungshorizont eines Schuelers (ab X Stunden -> Rang 2 -> weiter im Voraus)
+function studentRank(studentId) {
+  const rank2Min = Number(getSettingRaw('rank2_min_lessons'));
+  const dc = studentId ? doneCount(studentId) : 0;
+  const rank = dc >= rank2Min ? 2 : 1;
+  const horizon = rank >= 2
+    ? Number(getSettingRaw('booking_horizon_days_rank2'))
+    : Number(getSettingRaw('booking_horizon_days'));
+  return { rank, horizon, doneCount: dc, rank2Min };
+}
+// Gefahrene Sonderfahrten je Art
+function sonderCounts(studentId) {
+  const rows = db.prepare(
+    "SELECT lesson_type AS t, COUNT(*) AS n FROM bookings WHERE student_id=? AND status='done' AND (attended IS NULL OR attended=1) AND lesson_type IN ('ueberland','autobahn','nacht') GROUP BY lesson_type").all(studentId);
+  const m = { ueberland: 0, autobahn: 0, nacht: 0 };
+  for (const r of rows) m[r.t] = r.n;
+  return m;
+}
+function sonderReq() {
+  return { ueberland: Number(getSettingRaw('req_ueberland')), autobahn: Number(getSettingRaw('req_autobahn')), nacht: Number(getSettingRaw('req_nacht')) };
+}
+
+function dateOpenForStudents(date, studentId = null) {
+  const horizon = studentId ? studentRank(studentId).horizon : Number(getSettingRaw('booking_horizon_days'));
   const ahead = daysAhead(date);
   if (ahead < 0) return false;
   if (ahead > horizon) return false;
@@ -229,7 +255,7 @@ async function handleApi(req, res, url) {
   if (p === '/api/slots' && method === 'GET') {
     if (!requireStudent() && !requireInstructor()) return bad(res, 'Bitte anmelden', 401);
     const date = url.searchParams.get('date') || todayStr();
-    return ok(res, { date, ...buildDaySlots(date) });
+    return ok(res, { date, ...buildDaySlots(date, sess.kind === 'student' ? sess.student_id : null) });
   }
 
   if (p === '/api/my/bookings' && method === 'GET') {
@@ -238,7 +264,8 @@ async function handleApi(req, res, url) {
       `SELECT id,date,start_time,duration_min,status,gearbox,plate,note
        FROM bookings WHERE student_id = ? AND status != 'cancelled' ORDER BY date, start_time`
     ).all(sess.student_id);
-    return ok(res, { bookings: rows, weekInfo: weekInfoForStudent(sess.student_id) });
+    return ok(res, { bookings: rows, weekInfo: weekInfoForStudent(sess.student_id),
+      progress: { ...studentRank(sess.student_id), sonder: sonderCounts(sess.student_id), req: sonderReq() } });
   }
 
   // Abwesenheit des Fahrlehrers (Urlaub / freie Tage) – fuer Schueler sichtbar
@@ -336,6 +363,7 @@ async function handleApi(req, res, url) {
       if ('plate' in b) { fields.push('plate=?'); vals.push(b.plate ? String(b.plate).trim() : null); }
       if ('note' in b) { fields.push('note=?'); vals.push(b.note ? String(b.note).trim() : null); }
       if ('reason' in b) { fields.push('reason=?'); vals.push(b.reason ? String(b.reason).trim() : null); }
+      if ('lesson_type' in b) { fields.push('lesson_type=?'); vals.push(['ueberland', 'autobahn', 'nacht', 'normal'].includes(b.lesson_type) ? b.lesson_type : null); }
       if ('meet_label' in b) { fields.push('meet_label=?'); vals.push(b.meet_label ? String(b.meet_label).trim() : null); }
       if ('meet_lat' in b) { fields.push('meet_lat=?'); vals.push(b.meet_lat == null || b.meet_lat === '' ? null : Number(b.meet_lat)); }
       if ('meet_lng' in b) { fields.push('meet_lng=?'); vals.push(b.meet_lng == null || b.meet_lng === '' ? null : Number(b.meet_lng)); }
@@ -361,8 +389,9 @@ async function handleApi(req, res, url) {
             detail: `${who}nicht erschienen am ${wdShort(fresh.date)} ${dmy(fresh.date)} ${fresh.start_time}${fresh.reason ? ' – ' + fresh.reason : ''}` });
         } else if (fresh.status === 'done') {
           const car = fresh.gearbox === 'schalt' ? 'Schalter' : fresh.gearbox === 'automatik' ? 'Automatik' : '–';
+          const typeLabel = { ueberland: 'Überland', autobahn: 'Autobahn', nacht: 'Nachtfahrt' }[fresh.lesson_type];
           logEvent('done', { actor: 'instructor', studentId: fresh.student_id, bookingId: id, date: fresh.date,
-            detail: `${who}gefahren ${wdShort(fresh.date)} ${dmy(fresh.date)} ${fresh.start_time} · ${fresh.duration_min} Min · ${car}${fresh.plate ? ' · ' + fresh.plate : ''}${fresh.late_minutes ? ' · ' + fresh.late_minutes + ' Min zu spät' : ''}` });
+            detail: `${who}gefahren ${wdShort(fresh.date)} ${dmy(fresh.date)} ${fresh.start_time} · ${fresh.duration_min} Min · ${car}${typeLabel ? ' · ' + typeLabel : ''}${fresh.plate ? ' · ' + fresh.plate : ''}${fresh.late_minutes ? ' · ' + fresh.late_minutes + ' Min zu spät' : ''}` });
         }
       }
       return ok(res, { booking: db.prepare('SELECT * FROM bookings WHERE id = ?').get(id) });
@@ -454,11 +483,15 @@ async function handleApi(req, res, url) {
     }
     db.prepare("UPDATE bookings SET student_id = ?, status='booked' WHERE id = ?").run(sess.student_id, bk.id);
     db.prepare('DELETE FROM offer_declines WHERE booking_id = ?').run(bk.id);
-    // urspruenglichen Schueler informieren, dass er frei ist
+    // urspruenglichen Schueler informieren, dass er frei ist (anonym, wenn aktiviert)
     const taker = db.prepare('SELECT name FROM students WHERE id = ?').get(sess.student_id);
-    notify(bk.student_id, 'info', `Deine angebotene Fahrstunde am ${dmy(bk.date)} um ${bk.start_time} Uhr wurde von ${taker?.name || 'jemandem'} übernommen – du bist frei.`, bk.date);
+    const anon = getSettingRaw('anonymous_swaps') === '1';
+    const byWhom = anon ? 'von einem anderen Fahrschüler' : `von ${taker?.name || 'jemandem'}`;
+    notify(bk.student_id, 'info', `Deine angebotene Fahrstunde am ${dmy(bk.date)} um ${bk.start_time} Uhr wurde ${byWhom} übernommen – du bist frei.`, bk.date);
+    // Protokoll (nur der Fahrlehrer) enthaelt zur Nachvollziehbarkeit die Namen
+    const from = db.prepare('SELECT name FROM students WHERE id = ?').get(bk.student_id);
     logEvent('take', { actor: 'student', studentId: sess.student_id, bookingId: bk.id, date: bk.date,
-      detail: `${taker?.name || '?'} übernimmt ${wdShort(bk.date)} ${dmy(bk.date)} ${bk.start_time} Uhr` });
+      detail: `${taker?.name || '?'} übernimmt Stunde von ${from?.name || '?'} · ${wdShort(bk.date)} ${dmy(bk.date)} ${bk.start_time} Uhr` });
     return ok(res);
   }
 
@@ -668,8 +701,8 @@ async function handleApi(req, res, url) {
       `SELECT s.id,s.name,s.email,s.phone,s.username,s.birth_year,s.allowed_durations,s.created_at,
         (SELECT COUNT(*) FROM bookings b WHERE b.student_id=s.id AND b.status='done') AS done_count
        FROM students s ORDER BY s.name`
-    ).all();
-    return ok(res, { students: rows });
+    ).all().map((s) => ({ ...s, ...studentRank(s.id), sonder: sonderCounts(s.id) }));
+    return ok(res, { students: rows, req: sonderReq() });
   }
   // Erlaubte Slot-Laengen eines Schuelers setzen (z.B. 40-Min-Ausnahme)
   const stm = p.match(/^\/api\/students\/(\d+)$/);
@@ -762,7 +795,9 @@ async function handleApi(req, res, url) {
       'booking_horizon_days', 'cancel_hours', 'lock_hours', 'release_time', 'short_day_last_start',
       'vacation_credit_min', 'vacation_days_left', 'late_grace_min', 'policy_text',
       'instructor_phone', 'avg_speed_kmh', 'live_lead_min',
-      'meet_default_label', 'meet_default_lat', 'meet_default_lng'];
+      'meet_default_label', 'meet_default_lat', 'meet_default_lng',
+      'anonymous_swaps', 'req_ueberland', 'req_autobahn', 'req_nacht',
+      'rank2_min_lessons', 'booking_horizon_days_rank2'];
     const emptyOk = new Set(['instructor_phone', 'meet_default_label', 'meet_default_lat', 'meet_default_lng', 'policy_text']);
     for (const k of allowed) {
       if (!(k in b) || b[k] == null) continue;
@@ -807,11 +842,11 @@ function genUsername(name, year) {
 }
 
 // Slots eines Tages inkl. Status (frei / gebucht / geblockt)
-function buildDaySlots(date) {
+function buildDaySlots(date, studentId = null) {
   const workdays = getSettingRaw('workdays').split(',').map(Number);
   const ov = getOverride(date);
   const isWorkday = !(ov && ov.closed) && workdays.includes(isoDow(date));
-  const notOpenYet = !dateOpenForStudents(date);
+  const notOpenYet = !dateOpenForStudents(date, studentId);
   const grid = slotGrid(date);
   const bookings = db.prepare(
     "SELECT * FROM bookings WHERE date = ? AND status != 'cancelled'").all(date);
@@ -994,10 +1029,10 @@ function createBooking(res, sess, body) {
       return bad(res, 'An diesem Tag werden keine Fahrstunden angeboten');
 
     // 14-Tage-Fenster + taegliche Freigabe (der Fahrlehrer darf weiter voraus planen)
-    if (!dateOpenForStudents(date)) {
-      const horizon = Number(getSettingRaw('booking_horizon_days'));
+    if (!dateOpenForStudents(date, sess.student_id)) {
+      const { horizon, rank } = studentRank(sess.student_id);
       const rel = getSettingRaw('release_time');
-      return bad(res, `Dieser Tag ist noch nicht buchbar (Freigabe bis ${horizon} Tage im Voraus, taeglich ab ${rel} Uhr).`);
+      return bad(res, `Dieser Tag ist noch nicht buchbar (für dich als Rang ${rank}: bis ${horizon} Tage im Voraus, täglich ab ${rel} Uhr).`);
     }
 
     // Passt der Start ins (tagesabhaengige) Raster?

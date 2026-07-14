@@ -159,6 +159,7 @@ ensureColumn('day_overrides', 'type', "type TEXT NOT NULL DEFAULT 'short'");  //
 ensureColumn('bookings', 'meet_label', 'meet_label TEXT');   // Treffpunkt (Text)
 ensureColumn('bookings', 'meet_lat', 'meet_lat REAL');       // Treffpunkt-Koordinaten (optional)
 ensureColumn('bookings', 'meet_lng', 'meet_lng REAL');
+ensureColumn('bookings', 'lesson_type', 'lesson_type TEXT'); // normal | ueberland | autobahn | nacht
 
 // Live-Standort des Fahrlehrers (genau eine Zeile)
 db.exec(`CREATE TABLE IF NOT EXISTS live_location (
@@ -193,6 +194,12 @@ const DEFAULTS = {
   meet_default_label: '',    // Standard-Treffpunkt (Text)
   meet_default_lat: '',      // Standard-Treffpunkt-Koordinaten (optional)
   meet_default_lng: '',
+  anonymous_swaps: '1',      // Tausch anonym (Schueler sehen sich untereinander nicht)
+  req_ueberland: '5',        // Soll-Sonderfahrten: Ueberland
+  req_autobahn: '4',         // Soll-Sonderfahrten: Autobahn
+  req_nacht: '3',            // Soll-Sonderfahrten: Nachtfahrt
+  rank2_min_lessons: '15',   // ab so vielen gefahrenen Stunden -> Rang 2
+  booking_horizon_days_rank2: '21', // Rang 2 darf so viele Tage im Voraus buchen
   policy_text: 'Gebuchte Termine sind verbindlich. Kostenfrei stornieren nur bis '
     + '48 Std. vorher; ab 36 Std. vorher steht der Termin fest. Bei Nichterscheinen '
     + 'werden bis zu 75 % berechnet. Ab 20 Min Verspätung verkürzt sich die Fahrstunde '
@@ -221,7 +228,8 @@ export function getSettings() {
   // Zahlen als Zahlen liefern
   for (const n of ['lesson_min', 'break_min', 'weekly_target_h', 'daily_target_h', 'weekly_lo_h',
     'max_per_week', 'booking_horizon_days', 'cancel_hours', 'lock_hours',
-    'vacation_credit_min', 'vacation_days_left', 'late_grace_min', 'avg_speed_kmh', 'live_lead_min']) {
+    'vacation_credit_min', 'vacation_days_left', 'late_grace_min', 'avg_speed_kmh', 'live_lead_min',
+    'req_ueberland', 'req_autobahn', 'req_nacht', 'rank2_min_lessons', 'booking_horizon_days_rank2']) {
     out[n] = Number(out[n]);
   }
   return out;
