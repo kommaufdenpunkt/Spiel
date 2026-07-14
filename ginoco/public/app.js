@@ -542,7 +542,7 @@ function studentBookingItem(b) {
   return `<div class="bitem">
     <div>
       <div class="when">${WD[isoDow(b.date) - 1]} ${fmtShort(b.date)} · ${b.start_time} <span class="muted" style="font-weight:400">(${b.duration_min} Min)</span></div>
-      <div class="meta">${st} ${gear} ${b.plate ? '· ' + esc(b.plate) : ''}
+      <div class="meta">${st} ${typeBadge(b.lesson_type)} ${gear} ${b.plate ? '· ' + esc(b.plate) : ''}
         ${b.status === 'booked' && soon ? `<span class="muted">· in ${h < 1 ? '<1' : Math.round(h)} h</span>` : ''}</div>
     </div>
     <div class="inline">${actions}</div>
@@ -923,7 +923,7 @@ function instrBookingItem(b) {
     <div>
       <div class="when">${b.start_time}–${end} <span class="muted" style="font-weight:400">(${b.duration_min} Min)</span></div>
       <div class="meta"><strong>${who}</strong> ${b.student_phone ? '· ' + esc(b.student_phone) + ' ' + contactButtons(b.student_phone, `Hallo ${(b.student_name || '').split(' ')[0]}, wegen deiner Fahrstunde am ${fmtShort(b.date)} um ${b.start_time} Uhr:`) : ''}</div>
-      <div class="meta">${st} ${gear} ${b.plate ? '· 🚘 ' + esc(b.plate) : ''} ${b.meet_label ? '· 📍 ' + esc(b.meet_label) : ''} ${b.note ? '· ' + esc(b.note) : ''}</div>
+      <div class="meta">${st} ${typeBadge(b.lesson_type)} ${gear} ${b.plate ? '· 🚘 ' + esc(b.plate) : ''} ${b.meet_label ? '· 📍 ' + esc(b.meet_label) : ''} ${b.note ? '· ' + esc(b.note) : ''}</div>
     </div>
     <div class="inline">
       <button class="sec sm" data-mark="${b.id}">Bearbeiten</button>
@@ -1121,10 +1121,16 @@ async function loadK() {
 // Farbe je Fahrschüler (stabil über die id)
 const WK_COLORS = ['#4d8dff', '#35c07d', '#b079f0', '#e6934d', '#e06b9a', '#3fb6c4', '#c9a13b', '#7c8cf0'];
 function studentColor(id) { return id ? WK_COLORS[id % WK_COLORS.length] : '#5a6b80'; }
-// Standardfarben je Fahrt-Art (Sonderfahrten)
-const TYPE_COLORS = { ueberland: '#2f9e57', autobahn: '#2f6fd0', nacht: '#6d4bb0' };
-const TYPE_ICON = { ueberland: '🌄', autobahn: '🛣️', nacht: '🌙' };
-const TYPE_LABEL = { ueberland: 'Überland', autobahn: 'Autobahn', nacht: 'Nachtfahrt', normal: 'Normal' };
+// Standardfarben je Fahrt-Art (Sonderfahrten + normale Stunde)
+const TYPE_COLORS = { ueberland: '#2f9e57', autobahn: '#2f6fd0', nacht: '#6d4bb0', normal: '#5b6b7d' };
+const TYPE_ICON = { ueberland: '🌄', autobahn: '🛣️', nacht: '🌙', normal: '🚗' };
+const TYPE_LABEL = { ueberland: 'Überland', autobahn: 'Autobahn', nacht: 'Nachtfahrt', normal: 'Normale Stunde' };
+// Einheitliches, farbiges Abzeichen für die Fahrt-Art
+function typeBadge(type) {
+  const t = TYPE_LABEL[type] ? type : 'normal';
+  const c = TYPE_COLORS[t];
+  return `<span class="type-badge" style="background:${c}22;color:${c};border-color:${c}66">${TYPE_ICON[t]} ${TYPE_LABEL[t]}</span>`;
+}
 
 function renderWeek(el, monday, ov) {
   const s = state.settings;
@@ -1182,9 +1188,10 @@ function renderWeek(el, monday, ov) {
   </div></div>
   <div class="hint" style="margin-top:.7rem">Tipp: auf einen Termin tippen zum Bearbeiten/Abschließen. Farbe = Fahrschüler (bzw. Fahrt-Art), 🔄 = wird abgegeben, ✓ = gefahren.</div>
   <div class="legend"><span class="muted">Fahrt-Arten:</span>
-    <span class="legend-chip"><span class="sw" style="background:${TYPE_COLORS.ueberland}"></span>Überland</span>
-    <span class="legend-chip"><span class="sw" style="background:${TYPE_COLORS.autobahn}"></span>Autobahn</span>
-    <span class="legend-chip"><span class="sw" style="background:${TYPE_COLORS.nacht}"></span>Nachtfahrt</span>
+    <span class="legend-chip"><span class="sw" style="background:${TYPE_COLORS.ueberland}"></span>🌄 Überland</span>
+    <span class="legend-chip"><span class="sw" style="background:${TYPE_COLORS.autobahn}"></span>🛣️ Autobahn</span>
+    <span class="legend-chip"><span class="sw" style="background:${TYPE_COLORS.nacht}"></span>🌙 Nachtfahrt</span>
+    <span class="legend-chip"><span class="sw" style="background:${TYPE_COLORS.normal}"></span>🚗 Normale Stunde</span>
   </div>`;
   el.querySelectorAll('[data-wk]').forEach((b) => b.onclick = () => openMarkModal(b.dataset.wk));
 }
