@@ -195,16 +195,17 @@ async function handleApi(req, res, urlPath, ip) {
   if (urlPath === '/api/agents' && req.method === 'POST') {
     if (!adminOnly()) return true;
     let body; try { body = await readJson(req, 16 * 1024); } catch { body = {}; }
-    const rec = store.addAgent({ username: body.username, password: body.password, role: body.role, createdBy: reqName(req, ip) });
+    const rec = store.addAgent({ username: body.username, password: body.password, role: body.role, createdBy: reqName(req, ip), require2fa: !!body.require2fa });
     if (!rec) { sendJson(res, 400, { reason: 'exists-or-invalid' }); return true; }
-    sec.recordEvent('audit', ip, 'Mitarbeiter angelegt: ' + rec.username);
-    // otpauth-Link für Authenticator-Apps (Google Authenticator etc.) + QR-Bild.
-    // Passt zur Prüfung in verifyTotp: SHA1, 6 Stellen, 30-Sekunden-Fenster.
-    const label = encodeURIComponent('ident (' + rec.username + ')');
-    const otpauth = `otpauth://totp/${label}?secret=${rec.totpSecret}&issuer=ident&algorithm=SHA1&digits=6&period=30`;
-    let qr = '';
-    try { qr = await QRCode.toDataURL(otpauth, { margin: 1, width: 220 }); } catch (e) { /* QR optional */ }
-    sendJson(res, 200, { id: rec.id, username: rec.username, totpSecret: rec.totpSecret, otpauth, qr }); return true;
+    sec.recordEvent('audit', ip, 'Mitarbeiter angelegt: ' + rec.username + (rec.totpSecret ? ' (mit 2FA)' : ' (ohne 2FA)'));
+    // Nur bei aktiver 2FA: otpauth-Link + QR-Bild (SHA1/6/30 -> passt zu verifyTotp).
+    let otpauth = '', qr = '';
+    if (rec.totpSecret) {
+      const label = encodeURIComponent('ident (' + rec.username + ')');
+      otpauth = `otpauth://totp/${label}?secret=${rec.totpSecret}&issuer=ident&algorithm=SHA1&digits=6&period=30`;
+      try { qr = await QRCode.toDataURL(otpauth, { margin: 1, width: 220 }); } catch (e) { /* QR optional */ }
+    }
+    sendJson(res, 200, { id: rec.id, username: rec.username, totpSecret: rec.totpSecret, otpauth, qr, has2fa: !!rec.totpSecret }); return true;
   }
   if (urlPath === '/api/agent-delete' && req.method === 'POST') {
     if (!adminOnly()) return true; let body; try { body = await readJson(req, 16 * 1024); } catch { body = {}; }
