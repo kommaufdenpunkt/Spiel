@@ -15,6 +15,10 @@ const path = require('path');
 const crypto = require('crypto');
 const { WebSocketServer } = require('ws');
 const QRCode = require('qrcode');
+const {
+  generateRegistrationOptions, verifyRegistrationResponse,
+  generateAuthenticationOptions, verifyAuthenticationResponse,
+} = require('@simplewebauthn/server');
 const sec = require('./security.js');
 const store = require('./store.js');
 
@@ -27,6 +31,18 @@ const ADMIN_TOTP = process.env.ADMIN_TOTP_SECRET || process.env.MODERATOR_TOTP_S
 const TURN_HOST = process.env.TURN_HOST || '';
 const TURN_SECRET = process.env.TURN_SECRET || '';
 const TURN_TTL = parseInt(process.env.TURN_TTL || '3600', 10);
+
+// ---- Passkeys (Face ID / Fingerabdruck, WebAuthn) --------------------------
+// rpID = registrierbare Domain, damit Passkeys auf ident. UND pruefer. gelten.
+const RP_ID = process.env.RP_ID || '4ever1.tv';
+const RP_NAME = process.env.RP_NAME || '4EVER1';
+const RP_ORIGINS = (process.env.RP_ORIGINS || 'https://ident.4ever1.tv,https://pruefer.4ever1.tv')
+  .split(',').map((s) => s.trim()).filter(Boolean);
+const waChallenges = new Map(); // schlüssel -> { challenge, exp }
+function waSetChallenge(key, challenge) { waChallenges.set(key, { challenge, exp: Date.now() + 5 * 60 * 1000 }); }
+function waTakeChallenge(key) { const c = waChallenges.get(key); waChallenges.delete(key); return c && Date.now() <= c.exp ? c.challenge : null; }
+const b64urlToBuf = (s) => Buffer.from(String(s || ''), 'base64url');
+const bufToB64url = (u) => Buffer.from(u).toString('base64url');
 
 sec.init({ storageKey: STORAGE_KEY, adminTotp: ADMIN_TOTP, loginAllowIps: process.env.LOGIN_ALLOW_IPS });
 const storeInfo = store.init({ dir: DATA_DIR });
@@ -120,6 +136,41 @@ async function handleApi(req, res, urlPath, ip) {
     return true;
   }
 
+  // ---- Passkey-Login (Face ID / Fingerabdruck) – öffentlich ----
+  if (urlPath === '/api/passkey/login/options' && req.method === 'POST') {
+    if (!sec.loginAllowed(ip)) { sendJson(res, 403, { reason: 'ip-blocked' }); return true; }
+    let body; try { body = await readJson(req, 8 * 1024); } catch { body = {}; }
+    const agent = store.getAgentByUsername(body.username || '');
+    if (!agent || agent.locked || !(agent.passkeys || []).length) { sendJson(res, 404, { reason: 'no-passkey' }); return true; }
+    const opts = await generateAuthenticationOptions({
+      rpID: RP_ID, userVerification: 'preferred',
+      allowCredentials: agent.passkeys.map((p) => ({ id: b64urlToBuf(p.id), type: 'public-key' })),
+    });
+    waSetChallenge('auth:' + agent.username.toLowerCase(), opts.challenge);
+    sendJson(res, 200, opts); return true;
+  }
+  if (urlPath === '/api/passkey/login/verify' && req.method === 'POST') {
+    if (!sec.loginAllowed(ip)) { sendJson(res, 403, { reason: 'ip-blocked' }); return true; }
+    let body; try { body = await readJson(req, 32 * 1024); } catch { body = {}; }
+    const agent = store.getAgentByUsername(body.username || '');
+    const expectedChallenge = agent ? waTakeChallenge('auth:' + agent.username.toLowerCase()) : null;
+    const pk = agent ? (agent.passkeys || []).find((p) => p.id === (body.response && body.response.id)) : null;
+    if (!agent || agent.locked || !expectedChallenge || !pk) { sec.recordFail(ip, 'Passkey-Login fehlgeschlagen'); sendJson(res, 401, { reason: 'bad-login' }); return true; }
+    let verification;
+    try {
+      verification = await verifyAuthenticationResponse({
+        response: body.response, expectedChallenge, expectedOrigin: RP_ORIGINS, expectedRPID: RP_ID,
+        authenticator: { credentialID: b64urlToBuf(pk.id), credentialPublicKey: b64urlToBuf(pk.publicKey), counter: pk.counter || 0 },
+        requireUserVerification: false,
+      });
+    } catch (e) { verification = { verified: false }; }
+    if (!verification.verified) { sec.recordFail(ip, 'Passkey-Login fehlgeschlagen (' + agent.username + ')'); sendJson(res, 401, { reason: 'bad-login' }); return true; }
+    store.setPasskeyCounter(agent.id, pk.id, verification.authenticationInfo.newCounter);
+    sec.resetFails(ip); sec.resetAccountFails(agent.username); sec.recordEvent('login-ok', ip, 'Passkey: ' + agent.username);
+    sendJson(res, 200, { token: sec.issueToken(ip, { name: agent.username, role: agent.role }), name: agent.username, role: agent.role, mustChange: !!agent.mustChange });
+    return true;
+  }
+
   // ---- ab hier: gültiges Login nötig ----
   if (!authed(req, ip)) { sendJson(res, 401, { reason: 'auth' }); return true; }
 
@@ -129,6 +180,39 @@ async function handleApi(req, res, urlPath, ip) {
     const ok = store.changeOwnPassword(reqName(req, ip), body.newPassword);
     if (ok) sec.recordEvent('audit', ip, 'Passwort geändert: ' + reqName(req, ip));
     sendJson(res, ok ? 200 : 400, { ok }); return true;
+  }
+
+  // ---- Passkey einrichten (eingeloggter Prüfer, Face ID / Fingerabdruck) ----
+  if (urlPath === '/api/passkey/register/options' && req.method === 'POST') {
+    const agent = store.getAgentByUsername(reqName(req, ip));
+    if (!agent) { sendJson(res, 403, { reason: 'agent-only' }); return true; }
+    const opts = await generateRegistrationOptions({
+      rpName: RP_NAME, rpID: RP_ID,
+      userID: agent.id, userName: agent.username, userDisplayName: agent.username,
+      attestationType: 'none',
+      excludeCredentials: (agent.passkeys || []).map((p) => ({ id: b64urlToBuf(p.id), type: 'public-key' })),
+      authenticatorSelection: { residentKey: 'preferred', userVerification: 'preferred' },
+    });
+    waSetChallenge('reg:' + agent.id, opts.challenge);
+    sendJson(res, 200, opts); return true;
+  }
+  if (urlPath === '/api/passkey/register/verify' && req.method === 'POST') {
+    const agent = store.getAgentByUsername(reqName(req, ip));
+    if (!agent) { sendJson(res, 403, { reason: 'agent-only' }); return true; }
+    let body; try { body = await readJson(req, 32 * 1024); } catch { body = {}; }
+    const expectedChallenge = waTakeChallenge('reg:' + agent.id);
+    if (!expectedChallenge) { sendJson(res, 400, { reason: 'expired' }); return true; }
+    let verification;
+    try {
+      verification = await verifyRegistrationResponse({
+        response: body, expectedChallenge, expectedOrigin: RP_ORIGINS, expectedRPID: RP_ID, requireUserVerification: false,
+      });
+    } catch (e) { sendJson(res, 400, { reason: 'verify-failed', detail: e.message }); return true; }
+    if (!verification.verified || !verification.registrationInfo) { sendJson(res, 400, { reason: 'not-verified' }); return true; }
+    const { credentialID, credentialPublicKey, counter } = verification.registrationInfo;
+    store.addPasskey(agent.id, { id: bufToB64url(credentialID), publicKey: bufToB64url(credentialPublicKey), counter });
+    sec.recordEvent('audit', ip, 'Passkey eingerichtet: ' + agent.username);
+    sendJson(res, 200, { ok: true }); return true;
   }
 
   // ---- Zugangscodes ----

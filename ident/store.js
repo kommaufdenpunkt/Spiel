@@ -66,7 +66,27 @@ function listAgents() {
   return agents.map((a) => ({
     id: a.id, username: a.username, role: a.role, createdAt: a.createdAt,
     createdBy: a.createdBy || '', has2fa: !!a.totpSecret, mustChange: !!a.mustChange, locked: !!a.locked,
+    hasPasskey: (a.passkeys || []).length > 0,
   }));
+}
+
+// ---- Passkeys (Face ID / Fingerabdruck, WebAuthn) --------------------------
+function addPasskey(agentId, pk) {
+  const a = getAgentById(agentId); if (!a) return false;
+  if (!Array.isArray(a.passkeys)) a.passkeys = [];
+  a.passkeys.push({ id: pk.id, publicKey: pk.publicKey, counter: pk.counter || 0, createdAt: new Date().toISOString() });
+  save('agents.json', agents); return true;
+}
+function getAgentByPasskeyId(credId) {
+  return agents.find((a) => (a.passkeys || []).some((p) => p.id === credId)) || null;
+}
+function setPasskeyCounter(agentId, credId, counter) {
+  const a = getAgentById(agentId); if (!a) return false;
+  const p = (a.passkeys || []).find((x) => x.id === credId); if (!p) return false;
+  p.counter = counter; save('agents.json', agents); return true;
+}
+function agentPasskeys(agentId) {
+  const a = getAgentById(agentId); return a ? (a.passkeys || []) : [];
 }
 function getAgentByUsername(u) {
   const name = String(u || '').trim().toLowerCase();
@@ -245,6 +265,7 @@ module.exports = {
   init,
   listAgents, getAgentByUsername, getAgentById, addAgent, verifyAgent,
   setAgentPassword, changeOwnPassword, lockAgent, unlockAgent, deleteAgent, agentCount,
+  addPasskey, getAgentByPasskeyId, setPasskeyCounter, agentPasskeys,
   createCode, getCode, isCodeUsable, consumeCode, revokeCode, listCodes,
   saveCase, listCases, getCase, deleteCase, readDoc,
   saveRecording, listRecordings, getRecording, readRecording, deleteRecording,

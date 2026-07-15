@@ -206,7 +206,8 @@
     <div id="staffFields" style="display:none">
       <div class="field"><label for="userInput">Benutzername</label><input id="userInput" placeholder="dein persönlicher Login" autocomplete="username"></div>
       <div class="field"><label for="passInput">Passwort</label><input id="passInput" type="password" placeholder="dein Passwort" autocomplete="current-password"></div>
-      <div class="field"><label for="totpInput">2FA-Code</label><input id="totpInput" inputmode="numeric" placeholder="6-stelliger Code" autocomplete="one-time-code"></div>
+      <div class="field"><label for="totpInput">2FA-Code</label><input id="totpInput" inputmode="numeric" placeholder="6-stelliger Code (falls aktiv)" autocomplete="one-time-code"></div>
+      <button id="passkeyLoginBtn" type="button" style="width:100%;display:none">🔐 Mit Face ID / Fingerabdruck anmelden</button>
     </div>
 
     <div class="actions"><button id="enterBtn" class="primary">Audition starten</button></div>
@@ -316,7 +317,10 @@
     <div class="hint">Gib die Zugangsnummer (oder den Link) an den Bewerber weiter. Sobald er beitritt, erscheint er unten und kann abgeholt werden.</div>
     <div class="sect" style="margin-top:1rem">Wartende Bewerber</div>
     <div id="waitingList"></div>
-    <div class="actions" style="margin-top:1rem"><button id="waitLogout">Abmelden</button></div>
+    <div class="actions" style="margin-top:1rem">
+      <button id="setupPasskeyBtn" type="button" style="display:none">🔐 Face ID / Fingerabdruck für dieses Gerät einrichten</button>
+      <button id="waitLogout">Abmelden</button>
+    </div>
   </div>
 </div>
 

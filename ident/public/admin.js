@@ -117,7 +117,7 @@
     el.innerHTML = '';
     list.forEach((a) => {
       const div = document.createElement('div'); div.className = 'row';
-      div.innerHTML = `<div><b>${esc(a.username)}</b> <span class="pill ${a.role === 'admin' ? 'warn' : 'ok'}">${a.role === 'admin' ? 'Admin' : 'Prüfer'}</span> ${a.locked ? '<span class="pill no">gesperrt</span>' : ''} ${a.mustChange ? '<span class="pill warn">PW-Wechsel offen</span>' : ''}<div class="muted">2FA: ${a.has2fa ? 'aktiv' : 'aus'} · seit ${new Date(a.createdAt).toLocaleDateString('de-DE')}</div></div>`;
+      div.innerHTML = `<div><b>${esc(a.username)}</b> <span class="pill ${a.role === 'admin' ? 'warn' : 'ok'}">${a.role === 'admin' ? 'Admin' : 'Prüfer'}</span> ${a.locked ? '<span class="pill no">gesperrt</span>' : ''} ${a.mustChange ? '<span class="pill warn">PW-Wechsel offen</span>' : ''}<div class="muted">2FA: ${a.has2fa ? 'aktiv' : 'aus'} · Face ID/Fingerabdruck: ${a.hasPasskey ? 'ja' : 'nein'} · seit ${new Date(a.createdAt).toLocaleDateString('de-DE')}</div></div>`;
       const acts = document.createElement('div'); acts.className = 'acts';
       if (a.locked) acts.appendChild(btn('🔓 Entsperren', '', async () => { await api('POST', '/api/agent-unlock', { id: a.id }); loadAgents(); }));
       acts.appendChild(btn('🔑 PW zurücksetzen', '', async () => { const np = prompt('Neues Startpasswort (mind. 8 Zeichen):'); if (!np || np.length < 8) { toast('Zu kurz.'); return; } const x = await api('POST', '/api/agent-reset', { id: a.id, newPassword: np }); toast(x.body.ok ? 'Zurückgesetzt.' : 'Fehlgeschlagen.'); }));
