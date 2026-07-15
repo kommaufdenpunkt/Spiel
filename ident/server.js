@@ -31,6 +31,7 @@ const ADMIN_TOTP = process.env.ADMIN_TOTP_SECRET || process.env.MODERATOR_TOTP_S
 const TURN_HOST = process.env.TURN_HOST || '';
 const TURN_SECRET = process.env.TURN_SECRET || '';
 const TURN_TTL = parseInt(process.env.TURN_TTL || '3600', 10);
+const RETENTION_DAYS = parseInt(process.env.RETENTION_DAYS || '0', 10); // 0 = aus
 
 // ---- Passkeys (Face ID / Fingerabdruck, WebAuthn) --------------------------
 // rpID = registrierbare Domain, damit Passkeys auf ident. UND pruefer. gelten.
@@ -318,6 +319,39 @@ async function handleApi(req, res, urlPath, ip) {
     if (!data) { res.writeHead(404); res.end('not found'); return true; }
     res.writeHead(200, { 'Content-Type': data.mime, 'Cache-Control': 'no-store' }); res.end(data.buffer); return true;
   }
+  if (urlPath === '/api/case-export' && req.method === 'GET') {
+    if (!isAdmin(req, ip)) { res.writeHead(403); res.end('Forbidden'); return true; }
+    const c = store.getCase(new URL(req.url, 'http://x').searchParams.get('id'));
+    if (!c) { res.writeHead(404); res.end('Nicht gefunden'); return true; }
+    const eh = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[m]));
+    const status = c.result === 'approved' ? 'Freigegeben' : (c.result === 'rejected' ? 'Abgelehnt' : 'Offen');
+    const row = (k, v) => v ? `<tr><th>${eh(k)}</th><td>${eh(v)}</td></tr>` : '';
+    const imgs = (c.docs || []).map((d) => { const doc = store.readDoc(c.id, d); if (!doc) return ''; return `<figure><img src="data:${doc.mime};base64,${doc.buffer.toString('base64')}"><figcaption>${eh(d.label)}</figcaption></figure>`; }).join('');
+    const checks = (c.checklist || []).map((x) => `<li>${x.checked ? '☑' : '☐'} ${eh(x.label)}</li>`).join('');
+    const html = `<!doctype html><html lang="de"><head><meta charset="utf-8"><title>Audition ${eh(c.bigoName || c.verifiedName || c.code)}</title><style>
+      *{box-sizing:border-box} body{font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#1b2738;max-width:820px;margin:2rem auto;padding:0 1.2rem;line-height:1.5}
+      h1{font-size:1.4rem;margin:0 0 .2rem} .sub{color:#6b7a90;font-size:.9rem;margin:0 0 1.2rem}
+      .badge{display:inline-block;padding:.2rem .6rem;border-radius:999px;font-size:.85rem;font-weight:600}
+      .ok{background:#e7f6ec;color:#1a7a3c} .no{background:#fdecec;color:#c23b37} .open{background:#fff4e0;color:#9a6a00}
+      table{border-collapse:collapse;width:100%;margin:1rem 0} th,td{border:1px solid #e3e9f2;padding:.5rem .7rem;text-align:left;font-size:.92rem;vertical-align:top} th{width:34%;background:#f6f8fc;font-weight:600}
+      figure{margin:0} .imgs{display:flex;flex-wrap:wrap;gap:1rem;margin-top:1rem} .imgs img{max-width:240px;border:1px solid #e3e9f2;border-radius:8px} figcaption{font-size:.75rem;color:#6b7a90;text-align:center;margin-top:.2rem}
+      ul{padding-left:1.1rem;margin:.4rem 0} .print{margin:1rem 0;padding:.6rem 1rem;border:1px solid #3b6ef0;background:#eef3ff;border-radius:8px}
+      @media print{.print{display:none}}
+    </style></head><body>
+      <h1>4EVER1 · Audition</h1><p class="sub">BIGO Live · Bewerbungs-/Auditionsakte</p>
+      <div class="print">Tipp: Mit <b>Strg/Cmd + P</b> → „Als PDF sichern" exportierst du diese Akte als PDF.</div>
+      <p>Status: <span class="badge ${c.result === 'approved' ? 'ok' : (c.result === 'rejected' ? 'no' : 'open')}">${eh(status)}</span></p>
+      <table>
+        ${row('BIGO-Name', c.bigoName)}${row('Alter', c.age)}${row('Name laut Ausweis', c.verifiedName)}
+        ${row('Ausweisart', c.docType)}${row('Ausweis-Nr.', c.docNumber)}${row('Zugangsnummer', c.code)}
+        ${row('Prüfer', c.agentName)}${row('Datum', new Date(c.createdAt).toLocaleString('de-DE'))}
+        ${row('Notiz', c.note)}${row('Ablehnungsgrund', c.rejectReason)}
+      </table>
+      ${checks ? `<h3>Prüf-Checkliste</h3><ul>${checks}</ul>` : ''}
+      ${imgs ? `<h3>Bilder</h3><div class="imgs">${imgs}</div>` : ''}
+    </body></html>`;
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' }); res.end(html); return true;
+  }
   if (urlPath === '/api/case-delete' && req.method === 'POST') {
     if (!adminOnly()) return true; let body; try { body = await readJson(req, 16 * 1024); } catch { body = {}; }
     const ok = store.deleteCase(body.id); if (ok) sec.recordEvent('audit', ip, 'Fall gelöscht: ' + body.id);
@@ -472,5 +506,14 @@ server.listen(PORT, () => {
   console.log(`Mitarbeiter-Konten: ${store.agentCount()}`);
   console.log(`TURN: ${TURN_SECRET && TURN_HOST ? 'aktiv (' + TURN_HOST + ')' : 'nur STUN'}`);
   console.log(`Login-IP-Sperre: ${sec.loginIpRestricted() ? 'aktiv' : 'aus'}`);
+  console.log(`Aufbewahrung: ${RETENTION_DAYS > 0 ? 'Auto-Löschung nach ' + RETENTION_DAYS + ' Tagen' : 'aus (Akten bleiben)'}`);
   if (!sec.hasKey()) console.warn('!! WARNUNG: STORAGE_KEY fehlt – Daten werden UNVERSCHLÜSSELT gespeichert!');
 });
+
+// Auto-Löschung: beim Start und danach alle 6 Stunden.
+function runRetention() {
+  if (RETENTION_DAYS <= 0) return;
+  try { const n = store.purgeOlderThan(RETENTION_DAYS); if (n) { sec.recordEvent('audit', 'system', n + ' Akte(n)/Aufnahme(n) automatisch gelöscht (>' + RETENTION_DAYS + ' Tage)'); console.log('Auto-Löschung: ' + n + ' Einträge entfernt.'); } } catch (e) { console.error('Auto-Löschung Fehler:', e.message); }
+}
+runRetention();
+setInterval(runRetention, 6 * 60 * 60 * 1000);
