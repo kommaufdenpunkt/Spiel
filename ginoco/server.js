@@ -15,7 +15,7 @@ const PUBLIC = join(__dirname, 'public');
 const PORT = Number(process.env.PORT || 3000);
 const HOST = process.env.HOST || '0.0.0.0'; // hinter Caddy: HOST=127.0.0.1 (nur Proxy erreicht Node)
 const SESSION_DAYS = 30;
-const APP_VERSION = "2.8.3";
+const APP_VERSION = "2.8.4";
 // Einstellungen, die Schueler/Oeffentlichkeit sehen duerfen (Rest bleibt beim Fahrlehrer)
 const PUBLIC_SETTINGS = ['instructor_name', 'instructor_phone', 'policy_text',
   'cancel_hours', 'lock_hours', 'booking_horizon_days', 'booking_horizon_days_rank2',
@@ -698,10 +698,26 @@ async function handleApi(req, res, url) {
   }
 
   // Schueler aktualisiert eigene Handynummer
+  // Eigenes Profil ansehen (nur der Schüler selbst)
+  if (p === '/api/my/profile' && method === 'GET') {
+    if (!requireStudent()) return bad(res, 'Bitte anmelden', 401);
+    const st = db.prepare('SELECT name,email,phone,birth_year,username FROM students WHERE id=?').get(sess.student_id);
+    return ok(res, { profile: st || {} });
+  }
+  // Eigenes Profil vervollständigen (Name/Telefon/E-Mail/Jahrgang) – nur der Schüler selbst
   if (p === '/api/my/profile' && method === 'PATCH') {
     if (!requireStudent()) return bad(res, 'Bitte anmelden', 401);
     const b = await readBody(req);
-    if ('phone' in b) db.prepare('UPDATE students SET phone=? WHERE id=?').run(b.phone ? String(b.phone).trim() : null, sess.student_id);
+    const fields = [], vals = [];
+    if ('name' in b) { const nm = String(b.name || '').trim(); if (!nm) return bad(res, 'Name darf nicht leer sein'); fields.push('name=?'); vals.push(nm); }
+    if ('phone' in b) { fields.push('phone=?'); vals.push(b.phone ? String(b.phone).trim() : null); }
+    if ('email' in b) {
+      const em = b.email ? String(b.email).trim() : null;
+      if (em && db.prepare('SELECT 1 FROM students WHERE email=? AND id<>?').get(em, sess.student_id)) return bad(res, 'Diese E-Mail ist schon vergeben');
+      fields.push('email=?'); vals.push(em);
+    }
+    if ('birth_year' in b) { fields.push('birth_year=?'); vals.push(b.birth_year ? Number(b.birth_year) : null); }
+    if (fields.length) db.prepare(`UPDATE students SET ${fields.join(', ')} WHERE id=?`).run(...vals, sess.student_id);
     return ok(res);
   }
 

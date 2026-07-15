@@ -57,21 +57,34 @@ function openThemePicker() {
 }
 window.__openThemePicker = openThemePicker;
 
-function openPhoneModal() {
-  const phone = state.user?.phone || '';
+async function openProfileModal() {
   const ip = state.settings?.instructor_phone;
-  modal(`<h3>Handynummer</h3>
-    <p class="hint">Deine Nummer, damit dein Fahrlehrer dich erreichen kann (z.B. bei Verspätung).</p>
-    <div class="field"><label>Deine Handynummer</label><input id="ph-in" value="${esc(phone)}" placeholder="z.B. 0151 23456789"></div>
+  let pr = { name: state.user?.name || '', email: '', phone: state.user?.phone || '', birth_year: '', username: state.user?.username || '' };
+  try { const r = await api('/api/my/profile'); if (r.profile) pr = { ...pr, ...r.profile }; } catch {}
+  modal(`<h3>Mein Profil</h3>
+    <div class="err hidden" id="pf-err"></div>
+    <p class="hint">Vervollständige deine Daten. Sie sind <strong>nur für deinen Fahrlehrer</strong> sichtbar – kein anderer Fahrschüler sieht sie.</p>
+    <div class="field"><label>Name</label><input id="pf-name" value="${esc(pr.name || '')}" placeholder="Vor- und Nachname"></div>
+    <div class="row">
+      <div class="field"><label>Handynummer</label><input id="pf-phone" value="${esc(pr.phone || '')}" placeholder="z.B. 0151 23456789"></div>
+      <div class="field" style="max-width:130px"><label>Jahrgang</label><input id="pf-year" type="number" value="${pr.birth_year || ''}" min="1930" max="2015" placeholder="1997"></div>
+    </div>
+    <div class="field"><label>E-Mail (optional)</label><input id="pf-email" type="email" value="${esc(pr.email || '')}"></div>
+    <div class="field"><label>Login-Name (fest, ändert sich nicht)</label><input value="${esc(pr.username || '')}" readonly></div>
     ${ip ? `<div class="field"><label>Fahrschule erreichen</label><div class="inline">${contactButtons(ip)}</div></div>` : ''}
-    <div class="actions"><button class="sec" onclick="window.__closeModal()">Schließen</button><button id="ph-save">Speichern</button></div>`);
-  $('#ph-save').onclick = async () => {
-    try { await api('/api/my/profile', { method: 'PATCH', body: { phone: $('#ph-in').value } });
-      state.user.phone = $('#ph-in').value.trim(); closeModal(); toast('Gespeichert ✓', 'ok'); }
-    catch (e) { toast(e.message, 'err'); }
+    <div class="actions"><button class="sec" onclick="window.__closeModal()">Schließen</button><button id="pf-save">Speichern</button></div>`);
+  $('#pf-save').onclick = async () => {
+    try {
+      await api('/api/my/profile', { method: 'PATCH', body: {
+        name: $('#pf-name').value, phone: $('#pf-phone').value,
+        email: $('#pf-email').value || null, birth_year: $('#pf-year').value || null } });
+      state.user.name = $('#pf-name').value.trim(); state.user.phone = $('#pf-phone').value.trim();
+      closeModal(); toast('Profil gespeichert ✓', 'ok'); render();
+    } catch (e) { const el = $('#pf-err'); if (el) { el.textContent = e.message; el.classList.remove('hidden'); } else toast(e.message, 'err'); }
   };
 }
-window.__openPhone = openPhoneModal;
+window.__openPhone = openProfileModal;   // Alias (alte Aufrufe)
+window.__openProfile = openProfileModal;
 
 // ---------- API ----------
 async function api(path, opts = {}) {
@@ -197,7 +210,7 @@ function header() {
       <span class="role">${u.role === 'instructor' ? 'Fahrlehrer' : 'Fahrschüler'}</span>
       <strong>${esc(u.name || '')}</strong>${u.username ? `<span class="pill">${esc(u.username)}</span>` : ''}
       ${state.liveSharing ? '<button class="ghost sm" onclick="window.__stopLive()" title="Standort-Teilen beenden" style="color:var(--good)">🛰️ Live · Stopp</button>' : ''}
-      ${u.role === 'student' ? '<button class="ghost sm" onclick="window.__openPhone()" title="Handynummer">📱</button>' : ''}
+      ${u.role === 'student' ? '<button class="ghost sm" onclick="window.__openProfile()" title="Mein Profil">👤</button>' : ''}
       <button class="ghost sm" onclick="window.__openThemePicker()" title="Farbe wählen">🎨</button>
       <button class="ghost sm" id="logout">Abmelden</button>
     </div>
@@ -234,7 +247,7 @@ function mountEdgeMenus(role) {
         .map(([id, l]) => `<button data-scroll="${id}">${l}</button>`).join('');
   const rightItems = [
     '<button data-act="theme">🎨 Farbe wählen</button>',
-    role === 'student' ? '<button data-act="phone">📱 Handynummer</button>' : '',
+    role === 'student' ? '<button data-act="phone">👤 Mein Profil</button>' : '',
     state.liveSharing ? '<button data-act="live">🛰️ Live-Standort beenden</button>' : '',
     '<button data-act="reload">🔄 Aktualisieren</button>',
     '<button data-act="logout">🚪 Abmelden</button>',
