@@ -127,7 +127,7 @@ const blocked = new Map();      // ip -> { reason, at }
 const events = [];              // Sicherheits-Ereignisse (Ringpuffer)
 const rate = new Map();         // ip -> { n, reset }
 
-const MAX_IP_FAILS = 8, IP_BLOCK_MS = 15 * 60 * 1000;
+const MAX_IP_FAILS = 10, IP_BLOCK_MS = 10 * 60 * 1000;
 const MAX_ACCOUNT_FAILS = 5;
 const RATE_MAX = 60, RATE_WINDOW = 60 * 1000; // 60 Anfragen / Minute (nur unangemeldet)
 
@@ -143,7 +143,7 @@ function recordEvent(type, ip, detail) {
 function recordFail(ip, detail) {
   const f = fails.get(ip) || { n: 0, until: 0 };
   f.n += 1;
-  if (f.n >= MAX_IP_FAILS) { blocked.set(ip, { reason: 'brute-force', at: new Date().toISOString() }); f.n = 0; }
+  if (f.n >= MAX_IP_FAILS) { blocked.set(ip, { reason: 'brute-force', at: new Date().toISOString(), until: Date.now() + IP_BLOCK_MS }); f.n = 0; }
   fails.set(ip, f);
   recordEvent('auth-fail', ip, detail);
 }
@@ -154,8 +154,13 @@ function recordAccountFail(username) {
 }
 function resetFails(ip) { fails.delete(ip); }
 function resetAccountFails(username) { accountFails.delete(username); }
-function isBlocked(ip) { return blocked.has(ip); }
-function block(ip, reason) { blocked.set(ip, { reason: reason || 'manual', at: new Date().toISOString() }); recordEvent('blocked', ip, reason); }
+function isBlocked(ip) {
+  const b = blocked.get(ip);
+  if (!b) return false;
+  if (b.until && Date.now() > b.until) { blocked.delete(ip); fails.delete(ip); return false; } // Sperre automatisch abgelaufen
+  return true;
+}
+function block(ip, reason) { blocked.set(ip, { reason: reason || 'manual', at: new Date().toISOString(), until: 0 }); recordEvent('blocked', ip, reason); }
 function unblock(ip) { blocked.delete(ip); fails.delete(ip); recordEvent('unblock', ip, ''); }
 function rateLimit(ip) {
   const now = Date.now();
