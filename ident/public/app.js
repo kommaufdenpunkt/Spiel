@@ -95,6 +95,7 @@
     $('enterBtn').textContent = 'Kamera wird gestartet …';
     if (!(await startCamera())) { resetEnter(); $('lobbyErr').textContent = 'Kein Zugriff auf Kamera/Mikrofon. Bitte erlauben.'; return; }
     state.role = 'guest'; state.code = code; state.name = 'Bewerber';
+    state.profile = { bigoName: $('bigoInput').value.trim().slice(0, 80), age: $('ageInput').value.trim().slice(0, 10) };
     localTag.textContent = 'Du';
     startRoom();
   }
@@ -305,13 +306,14 @@
   const incoming = {}; // id -> {label, n, parts:[]}
   function setupDataChannel(dc) {
     state.dc = dc;
-    dc.onopen = () => { flushPendingDocs(); if (state.role === 'guest') $('guideStatus').textContent = 'Verbunden mit dem Prüfer. Bitte lade die Bilder hoch.'; };
+    dc.onopen = () => { flushPendingDocs(); if (state.role === 'guest') { $('guideStatus').textContent = 'Verbunden mit dem Prüfer. Bitte lade die Bilder hoch.'; if (state.profile) dcSend({ kind: 'profile', bigoName: state.profile.bigoName, age: state.profile.age }); } };
     dc.onmessage = (e) => {
       let m; try { m = JSON.parse(e.data); } catch { return; }
       if (m.kind === 'chat') addChat(m.text, false);
       else if (m.kind === 'doc-start') incoming[m.id] = { label: m.label, n: m.n, parts: [] };
       else if (m.kind === 'doc-part') { const it = incoming[m.id]; if (!it) return; it.parts[m.i] = m.part; if (it.parts.filter(Boolean).length === it.n) { onDocReceived(it.label, it.parts.join('')); delete incoming[m.id]; } }
       else if (m.kind === 'result') onResult(m.result);
+      else if (m.kind === 'profile') { if (m.bigoName && !$('vBigoName').value) $('vBigoName').value = m.bigoName; if (m.age && !$('vAge').value) $('vAge').value = m.age; }
     };
   }
   function dcSend(obj) { if (state.dc && state.dc.readyState === 'open') { state.dc.send(JSON.stringify(obj)); return true; } return false; }
@@ -381,6 +383,7 @@
     const body = {
       code: state.code, bigoName: $('vBigoName').value, age: $('vAge').value,
       verifiedName: $('vName').value, docNumber: $('vDocNumber').value, docType: $('vDocType').value,
+      note: $('vNote').value,
       result, rejectReason: rejectReason || '', agentName: state.name,
       checklist: checkBoxes().map((c) => ({ label: c.parentElement.textContent.trim(), checked: c.checked })),
       docs: state.docs.concat(state.snaps).map((d) => ({ label: d.label, dataUrl: d.dataUrl })),

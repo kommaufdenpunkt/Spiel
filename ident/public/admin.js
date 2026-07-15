@@ -48,21 +48,30 @@
   }
 
   // ---- Fälle ----
+  let allCases = [];
   async function loadCases() {
-    const r = await api('GET', '/api/cases'); const list = r.body.cases || [];
-    const el = $('caseList'); if (!list.length) { el.innerHTML = '<div class="empty">Noch keine Fälle.</div>'; return; }
+    const r = await api('GET', '/api/cases'); allCases = r.body.cases || [];
+    renderCases($('caseSearch') ? $('caseSearch').value : '');
+  }
+  function statusText(res) { return res === 'approved' ? 'freigegeben' : (res === 'rejected' ? 'abgelehnt' : 'offen'); }
+  function renderCases(term) {
+    const el = $('caseList'); const q = String(term || '').trim().toLowerCase();
+    const list = !q ? allCases : allCases.filter((c) => [c.bigoName, c.age, c.verifiedName, c.code, c.docNumber, c.agentName, c.note, statusText(c.result)].join(' ').toLowerCase().includes(q));
+    if (!allCases.length) { el.innerHTML = '<div class="empty">Noch keine Fälle.</div>'; return; }
+    if (!list.length) { el.innerHTML = '<div class="empty">Keine Treffer für „' + esc(term) + '".</div>'; return; }
     el.innerHTML = '';
     list.forEach((c) => {
       const div = document.createElement('div'); div.className = 'acc';
       const date = new Date(c.createdAt).toLocaleString('de-DE');
       const pill = c.result === 'approved' ? '<span class="pill ok">✓ freigegeben</span>' : (c.result === 'rejected' ? '<span class="pill no">✖ abgelehnt</span>' : '<span class="pill warn">offen</span>');
       const thumbs = (c.docs || []).map((d) => { const src = `/api/doc?id=${c.id}&file=${encodeURIComponent(d.file)}&token=${encodeURIComponent(token)}`; return `<figure><a href="${src}" target="_blank" rel="noopener"><img src="${src}" alt=""></a><figcaption>${esc(d.label)}</figcaption></figure>`; }).join('');
-      div.innerHTML = `<div class="top"><div><div class="nm">${esc(c.bigoName || c.verifiedName || '—')}</div><div class="meta">${c.bigoName ? 'BIGO: <b>' + esc(c.bigoName) + '</b> · ' : ''}${c.age ? 'Alter: ' + esc(c.age) + ' · ' : ''}Name: ${esc(c.verifiedName || '-')}<br>${esc(c.docType || '-')} · Nr.: ${esc(c.docNumber || '-')}<br>Nummer: ${esc(c.code || '-')} · Prüfer: ${esc(c.agentName || '-')} · ${esc(date)}${c.rejectReason ? '<br>Grund: ' + esc(c.rejectReason) : ''}</div></div>${pill}</div><div class="thumbs">${thumbs}</div>`;
+      div.innerHTML = `<div class="top"><div><div class="nm">${esc(c.bigoName || c.verifiedName || '—')}</div><div class="meta">${c.bigoName ? 'BIGO: <b>' + esc(c.bigoName) + '</b> · ' : ''}${c.age ? 'Alter: ' + esc(c.age) + ' · ' : ''}Name: ${esc(c.verifiedName || '-')}<br>${esc(c.docType || '-')} · Nr.: ${esc(c.docNumber || '-')}<br>Nummer: ${esc(c.code || '-')} · Prüfer: ${esc(c.agentName || '-')} · ${esc(date)}${c.note ? '<br>Notiz: ' + esc(c.note) : ''}${c.rejectReason ? '<br>Grund: ' + esc(c.rejectReason) : ''}</div></div>${pill}</div><div class="thumbs">${thumbs}</div>`;
       const acts = document.createElement('div'); acts.style.marginTop = '.7rem';
       acts.appendChild(btn('🗑 Akte löschen', 'danger', async () => { if (!confirm('Diese Akte inkl. Bilder endgültig löschen?')) return; await api('POST', '/api/case-delete', { id: c.id }); loadCases(); loadOverview(); }));
       div.appendChild(acts); el.appendChild(div);
     });
   }
+  if ($('caseSearch')) $('caseSearch').addEventListener('input', (e) => renderCases(e.target.value));
 
   // ---- Aufnahmen ----
   async function loadRec() {
