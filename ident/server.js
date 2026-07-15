@@ -379,8 +379,11 @@ wss.on('connection', (ws, req) => {
 server.listen(PORT, () => {
   console.log(`ident läuft auf Port ${PORT}`);
   console.log(`Daten: ${storeInfo.DATA_DIR} (${sec.hasKey() ? 'verschlüsselt' : 'UNVERSCHLÜSSELT'})`);
-  console.log(`Admin-Passwort: ${ADMIN_PASSWORD ? 'gesetzt' : 'NICHT gesetzt – Verwaltung gesperrt'}`);
-  console.log(`Admin-2FA: ${sec.adminTotpActive() ? 'aktiv' : 'AUS (empfohlen: ADMIN_TOTP_SECRET setzen)'}`);
+  const pwHint = ADMIN_PASSWORD
+    ? `gesetzt (${ADMIN_PASSWORD.length} Zeichen, beginnt mit "${ADMIN_PASSWORD.slice(0, 2)}", endet mit "${ADMIN_PASSWORD.slice(-2)}")`
+    : 'NICHT gesetzt – Verwaltung gesperrt';
+  console.log(`Admin-Passwort: ${pwHint}`);
+  console.log(`Admin-2FA: ${sec.adminTotpActive() ? 'AKTIV (2FA-Code nötig)' : 'AUS (nur Passwort)'}`);
   console.log(`Mitarbeiter-Konten: ${store.agentCount()}`);
   console.log(`TURN: ${TURN_SECRET && TURN_HOST ? 'aktiv (' + TURN_HOST + ')' : 'nur STUN'}`);
   console.log(`Login-IP-Sperre: ${sec.loginIpRestricted() ? 'aktiv' : 'aus'}`);
