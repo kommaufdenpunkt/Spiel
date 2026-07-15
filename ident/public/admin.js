@@ -83,24 +83,31 @@
   // ---- Mitarbeiter ----
   $('addAgent').addEventListener('click', async () => {
     const username = $('newUser').value.trim(), password = $('newPass').value, role = $('newRole').value;
+    const require2fa = $('new2fa').checked;
     if (!username || password.length < 8) { toast('Benutzername + Passwort (mind. 8 Zeichen) nötig.'); return; }
-    const r = await api('POST', '/api/agents', { username, password, role });
+    const r = await api('POST', '/api/agents', { username, password, role, require2fa });
     if (r.status === 200) {
-      $('newUser').value = ''; $('newPass').value = '';
-      $('agentResult').innerHTML = `
-        <div><b>${esc(r.body.username)}</b> wurde angelegt. Jetzt die 2FA (Pflicht) einrichten:</div>
-        <ol style="margin:.6rem 0 .4rem 1.1rem;padding:0;line-height:1.5">
-          <li><b>Authenticator-App</b> auf dem Handy installieren – z. B. <b>Google Authenticator</b> (kostenlos im App Store / Play Store).</li>
-          <li>In der App auf <b>„+"</b> → <b>„QR-Code scannen"</b> und den Code unten scannen:</li>
-        </ol>
-        ${r.body.qr ? `<img src="${r.body.qr}" alt="2FA-QR-Code" style="width:200px;height:200px;background:#fff;padding:8px;border-radius:12px;border:1px solid var(--line)">` : ''}
-        <ol start="3" style="margin:.6rem 0 .2rem 1.1rem;padding:0;line-height:1.5">
-          <li>Der Prüfer öffnet seinen eigenen Link: <b>ident.4ever1.tv/pruefer</b> (die Anmeldung erscheint dort direkt).</li>
-          <li>Dort eingeben: <b>Benutzername</b> + <b>Startpasswort</b> + den <b>6-stelligen Code</b> aus der App.</li>
-          <li>Beim <b>ersten Login</b> setzt der Prüfer sein <b>eigenes Passwort</b>.</li>
-        </ol>
-        <div class="muted" style="margin-top:.5rem">Falls das Scannen nicht klappt, den Schlüssel in der App manuell eintragen: <code>${esc(r.body.totpSecret)}</code></div>
-        <div class="muted" style="margin-top:.3rem">⚠️ Dieser QR-Code wird aus Sicherheitsgründen <b>nur jetzt</b> angezeigt. Am besten gleich scannen. Verloren? Einfach den Prüfer löschen und neu anlegen.</div>`;
+      $('newUser').value = ''; $('newPass').value = ''; $('new2fa').checked = false;
+      if (r.body.has2fa) {
+        $('agentResult').innerHTML = `
+          <div><b>${esc(r.body.username)}</b> wurde angelegt. Jetzt die 2FA einrichten:</div>
+          <ol style="margin:.6rem 0 .4rem 1.1rem;padding:0;line-height:1.5">
+            <li><b>Authenticator-App</b> auf dem Handy installieren – z. B. <b>Google Authenticator</b>.</li>
+            <li>In der App auf <b>„+"</b> → <b>„QR-Code scannen"</b> und den Code unten scannen:</li>
+          </ol>
+          ${r.body.qr ? `<img src="${r.body.qr}" alt="2FA-QR-Code" style="width:200px;height:200px;background:#fff;padding:8px;border-radius:12px;border:1px solid var(--line)">` : ''}
+          <ol start="3" style="margin:.6rem 0 .2rem 1.1rem;padding:0;line-height:1.5">
+            <li>Der Prüfer öffnet <b>ident.4ever1.tv/pruefer</b>.</li>
+            <li>Eingeben: <b>Benutzername</b> + <b>Startpasswort</b> + den <b>6-stelligen Code</b> aus der App.</li>
+            <li>Beim <b>ersten Login</b> setzt der Prüfer sein <b>eigenes Passwort</b>.</li>
+          </ol>
+          <div class="muted" style="margin-top:.5rem">Klappt das Scannen nicht, Schlüssel manuell eintragen: <code>${esc(r.body.totpSecret)}</code></div>
+          <div class="muted" style="margin-top:.3rem">⚠️ Der QR-Code wird <b>nur jetzt</b> angezeigt. Verloren? Prüfer löschen und neu anlegen.</div>`;
+      } else {
+        $('agentResult').innerHTML = `
+          <div><b>${esc(r.body.username)}</b> wurde angelegt – <b>ohne 2FA</b> (nur Benutzername + Passwort).</div>
+          <div class="muted" style="margin-top:.4rem">Login des Prüfers auf <b>ident.4ever1.tv/pruefer</b>: Benutzername + Startpasswort (2FA-Feld bleibt leer). Beim ersten Login wird ein eigenes Passwort gesetzt.</div>`;
+      }
       loadAgents();
     } else toast(r.body && r.body.reason === 'exists-or-invalid' ? 'Benutzername existiert bereits.' : 'Anlegen fehlgeschlagen.');
   });

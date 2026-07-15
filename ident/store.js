@@ -73,13 +73,13 @@ function getAgentByUsername(u) {
   return agents.find((a) => a.username.toLowerCase() === name) || null;
 }
 function getAgentById(id) { return agents.find((a) => a.id === id) || null; }
-function addAgent({ username, password, role, createdBy }) {
+function addAgent({ username, password, role, createdBy, require2fa = true }) {
   const name = String(username || '').trim();
   if (!name || !password || getAgentByUsername(name)) return null;
   const { salt, hash } = sec.hashPassword(password);
   const rec = {
     id: crypto.randomUUID(), username: name, role: role === 'admin' ? 'admin' : 'agent',
-    salt, hash, totpSecret: sec.generateTotpSecret(), mustChange: true, locked: false,
+    salt, hash, totpSecret: require2fa ? sec.generateTotpSecret() : '', mustChange: true, locked: false,
     createdAt: new Date().toISOString(), createdBy: String(createdBy || '').slice(0, 60),
   };
   agents.push(rec); save('agents.json', agents);
