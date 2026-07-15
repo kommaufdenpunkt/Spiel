@@ -110,9 +110,29 @@
 
   async function startCamera() {
     try {
-      state.localStream = await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' }, audio: { echoCancellation: true, noiseSuppression: true } });
+      state.localStream = await navigator.mediaDevices.getUserMedia({
+        video: { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 }, facingMode: 'user' },
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+      });
+      // Hinweise an den Encoder: flüssiges Video (Gespräch) + klare Sprache.
+      state.localStream.getVideoTracks().forEach((t) => { try { t.contentHint = 'motion'; } catch {} });
+      state.localStream.getAudioTracks().forEach((t) => { try { t.contentHint = 'speech'; } catch {} });
       localVideo.srcObject = state.localStream; return true;
     } catch { return false; }
+  }
+  // Hebt automatisch die Qualitäts-Obergrenze an (Bild schärfer bei guter Leitung,
+  // klarer Ton). Bei schlechtem Netz regelt WebRTC selbst wieder herunter.
+  async function tuneQuality(pc) {
+    for (const sender of pc.getSenders()) {
+      if (!sender.track) continue;
+      try {
+        const p = sender.getParameters();
+        if (!p.encodings || !p.encodings.length) p.encodings = [{}];
+        if (sender.track.kind === 'video') { p.encodings[0].maxBitrate = 2500000; p.degradationPreference = 'balanced'; }
+        else if (sender.track.kind === 'audio') { p.encodings[0].maxBitrate = 64000; }
+        await sender.setParameters(p);
+      } catch (e) { /* nicht kritisch */ }
+    }
   }
 
   // erzwungener Passwortwechsel (Erstlogin/Reset)
@@ -278,10 +298,11 @@
     state.polite = state.role === 'guest';
     const pc = new RTCPeerConnection({ iceServers: state.iceServers || FALLBACK_ICE }); state.pc = pc;
     state.localStream.getTracks().forEach((t) => pc.addTrack(t, state.localStream));
+    tuneQuality(pc);
     pc.onnegotiationneeded = async () => { try { state.makingOffer = true; await pc.setLocalDescription(); signal({ description: pc.localDescription }); } catch {} finally { state.makingOffer = false; } };
     pc.onicecandidate = ({ candidate }) => { if (candidate) signal({ candidate }); };
     pc.ontrack = ({ streams }) => { remoteVideo.srcObject = streams[0]; remoteWaiting.style.display = 'none'; };
-    pc.onconnectionstatechange = () => { if (['failed', 'disconnected'].includes(pc.connectionState)) $('bannerText').textContent = 'Verbindung gestört – wird neu aufgebaut …'; };
+    pc.onconnectionstatechange = () => { if (pc.connectionState === 'connected') tuneQuality(pc); if (['failed', 'disconnected'].includes(pc.connectionState)) $('bannerText').textContent = 'Verbindung gestört – wird neu aufgebaut …'; };
     // Prüfer (impolite) erstellt den Datenkanal; Bewerber empfängt ihn.
     if (state.role === 'host') setupDataChannel(pc.createDataChannel('app'));
     else pc.ondatachannel = (e) => setupDataChannel(e.channel);
