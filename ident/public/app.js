@@ -172,6 +172,58 @@
   });
   $('waitLogout').addEventListener('click', () => { clearInterval(state.waitingTimer); state.token = ''; state.name = ''; state.isAdmin = false; $('waitingView').style.display = 'none'; $('lobby').style.display = ''; $('passInput').value = ''; $('totpInput').value = ''; });
 
+  // ================= PASSKEY (Face ID / Fingerabdruck, WebAuthn) =================
+  const b64urlToBuf = (s) => { s = String(s).replace(/-/g, '+').replace(/_/g, '/'); while (s.length % 4) s += '='; const bin = atob(s); const u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return u.buffer; };
+  const bufToB64url = (buf) => { const u = new Uint8Array(buf); let s = ''; for (const x of u) s += String.fromCharCode(x); return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); };
+  const passkeySupported = !!(window.PublicKeyCredential && navigator.credentials);
+  if (passkeySupported) {
+    if ($('passkeyLoginBtn')) $('passkeyLoginBtn').style.display = '';
+    if ($('setupPasskeyBtn')) $('setupPasskeyBtn').style.display = '';
+  }
+  async function registerPasskey() {
+    if (!passkeySupported) { toast('Dieses Gerät unterstützt keine Passkeys.'); return; }
+    const o = await api('POST', '/api/passkey/register/options', {});
+    if (o.status !== 200) { toast('Einrichtung nicht möglich.'); return; }
+    const opt = o.body;
+    opt.challenge = b64urlToBuf(opt.challenge);
+    opt.user.id = b64urlToBuf(opt.user.id);
+    (opt.excludeCredentials || []).forEach((c) => { c.id = b64urlToBuf(c.id); });
+    let cred;
+    try { cred = await navigator.credentials.create({ publicKey: opt }); } catch (e) { toast('Abgebrochen.'); return; }
+    const payload = {
+      id: cred.id, rawId: bufToB64url(cred.rawId), type: cred.type,
+      response: { attestationObject: bufToB64url(cred.response.attestationObject), clientDataJSON: bufToB64url(cred.response.clientDataJSON) },
+      clientExtensionResults: cred.getClientExtensionResults(),
+    };
+    const v = await api('POST', '/api/passkey/register/verify', payload);
+    toast(v.status === 200 ? 'Face ID / Fingerabdruck aktiviert ✓' : 'Einrichtung fehlgeschlagen.');
+  }
+  async function loginWithPasskey() {
+    if (!passkeySupported) { $('lobbyErr').textContent = 'Dieses Gerät unterstützt keine Passkeys.'; return; }
+    const username = $('userInput').value.trim();
+    if (!username) { $('lobbyErr').textContent = 'Bitte zuerst den Benutzernamen eingeben.'; return; }
+    $('lobbyErr').textContent = '';
+    const o = await api('POST', '/api/passkey/login/options', { username });
+    if (o.status !== 200) { $('lobbyErr').textContent = o.body && o.body.reason === 'no-passkey' ? 'Für diesen Benutzer ist noch kein Face ID / Fingerabdruck eingerichtet.' : 'Passkey-Login nicht möglich.'; return; }
+    const opt = o.body;
+    opt.challenge = b64urlToBuf(opt.challenge);
+    (opt.allowCredentials || []).forEach((c) => { c.id = b64urlToBuf(c.id); });
+    let cred;
+    try { cred = await navigator.credentials.get({ publicKey: opt }); } catch (e) { return; }
+    const response = {
+      id: cred.id, rawId: bufToB64url(cred.rawId), type: cred.type,
+      response: { authenticatorData: bufToB64url(cred.response.authenticatorData), clientDataJSON: bufToB64url(cred.response.clientDataJSON), signature: bufToB64url(cred.response.signature), userHandle: cred.response.userHandle ? bufToB64url(cred.response.userHandle) : undefined },
+      clientExtensionResults: cred.getClientExtensionResults(),
+    };
+    const r = await api('POST', '/api/passkey/login/verify', { username, response });
+    if (r.status !== 200 || !r.body.token) { $('lobbyErr').textContent = 'Anmeldung fehlgeschlagen.'; return; }
+    state.token = r.body.token; state.name = r.body.name; state.isAdmin = r.body.role === 'admin'; state.mustChange = !!r.body.mustChange;
+    if (state.mustChange) { const ok = await forcePwChange(); if (!ok) return; }
+    openWaiting();
+  }
+  if ($('passkeyLoginBtn')) $('passkeyLoginBtn').addEventListener('click', loginWithPasskey);
+  if ($('setupPasskeyBtn')) $('setupPasskeyBtn').addEventListener('click', registerPasskey);
+
   // ================= RAUM / WebRTC =================
   function startRoom() {
     $('lobby').style.display = 'none'; $('waitingView').style.display = 'none';
