@@ -205,6 +205,7 @@ function saveCase(data) {
     verifiedName: String(data.verifiedName || '').slice(0, 120),
     docType: String(data.docType || '').slice(0, 40),
     docNumber: String(data.docNumber || '').slice(0, 60),
+    note: String(data.note || '').slice(0, 500),
     result: data.result === 'approved' ? 'approved' : (data.result === 'rejected' ? 'rejected' : 'open'),
     rejectReason: String(data.rejectReason || '').slice(0, 200),
     agentName: String(data.agentName || '').slice(0, 60),
