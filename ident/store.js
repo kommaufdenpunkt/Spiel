@@ -262,12 +262,22 @@ function deleteRecording(id) {
   recordings.splice(i, 1); save('recordings.json', recordings); return true;
 }
 
+// Löscht Akten + Aufnahmen, die älter als `days` Tage sind (Datenschutz-Frist).
+function purgeOlderThan(days) {
+  if (!days || days <= 0) return 0;
+  const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
+  let n = 0;
+  cases.slice().forEach((c) => { const t = new Date(c.createdAt).getTime(); if (t && t < cutoff) { deleteCase(c.id); n++; } });
+  recordings.slice().forEach((r) => { const t = new Date(r.createdAt).getTime(); if (t && t < cutoff) { deleteRecording(r.id); n++; } });
+  return n;
+}
+
 module.exports = {
   init,
   listAgents, getAgentByUsername, getAgentById, addAgent, verifyAgent,
   setAgentPassword, changeOwnPassword, lockAgent, unlockAgent, deleteAgent, agentCount,
   addPasskey, getAgentByPasskeyId, setPasskeyCounter, agentPasskeys,
   createCode, getCode, isCodeUsable, consumeCode, revokeCode, listCodes,
-  saveCase, listCases, getCase, deleteCase, readDoc,
+  saveCase, listCases, getCase, deleteCase, readDoc, purgeOlderThan,
   saveRecording, listRecordings, getRecording, readRecording, deleteRecording,
 };
