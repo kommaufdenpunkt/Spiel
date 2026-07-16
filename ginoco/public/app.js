@@ -211,11 +211,11 @@ function toast(msg, kind = '') {
 }
 function esc(s) { return String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
 
-function modal(html) {
+function modal(html, extra) {
   closeModal();
   const bg = document.createElement('div');
   bg.className = 'modal-bg';
-  bg.innerHTML = `<div class="modal">${html}</div>`;
+  bg.innerHTML = `<div class="modal${extra === 'wide' ? ' wide' : ''}">${html}</div>`;
   bg.addEventListener('click', (e) => { if (e.target === bg) closeModal(); });
   document.body.appendChild(bg);
   return bg;
@@ -1477,6 +1477,7 @@ async function tabSchueler(scope) {
             ${s.notes ? `<br><span class="muted" title="${esc(s.notes)}" style="font-size:.78rem">📝 ${esc(s.notes.length > 40 ? s.notes.slice(0, 40) + '…' : s.notes)}</span>` : ''}
             <div class="inline" style="margin-top:.3rem;gap:.3rem;flex-wrap:wrap">
               <button class="ghost sm" data-edit="${s.id}">✏️ Bearbeiten</button>
+              <button class="ghost sm" data-card="${s.id}" data-cname="${esc(s.name)}">📋 Ausbildungskarte</button>
               ${isArch
                 ? `<button class="ghost sm" data-react="${s.id}" style="color:var(--brand)">↩︎ Reaktivieren</button>`
                 : `<button class="ghost sm" data-arch="${s.id}" data-aname="${esc(s.name)}" style="color:var(--good)">✅ Bestanden</button>`}
@@ -1504,6 +1505,8 @@ async function tabSchueler(scope) {
       openStandortModal(btn.dataset.home, btn.dataset.sname, btn.dataset.hlabel, btn.dataset.hlat, btn.dataset.hlng));
     $('#s-list').querySelectorAll('[data-edit]').forEach((btn) => btn.onclick = () =>
       openEditStudentModal(students.find((x) => x.id === Number(btn.dataset.edit))));
+    $('#s-list').querySelectorAll('[data-card]').forEach((btn) => btn.onclick = () =>
+      openTrainingCard(btn.dataset.card, btn.dataset.cname));
     $('#s-list').querySelectorAll('[data-del]').forEach((btn) => btn.onclick = () =>
       deleteStudent(btn.dataset.del, btn.dataset.dname));
     $('#s-list').querySelectorAll('[data-arch]').forEach((btn) => btn.onclick = async () => {
@@ -1636,6 +1639,82 @@ async function deleteStudent(id, name) {
   if (!confirm(`„${name}" wirklich löschen? Alle Buchungen dieses Schülers werden mitgelöscht. Das kann nicht rückgängig gemacht werden.`)) return;
   try { await api('/api/students/' + id, { method: 'DELETE' }); toast('Fahrschüler gelöscht', 'ok'); tabSchueler(); }
   catch (e) { toast(e.message, 'err'); }
+}
+
+// ---------- Ausbildungsdiagrammkarte (BVF) pro Fahrschüler ----------
+const CURRICULUM = [
+  { key: 'grund', title: 'Grundstufe – Einweisung & Bedienung', items: [
+    'Besonderheiten beim Einsteigen', 'Einstellen: Sitz', 'Einstellen: Spiegel', 'Einstellen: Lenkrad', 'Einstellen: Kopfstütze',
+    'Lenkradhaltung', 'Pedale', 'Gurt anlegen/anpassen', 'Schalt-/Wählhebel', 'Zündschloss', 'Motor anlassen',
+    'Anfahr-/Anhalteübungen', 'Schaltübungen hochschalten', 'Schaltübungen runterschalten', 'Lenkübungen'] },
+  { key: 'grundfahr', title: 'Grundfahraufgaben', items: [
+    'Rückwärtsfahren', 'Umkehren', 'Gefahrbremsung', 'Einparken längs vorwärts', 'Einparken längs rückwärts', 'Einparken quer vorwärts', 'Einparken quer rückwärts'] },
+  { key: 'aufbau', title: 'Aufbaustufe – Umweltschonend, vorausschauend, Blickschulung', items: [
+    'Rollen und Schalten', 'Abbremsen und Schalten', 'Bremsübung degressiv', 'Zielbremsung', 'Bremsen in Gefahrsituationen',
+    'Gefälle/Steigung: Anhalten', 'Gefälle/Steigung: Anfahren', 'Gefälle/Steigung: Rückwärts', 'Gefälle/Steigung: Sichern', 'Gefälle/Steigung: Schalten',
+    'Tastgeschwindigkeit', 'Bedienungs- & Kontrolleinrichtungen', 'Örtliche Besonderheiten'] },
+  { key: 'leistung', title: 'Leistungsstufe – Schwierige Verkehrssituationen', items: [
+    'Fahrbahnbenutzung / Einordnen', 'Markierungen', 'Fahrstreifenwechsel links', 'Fahrstreifenwechsel rechts', 'Vorbeifahren/Überholen',
+    'Abbiegen rechts', 'Abbiegen links', 'Abbiegen mehrspurig', 'Radweg/Sonderstreifen', 'Straßenbahnen/Einbahnstraßen',
+    'Vorfahrt: rechts vor links', 'Grünpfeil', 'Polizeibeamte', 'Geschwindigkeit/Abstand',
+    'Fußgängerüberwege', 'Kinder', 'ÖPNV/Schulbus', 'Ältere/Behinderte', 'Radfahrer/Mofa', 'Verkehrsberuhigter Bereich',
+    'Schwierige Verkehrsführung', 'Engpass', 'Kreisverkehr', 'Bahnübergang', 'Kritische Verkehrssituationen', 'Schwung nutzen'] },
+  { key: 'ueberland', title: '🌄 Überlandfahrten', items: [
+    'Angepasste Geschwindigkeit/Gangwahl', 'Abstand vorne', 'Abstand hinten', 'Abstand seitlich', 'Beobachtung/Spiegel', 'Verkehrszeichen',
+    'Kreuzungen/Einmündungen', 'Kurven', 'Steigungen', 'Gefälle', 'Alleen', 'Überholen',
+    'Liegenbleiben + Absichern', 'Fußgänger', 'Einfahren in Ortschaften', 'Wild/Tiere', 'Leistungsgrenze', 'Ablenkung', 'Orientierung'] },
+  { key: 'autobahn', title: '🛣️ Autobahn', items: [
+    'Fahrtplanung', 'Einfahren in BAB', 'Fahrstreifenwahl', 'Geschwindigkeit', 'Abstand vorne', 'Abstand hinten', 'Abstand seitlich',
+    'Überholen', 'Schilder/Markierungen', 'Vorbeifahren/Anschlussstellen', 'Rast-/Parkplätze/Tankstellen', 'Verhalten bei Unfällen',
+    'Dichter Verkehr/Stau', 'Leistungsgrenze', 'Konfliktsituationen', 'Ablenkung', 'Verlassen der BAB'] },
+  { key: 'dunkel', title: '🌙 Dämmerung / Dunkelheit', items: [
+    'Beleuchtung kontrollieren', 'Beleuchtung benutzen', 'Beleuchtung einstellen', 'Fernlicht', 'Beleuchtete Straßen', 'Unbeleuchtete Straßen', 'Parken',
+    'Schlechte Witterung', 'Bahnübergänge', 'Tiere', 'Unbeleuchtete Verkehrsteilnehmer', 'Blendung', 'Orientierung', 'Abschlussbesprechung'] },
+  { key: 'reife', title: '🎓 Reife- und Teststufe', items: [
+    'Selbstständiges Fahren innerorts', 'Selbstständiges Fahren außerorts', 'Verantwortungsbewusstes Fahren', 'Testfahrt unter Prüfungsbedingungen', 'Wiederholung/Vertiefung', 'Leistungsbewertung'] },
+];
+const CURR_TOTAL = CURRICULUM.reduce((n, s) => n + s.items.length, 0);
+const currKey = (sk, i) => `${sk}:${i}`;
+
+async function openTrainingCard(id, name) {
+  let training = {};
+  try { const r = await api('/api/students/' + id + '/training'); training = r.training || {}; } catch (e) { toast(e.message, 'err'); return; }
+  const doneCount = () => Object.values(training).filter(Boolean).length;
+  const bar = () => {
+    const d = doneCount(), pct = Math.round((d / CURR_TOTAL) * 100);
+    return `<div style="margin:.2rem 0 .6rem">
+      <div style="display:flex;justify-content:space-between;font-size:.82rem;color:var(--muted)"><span>Ausbildungsfortschritt</span><span id="tc-pct">${d}/${CURR_TOTAL} · ${pct}%</span></div>
+      <div style="height:9px;background:#0f151d;border-radius:6px;overflow:hidden;margin-top:.25rem"><div id="tc-fill" style="height:100%;width:${pct}%;background:var(--brand);transition:.2s"></div></div>
+    </div>`;
+  };
+  const sections = CURRICULUM.map((s) => {
+    const done = s.items.filter((_, i) => training[currKey(s.key, i)]).length;
+    return `<details class="tc-sec" open>
+      <summary>${esc(s.title)} <span class="pill" data-secpill="${s.key}">${done}/${s.items.length}</span></summary>
+      <div class="tc-items">${s.items.map((it, i) => {
+        const k = currKey(s.key, i);
+        return `<label class="tc-item"><input type="checkbox" data-tc="${k}" data-sk="${s.key}" ${training[k] ? 'checked' : ''}> ${esc(it)}</label>`;
+      }).join('')}</div>
+    </details>`;
+  }).join('');
+  modal(`<h3>📋 Ausbildungskarte – ${esc(name)}</h3>
+    <p class="hint">Hake ab, was ${esc((name || '').split(' ')[0])} schon geübt/beherrscht hat. Wird automatisch gespeichert. Nur für dich sichtbar.</p>
+    <div id="tc-bar">${bar()}</div>
+    <div style="max-height:52vh;overflow:auto;margin:.2rem -.2rem 0;padding:0 .2rem">${sections}</div>
+    <div class="actions"><button onclick="window.__closeModal()">Schließen</button></div>`, 'wide');
+  const refreshBar = () => { const t = $('#tc-bar'); if (t) t.innerHTML = bar(); };
+  let saveTimer = null;
+  const save = () => { clearTimeout(saveTimer); saveTimer = setTimeout(async () => {
+    try { await api('/api/students/' + id + '/training', { method: 'PUT', body: { training } }); } catch (e) { toast(e.message, 'err'); }
+  }, 500); };
+  document.querySelectorAll('[data-tc]').forEach((cb) => cb.onchange = () => {
+    training[cb.dataset.tc] = cb.checked ? 1 : 0;
+    if (!cb.checked) delete training[cb.dataset.tc];
+    const sec = CURRICULUM.find((s) => s.key === cb.dataset.sk);
+    const done = sec.items.filter((_, i) => training[currKey(sec.key, i)]).length;
+    const pill = document.querySelector(`[data-secpill="${cb.dataset.sk}"]`); if (pill) pill.textContent = `${done}/${sec.items.length}`;
+    refreshBar(); save();
+  });
 }
 
 // Zugangsdaten-Anzeige mit Kopier-Funktion (nach Anlegen)

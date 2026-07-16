@@ -150,6 +150,7 @@ ensureColumn('students', 'home_lat', 'home_lat REAL');
 ensureColumn('students', 'home_lng', 'home_lng REAL');
 ensureColumn('students', 'archived_at', 'archived_at TEXT');   // gesetzt = bestanden/archiviert (aus aktiver Liste)
 ensureColumn('students', 'notes', 'notes TEXT');               // Karteikarte / Notizen des Fahrlehrers
+ensureColumn('students', 'training', 'training TEXT');         // Ausbildungsdiagrammkarte (JSON: abgehakte Punkte)
 
 // Absagen ("keine Zeit") auf ein Uebernahme-Angebot
 db.exec(`CREATE TABLE IF NOT EXISTS offer_declines (

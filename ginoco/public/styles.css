@@ -114,6 +114,16 @@ main{max-width:1080px;margin:0 auto;padding:1.4rem 1.2rem 4rem}
 .tour-dots{display:flex;gap:.4rem;justify-content:center;margin:1rem 0 .2rem}
 .tour-dots span{width:8px;height:8px;border-radius:50%;background:var(--line);transition:.2s}
 .tour-dots span.on{background:var(--brand);width:22px;border-radius:5px}
+/* Ausbildungskarte */
+.modal.wide{max-width:640px}
+.tc-sec{border:1px solid var(--line);border-radius:10px;margin-bottom:.5rem;background:var(--card2)}
+.tc-sec>summary{cursor:pointer;padding:.6rem .8rem;font-weight:700;font-size:.9rem;list-style:none;display:flex;justify-content:space-between;align-items:center;gap:.5rem}
+.tc-sec>summary::-webkit-details-marker{display:none}
+.tc-sec[open]>summary{border-bottom:1px solid var(--line)}
+.tc-items{display:grid;grid-template-columns:1fr 1fr;gap:.1rem .8rem;padding:.5rem .8rem .7rem}
+@media(max-width:560px){.tc-items{grid-template-columns:1fr}}
+.tc-item{display:flex;align-items:flex-start;gap:.5rem;font-size:.86rem;font-weight:500;color:var(--ink);margin:0;padding:.25rem 0;cursor:pointer}
+.tc-item input{width:auto;margin-top:.15rem;flex:none}
 .badge.schalt{background:rgba(150,110,220,.2);color:#b79cf0}
 .badge.automatik{background:rgba(50,160,220,.2);color:#6fc3f0}
 .badge.done{background:var(--good-bg);color:var(--good)}

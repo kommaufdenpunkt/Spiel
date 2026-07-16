@@ -15,7 +15,7 @@ const PUBLIC = join(__dirname, 'public');
 const PORT = Number(process.env.PORT || 3000);
 const HOST = process.env.HOST || '0.0.0.0'; // hinter Caddy: HOST=127.0.0.1 (nur Proxy erreicht Node)
 const SESSION_DAYS = 30;
-const APP_VERSION = "3.1.0";
+const APP_VERSION = "3.2.0";
 // Einstellungen, die Schueler/Oeffentlichkeit sehen duerfen (Rest bleibt beim Fahrlehrer)
 const PUBLIC_SETTINGS = ['instructor_name', 'instructor_phone', 'policy_text',
   'cancel_hours', 'lock_hours', 'booking_horizon_days', 'booking_horizon_days_rank2',
@@ -904,6 +904,28 @@ async function handleApi(req, res, url) {
       } catch (e) { errors.push({ line, error: e.message }); }
     }
     return ok(res, { created, errors });
+  }
+
+  // Ausbildungskarte lesen/speichern (Fahrlehrer)
+  const trm = p.match(/^\/api\/students\/(\d+)\/training$/);
+  if (trm && method === 'GET') {
+    if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
+    const st = db.prepare('SELECT training FROM students WHERE id=?').get(Number(trm[1]));
+    if (!st) return bad(res, 'Schüler nicht gefunden', 404);
+    let training = {};
+    try { training = st.training ? JSON.parse(st.training) : {}; } catch {}
+    return ok(res, { training });
+  }
+  if (trm && method === 'PUT') {
+    if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
+    const b = await readBody(req);
+    const t = (b && typeof b.training === 'object' && b.training) ? b.training : {};
+    // nur boolesche true-Werte speichern, kompakt halten
+    const clean = {};
+    for (const k of Object.keys(t)) if (t[k]) clean[String(k).slice(0, 80)] = 1;
+    db.prepare('UPDATE students SET training=? WHERE id=?').run(JSON.stringify(clean), Number(trm[1]));
+    logEvent('info', { actor: 'instructor', studentId: Number(trm[1]), detail: `Ausbildungskarte aktualisiert (${Object.keys(clean).length} Punkte)` });
+    return ok(res, { saved: true, count: Object.keys(clean).length });
   }
 
   // Fahrschüler archivieren (bestanden) bzw. reaktivieren
