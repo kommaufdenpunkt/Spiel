@@ -86,6 +86,41 @@ async function openProfileModal() {
 window.__openPhone = openProfileModal;   // Alias (alte Aufrufe)
 window.__openProfile = openProfileModal;
 
+// ---------- Geführter Einstieg (Tutorial) für Fahrschüler ----------
+const TOUR = [
+  { icon: '👋', title: 'Willkommen bei ginoco', text: 'Hier buchst du deine Fahrstunden selbst – schnell und von überall. In ein paar kurzen Schritten zeige ich dir, wie es geht. Du kannst jederzeit auf „Überspringen“ tippen.' },
+  { icon: '📅', title: '1. Fahrstunde buchen', text: 'Wähle oben einen Tag (mit ‹ › oder über das Datum). Freie Zeiten sind <strong>grün</strong> und mit „FREI“ markiert. Tippe auf <strong>Buchen</strong>, wähle die Dauer (z. B. 80 Min) und bestätige mit „Ja, verbindlich buchen“. Fertig! ✅' },
+  { icon: '📋', title: '2. Deine Termine', text: 'Oben unter <strong>„Meine Termine“</strong> siehst du alle gebuchten Stunden mit Datum, Uhrzeit und Treffpunkt. Über <strong>„Zum Kalender hinzufügen“</strong> landen sie in deinem Handy-Kalender.' },
+  { icon: '🔄', title: '3. Doch keine Zeit?', text: 'Kannst du an dem Tag nicht: Tippe bei der Stunde auf <strong>„Zur Übernahme anbieten“</strong> – ein anderer Fahrschüler kann sie dann übernehmen (anonym, keiner sieht deinen Namen). Ist es noch früh genug, kannst du auch einfach <strong>„Stornieren“</strong>.' },
+  { icon: '👤', title: '4. Dein Profil', text: 'Tippe oben auf <strong>👤</strong> und vervollständige deine Daten (Name, Handynummer, Jahrgang). Die sieht <strong>nur dein Fahrlehrer</strong> – kein anderer Fahrschüler.' },
+  { icon: '🎉', title: 'Los geht’s!', text: 'Das war’s schon. Viel Erfolg beim Üben! 🚗 Diese Einführung findest du jederzeit wieder über das <strong>❓</strong> oben rechts.' },
+];
+function openTour() {
+  let i = 0;
+  const finish = () => { try { localStorage.setItem('ginoco-tour-done', '1'); } catch {} closeModal(); };
+  const draw = () => {
+    const s = TOUR[i];
+    modal(`<div style="text-align:center">
+        <div style="font-size:2.8rem;line-height:1;margin:.2rem 0 .3rem">${s.icon}</div>
+        <h3 style="margin:.1rem 0 .6rem">${esc(s.title)}</h3>
+        <p style="font-size:.96rem;line-height:1.65;color:var(--ink);margin:0 .2rem">${s.text}</p>
+        <div class="tour-dots">${TOUR.map((_, k) => `<span class="${k === i ? 'on' : ''}"></span>`).join('')}</div>
+      </div>
+      <div class="actions" style="justify-content:space-between;align-items:center">
+        <button class="ghost sm" id="tour-skip">Überspringen</button>
+        <div class="inline" style="gap:.4rem">
+          ${i > 0 ? '<button class="sec sm" id="tour-prev">Zurück</button>' : ''}
+          <button class="sm" id="tour-next">${i < TOUR.length - 1 ? 'Weiter ›' : 'Los geht’s 🚗'}</button>
+        </div>
+      </div>`);
+    $('#tour-skip').onclick = finish;
+    const prev = $('#tour-prev'); if (prev) prev.onclick = () => { i--; draw(); };
+    $('#tour-next').onclick = () => { if (i < TOUR.length - 1) { i++; draw(); } else finish(); };
+  };
+  draw();
+}
+window.__openTour = openTour;
+
 // ---------- API ----------
 async function api(path, opts = {}) {
   const res = await fetch(path, {
@@ -210,6 +245,7 @@ function header() {
       <span class="role">${u.role === 'instructor' ? 'Fahrlehrer' : 'Fahrschüler'}</span>
       <strong>${esc(u.name || '')}</strong>${u.username ? `<span class="pill">${esc(u.username)}</span>` : ''}
       ${state.liveSharing ? '<button class="ghost sm" onclick="window.__stopLive()" title="Standort-Teilen beenden" style="color:var(--good)">🛰️ Live · Stopp</button>' : ''}
+      ${u.role === 'student' ? '<button class="ghost sm" onclick="window.__openTour()" title="Kurze Einführung">❓</button>' : ''}
       ${u.role === 'student' ? '<button class="ghost sm" onclick="window.__openProfile()" title="Mein Profil">👤</button>' : ''}
       <button class="ghost sm" onclick="window.__openThemePicker()" title="Farbe wählen">🎨</button>
       <button class="ghost sm" id="logout">Abmelden</button>
@@ -427,6 +463,10 @@ async function renderStudent() {
   $('#dpick').onchange = (e) => { state.date = e.target.value; syncStudent(); };
   mountEdgeMenus('student');
   syncStudent();
+  // Beim ersten Mal automatisch die kurze Einführung zeigen
+  let tourDone = false;
+  try { tourDone = localStorage.getItem('ginoco-tour-done') === '1'; } catch {}
+  if (!tourDone && !state._tourShown) { state._tourShown = true; setTimeout(openTour, 500); }
 }
 
 let myBookingsCache = [];
