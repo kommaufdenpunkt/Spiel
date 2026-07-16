@@ -48,6 +48,19 @@ header .brand{display:flex;align-items:center;gap:.6rem;font-weight:800;letter-s
 header .brand .logo{font-size:1.4rem}
 header .who{display:flex;align-items:center;gap:.8rem;font-size:.88rem}
 header .who .role{background:#212b38;padding:.2rem .6rem;border-radius:20px;color:var(--muted);font-weight:600}
+/* Handy: Kopfzeile kompakt halten, nichts läuft über */
+@media(max-width:560px){
+  header{padding:.5rem .5rem}
+  header .brand{font-size:.96rem;gap:.35rem}
+  header .who{gap:.22rem;font-size:.8rem}
+  header .who .role,header .who > .pill{display:none}
+  header .who strong{max-width:7ch;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  header .who button.sm{padding:.3rem .42rem}
+  main{padding:1rem .7rem 4rem}
+  .card{padding:1rem .9rem}
+}
+/* Off-Canvas-Menüs sollen keine horizontale Scroll-Leiste erzeugen */
+html{overflow-x:hidden}
 
 /* ---- Layout ---- */
 main{max-width:1080px;margin:0 auto;padding:1.4rem 1.2rem 4rem}
