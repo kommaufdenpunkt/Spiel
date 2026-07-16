@@ -85,6 +85,7 @@
     <button data-sec="cases">🗂 Fälle / Akten</button>
     <button data-sec="rec">🎬 Aufnahmen</button>
     <button data-sec="agents">👥 Mitarbeiter</button>
+    <button data-sec="script">📖 Audition-Text</button>
     <button data-sec="security">🛡 Überwachung</button>
     <button id="logout" style="margin-top:auto;color:var(--bad)">Abmelden</button>
   </nav>
@@ -96,6 +97,11 @@
       <div class="note" style="margin-bottom:.7rem">Prüfer melden sich über ihren eigenen Link <b>ident.4ever1.tv/pruefer</b> an (nicht unter /admin). Mit Häkchen <b>„2FA verlangen"</b> erscheint nach dem Anlegen ein QR-Code für Google Authenticator – ohne Häkchen reicht Benutzername + Passwort.</div>
       <div class="addbar"><input id="newUser" placeholder="Benutzername"><input id="newPass" placeholder="Startpasswort"><select id="newRole" style="padding:.6rem;border-radius:10px;border:1px solid var(--line)"><option value="agent">Prüfer</option><option value="admin">Admin</option></select><label style="display:flex;align-items:center;gap:.4rem;font-size:.85rem;color:var(--dim);white-space:nowrap"><input type="checkbox" id="new2fa" style="width:auto"> 2FA verlangen</label><button id="addAgent" class="primary">+ Anlegen</button></div>
       <div id="agentResult" class="note"></div><div id="agentList"></div>
+    </div>
+    <div class="section" data-pane="script"><h2>Audition-Text (Teleprompter)</h2>
+      <p class="sub">Diesen Text sieht der Bewerber während der Audition und liest ihn in die Kamera. Das Tempo bestimmt der Bewerber selbst. Platzhalter wie <b>[dein Name]</b> ruhig stehen lassen.</p>
+      <textarea id="scriptText" style="width:100%;min-height:320px;font-family:inherit;font-size:.95rem;line-height:1.6;padding:.8rem;border-radius:12px;border:1px solid var(--line);background:#0f1728;color:var(--ink)"></textarea>
+      <div style="margin-top:.7rem;display:flex;gap:.5rem;align-items:center"><button id="scriptSave" class="primary">Speichern</button><span id="scriptMsg" class="muted"></span></div>
     </div>
     <div class="section" data-pane="security"><h2>Überwachung</h2>
       <h3 style="font-size:.95rem">Gesperrte IPs</h3><div id="blockedList"></div>

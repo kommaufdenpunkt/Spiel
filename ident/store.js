@@ -25,6 +25,20 @@ let codes = [];
 let agents = [];
 let cases = [];
 let recordings = [];
+let settings = {};
+
+const DEFAULT_SCRIPT = [
+  'Hallo, mein Name ist [dein Name].',
+  'Mein BIGO-Name ist [dein BIGO-Name] und ich bin [dein Alter] Jahre alt.',
+  'Mit diesem Video bewerbe ich mich bei der Agentur 4EVER1 als Streamerin bzw. Streamer auf BIGO Live.',
+  'Ich möchte dem V-System der Agentur 4EVER1 beitreten und kenne die dazugehörigen Regeln.',
+  'Mir ist bewusst, dass ich mich in meinen Streams zeigen muss und die allgemeinen BIGO-Regeln einhalte:',
+  'keine verbotenen Inhalte, kein Parallelstreaming und kein Streaming auf Konkurrenz-Apps.',
+  'Ich wurde über die Transferregeln, also Freigabe und Freikauf, informiert.',
+  'Ich bin damit einverstanden, dass meine Angaben und diese Aufnahme gespeichert und zur Bearbeitung meiner Bewerbung an den BIGO-Support weitergeleitet werden.',
+  'Hiermit erkläre ich ausdrücklich meinen Wunsch, der Agentur 4EVER1 beizutreten.',
+  'Vielen Dank.',
+].join('\n');
 
 function file(name) { return path.join(DATA_DIR, name); }
 function load(name, fallback) {
@@ -58,6 +72,7 @@ function init({ dir } = {}) {
   agents = load('agents.json', []);
   cases = load('cases.json', []);
   recordings = load('recordings.json', []);
+  settings = load('settings.json', {});
   return { DATA_DIR };
 }
 
@@ -272,8 +287,11 @@ function purgeOlderThan(days) {
   return n;
 }
 
+function getScript() { return typeof settings.script === 'string' ? settings.script : DEFAULT_SCRIPT; }
+function setScript(text) { settings.script = String(text || '').slice(0, 8000); save('settings.json', settings); return true; }
+
 module.exports = {
-  init,
+  init, getScript, setScript,
   listAgents, getAgentByUsername, getAgentById, addAgent, verifyAgent,
   setAgentPassword, changeOwnPassword, lockAgent, unlockAgent, deleteAgent, agentCount,
   addPasskey, getAgentByPasskeyId, setPasskeyCounter, agentPasskeys,

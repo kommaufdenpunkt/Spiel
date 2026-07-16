@@ -136,6 +136,11 @@
   .shot{position:relative;width:calc(50% - .25rem)}
   .shot img{width:100%;border:1px solid var(--line);border-radius:8px;display:block;cursor:zoom-in}
   .shot .cap{font-size:.66rem;color:var(--dim);text-align:center;margin-top:.15rem}
+  .prompter{height:190px;overflow:hidden;border:1px solid var(--line);border-radius:12px;background:#0b1220;padding:1rem 1.1rem;position:relative;scroll-behavior:auto}
+  .prompter #prompterText{font-size:1.25rem;line-height:1.9;color:#eef3ff;white-space:pre-wrap;font-weight:500}
+  .prompter::after{content:"";position:absolute;left:0;right:0;bottom:0;height:40px;background:linear-gradient(transparent,#0b1220);pointer-events:none}
+  .prompter-ctrl{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;margin-top:.5rem;font-size:.82rem;color:var(--dim)}
+  .prompter-ctrl input[type=range]{width:120px}
   .checklist{display:flex;flex-direction:column;gap:.5rem}
   .checklist label{display:flex;gap:.55rem;align-items:flex-start;font-size:.85rem;line-height:1.35;cursor:pointer}
   .checklist input{margin-top:.15rem}
@@ -252,6 +257,15 @@
     <!-- BEWERBER -->
     <div class="pane sel" data-pane="main" id="guidePane" style="display:none">
       <div class="status pending" id="guideStatus">Bitte lade nacheinander die Bilder hoch.</div>
+
+      <div class="sect">📖 Text vorlesen (in die Kamera)</div>
+      <div class="prompter" id="prompterBox"><div id="prompterText"></div></div>
+      <div class="prompter-ctrl">
+        <button id="prompterToggle" class="primary">▶ Start</button>
+        <button id="prompterReset" title="Von vorn">↺</button>
+        <label>Tempo <input type="range" id="prompterSpeed" min="1" max="10" value="4"></label>
+      </div>
+
       <div class="gstep" id="gs1"><span class="gn">1</span><div class="gt">Ausweis-Vorderseite<small>gut lesbar, alle Ecken sichtbar</small></div></div>
       <button id="upFront" class="primary">📄 Vorderseite hochladen</button>
       <div class="gstep" id="gs2"><span class="gn">2</span><div class="gt">Ausweis-Rückseite</div></div>

@@ -245,6 +245,23 @@
   if ($('passkeyLoginBtn')) $('passkeyLoginBtn').addEventListener('click', loginWithPasskey);
   if ($('setupPasskeyBtn')) $('setupPasskeyBtn').addEventListener('click', registerPasskey);
 
+  // ================= TELEPROMPTER (Bewerber liest den Audition-Text ab) =================
+  let prompterTimer = null;
+  async function loadScript() { try { const r = await api('GET', '/api/script'); if (r.status === 200 && $('prompterText')) $('prompterText').textContent = r.body.script || ''; } catch {} }
+  function prompterStop() { if (prompterTimer) clearInterval(prompterTimer); prompterTimer = null; if ($('prompterToggle')) $('prompterToggle').textContent = '▶ Start'; }
+  function prompterStart() {
+    if (prompterTimer || !$('prompterBox')) return;
+    $('prompterToggle').textContent = '⏸ Pause';
+    prompterTimer = setInterval(() => {
+      const box = $('prompterBox'); const speed = parseInt($('prompterSpeed').value, 10) || 4;
+      box.scrollTop += Math.max(1, speed * 0.6);
+      if (box.scrollTop + box.clientHeight >= box.scrollHeight - 1) prompterStop();
+    }, 40);
+  }
+  if ($('prompterToggle')) $('prompterToggle').addEventListener('click', () => (prompterTimer ? prompterStop() : prompterStart()));
+  if ($('prompterReset')) $('prompterReset').addEventListener('click', () => { prompterStop(); $('prompterBox').scrollTop = 0; });
+  loadScript();
+
   // ================= RAUM / WebRTC =================
   function startRoom() {
     $('lobby').style.display = 'none'; $('waitingView').style.display = 'none';
