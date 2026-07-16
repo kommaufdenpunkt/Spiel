@@ -32,8 +32,14 @@
   function show(sec) {
     document.querySelectorAll('.nav button[data-sec]').forEach((b) => b.classList.toggle('sel', b.dataset.sec === sec));
     document.querySelectorAll('.section').forEach((s) => s.classList.toggle('on', s.dataset.pane === sec));
-    ({ overview: loadOverview, cases: loadCases, rec: loadRec, agents: loadAgents, security: loadSecurity }[sec] || (() => {}))();
+    ({ overview: loadOverview, cases: loadCases, rec: loadRec, agents: loadAgents, script: loadScriptEditor, security: loadSecurity }[sec] || (() => {}))();
   }
+  async function loadScriptEditor() { const r = await api('GET', '/api/script'); if (r.status === 200) $('scriptText').value = r.body.script || ''; }
+  if ($('scriptSave')) $('scriptSave').addEventListener('click', async () => {
+    const r = await api('POST', '/api/script', { script: $('scriptText').value });
+    $('scriptMsg').textContent = r.status === 200 ? 'Gespeichert ✓' : 'Fehler beim Speichern';
+    setTimeout(() => { $('scriptMsg').textContent = ''; }, 2500);
+  });
 
   // ---- Übersicht ----
   async function loadOverview() {
