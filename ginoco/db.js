@@ -148,6 +148,8 @@ db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_students_email ON students(email)
 ensureColumn('students', 'home_label', 'home_label TEXT');
 ensureColumn('students', 'home_lat', 'home_lat REAL');
 ensureColumn('students', 'home_lng', 'home_lng REAL');
+ensureColumn('students', 'archived_at', 'archived_at TEXT');   // gesetzt = bestanden/archiviert (aus aktiver Liste)
+ensureColumn('students', 'notes', 'notes TEXT');               // Karteikarte / Notizen des Fahrlehrers
 
 // Absagen ("keine Zeit") auf ein Uebernahme-Angebot
 db.exec(`CREATE TABLE IF NOT EXISTS offer_declines (

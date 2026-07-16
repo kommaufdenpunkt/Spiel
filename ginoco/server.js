@@ -15,7 +15,7 @@ const PUBLIC = join(__dirname, 'public');
 const PORT = Number(process.env.PORT || 3000);
 const HOST = process.env.HOST || '0.0.0.0'; // hinter Caddy: HOST=127.0.0.1 (nur Proxy erreicht Node)
 const SESSION_DAYS = 30;
-const APP_VERSION = "3.0.1";
+const APP_VERSION = "3.1.0";
 // Einstellungen, die Schueler/Oeffentlichkeit sehen duerfen (Rest bleibt beim Fahrlehrer)
 const PUBLIC_SETTINGS = ['instructor_name', 'instructor_phone', 'policy_text',
   'cancel_hours', 'lock_hours', 'booking_horizon_days', 'booking_horizon_days_rank2',
@@ -779,13 +779,16 @@ async function handleApi(req, res, url) {
   // -- Schueler --
   if (p === '/api/students' && method === 'GET') {
     if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
+    const archived = url.searchParams.get('scope') === 'archived';
     const rows = db.prepare(
       `SELECT s.id,s.name,s.email,s.phone,s.username,s.birth_year,s.allowed_durations,s.created_at,
-        s.home_label,s.home_lat,s.home_lng,
+        s.home_label,s.home_lat,s.home_lng,s.archived_at,s.notes,
         (SELECT COUNT(*) FROM bookings b WHERE b.student_id=s.id AND b.status='done') AS done_count
-       FROM students s ORDER BY s.name`
+       FROM students s WHERE s.archived_at IS ${archived ? 'NOT NULL' : 'NULL'} ORDER BY s.name`
     ).all().map((s) => ({ ...s, ...studentRank(s.id), sonder: sonderCounts(s.id) }));
-    return ok(res, { students: rows, req: sonderReq() });
+    const activeCount = db.prepare('SELECT COUNT(*) AS c FROM students WHERE archived_at IS NULL').get().c;
+    const archivedCount = db.prepare('SELECT COUNT(*) AS c FROM students WHERE archived_at IS NOT NULL').get().c;
+    return ok(res, { students: rows, req: sonderReq(), activeCount, archivedCount, scope: archived ? 'archived' : 'active' });
   }
   // Erlaubte Slot-Laengen eines Schuelers setzen (z.B. 40-Min-Ausnahme)
   const stm = p.match(/^\/api\/students\/(\d+)$/);
@@ -793,13 +796,14 @@ async function handleApi(req, res, url) {
     if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
     const b = await readBody(req);
     const sid = Number(stm[1]);
-    // Stammdaten bearbeiten (Name / Telefon / E-Mail / Jahrgang)
-    if ('name' in b || 'phone' in b || 'email' in b || 'birth_year' in b) {
+    // Stammdaten bearbeiten (Name / Telefon / E-Mail / Jahrgang / Notiz)
+    if ('name' in b || 'phone' in b || 'email' in b || 'birth_year' in b || 'notes' in b) {
       const st = db.prepare('SELECT id FROM students WHERE id=?').get(sid);
       if (!st) return bad(res, 'Schueler nicht gefunden', 404);
       const fields = [], vals = [];
       if ('name' in b) { const nm = String(b.name || '').trim(); if (!nm) return bad(res, 'Name darf nicht leer sein'); fields.push('name=?'); vals.push(nm); }
       if ('phone' in b) { fields.push('phone=?'); vals.push(b.phone ? String(b.phone).trim() : null); }
+      if ('notes' in b) { fields.push('notes=?'); vals.push(b.notes ? String(b.notes).trim() : null); }
       if ('email' in b) {
         const em = b.email ? String(b.email).trim() : null;
         if (em && db.prepare('SELECT 1 FROM students WHERE email=? AND id<>?').get(em, sid)) return bad(res, 'Diese E-Mail ist schon vergeben');
@@ -900,6 +904,23 @@ async function handleApi(req, res, url) {
       } catch (e) { errors.push({ line, error: e.message }); }
     }
     return ok(res, { created, errors });
+  }
+
+  // Fahrschüler archivieren (bestanden) bzw. reaktivieren
+  const arm = p.match(/^\/api\/students\/(\d+)\/(archive|reactivate)$/);
+  if (arm && method === 'POST') {
+    if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
+    const sid = Number(arm[1]);
+    const st = db.prepare('SELECT id,name FROM students WHERE id=?').get(sid);
+    if (!st) return bad(res, 'Schüler nicht gefunden', 404);
+    if (arm[2] === 'archive') {
+      db.prepare('UPDATE students SET archived_at=? WHERE id=?').run(new Date().toISOString(), sid);
+      logEvent('info', { actor: 'instructor', studentId: sid, detail: `Fahrschüler archiviert/bestanden (${st.name})` });
+      return ok(res, { archived: true });
+    }
+    db.prepare('UPDATE students SET archived_at=NULL WHERE id=?').run(sid);
+    logEvent('info', { actor: 'instructor', studentId: sid, detail: `Fahrschüler reaktiviert (${st.name})` });
+    return ok(res, { archived: false });
   }
 
   // Fahrschüler löschen (Fahrlehrer) – inkl. seiner Buchungen

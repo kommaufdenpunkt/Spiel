@@ -1421,7 +1421,9 @@ async function loadCodes() {
 }
 
 // ---- Tab: Schüler ----
-async function tabSchueler() {
+async function tabSchueler(scope) {
+  scope = scope || state._schuelerScope || 'active';
+  state._schuelerScope = scope;
   const box = $('#itab');
   box.innerHTML = `<div class="card">
     <div class="inline" style="justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:.6rem">
@@ -1431,13 +1433,23 @@ async function tabSchueler() {
         <button class="sm" id="s-add">➕ Fahrschüler anlegen</button>
       </div>
     </div>
-    <p class="hint">Lege hier deine Fahrschüler an – jeder bekommt automatisch einen Login-Namen und ein Startpasswort, das du ihm weitergibst. Über die Zeilen kannst du Daten bearbeiten, Stundenlängen freischalten (40/80/120), Treffpunkt festlegen, Passwort zurücksetzen oder den Schüler löschen.</p>
+    <div class="tabs" style="max-width:340px;margin:.2rem 0 .8rem">
+      <button id="sc-active" class="${scope === 'active' ? 'active' : ''}">Aktiv <span id="sc-ac"></span></button>
+      <button id="sc-arch" class="${scope === 'archived' ? 'active' : ''}">✅ Archiv <span id="sc-arc"></span></button>
+    </div>
+    <p class="hint">${scope === 'archived'
+      ? 'Bestandene / archivierte Fahrschüler. Ihre Daten und Fahrstunden bleiben einsehbar; sie tauchen nicht in der aktiven Liste auf. Über „Reaktivieren“ kommen sie zurück.'
+      : 'Lege Fahrschüler an – jeder bekommt automatisch Login + Startpasswort. Über die Zeilen: bearbeiten, Notiz, Stundenlängen (40/80/120), Treffpunkt, Zugangsdaten, archivieren (bestanden) oder löschen.'}</p>
     <div id="s-list"></div></div>`;
   $('#s-add').onclick = () => openCreateStudentModal();
   $('#s-bulk').onclick = () => openBulkStudentModal();
+  $('#sc-active').onclick = () => tabSchueler('active');
+  $('#sc-arch').onclick = () => tabSchueler('archived');
   try {
-    const { students, req } = await api('/api/students');
-    if (!students.length) { $('#s-list').innerHTML = '<p class="muted">Noch keine Fahrschüler registriert. Erzeuge im Tab „Zugangscodes“ einen Code.</p>'; return; }
+    const { students, req, activeCount, archivedCount } = await api('/api/students' + (scope === 'archived' ? '?scope=archived' : ''));
+    if ($('#sc-ac')) $('#sc-ac').textContent = activeCount != null ? `(${activeCount})` : '';
+    if ($('#sc-arc')) $('#sc-arc').textContent = archivedCount != null ? `(${archivedCount})` : '';
+    if (!students.length) { $('#s-list').innerHTML = `<p class="muted">${scope === 'archived' ? 'Noch keine archivierten Fahrschüler.' : 'Noch keine aktiven Fahrschüler. Lege oben welche an.'}</p>`; return; }
     const sonderCell = (s) => ['ueberland', 'autobahn', 'nacht'].map((k) => {
       const have = s.sonder?.[k] || 0, need = req[k]; const done = have >= need;
       return `<span class="pill" style="${done ? 'background:var(--good-bg);color:var(--good)' : ''}">${TYPE_ICON[k]} ${have}/${need}</span>`;
@@ -1458,10 +1470,16 @@ async function tabSchueler() {
         const homeCell = hasHome
           ? `<span class="pill" style="background:var(--good-bg);color:var(--good)">📍 ${esc(s.home_label || 'gesetzt')}</span>`
           : `<span class="muted">– nicht vereinbart –</span>`;
+        const isArch = !!s.archived_at;
         return `<tr data-search="${esc(searchStr)}">
           <td><strong>${esc(s.name)}</strong>${s.birth_year ? ` <span class="muted">(${s.birth_year})</span>` : ''}
-            <div class="inline" style="margin-top:.3rem;gap:.3rem">
+            ${isArch ? '<br><span class="pill" style="background:var(--good-bg);color:var(--good)">✅ bestanden</span>' : ''}
+            ${s.notes ? `<br><span class="muted" title="${esc(s.notes)}" style="font-size:.78rem">📝 ${esc(s.notes.length > 40 ? s.notes.slice(0, 40) + '…' : s.notes)}</span>` : ''}
+            <div class="inline" style="margin-top:.3rem;gap:.3rem;flex-wrap:wrap">
               <button class="ghost sm" data-edit="${s.id}">✏️ Bearbeiten</button>
+              ${isArch
+                ? `<button class="ghost sm" data-react="${s.id}" style="color:var(--brand)">↩︎ Reaktivieren</button>`
+                : `<button class="ghost sm" data-arch="${s.id}" data-aname="${esc(s.name)}" style="color:var(--good)">✅ Bestanden</button>`}
               <button class="ghost sm" data-del="${s.id}" data-dname="${esc(s.name)}" style="color:var(--bad)">🗑️</button>
             </div></td>
           <td><span class="codechip">${esc(s.username || '–')}</span><br><button class="ghost sm" data-reset="${s.id}" data-uname="${esc(s.username || '')}" data-sname="${esc(s.name)}" style="margin-top:.3rem">🔑 Zugangsdaten</button></td>
@@ -1488,6 +1506,15 @@ async function tabSchueler() {
       openEditStudentModal(students.find((x) => x.id === Number(btn.dataset.edit))));
     $('#s-list').querySelectorAll('[data-del]').forEach((btn) => btn.onclick = () =>
       deleteStudent(btn.dataset.del, btn.dataset.dname));
+    $('#s-list').querySelectorAll('[data-arch]').forEach((btn) => btn.onclick = async () => {
+      if (!confirm(`„${btn.dataset.aname}" als bestanden markieren und ins Archiv verschieben? Daten & Fahrstunden bleiben einsehbar, du kannst jederzeit reaktivieren.`)) return;
+      try { await api('/api/students/' + btn.dataset.arch + '/archive', { method: 'POST' }); toast('Ins Archiv verschoben ✅', 'ok'); tabSchueler(); }
+      catch (e) { toast(e.message, 'err'); }
+    });
+    $('#s-list').querySelectorAll('[data-react]').forEach((btn) => btn.onclick = async () => {
+      try { await api('/api/students/' + btn.dataset.react + '/reactivate', { method: 'POST' }); toast('Reaktiviert ↩︎', 'ok'); tabSchueler(); }
+      catch (e) { toast(e.message, 'err'); }
+    });
     // Suche: filtert die Zeilen nach Name / Login / Telefon / E-Mail
     const search = $('#s-search');
     if (search) search.oninput = () => {
@@ -1588,6 +1615,8 @@ function openEditStudentModal(s) {
       <div class="field"><label>Telefon</label><input id="es-phone" value="${esc(s.phone || '')}"></div>
     </div>
     <div class="field"><label>E-Mail</label><input id="es-email" type="email" value="${esc(s.email || '')}"></div>
+    <div class="field"><label>📝 Notiz / Karteikarte (nur für dich)</label>
+      <textarea id="es-notes" rows="4" placeholder="z.B. Ausbildungsstand, was noch geübt werden muss, Besonderheiten …" style="resize:vertical">${esc(s.notes || '')}</textarea></div>
     <div class="actions">
       <button class="sec" onclick="window.__closeModal()">Abbrechen</button>
       <button id="es-go">Speichern</button>
@@ -1596,9 +1625,10 @@ function openEditStudentModal(s) {
     try {
       await api('/api/students/' + s.id, { method: 'PATCH', body: {
         name: $('#es-name').value, birth_year: $('#es-year').value || null,
-        phone: $('#es-phone').value || null, email: $('#es-email').value || null } });
+        phone: $('#es-phone').value || null, email: $('#es-email').value || null,
+        notes: $('#es-notes').value || null } });
       closeModal(); toast('Gespeichert ✓', 'ok'); tabSchueler();
-    } catch (e) { showErr(e.message); }
+    } catch (e) { const el = $('#autherr'); if (el) { el.textContent = e.message; el.classList.remove('hidden'); } else toast(e.message, 'err'); }
   };
 }
 
