@@ -475,24 +475,27 @@ const server = http.createServer(async (req, res) => {
   });
 });
 
-// ---- WebSocket-Signalisierung (WebRTC) -------------------------------------
+// ---- WebSocket-Signalisierung (WebRTC-Mesh: 1 Bewerber + bis zu 4 Prüfer) --
 const wss = new WebSocketServer({ server });
-/** rooms: Map<code, {host?:ws, guest?:ws}>  */
+/** rooms: Map<code, Map<peerId, ws>> */
 const rooms = new Map();
 /** waiting: Map<code, {code, note, joinedAt, claimedBy, claimedAt}> */
 const waiting = new Map();
 const CLAIM_TTL = 30000;
+const MAX_HOSTS = 4;
+function roomHosts(room) { let n = 0; if (room) for (const w of room.values()) if (w.role === 'host') n++; return n; }
+function roomHasGuest(room) { if (room) for (const w of room.values()) if (w.role === 'guest') return true; return false; }
 function waitingBusy(entry) {
   const room = rooms.get(entry.code);
-  if (room && room.host) return true;
+  if (room && roomHosts(room) > 0) return true;
   return !!(entry.claimedBy && (Date.now() - entry.claimedAt) < CLAIM_TTL);
 }
 function send(ws, obj) { if (ws && ws.readyState === ws.OPEN) ws.send(JSON.stringify(obj)); }
-function otherPeer(room, ws) { if (!room) return null; return room.host === ws ? room.guest : room.host; }
 
 wss.on('connection', (ws, req) => {
   ws.ip = sec.clientIp(req);
   if (sec.isBlocked(ws.ip)) { try { ws.close(); } catch {} return; }
+  ws.peerId = crypto.randomUUID();
 
   ws.on('message', (raw) => {
     let msg; try { msg = JSON.parse(raw.toString()); } catch { return; }
@@ -500,7 +503,7 @@ wss.on('connection', (ws, req) => {
     if (msg.type === 'join') {
       const code = String(msg.room || '').trim().toUpperCase();
       if (!code) { send(ws, { type: 'error', reason: 'no-room' }); return; }
-      let role = msg.role === 'host' ? 'host' : 'guest';
+      const role = msg.role === 'host' ? 'host' : 'guest';
 
       if (role === 'host') {
         if (!sec.validToken(msg.token, ws.ip)) { sec.recordFail(ws.ip, 'WS: ungültiges Prüfer-Token'); send(ws, { type: 'error', reason: 'auth' }); return; }
@@ -508,40 +511,45 @@ wss.on('connection', (ws, req) => {
         if (!store.isCodeUsable(code)) { sec.recordFail(ws.ip, 'WS: ungültiger Zugangscode (' + code + ')'); send(ws, { type: 'error', reason: 'bad-code' }); return; }
       }
 
-      let room = rooms.get(code); if (!room) { room = {}; rooms.set(code, room); }
-      if (role === 'host' && room.host && room.host !== ws) role = 'guest';
-      if (role === 'guest' && room.guest && room.guest !== ws) { send(ws, { type: 'error', reason: 'room-full' }); return; }
+      let room = rooms.get(code); if (!room) { room = new Map(); rooms.set(code, room); }
+      if (role === 'guest' && roomHasGuest(room)) { send(ws, { type: 'error', reason: 'room-full' }); return; }
+      if (role === 'host' && roomHosts(room) >= MAX_HOSTS) { send(ws, { type: 'error', reason: 'room-full' }); return; }
 
-      ws.roomCode = code; ws.role = role; room[role] = ws;
+      ws.roomCode = code; ws.role = role; ws.pname = String(msg.name || (role === 'host' ? 'Prüfer' : 'Bewerber')).slice(0, 40);
+      const peers = [];
+      for (const other of room.values()) peers.push({ peerId: other.peerId, role: other.role, name: other.pname });
+      room.set(ws.peerId, ws);
+      // Neuen Teilnehmer den Bestehenden melden (die initiieren die Verbindung).
+      for (const other of room.values()) if (other !== ws) send(other, { type: 'peer-joined', peerId: ws.peerId, role, name: ws.pname });
+      send(ws, { type: 'joined', role, peerId: ws.peerId, peers });
 
       if (role === 'guest') {
         const note = store.getCode(code); // Notiz aus dem Code (falls hinterlegt)
         waiting.set(code, { code, note: note ? note.note : '', joinedAt: Date.now(), claimedBy: null, claimedAt: 0 });
-      }
-      send(ws, { type: 'joined', role, room: code });
-
-      if (room.host && room.guest) {
-        const w = waiting.get(code); if (w) { w.claimedAt = Date.now(); }
-        send(room.host, { type: 'peer-ready' });
-        send(room.guest, { type: 'peer-ready' });
+      } else {
+        const w = waiting.get(code); if (w) { w.claimedBy = ws.pname; w.claimedAt = Date.now(); }
       }
       return;
     }
 
-    if (msg.type === 'signal') { send(otherPeer(rooms.get(ws.roomCode), ws), { type: 'signal', data: msg.data }); return; }
-    if (msg.type === 'app') { send(otherPeer(rooms.get(ws.roomCode), ws), { type: 'app', data: msg.data }); return; }
+    // Signal gezielt an einen Peer (msg.to) weiterreichen.
+    if (msg.type === 'signal') {
+      const room = rooms.get(ws.roomCode); if (!room) return;
+      const target = room.get(msg.to); if (target) send(target, { type: 'signal', from: ws.peerId, data: msg.data });
+      return;
+    }
   });
 
   ws.on('close', () => {
     const room = rooms.get(ws.roomCode); if (!room) return;
-    send(otherPeer(room, ws), { type: 'peer-left' });
-    if (room.host === ws) {
-      room.host = undefined;
+    room.delete(ws.peerId);
+    for (const other of room.values()) send(other, { type: 'peer-left', peerId: ws.peerId });
+    if (ws.role === 'guest') { waiting.delete(ws.roomCode); }
+    else {
       const w = waiting.get(ws.roomCode);
-      if (w && room.guest) { if (!store.isCodeUsable(ws.roomCode)) waiting.delete(ws.roomCode); else { w.claimedBy = null; w.claimedAt = 0; } }
+      if (w && roomHosts(room) === 0) { if (!store.isCodeUsable(ws.roomCode)) waiting.delete(ws.roomCode); else { w.claimedBy = null; w.claimedAt = 0; } }
     }
-    if (room.guest === ws) { room.guest = undefined; waiting.delete(ws.roomCode); }
-    if (!room.host && !room.guest) rooms.delete(ws.roomCode);
+    if (room.size === 0) rooms.delete(ws.roomCode);
   });
 });
 
