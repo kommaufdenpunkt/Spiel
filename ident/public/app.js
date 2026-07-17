@@ -280,6 +280,7 @@
 
   // ================= RAUM / WebRTC =================
   function startRoom() {
+    state.caseDone = false;
     $('lobby').style.display = 'none'; $('waitingView').style.display = 'none';
     $('room').classList.add('active');
     setupRoleUI();
@@ -456,7 +457,7 @@
     addShot('snapShots', label, url); toast(label + ' aufgenommen');
   }
   function checkBoxes() { return Array.from(document.querySelectorAll('#checklist input[data-chk]')); }
-  $('checklist').addEventListener('change', () => { $('approveBtn').disabled = !checkBoxes().every((c) => c.checked); });
+  $('checklist').addEventListener('change', () => { $('approveBtn').disabled = state.caseDone || !checkBoxes().every((c) => c.checked); });
 
   $('approveBtn').addEventListener('click', () => saveCase('approved'));
   $('rejectBtn').addEventListener('click', () => {
@@ -472,19 +473,30 @@
       checklist: checkBoxes().map((c) => ({ label: c.parentElement.textContent.trim(), checked: c.checked })),
       docs: state.docs.concat(state.snaps).map((d) => ({ label: d.label, dataUrl: d.dataUrl })),
     };
+    if (state.caseDone) return; // im Gruppengespräch bereits abgeschlossen
     $('approveBtn').disabled = true; $('rejectBtn').disabled = true;
     const r = await api('POST', '/api/case', body);
     if (r.status === 200) {
-      dcBroadcast({ kind: 'result', result });
+      state.caseDone = true;
+      dcBroadcast({ kind: 'result', result }); // Bewerber + andere Prüfer informieren
       $('reviewStatus').className = 'status ' + (result === 'approved' ? 'ok' : 'bad');
       $('reviewStatus').textContent = result === 'approved' ? '✓ Freigegeben – Akte angelegt.' : '✖ Abgelehnt – Akte angelegt.';
       toast(result === 'approved' ? 'Freigegeben ✓' : 'Abgelehnt');
+    } else if (r.body && r.body.reason === 'bad-code') {
+      state.caseDone = true; // ein anderer Prüfer war schneller
+      $('reviewStatus').className = 'status ok'; $('reviewStatus').textContent = '✓ Wurde bereits von einem anderen Prüfer abgeschlossen.';
     } else {
       $('rejectBtn').disabled = false; $('approveBtn').disabled = !checkBoxes().every((c) => c.checked);
-      toast(r.body && r.body.reason === 'bad-code' ? 'Zugangsnummer ungültig/verbraucht – evtl. schon abgeschlossen.' : 'Speichern fehlgeschlagen.');
+      toast('Speichern fehlgeschlagen. Bitte erneut versuchen.');
     }
   }
-  function onResult(result) { // Bewerber-Seite
+  function onResult(result) {
+    if (state.role === 'host') { // anderer Prüfer hat den Fall abgeschlossen
+      state.caseDone = true; $('approveBtn').disabled = true; $('rejectBtn').disabled = true;
+      $('reviewStatus').className = 'status ' + (result === 'approved' ? 'ok' : 'bad');
+      $('reviewStatus').textContent = result === 'approved' ? '✓ Ein Prüfer hat bereits freigegeben.' : '✖ Ein Prüfer hat bereits abgelehnt.';
+      return;
+    }
     if (result === 'approved') { $('okBadge').classList.add('on'); $('guideStatus').className = 'status ok'; $('guideStatus').textContent = '✓ Deine Audition wurde erfolgreich übermittelt. Viel Erfolg – die Agentur 4EVER1 meldet sich!'; toast('Übermittelt ✓'); }
     else { $('guideStatus').className = 'status bad'; $('guideStatus').textContent = '✖ Die Audition wurde nicht angenommen. Bei Fragen wende dich an die Agentur 4EVER1.'; }
   }
