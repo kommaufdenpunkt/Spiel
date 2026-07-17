@@ -175,15 +175,19 @@
       const since = secs < 60 ? secs + ' Sek.' : Math.floor(secs / 60) + ' Min.';
       const st = w.busy ? (w.claimedBy ? 'wird von ' + esc(w.claimedBy) + ' geholt' : 'in Bearbeitung') : 'wartet seit ' + since;
       div.innerHTML = `<span class="gn">👤</span><div class="gt">Bewerber-Nr. ${esc(w.code)}${w.note ? ' · ' + esc(w.note) : ''}<small>${st}</small></div>`;
-      const b = document.createElement('button'); b.className = 'primary'; b.textContent = '📞 Abholen'; b.disabled = !!w.busy;
-      b.addEventListener('click', () => abholen(w.code)); div.appendChild(b); el.appendChild(div);
+      const b = document.createElement('button');
+      if (w.busy) { b.className = 'good'; b.textContent = '➕ Beitreten'; b.addEventListener('click', () => joinRoom(w.code, true)); }
+      else { b.className = 'primary'; b.textContent = '📞 Abholen'; b.addEventListener('click', () => joinRoom(w.code, false)); }
+      div.appendChild(b); el.appendChild(div);
     });
   }
-  async function abholen(code) {
-    const claim = await api('POST', '/api/waiting/claim', { code });
-    if (claim.status !== 200) { toast(claim.body && claim.body.by ? 'Wird gerade von ' + claim.body.by + ' übernommen.' : 'Bewerber nicht mehr verfügbar.'); refreshWaiting(); return; }
+  async function joinRoom(code, alreadyRunning) {
+    if (!alreadyRunning) {
+      const claim = await api('POST', '/api/waiting/claim', { code });
+      if (claim.status !== 200) { toast(claim.body && claim.body.by ? 'Wird gerade von ' + claim.body.by + ' übernommen.' : 'Bewerber nicht mehr verfügbar.'); refreshWaiting(); return; }
+    }
     clearInterval(state.waitingTimer); state.waitingTimer = 0;
-    if (!(await startCamera())) { api('POST', '/api/waiting/release', { code }); openWaiting(); toast('Kein Zugriff auf Kamera/Mikrofon.'); return; }
+    if (!(await startCamera())) { if (!alreadyRunning) api('POST', '/api/waiting/release', { code }); openWaiting(); toast('Kein Zugriff auf Kamera/Mikrofon.'); return; }
     state.role = 'host'; state.code = code; localTag.textContent = state.name + ' (Du)';
     $('waitingView').style.display = 'none';
     startRoom();
@@ -295,85 +299,113 @@
   }
 
   function connectSignaling() {
+    state.peers = new Map(); state.mainPeerId = null; state.myUploads = state.myUploads || [];
+    $('vextras').innerHTML = '';
     const proto = location.protocol === 'https:' ? 'wss' : 'ws';
     const ws = new WebSocket(`${proto}://${location.host}`); state.ws = ws;
-    ws.onopen = () => ws.send(JSON.stringify({ type: 'join', room: state.code, role: state.role, token: state.token || '' }));
+    ws.onopen = () => ws.send(JSON.stringify({ type: 'join', room: state.code, role: state.role, token: state.token || '', name: state.name }));
     ws.onmessage = async (ev) => {
       let m; try { m = JSON.parse(ev.data); } catch { return; }
       switch (m.type) {
-        case 'joined': state.role = m.role; setupRoleUI(); break;
+        case 'joined':
+          state.role = m.role; state.selfId = m.peerId; setupRoleUI();
+          (m.peers || []).forEach((p) => ensurePeer(p.peerId, p.role, p.name, false));
+          if ((m.peers || []).length) $('bannerText').textContent = 'Verbunden.';
+          break;
+        case 'peer-joined': $('bannerText').textContent = 'Verbunden.'; ensurePeer(m.peerId, m.role, m.name, true); break;
+        case 'signal': await handleSignal(m.from, m.data); break;
+        case 'peer-left': removePeer(m.peerId); break;
         case 'error':
           if (m.reason === 'room-full') toast('Der Raum ist bereits voll.');
           else if (m.reason === 'auth') backToStart('Anmeldung abgelaufen – bitte neu anmelden.');
           else if (m.reason === 'bad-code') backToStart('Ungültige oder bereits benutzte Zugangsnummer.');
           break;
-        case 'peer-ready':
-          remoteTag.textContent = state.role === 'host' ? 'Bewerber' : 'Prüfer';
-          $('bannerText').textContent = 'Verbunden.';
-          createPeer(); break;
-        case 'signal': await handleSignal(m.data); break;
-        case 'peer-left':
-          remoteVideo.srcObject = null; remoteWaiting.style.display = ''; remoteWaiting.textContent = 'Gegenüber hat den Raum verlassen.';
-          sysMsg('Gegenüber hat den Raum verlassen.'); resetPeer(); break;
       }
     };
     ws.onclose = () => sysMsg('Verbindung zum Server getrennt.');
   }
-  function signal(data) { if (state.ws && state.ws.readyState === WebSocket.OPEN) state.ws.send(JSON.stringify({ type: 'signal', data })); }
+  function sig(to, data) { if (state.ws && state.ws.readyState === WebSocket.OPEN) state.ws.send(JSON.stringify({ type: 'signal', to, data })); }
+  function isMainRole(role) { return state.role === 'host' ? role === 'guest' : role === 'host'; }
 
-  function resetPeer() { if (state.pc) { try { state.pc.close(); } catch {} } state.pc = null; state.dc = null; state.makingOffer = false; state.ignoreOffer = false; }
-  function createPeer() {
-    if (state.pc) return state.pc;
-    state.polite = state.role === 'guest';
-    const pc = new RTCPeerConnection({ iceServers: state.iceServers || FALLBACK_ICE }); state.pc = pc;
-    state.localStream.getTracks().forEach((t) => pc.addTrack(t, state.localStream));
+  function ensurePeer(peerId, role, name, initiator) {
+    if (state.peers.has(peerId)) return state.peers.get(peerId);
+    const pc = new RTCPeerConnection({ iceServers: state.iceServers || FALLBACK_ICE });
+    const P = { pc, dc: null, makingOffer: false, ignoreOffer: false, polite: !initiator, initiator, role, name, stream: null, isMain: false };
+    state.peers.set(peerId, P);
+    if (state.localStream) state.localStream.getTracks().forEach((t) => pc.addTrack(t, state.localStream));
     tuneQuality(pc);
-    pc.onnegotiationneeded = async () => { try { state.makingOffer = true; await pc.setLocalDescription(); signal({ description: pc.localDescription }); } catch {} finally { state.makingOffer = false; } };
-    pc.onicecandidate = ({ candidate }) => { if (candidate) signal({ candidate }); };
-    pc.ontrack = ({ streams }) => { remoteVideo.srcObject = streams[0]; remoteWaiting.style.display = 'none'; };
-    pc.onconnectionstatechange = () => { if (pc.connectionState === 'connected') { tuneQuality(pc); if (state.role === 'guest') toast('🎬 Es geht los – der Prüfer ist jetzt da!'); } if (['failed', 'disconnected'].includes(pc.connectionState)) $('bannerText').textContent = 'Verbindung gestört – wird neu aufgebaut …'; };
-    // Prüfer (impolite) erstellt den Datenkanal; Bewerber empfängt ihn.
-    if (state.role === 'host') setupDataChannel(pc.createDataChannel('app'));
-    else pc.ondatachannel = (e) => setupDataChannel(e.channel);
-    return pc;
+    pc.onnegotiationneeded = async () => { if (!P.initiator) return; try { P.makingOffer = true; await pc.setLocalDescription(); sig(peerId, { description: pc.localDescription }); } catch {} finally { P.makingOffer = false; } };
+    pc.onicecandidate = ({ candidate }) => { if (candidate) sig(peerId, { candidate }); };
+    pc.ontrack = ({ streams }) => attachStream(peerId, streams[0]);
+    pc.onconnectionstatechange = () => { if (pc.connectionState === 'connected') tuneQuality(pc); };
+    if (initiator) setupDataChannel(peerId, pc.createDataChannel('app'));
+    else pc.ondatachannel = (e) => setupDataChannel(peerId, e.channel);
+    return P;
   }
-  async function handleSignal(data) {
-    const pc = createPeer();
+  function attachStream(peerId, stream) {
+    const P = state.peers.get(peerId); if (!P) return; P.stream = stream;
+    if (state.mainPeerId === peerId) { remoteVideo.srcObject = stream; return; } // ist bereits das Hauptbild (2. Track)
+    if (!state.mainPeerId && isMainRole(P.role)) {
+      state.mainPeerId = peerId; P.isMain = true;
+      remoteVideo.srcObject = stream; remoteWaiting.style.display = 'none';
+      remoteTag.textContent = P.role === 'guest' ? 'Bewerber' : (P.name || 'Prüfer');
+      if (state.role === 'guest') toast('🎬 Es geht los – der Prüfer ist jetzt da!');
+    } else { addTile(peerId, P.name || (P.role === 'host' ? 'Prüfer' : 'Bewerber'), stream); }
+  }
+  function addTile(peerId, name, stream) {
+    let t = document.querySelector('.vextra[data-peer="' + peerId + '"]');
+    if (!t) { t = document.createElement('div'); t.className = 'vextra'; t.setAttribute('data-peer', peerId); t.innerHTML = '<video autoplay playsinline></video><span class="etag"></span>'; $('vextras').appendChild(t); }
+    t.querySelector('video').srcObject = stream; t.querySelector('.etag').textContent = name;
+  }
+  function removeTile(peerId) { const t = document.querySelector('.vextra[data-peer="' + peerId + '"]'); if (t) t.remove(); }
+  function removePeer(peerId) {
+    const P = state.peers.get(peerId); if (P) { try { P.pc.close(); } catch {} }
+    state.peers.delete(peerId); removeTile(peerId);
+    if (state.mainPeerId === peerId) {
+      state.mainPeerId = null; remoteVideo.srcObject = null;
+      for (const [pid, pp] of state.peers) { if (pp.stream && isMainRole(pp.role)) { removeTile(pid); attachStream(pid, pp.stream); break; } }
+      if (!state.mainPeerId) { remoteWaiting.style.display = ''; remoteWaiting.textContent = 'Warte auf Teilnehmer …'; }
+    }
+  }
+  function closeAllPeers() { if (state.peers) state.peers.forEach((P) => { try { P.pc.close(); } catch {} }); state.peers = new Map(); state.mainPeerId = null; if ($('vextras')) $('vextras').innerHTML = ''; }
+  async function handleSignal(from, data) {
+    const P = state.peers.get(from); if (!P) return; const pc = P.pc;
     try {
       if (data.description) {
-        const offerCollision = data.description.type === 'offer' && (state.makingOffer || pc.signalingState !== 'stable');
-        state.ignoreOffer = !state.polite && offerCollision;
-        if (state.ignoreOffer) return;
+        const collision = data.description.type === 'offer' && (P.makingOffer || pc.signalingState !== 'stable');
+        P.ignoreOffer = !P.polite && collision;
+        if (P.ignoreOffer) return;
         await pc.setRemoteDescription(data.description);
-        if (data.description.type === 'offer') { await pc.setLocalDescription(); signal({ description: pc.localDescription }); }
-      } else if (data.candidate) {
-        try { await pc.addIceCandidate(data.candidate); } catch { if (!state.ignoreOffer) throw new Error('ice'); }
-      }
-    } catch (e) { /* ignorieren – Perfect Negotiation regelt Kollisionen */ }
+        if (data.description.type === 'offer') { await pc.setLocalDescription(); sig(from, { description: pc.localDescription }); }
+      } else if (data.candidate) { try { await pc.addIceCandidate(data.candidate); } catch {} }
+    } catch (e) { /* Perfect Negotiation regelt Kollisionen */ }
   }
 
-  // ---- Datenkanal (Chat + Bild-Übertragung + Ergebnis) ----
-  const incoming = {}; // id -> {label, n, parts:[]}
-  function setupDataChannel(dc) {
-    state.dc = dc;
-    dc.onopen = () => { flushPendingDocs(); if (state.role === 'guest') { $('guideStatus').textContent = 'Verbunden mit dem Prüfer. Bitte lade die Bilder hoch.'; if (state.profile) dcSend({ kind: 'profile', bigoName: state.profile.bigoName, age: state.profile.age }); } };
+  // ---- Datenkanäle je Peer (Chat + Bild-Übertragung + Ergebnis) ----
+  const incoming = {}; // key peerId:id -> {label, n, parts}
+  function setupDataChannel(peerId, dc) {
+    const P = state.peers.get(peerId); if (P) P.dc = dc;
+    dc.onopen = () => {
+      if (state.role === 'guest') {
+        if (state.profile) dcSendTo(dc, { kind: 'profile', bigoName: state.profile.bigoName, age: state.profile.age });
+        (state.myUploads || []).forEach((d) => sendDocTo(dc, d.label, d.dataUrl)); // auch später dazugekommene Prüfer bekommen die Bilder
+        $('guideStatus').textContent = 'Verbunden mit dem Prüfer. Bitte lade die Bilder hoch.';
+      }
+    };
     dc.onmessage = (e) => {
       let m; try { m = JSON.parse(e.data); } catch { return; }
+      const key = peerId + ':' + m.id;
       if (m.kind === 'chat') addChat(m.text, false);
-      else if (m.kind === 'doc-start') incoming[m.id] = { label: m.label, n: m.n, parts: [] };
-      else if (m.kind === 'doc-part') { const it = incoming[m.id]; if (!it) return; it.parts[m.i] = m.part; if (it.parts.filter(Boolean).length === it.n) { onDocReceived(it.label, it.parts.join('')); delete incoming[m.id]; } }
+      else if (m.kind === 'doc-start') incoming[key] = { label: m.label, n: m.n, parts: [] };
+      else if (m.kind === 'doc-part') { const it = incoming[key]; if (!it) return; it.parts[m.i] = m.part; if (it.parts.filter(Boolean).length === it.n) { onDocReceived(it.label, it.parts.join('')); delete incoming[key]; } }
       else if (m.kind === 'result') onResult(m.result);
       else if (m.kind === 'profile') { if (m.bigoName && !$('vBigoName').value) $('vBigoName').value = m.bigoName; if (m.age && !$('vAge').value) $('vAge').value = m.age; }
     };
   }
-  function dcSend(obj) { if (state.dc && state.dc.readyState === 'open') { state.dc.send(JSON.stringify(obj)); return true; } return false; }
-  function sendDoc(label, dataUrl) {
-    const id = Math.random().toString(36).slice(2); const size = 15000; const n = Math.ceil(dataUrl.length / size);
-    if (!dcSend({ kind: 'doc-start', id, label, n })) return false;
-    for (let i = 0; i < n; i++) dcSend({ kind: 'doc-part', id, i, part: dataUrl.slice(i * size, (i + 1) * size) });
-    return true;
-  }
-  function flushPendingDocs() { if (state.role !== 'guest') return; const q = state.pendingDocs.slice(); state.pendingDocs = []; q.forEach((d) => sendDoc(d.label, d.dataUrl)); }
+  function dcSendTo(dc, obj) { if (dc && dc.readyState === 'open') { dc.send(JSON.stringify(obj)); return true; } return false; }
+  function dcBroadcast(obj) { let any = false; if (state.peers) state.peers.forEach((P) => { if (dcSendTo(P.dc, obj)) any = true; }); return any; }
+  function sendDocTo(dc, label, dataUrl) { const id = Math.random().toString(36).slice(2); const size = 15000; const n = Math.ceil(dataUrl.length / size); if (!dcSendTo(dc, { kind: 'doc-start', id, label, n })) return; for (let i = 0; i < n; i++) dcSendTo(dc, { kind: 'doc-part', id, i, part: dataUrl.slice(i * size, (i + 1) * size) }); }
+  function sendDocAll(label, dataUrl) { if (state.peers) state.peers.forEach((P) => { if (P.dc && P.dc.readyState === 'open') sendDocTo(P.dc, label, dataUrl); }); }
 
   // ================= BEWERBER: Bilder hochladen =================
   $('upFront').addEventListener('click', () => pickImage('Ausweis-Vorderseite', 'gs1'));
@@ -385,8 +417,10 @@
     const dataUrl = await resizeImage(f, 1600, 0.85);
     addShot('guestShots', state.uploadTarget, dataUrl);
     if (state._gstep) $(state._gstep).classList.add('done');
-    if (dcSend({ kind: 'ping' }) || (state.dc && state.dc.readyState === 'open')) sendDoc(state.uploadTarget, dataUrl);
-    else { state.pendingDocs.push({ label: state.uploadTarget, dataUrl }); toast('Bild gespeichert – wird gesendet, sobald der Prüfer verbunden ist.'); }
+    state.myUploads = state.myUploads || []; state.myUploads.push({ label: state.uploadTarget, dataUrl });
+    sendDocAll(state.uploadTarget, dataUrl);
+    const anyOpen = state.peers && [...state.peers.values()].some((P) => P.dc && P.dc.readyState === 'open');
+    if (!anyOpen) toast('Bild gespeichert – wird gesendet, sobald ein Prüfer verbunden ist.');
     const doneAll = ['gs1', 'gs2', 'gs3'].every((g) => $(g).classList.contains('done'));
     $('guideStatus').className = 'status ' + (doneAll ? 'ok' : 'pending');
     $('guideStatus').textContent = doneAll ? 'Alle Bilder hochgeladen. Der Prüfer meldet sich gleich.' : 'Weiter mit dem nächsten Bild.';
@@ -441,7 +475,7 @@
     $('approveBtn').disabled = true; $('rejectBtn').disabled = true;
     const r = await api('POST', '/api/case', body);
     if (r.status === 200) {
-      dcSend({ kind: 'result', result });
+      dcBroadcast({ kind: 'result', result });
       $('reviewStatus').className = 'status ' + (result === 'approved' ? 'ok' : 'bad');
       $('reviewStatus').textContent = result === 'approved' ? '✓ Freigegeben – Akte angelegt.' : '✖ Abgelehnt – Akte angelegt.';
       toast(result === 'approved' ? 'Freigegeben ✓' : 'Abgelehnt');
@@ -466,7 +500,7 @@
 
   // ================= CHAT =================
   function addChat(text, me) { const d = document.createElement('div'); d.className = 'msg ' + (me ? 'me' : 'them'); d.textContent = text; chatLog.appendChild(d); chatLog.scrollTop = chatLog.scrollHeight; }
-  function sendChat() { const v = $('chatInput').value.trim(); if (!v) return; if (dcSend({ kind: 'chat', text: v })) { addChat(v, true); $('chatInput').value = ''; } else toast('Noch nicht verbunden.'); }
+  function sendChat() { const v = $('chatInput').value.trim(); if (!v) return; if (dcBroadcast({ kind: 'chat', text: v })) { addChat(v, true); $('chatInput').value = ''; } else toast('Noch nicht verbunden.'); }
   $('chatSend').addEventListener('click', sendChat);
   $('chatInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') sendChat(); });
   document.querySelectorAll('.tabs button').forEach((b) => b.addEventListener('click', () => {
@@ -495,7 +529,8 @@
     const canvasStream = canvas.captureStream(25);
     // Audio beider Seiten mischen
     const ac = new (window.AudioContext || window.webkitAudioContext)(); state.audioCtx = ac; const dest = ac.createMediaStreamDestination();
-    [state.localStream, remoteVideo.srcObject].forEach((s) => { if (s && s.getAudioTracks().length) { try { ac.createMediaStreamSource(s).connect(dest); } catch {} } });
+    const audioStreams = [state.localStream]; if (state.peers) state.peers.forEach((P) => { if (P.stream) audioStreams.push(P.stream); });
+    audioStreams.forEach((s) => { if (s && s.getAudioTracks && s.getAudioTracks().length) { try { ac.createMediaStreamSource(s).connect(dest); } catch {} } });
     const mixed = new MediaStream([...canvasStream.getVideoTracks(), ...dest.stream.getAudioTracks()]);
     const { mime, ext } = pickMime(); state.recMime = mime; state.recExt = ext; state.recChunks = [];
     const rec = mime ? new MediaRecorder(mixed, { mimeType: mime }) : new MediaRecorder(mixed); state.recorder = rec;
@@ -521,7 +556,7 @@
   $('leaveBtn').addEventListener('click', leaveRoom);
   function leaveRoom() {
     if (state.recorder && state.recorder.state === 'recording') stopRec();
-    try { if (state.ws) state.ws.close(); } catch {} state.ws = null; resetPeer();
+    try { if (state.ws) state.ws.close(); } catch {} state.ws = null; closeAllPeers();
     if (state.localStream) { state.localStream.getTracks().forEach((t) => { try { t.stop(); } catch {} }); state.localStream = null; }
     resetForNext(); $('room').classList.remove('active'); openWaiting();
   }
@@ -536,7 +571,7 @@
   }
 
   function backToStart(errText) {
-    try { if (state.ws) state.ws.close(); } catch {} state.ws = null; resetPeer();
+    try { if (state.ws) state.ws.close(); } catch {} state.ws = null; closeAllPeers();
     if (state.localStream) { state.localStream.getTracks().forEach((t) => { try { t.stop(); } catch {} }); state.localStream = null; }
     $('room').classList.remove('active'); $('waitingView').style.display = 'none'; $('lobby').style.display = '';
     $('lobbyErr').textContent = errText || ''; resetEnter();
