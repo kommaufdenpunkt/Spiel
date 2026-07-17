@@ -91,14 +91,26 @@
       resetEnter(); openWaiting(); return;
     }
 
-    // Bewerber
-    $('enterBtn').textContent = 'Kamera wird gestartet …';
-    if (!(await startCamera())) { resetEnter(); $('lobbyErr').textContent = 'Kein Zugriff auf Kamera/Mikrofon. Bitte erlauben.'; return; }
+    // Bewerber -> erst Willkommen/Ablauf zeigen; Kamera startet erst bei "Bereit".
     state.role = 'guest'; state.code = code; state.name = 'Bewerber';
     state.profile = { bigoName: $('bigoInput').value.trim().slice(0, 80), age: $('ageInput').value.trim().slice(0, 10) };
-    localTag.textContent = 'Du';
-    startRoom();
+    resetEnter();
+    $('lobby').style.display = 'none';
+    loadIntro();
+    $('onboarding').style.display = '';
   }
+  async function loadIntro() { try { const r = await api('GET', '/api/intro'); if (r.status === 200 && $('introText')) $('introText').textContent = r.body.intro || ''; } catch {} }
+  if ($('readyBtn')) $('readyBtn').addEventListener('click', async () => {
+    const b = $('readyBtn'); b.disabled = true; b.textContent = 'Kamera wird gestartet …';
+    if (!(await startCamera())) { b.disabled = false; b.textContent = 'Bereit – in den Warteraum'; toast('Kein Zugriff auf Kamera/Mikrofon. Bitte erlauben.'); return; }
+    localTag.textContent = 'Du'; $('onboarding').style.display = 'none';
+    b.disabled = false; b.textContent = 'Bereit – in den Warteraum';
+    startRoom();
+  });
+  if ($('backToStart')) $('backToStart').addEventListener('click', () => { $('onboarding').style.display = 'none'; $('lobby').style.display = ''; });
+  // Textfelder mit "grow" wachsen mit dem Inhalt (Zeilenumbrüche).
+  function autoGrow(el) { el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 280) + 'px'; }
+  document.querySelectorAll('textarea.grow').forEach((t) => { t.addEventListener('input', () => autoGrow(t)); });
   function loginErr(r) {
     const x = r.body && r.body.reason;
     if (x === 'account-locked') return 'Konto gesperrt (zu viele Fehlversuche). Bitte an den Admin wenden.';
@@ -319,7 +331,7 @@
     pc.onnegotiationneeded = async () => { try { state.makingOffer = true; await pc.setLocalDescription(); signal({ description: pc.localDescription }); } catch {} finally { state.makingOffer = false; } };
     pc.onicecandidate = ({ candidate }) => { if (candidate) signal({ candidate }); };
     pc.ontrack = ({ streams }) => { remoteVideo.srcObject = streams[0]; remoteWaiting.style.display = 'none'; };
-    pc.onconnectionstatechange = () => { if (pc.connectionState === 'connected') tuneQuality(pc); if (['failed', 'disconnected'].includes(pc.connectionState)) $('bannerText').textContent = 'Verbindung gestört – wird neu aufgebaut …'; };
+    pc.onconnectionstatechange = () => { if (pc.connectionState === 'connected') { tuneQuality(pc); if (state.role === 'guest') toast('🎬 Es geht los – der Prüfer ist jetzt da!'); } if (['failed', 'disconnected'].includes(pc.connectionState)) $('bannerText').textContent = 'Verbindung gestört – wird neu aufgebaut …'; };
     // Prüfer (impolite) erstellt den Datenkanal; Bewerber empfängt ihn.
     if (state.role === 'host') setupDataChannel(pc.createDataChannel('app'));
     else pc.ondatachannel = (e) => setupDataChannel(e.channel);

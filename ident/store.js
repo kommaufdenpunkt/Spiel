@@ -40,6 +40,21 @@ const DEFAULT_SCRIPT = [
   'Vielen Dank.',
 ].join('\n');
 
+const DEFAULT_INTRO = [
+  'Hey, schön, dass du da bist! 👋',
+  '',
+  'So läuft deine Audition ab:',
+  '1. Du kommst gleich in den Warteraum.',
+  '2. Ein Prüfer der Agentur 4EVER1 holt dich ins Gespräch – das können 1 bis 3 Personen sein, also nicht erschrecken.',
+  '3. Kurzes Hallo – wie geht’s dir usw.',
+  '4. Danach liest du in Ruhe einen kurzen Text in die Kamera. Den siehst du schon im Warteraum und kannst ihn vorher durchlesen.',
+  '5. Fertig – das war’s!',
+  '',
+  'Wichtig: Lade dir das PK-Board herunter – dort findest du das Tutorial und die BIGO-Regeln.',
+  '',
+  'Wenn du auf „Bereit“ klickst, bist du damit einverstanden, dass ab jetzt die Video- und Tonaufnahme läuft.',
+].join('\n');
+
 function file(name) { return path.join(DATA_DIR, name); }
 function load(name, fallback) {
   const p = file(name);
@@ -289,9 +304,11 @@ function purgeOlderThan(days) {
 
 function getScript() { return typeof settings.script === 'string' ? settings.script : DEFAULT_SCRIPT; }
 function setScript(text) { settings.script = String(text || '').slice(0, 8000); save('settings.json', settings); return true; }
+function getIntro() { return typeof settings.intro === 'string' ? settings.intro : DEFAULT_INTRO; }
+function setIntro(text) { settings.intro = String(text || '').slice(0, 8000); save('settings.json', settings); return true; }
 
 module.exports = {
-  init, getScript, setScript,
+  init, getScript, setScript, getIntro, setIntro,
   listAgents, getAgentByUsername, getAgentById, addAgent, verifyAgent,
   setAgentPassword, changeOwnPassword, lockAgent, unlockAgent, deleteAgent, agentCount,
   addPasskey, getAgentByPasskeyId, setPasskeyCounter, agentPasskeys,

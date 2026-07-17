@@ -34,11 +34,19 @@
     document.querySelectorAll('.section').forEach((s) => s.classList.toggle('on', s.dataset.pane === sec));
     ({ overview: loadOverview, cases: loadCases, rec: loadRec, agents: loadAgents, script: loadScriptEditor, security: loadSecurity }[sec] || (() => {}))();
   }
-  async function loadScriptEditor() { const r = await api('GET', '/api/script'); if (r.status === 200) $('scriptText').value = r.body.script || ''; }
+  async function loadScriptEditor() {
+    const s = await api('GET', '/api/script'); if (s.status === 200) $('scriptText').value = s.body.script || '';
+    const i = await api('GET', '/api/intro'); if (i.status === 200) $('introTextEdit').value = i.body.intro || '';
+  }
   if ($('scriptSave')) $('scriptSave').addEventListener('click', async () => {
     const r = await api('POST', '/api/script', { script: $('scriptText').value });
     $('scriptMsg').textContent = r.status === 200 ? 'Gespeichert ✓' : 'Fehler beim Speichern';
     setTimeout(() => { $('scriptMsg').textContent = ''; }, 2500);
+  });
+  if ($('introSave')) $('introSave').addEventListener('click', async () => {
+    const r = await api('POST', '/api/intro', { intro: $('introTextEdit').value });
+    $('introMsg').textContent = r.status === 200 ? 'Gespeichert ✓' : 'Fehler beim Speichern';
+    setTimeout(() => { $('introMsg').textContent = ''; }, 2500);
   });
 
   // ---- Übersicht ----
