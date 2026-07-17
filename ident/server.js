@@ -374,7 +374,12 @@ async function handleApi(req, res, urlPath, ip) {
     sendJson(res, 200, { ok }); return true;
   }
 
-  if (urlPath === '/api/recordings' && req.method === 'GET') { if (!adminOnly()) return true; sendJson(res, 200, { recordings: store.listRecordings() }); return true; }
+  if (urlPath === '/api/recordings' && req.method === 'GET') {
+    if (!adminOnly()) return true;
+    const cs = store.listCases();
+    const recs = store.listRecordings().map((r) => { const c = cs.find((x) => x.code === r.code); return { ...r, bigoName: c ? c.bigoName : '', name: c ? c.verifiedName : '', result: c ? c.result : '' }; });
+    sendJson(res, 200, { recordings: recs }); return true;
+  }
   if (urlPath === '/api/recording' && req.method === 'GET') {
     if (!isAdmin(req, ip)) { res.writeHead(403); res.end('Forbidden'); return true; }
     const data = store.readRecording(new URL(req.url, 'http://x').searchParams.get('id'));
