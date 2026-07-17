@@ -28,6 +28,11 @@ const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '';
 const STORAGE_KEY = process.env.STORAGE_KEY || '';
 const ADMIN_TOTP = process.env.ADMIN_TOTP_SECRET || process.env.MODERATOR_TOTP_SECRET || '';
+// Notausgang: ADMIN_2FA_OFF=1 (Env) + Redeploy schaltet die Admin-2FA komplett ab.
+const ADMIN_2FA_OFF = /^(1|true|yes|on)$/i.test(process.env.ADMIN_2FA_OFF || '');
+// Wirksames Admin-2FA-Secret: Env hat Vorrang, sonst das im Panel gesetzte.
+function adminTotpSecret() { return ADMIN_2FA_OFF ? '' : (ADMIN_TOTP || store.getAdminTotp()); }
+let pendingAdminTotp = '';
 const TURN_HOST = process.env.TURN_HOST || '';
 const TURN_SECRET = process.env.TURN_SECRET || '';
 const TURN_TTL = parseInt(process.env.TURN_TTL || '3600', 10);
@@ -127,7 +132,7 @@ async function handleApi(req, res, urlPath, ip) {
     }
     // Admin-Login (leerer Benutzername + Admin-Passwort + Admin-2FA)
     if (!ADMIN_PASSWORD) { sendJson(res, 503, { reason: 'admin-not-configured' }); return true; }
-    if (sec.safeEqual(body.password || '', ADMIN_PASSWORD) && sec.verifyAdminTotp(body.totp)) {
+    if (sec.safeEqual(body.password || '', ADMIN_PASSWORD) && sec.verifyTotp(adminTotpSecret(), body.totp)) {
       sec.resetFails(ip); sec.recordEvent('login-ok', ip, 'Admin');
       sendJson(res, 200, { token: sec.issueToken(ip, { name: 'Admin', role: 'admin' }), name: 'Admin', role: 'admin' });
     } else {
@@ -321,6 +326,30 @@ async function handleApi(req, res, urlPath, ip) {
     let body; try { body = await readJson(req, 16 * 1024); } catch { body = {}; }
     store.setIntro(body.intro || ''); sec.recordEvent('audit', ip, 'Begrüßungstext geändert');
     sendJson(res, 200, { ok: true, intro: store.getIntro() }); return true;
+  }
+  // ---- Admin-2FA im Panel (Face-ID-frei, mit Notausgang ADMIN_2FA_OFF) ----
+  if (urlPath === '/api/admin-2fa/status' && req.method === 'GET') {
+    if (!adminOnly()) return true;
+    sendJson(res, 200, { active: !!store.getAdminTotp(), envForced: !!ADMIN_TOTP, off: ADMIN_2FA_OFF }); return true;
+  }
+  if (urlPath === '/api/admin-2fa/setup' && req.method === 'POST') {
+    if (!adminOnly()) return true;
+    const secret = sec.generateTotpSecret(); pendingAdminTotp = secret;
+    const otpauth = `otpauth://totp/${encodeURIComponent('4EVER1 Admin')}?secret=${secret}&issuer=4EVER1&algorithm=SHA1&digits=6&period=30`;
+    let qr = ''; try { qr = await QRCode.toDataURL(otpauth, { margin: 1, width: 220 }); } catch (e) { /* QR optional */ }
+    sendJson(res, 200, { qr, otpauth, secret }); return true;
+  }
+  if (urlPath === '/api/admin-2fa/activate' && req.method === 'POST') {
+    if (!adminOnly()) return true;
+    let body; try { body = await readJson(req, 8 * 1024); } catch { body = {}; }
+    if (!pendingAdminTotp || !sec.verifyTotp(pendingAdminTotp, body.code)) { sendJson(res, 400, { reason: 'bad-code' }); return true; }
+    store.setAdminTotp(pendingAdminTotp); pendingAdminTotp = ''; sec.recordEvent('audit', ip, 'Admin-2FA aktiviert');
+    sendJson(res, 200, { ok: true }); return true;
+  }
+  if (urlPath === '/api/admin-2fa/disable' && req.method === 'POST') {
+    if (!adminOnly()) return true;
+    store.setAdminTotp(''); pendingAdminTotp = ''; sec.recordEvent('audit', ip, 'Admin-2FA deaktiviert');
+    sendJson(res, 200, { ok: true }); return true;
   }
   if (urlPath === '/api/cases' && req.method === 'GET') {
     if (!adminOnly()) return true;
@@ -523,7 +552,7 @@ server.listen(PORT, () => {
     ? `gesetzt (${ADMIN_PASSWORD.length} Zeichen, beginnt mit "${ADMIN_PASSWORD.slice(0, 2)}", endet mit "${ADMIN_PASSWORD.slice(-2)}")`
     : 'NICHT gesetzt – Verwaltung gesperrt';
   console.log(`Admin-Passwort: ${pwHint}`);
-  console.log(`Admin-2FA: ${sec.adminTotpActive() ? 'AKTIV (2FA-Code nötig)' : 'AUS (nur Passwort)'}`);
+  console.log(`Admin-2FA: ${adminTotpSecret() ? 'AKTIV (2FA-Code nötig)' : 'AUS (nur Passwort)'}${ADMIN_2FA_OFF ? ' – per ADMIN_2FA_OFF abgeschaltet' : ''}`);
   console.log(`Mitarbeiter-Konten: ${store.agentCount()}`);
   console.log(`TURN: ${TURN_SECRET && TURN_HOST ? 'aktiv (' + TURN_HOST + ')' : 'nur STUN'}`);
   console.log(`Login-IP-Sperre: ${sec.loginIpRestricted() ? 'aktiv' : 'aus'}`);

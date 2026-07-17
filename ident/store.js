@@ -306,9 +306,11 @@ function getScript() { return typeof settings.script === 'string' ? settings.scr
 function setScript(text) { settings.script = String(text || '').slice(0, 8000); save('settings.json', settings); return true; }
 function getIntro() { return typeof settings.intro === 'string' ? settings.intro : DEFAULT_INTRO; }
 function setIntro(text) { settings.intro = String(text || '').slice(0, 8000); save('settings.json', settings); return true; }
+function getAdminTotp() { return typeof settings.adminTotp === 'string' ? settings.adminTotp : ''; }
+function setAdminTotp(secret) { settings.adminTotp = String(secret || ''); save('settings.json', settings); return true; }
 
 module.exports = {
-  init, getScript, setScript, getIntro, setIntro,
+  init, getScript, setScript, getIntro, setIntro, getAdminTotp, setAdminTotp,
   listAgents, getAgentByUsername, getAgentById, addAgent, verifyAgent,
   setAgentPassword, changeOwnPassword, lockAgent, unlockAgent, deleteAgent, agentCount,
   addPasskey, getAgentByPasskeyId, setPasskeyCounter, agentPasskeys,
