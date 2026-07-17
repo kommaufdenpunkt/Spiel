@@ -485,7 +485,13 @@
   function startRec() {
     if (!window.MediaRecorder) { toast('Browser unterstützt keine Aufnahme.'); return; }
     const W = 1280, H = 480; const canvas = document.createElement('canvas'); canvas.width = W; canvas.height = H; const ctx = canvas.getContext('2d');
-    const draw = () => { ctx.fillStyle = '#0d1526'; ctx.fillRect(0, 0, W, H); cover(ctx, remoteVideo, 0, 0, W / 2, H); cover(ctx, localVideo, W / 2, 0, W / 2, H); if (state.recorder) requestAnimationFrame(draw); };
+    // Nur ~25 fps zeichnen (spart CPU), passend zur Aufnahme-Framerate.
+    let lastDraw = 0;
+    const draw = (ts) => {
+      if (!state.recorder) return;
+      if (!lastDraw || ts - lastDraw >= 38) { lastDraw = ts; ctx.fillStyle = '#0d1526'; ctx.fillRect(0, 0, W, H); cover(ctx, remoteVideo, 0, 0, W / 2, H); cover(ctx, localVideo, W / 2, 0, W / 2, H); }
+      requestAnimationFrame(draw);
+    };
     const canvasStream = canvas.captureStream(25);
     // Audio beider Seiten mischen
     const ac = new (window.AudioContext || window.webkitAudioContext)(); state.audioCtx = ac; const dest = ac.createMediaStreamDestination();
