@@ -40,6 +40,10 @@
     background:#0f1728;color:var(--ink);width:100%;transition:.12s}
   input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px #5b8cff44}
   input::placeholder{color:#6c7d99}
+  textarea{font-family:inherit;font-size:1rem;padding:.7rem .85rem;border-radius:10px;border:1px solid var(--line);background:#0f1728;color:var(--ink);width:100%;line-height:1.5;resize:vertical}
+  textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px #5b8cff44}
+  textarea::placeholder{color:#6c7d99}
+  .introtext{white-space:pre-wrap;line-height:1.65;font-size:.96rem;color:var(--ink);max-height:52vh;overflow:auto;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:1rem 1.1rem;margin:.2rem 0 1.2rem}
   input[type=checkbox]{width:auto;padding:0}
   a{color:var(--accent)}
   ::-webkit-scrollbar{width:10px;height:10px}
@@ -230,6 +234,16 @@
   </div>
 </div>
 
+<!-- ===================== WILLKOMMEN / ABLAUF ===================== -->
+<div id="onboarding" class="lobby" style="display:none">
+  <div class="card">
+    <h2>Willkommen 👋</h2>
+    <div class="introtext" id="introText"></div>
+    <div class="actions"><button id="readyBtn" class="primary">Bereit – in den Warteraum</button></div>
+    <button id="backToStart" class="linklike">← Zurück</button>
+  </div>
+</div>
+
 <!-- ===================== RAUM ===================== -->
 <div id="room" class="room">
   <section class="stage">
@@ -308,7 +322,7 @@
       <input id="vName" placeholder="Name laut Ausweis">
       <input id="vDocNumber" placeholder="Ausweis-Nr. (Altersnachweis)">
       <input id="vDocType" placeholder="Ausweisart (z. B. Personalausweis)">
-      <input id="vNote" placeholder="Notiz (optional)">
+      <textarea id="vNote" class="grow" rows="2" placeholder="Notiz (optional) – Zeilenumbrüche erlaubt"></textarea>
       <div class="sect">Prüf-Checkliste</div>
       <div class="checklist" id="checklist">
         <label><input type="checkbox" data-chk> Ausweis-Vorder- & Rückseite gesehen</label>

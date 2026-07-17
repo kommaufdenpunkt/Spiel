@@ -174,6 +174,7 @@ async function handleApi(req, res, urlPath, ip) {
 
   // ---- Audition-Text (Teleprompter) – Abruf öffentlich (Bewerber liest ihn) ----
   if (urlPath === '/api/script' && req.method === 'GET') { sendJson(res, 200, { script: store.getScript() }); return true; }
+  if (urlPath === '/api/intro' && req.method === 'GET') { sendJson(res, 200, { intro: store.getIntro() }); return true; }
 
   // ---- ab hier: gültiges Login nötig ----
   if (!authed(req, ip)) { sendJson(res, 401, { reason: 'auth' }); return true; }
@@ -314,6 +315,12 @@ async function handleApi(req, res, urlPath, ip) {
     let body; try { body = await readJson(req, 16 * 1024); } catch { body = {}; }
     store.setScript(body.script || ''); sec.recordEvent('audit', ip, 'Audition-Text geändert');
     sendJson(res, 200, { ok: true, script: store.getScript() }); return true;
+  }
+  if (urlPath === '/api/intro' && req.method === 'POST') {
+    if (!adminOnly()) return true;
+    let body; try { body = await readJson(req, 16 * 1024); } catch { body = {}; }
+    store.setIntro(body.intro || ''); sec.recordEvent('audit', ip, 'Begrüßungstext geändert');
+    sendJson(res, 200, { ok: true, intro: store.getIntro() }); return true;
   }
   if (urlPath === '/api/cases' && req.method === 'GET') {
     if (!adminOnly()) return true;

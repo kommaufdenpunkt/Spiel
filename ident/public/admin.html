@@ -98,10 +98,16 @@
       <div class="addbar"><input id="newUser" placeholder="Benutzername"><input id="newPass" placeholder="Startpasswort"><select id="newRole" style="padding:.6rem;border-radius:10px;border:1px solid var(--line)"><option value="agent">Prüfer</option><option value="admin">Admin</option></select><label style="display:flex;align-items:center;gap:.4rem;font-size:.85rem;color:var(--dim);white-space:nowrap"><input type="checkbox" id="new2fa" style="width:auto"> 2FA verlangen</label><button id="addAgent" class="primary">+ Anlegen</button></div>
       <div id="agentResult" class="note"></div><div id="agentList"></div>
     </div>
-    <div class="section" data-pane="script"><h2>Audition-Text (Teleprompter)</h2>
-      <p class="sub">Diesen Text sieht der Bewerber während der Audition und liest ihn in die Kamera. Das Tempo bestimmt der Bewerber selbst. Platzhalter wie <b>[dein Name]</b> ruhig stehen lassen.</p>
-      <textarea id="scriptText" style="width:100%;min-height:320px;font-family:inherit;font-size:.95rem;line-height:1.6;padding:.8rem;border-radius:12px;border:1px solid var(--line);background:#0f1728;color:var(--ink)"></textarea>
-      <div style="margin-top:.7rem;display:flex;gap:.5rem;align-items:center"><button id="scriptSave" class="primary">Speichern</button><span id="scriptMsg" class="muted"></span></div>
+    <div class="section" data-pane="script"><h2>Texte für die Audition</h2>
+      <h3 style="font-size:1rem;margin:.2rem 0 .3rem">Begrüßung / Ablauf (Warteraum)</h3>
+      <p class="sub">Sieht der Bewerber beim Reinkommen: Willkommen, Ablauf, PK-Board-Hinweis und die Einwilligung „ab jetzt wird aufgezeichnet". Zeilenumbrüche bleiben erhalten.</p>
+      <textarea id="introTextEdit" style="width:100%;min-height:220px;font-family:inherit;font-size:.95rem;line-height:1.6;padding:.8rem;border-radius:12px;border:1px solid var(--line);background:#0f1728;color:var(--ink)"></textarea>
+      <div style="margin-top:.7rem;display:flex;gap:.5rem;align-items:center"><button id="introSave" class="primary">Begrüßung speichern</button><span id="introMsg" class="muted"></span></div>
+      <hr style="border:0;border-top:1px solid var(--line);margin:1.5rem 0">
+      <h3 style="font-size:1rem;margin:.2rem 0 .3rem">Vorlese-Text (Teleprompter)</h3>
+      <p class="sub">Diesen Text liest der Bewerber in die Kamera; das Tempo bestimmt er selbst. Platzhalter wie <b>[dein Name]</b> ruhig stehen lassen.</p>
+      <textarea id="scriptText" style="width:100%;min-height:280px;font-family:inherit;font-size:.95rem;line-height:1.6;padding:.8rem;border-radius:12px;border:1px solid var(--line);background:#0f1728;color:var(--ink)"></textarea>
+      <div style="margin-top:.7rem;display:flex;gap:.5rem;align-items:center"><button id="scriptSave" class="primary">Vorlese-Text speichern</button><span id="scriptMsg" class="muted"></span></div>
     </div>
     <div class="section" data-pane="security"><h2>Überwachung</h2>
       <h3 style="font-size:.95rem">Gesperrte IPs</h3><div id="blockedList"></div>
