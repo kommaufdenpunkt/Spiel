@@ -92,14 +92,24 @@
   async function loadRec() {
     const r = await api('GET', '/api/recordings'); const list = r.body.recordings || [];
     const el = $('recList'); if (!list.length) { el.innerHTML = '<div class="empty">Noch keine Aufnahmen.</div>'; return; }
-    el.innerHTML = '';
+    el.className = 'reclist'; el.innerHTML = '';
     list.forEach((rec) => {
-      const div = document.createElement('div'); div.className = 'acc';
+      const div = document.createElement('div'); div.className = 'reccard';
       const date = new Date(rec.createdAt).toLocaleString('de-DE'); const mm = Math.floor((rec.durationSec || 0) / 60), ss = (rec.durationSec || 0) % 60;
       const mb = (rec.bytes / (1024 * 1024)).toFixed(1); const src = `/api/recording?id=${encodeURIComponent(rec.id)}&token=${encodeURIComponent(token)}`;
-      div.innerHTML = `<div class="top"><div><div class="nm">Nummer ${esc(rec.code || '-')}</div><div class="meta">${esc(date)} · Dauer ${mm}:${String(ss).padStart(2, '0')} · ${mb} MB · Prüfer: ${esc(rec.agentName || '-')}</div></div></div><video controls preload="none" src="${src}" style="width:100%;max-height:360px;border-radius:8px;background:#000;margin:.5rem 0"></video>`;
-      const acts = document.createElement('div'); const dl = document.createElement('a'); dl.href = src; dl.textContent = '⬇ Herunterladen'; dl.setAttribute('download', 'aufnahme_' + (rec.code || 'x') + '.' + (rec.ext || 'webm')); dl.style.marginRight = '.7rem';
-      acts.appendChild(dl); acts.appendChild(btn('🗑 Löschen', 'danger', async () => { if (!confirm('Aufnahme endgültig löschen?')) return; await api('POST', '/api/recording-delete', { id: rec.id }); loadRec(); loadOverview(); }));
+      const title = rec.bigoName || rec.name || ('Nummer ' + (rec.code || '-'));
+      const pill = rec.result === 'approved' ? '<span class="pill ok">✓ freigegeben</span>' : (rec.result === 'rejected' ? '<span class="pill no">✖ abgelehnt</span>' : '');
+      div.innerHTML = `
+        <div class="recvid"><video controls playsinline preload="metadata" src="${src}#t=0.1"></video><span class="recdur">${mm}:${String(ss).padStart(2, '0')}</span></div>
+        <div class="recbody">
+          <div class="rectop"><div class="nm">${esc(title)}</div>${pill}</div>
+          <div class="meta">${rec.bigoName && rec.name ? 'Name: ' + esc(rec.name) + ' · ' : ''}Nr.: ${esc(rec.code || '-')}<br>${esc(date)} · ${mb} MB · Prüfer: ${esc(rec.agentName || '-')}</div>
+        </div>`;
+      const acts = document.createElement('div'); acts.className = 'recacts';
+      acts.appendChild(btn('🔍 Groß ansehen', '', () => window.open(src, '_blank')));
+      const dl = document.createElement('a'); dl.href = src; dl.className = 'reclink'; dl.textContent = '⬇ Herunterladen'; dl.setAttribute('download', 'audition_' + (rec.bigoName || rec.code || 'x') + '.' + (rec.ext || 'webm'));
+      acts.appendChild(dl);
+      acts.appendChild(btn('🗑 Löschen', 'danger', async () => { if (!confirm('Aufnahme endgültig löschen?')) return; await api('POST', '/api/recording-delete', { id: rec.id }); loadRec(); loadOverview(); }));
       div.appendChild(acts); el.appendChild(div);
     });
   }
