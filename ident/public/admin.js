@@ -32,7 +32,36 @@
   function show(sec) {
     document.querySelectorAll('.nav button[data-sec]').forEach((b) => b.classList.toggle('sel', b.dataset.sec === sec));
     document.querySelectorAll('.section').forEach((s) => s.classList.toggle('on', s.dataset.pane === sec));
-    ({ overview: loadOverview, cases: loadCases, rec: loadRec, agents: loadAgents, script: loadScriptEditor, security: loadSecurity }[sec] || (() => {}))();
+    ({ overview: loadOverview, cases: loadCases, rec: loadRec, agents: loadAgents, script: loadScriptEditor, adminsec: loadA2fa, security: loadSecurity }[sec] || (() => {}))();
+  }
+  async function loadA2fa() {
+    const s = (await api('GET', '/api/admin-2fa/status')).body || {};
+    const st = $('a2faStatus'), setup = $('a2faSetup'); setup.innerHTML = '';
+    if (s.envForced) { st.innerHTML = '🔐 Admin-2FA ist über eine Server-Variable (ADMIN_TOTP_SECRET) fest aktiv.'; return; }
+    if (s.off) { st.innerHTML = '⚠️ Admin-2FA ist per Notausgang (ADMIN_2FA_OFF) abgeschaltet.'; return; }
+    if (s.active) {
+      st.innerHTML = '✅ Admin-2FA ist <b>AKTIV</b> – beim Login brauchst du einen 6-stelligen Code.';
+      setup.appendChild(btn('2FA deaktivieren', 'danger', async () => { if (!confirm('Admin-2FA wirklich deaktivieren?')) return; await api('POST', '/api/admin-2fa/disable', {}); loadA2fa(); }));
+    } else {
+      st.innerHTML = 'Admin-2FA ist derzeit <b>AUS</b> (nur Passwort).';
+      setup.appendChild(btn('🔐 2FA einrichten', 'primary', startA2faSetup));
+    }
+  }
+  async function startA2faSetup() {
+    const r = await api('POST', '/api/admin-2fa/setup', {}); if (r.status !== 200) { toast('Fehler.'); return; }
+    $('a2faSetup').innerHTML = `
+      <div>Mit <b>Google Authenticator</b> diesen QR scannen, dann den Code eingeben und <b>Aktivieren</b>:</div>
+      ${r.body.qr ? `<img src="${r.body.qr}" alt="QR" style="width:200px;height:200px;background:#fff;padding:8px;border-radius:12px;margin:.6rem 0">` : ''}
+      <div class="muted">Oder Schlüssel manuell eintragen: <code>${esc(r.body.secret)}</code></div>
+      <div style="display:flex;gap:.5rem;align-items:center;margin-top:.7rem;flex-wrap:wrap">
+        <input id="a2faCode" inputmode="numeric" placeholder="6-stelliger Code" style="max-width:180px">
+        <button id="a2faActivate" class="primary">Aktivieren</button><span id="a2faMsg" class="muted"></span>
+      </div>`;
+    $('a2faActivate').addEventListener('click', async () => {
+      const rr = await api('POST', '/api/admin-2fa/activate', { code: $('a2faCode').value.trim() });
+      if (rr.status === 200) { $('a2faMsg').textContent = 'Aktiviert ✓'; setTimeout(loadA2fa, 900); }
+      else $('a2faMsg').textContent = 'Code falsch – bitte erneut versuchen.';
+    });
   }
   async function loadScriptEditor() {
     const s = await api('GET', '/api/script'); if (s.status === 200) $('scriptText').value = s.body.script || '';
