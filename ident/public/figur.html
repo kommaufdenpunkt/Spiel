@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>4EVER1 · Figuren & Erklär-Video</title>
+<link rel="icon" href="/icon-192.png">
+<meta name="theme-color" content="#0d1320">
+<style>
+  :root{--bg:#0d1320;--panel:#161d2c;--panel2:#1c2438;--line:#2b3651;--ink:#e9eefb;--dim:#9aabc6;--accent:#5b8cff;--warm:#e8975d;--good:#3ec77b}
+  *{box-sizing:border-box}html,body{margin:0;height:100%}
+  body{color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;min-height:100%;
+    background:radial-gradient(1100px 580px at 82% -12%,#3a2a1566,transparent 60%),radial-gradient(900px 540px at -6% 108%,#16265066,transparent 55%),var(--bg)}
+  header{display:flex;align-items:center;gap:.65rem;padding:.7rem 1.1rem;border-bottom:1px solid var(--line);background:#0f1626d9;position:sticky;top:0;z-index:5}
+  .logo{width:32px;height:32px;border-radius:9px;display:grid;place-items:center;background:linear-gradient(135deg,#6f9bff,#3b6ef0)}
+  h1{font-size:1rem;margin:0}h1 small{display:block;font-size:.64rem;color:var(--dim);letter-spacing:.16em;text-transform:uppercase}
+  .wrap{max-width:1000px;margin:1.3rem auto;padding:0 1.1rem;display:grid;gap:1.2rem;grid-template-columns:1fr 1fr}
+  @media(max-width:800px){.wrap{grid-template-columns:1fr}}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:1.2rem 1.3rem}
+  .card h2{margin:.1rem 0 1rem;font-size:1.15rem}
+  .stage{display:flex;justify-content:center;background:var(--panel2);border:1px solid var(--line);border-radius:16px;padding:1rem}
+  .stage svg{width:230px;height:250px;max-width:100%}
+  .tabs{display:flex;gap:.5rem;margin-bottom:.9rem}
+  .tabs button{flex:1}
+  .tabs button.sel{outline:2px solid var(--accent)}
+  .ctrl{display:flex;align-items:center;justify-content:space-between;gap:.6rem;margin:.55rem 0;font-size:.9rem}
+  .ctrl .lbl{color:var(--dim);min-width:92px}
+  .cyc{display:flex;align-items:center;gap:.5rem}
+  .cyc .val{min-width:96px;text-align:center;font-weight:600}
+  .swatches{display:flex;gap:.4rem;flex-wrap:wrap}
+  .sw{width:26px;height:26px;border-radius:50%;border:2px solid #ffffff33;cursor:pointer}
+  .sw.on{outline:3px solid var(--accent);outline-offset:1px}
+  button{font-family:inherit;cursor:pointer;border:1px solid var(--line);background:linear-gradient(180deg,#232e46,#1a2336);color:var(--ink);
+    padding:.6rem 1rem;border-radius:12px;font-size:.9rem;font-weight:600;transition:transform .14s cubic-bezier(.2,.7,.3,1),filter .14s,box-shadow .14s;
+    box-shadow:0 1px 0 rgba(255,255,255,.05) inset,0 2px 6px rgba(0,0,0,.35)}
+  button:hover:not(:disabled){transform:translateY(-1px);border-color:var(--accent)}
+  button:active:not(:disabled){transform:translateY(0);filter:brightness(.95)}
+  button.primary{background:linear-gradient(180deg,#6a97ff,#3b6ef0 52%,#2a55c8);border-color:#2a55c8;color:#fff;box-shadow:0 1px 0 rgba(255,255,255,.3) inset,0 14px 28px -12px rgba(59,110,240,.7)}
+  button.good{background:linear-gradient(180deg,#48d178,#23a952 52%,#178a44);border-color:#178a44;color:#fff}
+  .iconbtn{width:38px;height:38px;padding:0;border-radius:10px;font-size:1.1rem}
+  .muted{color:var(--dim);font-size:.82rem;line-height:1.5}
+  .row{display:flex;gap:.6rem;flex-wrap:wrap;align-items:center;margin-top:.8rem}
+  .team{display:flex;gap:.8rem;justify-content:center;flex-wrap:wrap}
+  .team .fig{text-align:center}.team svg{width:150px;height:165px}
+  .team .nm{font-size:.8rem;color:var(--dim);margin-top:.2rem}
+  .subtitle{margin-top:1rem;min-height:3.2em;background:#0b1220;border:1px solid var(--line);border-radius:12px;padding:.8rem 1rem;font-size:1.05rem;line-height:1.5}
+  input[type=text]{font-family:inherit;font-size:.9rem;padding:.5rem .7rem;border-radius:10px;border:1px solid var(--line);background:#0f1728;color:var(--ink);width:120px}
+  input[type=range]{width:130px}
+  a{color:var(--accent)}
+</style>
+</head>
+<body>
+<header>
+  <span class="logo"><svg viewBox="0 0 24 24" width="20" height="20" fill="none"><path d="M12 2.6l6.8 2.5v5.2c0 4.3-2.9 7.4-6.8 8.8-3.9-1.4-6.8-4.5-6.8-8.8V5.1L12 2.6z" fill="#fff"/><path d="M8.6 12.1l2.2 2.2 4.6-4.8" stroke="#2a55c8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+  <h1>4EVER1 <small>Figuren · Erklär-Video</small></h1>
+</header>
+
+<div class="wrap">
+  <!-- LINKS: Baukasten -->
+  <div class="card">
+    <h2>Figur erstellen</h2>
+    <div class="tabs" id="teamTabs"></div>
+    <div class="stage"><div id="preview"></div></div>
+    <div class="ctrl"><span class="lbl">Name</span><input type="text" id="figName" maxlength="16" placeholder="z. B. Gino"></div>
+    <div class="ctrl"><span class="lbl">Rolle</span><input type="text" id="figRole" maxlength="48" placeholder="z. B. Teamleitung" style="width:190px"></div>
+    <div id="controls"></div>
+    <div class="ctrl"><span class="lbl">Hautton</span><div class="swatches" id="swSkin"></div></div>
+    <div class="ctrl"><span class="lbl">Haarfarbe</span><div class="swatches" id="swHair"></div></div>
+    <div class="ctrl"><span class="lbl">Shirt</span><div class="swatches" id="swShirt"></div></div>
+    <div class="ctrl"><span class="lbl">Hintergrund</span><div class="swatches" id="swBg"></div></div>
+    <div class="row"><button class="good" id="saveBtn">💾 Team speichern</button><span class="muted" id="saveMsg"></span></div>
+    <p class="muted" style="margin-top:.8rem">Baue nacheinander <b>Person 1–3</b> nach – so, dass sie euch ähneln. Speichern nicht vergessen.</p>
+  </div>
+
+  <!-- RECHTS: Erklär-Video -->
+  <div class="card">
+    <h2>Erklär-Video (Team &amp; PK Board)</h2>
+    <div class="team" id="videoTeam"></div>
+    <div class="subtitle" id="subtitle">Hier stellen sich eure Figuren vor und erklären das PK Board. Auf „Abspielen" tippen.</div>
+    <div class="row">
+      <button class="primary" id="playBtn">▶ Abspielen</button>
+      <button id="stopBtn">⏹ Stopp</button>
+      <span class="lbl muted">Tempo</span><input type="range" id="rate" min="0.7" max="1.3" step="0.1" value="1">
+    </div>
+    <details style="margin-top:1rem">
+      <summary class="muted" style="cursor:pointer;user-select:none">✎ Erklär-Text bearbeiten</summary>
+      <p class="muted" style="margin:.6rem 0">Eine Zeile pro Satz. Beginnt eine Zeile mit einem Namen und Doppelpunkt (z. B. <b>Gino:</b>), spricht diese Figur. Zeilen ohne Namen sprechen alle abwechselnd.</p>
+      <textarea id="scriptBox" style="width:100%;min-height:220px;font-family:inherit;font-size:.9rem;line-height:1.55;padding:.7rem;border-radius:12px;border:1px solid var(--line);background:#0f1728;color:var(--ink)"></textarea>
+      <div class="row"><button class="good" id="scriptSaveBtn">💾 Text speichern</button><button id="scriptResetBtn">↺ Standard-Text</button><span class="muted" id="scriptMsg"></span></div>
+    </details>
+    <p class="muted" style="margin-top:.8rem">Die Figuren tragen den Text mit der Sprachausgabe des Browsers vor – mit Mundbewegung und Untertiteln. Ton bitte anlassen.</p>
+    <p class="muted"><a href="/admin">← zum Admin</a></p>
+  </div>
+</div>
+<script src="/figur.js"></script>
+</body>
+</html>
