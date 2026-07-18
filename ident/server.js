@@ -70,6 +70,7 @@ function sanitizeFigures(arr) {
       numKeys.forEach((k) => { let n = parseInt(f[k], 10); if (!Number.isFinite(n) || n < 0) n = 0; o[k] = Math.min(n, 99); });
       o.name = String(f.name || '').slice(0, 16);
       o.role = String(f.role || '').slice(0, 48);
+      if (typeof f.img === 'string' && /^data:image\/(png|jpe?g|webp);base64,/.test(f.img) && f.img.length <= 700000) o.img = f.img;
     }
     return o;
   });
@@ -348,7 +349,7 @@ async function handleApi(req, res, urlPath, ip) {
   // ---- Figuren (Team-Avatare) speichern – nur Admin (GET ist oben öffentlich) --
   if (urlPath === '/api/figures' && req.method === 'POST') {
     if (!adminOnly()) return true;
-    let body; try { body = await readJson(req, 32 * 1024); } catch { body = {}; }
+    let body; try { body = await readJson(req, 4 * 1024 * 1024); } catch { body = {}; }
     store.setFigures(sanitizeFigures(body.figures));
     if (typeof body.script === 'string') store.setFigureScript(body.script);
     sec.recordEvent('audit', ip, 'Figuren geändert');

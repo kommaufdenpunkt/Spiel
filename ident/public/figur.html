@@ -61,7 +61,13 @@
     <h2>Figur erstellen</h2>
     <div class="tabs" id="teamTabs"></div>
     <div class="stage"><div id="preview"></div></div>
-    <div class="ctrl"><span class="lbl">Name</span><input type="text" id="figName" maxlength="16" placeholder="z. B. Gino"></div>
+    <div class="row" style="margin:.6rem 0 .2rem">
+      <input type="file" id="figImg" accept="image/*" style="display:none">
+      <button class="primary" id="uploadBtn">📷 Eigenes Bild / KI-Figur</button>
+      <button id="clearImgBtn">✏️ Zeichnung nutzen</button>
+    </div>
+    <p class="muted" id="imgHint" style="margin:0 0 .5rem"></p>
+    <div class="ctrl"><span class="lbl">Name</span><input type="text" id="figName" maxlength="16" placeholder="z. B. eyfahrlehrer"></div>
     <div class="ctrl"><span class="lbl">Rolle</span><input type="text" id="figRole" maxlength="48" placeholder="z. B. Teamleitung" style="width:190px"></div>
     <div id="controls"></div>
     <div class="ctrl"><span class="lbl">Hautton</span><div class="swatches" id="swSkin"></div></div>
