@@ -300,8 +300,7 @@
   }
 
   function connectSignaling() {
-    state.peers = new Map(); state.mainPeerId = null; state.myUploads = state.myUploads || [];
-    $('vextras').innerHTML = '';
+    closeAllPeers(); state.myUploads = state.myUploads || []; state.leaving = false;
     const proto = location.protocol === 'https:' ? 'wss' : 'ws';
     const ws = new WebSocket(`${proto}://${location.host}`); state.ws = ws;
     ws.onopen = () => ws.send(JSON.stringify({ type: 'join', room: state.code, role: state.role, token: state.token || '', name: state.name }));
@@ -323,7 +322,11 @@
           break;
       }
     };
-    ws.onclose = () => sysMsg('Verbindung zum Server getrennt.');
+    ws.onclose = () => {
+      if (state.leaving || !$('room').classList.contains('active')) { sysMsg('Verbindung zum Server getrennt.'); return; }
+      sysMsg('Verbindung unterbrochen – neuer Versuch …'); $('bannerText').textContent = 'Verbindung wird wiederhergestellt …';
+      clearTimeout(state.reconnectT); state.reconnectT = setTimeout(() => { if (!state.leaving && $('room').classList.contains('active')) connectSignaling(); }, 2500);
+    };
   }
   function sig(to, data) { if (state.ws && state.ws.readyState === WebSocket.OPEN) state.ws.send(JSON.stringify({ type: 'signal', to, data })); }
   function isMainRole(role) { return state.role === 'host' ? role === 'guest' : role === 'host'; }
@@ -338,7 +341,12 @@
     pc.onnegotiationneeded = async () => { if (!P.initiator) return; try { P.makingOffer = true; await pc.setLocalDescription(); sig(peerId, { description: pc.localDescription }); } catch {} finally { P.makingOffer = false; } };
     pc.onicecandidate = ({ candidate }) => { if (candidate) sig(peerId, { candidate }); };
     pc.ontrack = ({ streams }) => attachStream(peerId, streams[0]);
-    pc.onconnectionstatechange = () => { if (pc.connectionState === 'connected') tuneQuality(pc); };
+    pc.onconnectionstatechange = () => {
+      const s = pc.connectionState;
+      if (s === 'connected') { tuneQuality(pc); $('bannerText').textContent = 'Verbunden.'; }
+      else if (s === 'failed') { $('bannerText').textContent = 'Verbindung wird wiederhergestellt …'; if (P.initiator) { try { pc.restartIce(); } catch {} } }
+      else if (s === 'disconnected') { $('bannerText').textContent = 'Verbindung instabil …'; }
+    };
     if (initiator) setupDataChannel(peerId, pc.createDataChannel('app'));
     else pc.ondatachannel = (e) => setupDataChannel(peerId, e.channel);
     return P;
@@ -368,7 +376,7 @@
       if (!state.mainPeerId) { remoteWaiting.style.display = ''; remoteWaiting.textContent = 'Warte auf Teilnehmer …'; }
     }
   }
-  function closeAllPeers() { if (state.peers) state.peers.forEach((P) => { try { P.pc.close(); } catch {} }); state.peers = new Map(); state.mainPeerId = null; if ($('vextras')) $('vextras').innerHTML = ''; }
+  function closeAllPeers() { if (state.peers) state.peers.forEach((P) => { try { P.pc.close(); } catch {} }); state.peers = new Map(); state.mainPeerId = null; if ($('vextras')) $('vextras').innerHTML = ''; if (remoteVideo) remoteVideo.srcObject = null; }
   async function handleSignal(from, data) {
     const P = state.peers.get(from); if (!P) return; const pc = P.pc;
     try {
@@ -568,7 +576,7 @@
   $('leaveBtn').addEventListener('click', leaveRoom);
   function leaveRoom() {
     if (state.recorder && state.recorder.state === 'recording') stopRec();
-    try { if (state.ws) state.ws.close(); } catch {} state.ws = null; closeAllPeers();
+    state.leaving = true; clearTimeout(state.reconnectT); try { if (state.ws) state.ws.close(); } catch {} state.ws = null; closeAllPeers();
     if (state.localStream) { state.localStream.getTracks().forEach((t) => { try { t.stop(); } catch {} }); state.localStream = null; }
     resetForNext(); $('room').classList.remove('active'); openWaiting();
   }
@@ -583,7 +591,7 @@
   }
 
   function backToStart(errText) {
-    try { if (state.ws) state.ws.close(); } catch {} state.ws = null; closeAllPeers();
+    state.leaving = true; clearTimeout(state.reconnectT); try { if (state.ws) state.ws.close(); } catch {} state.ws = null; closeAllPeers();
     if (state.localStream) { state.localStream.getTracks().forEach((t) => { try { t.stop(); } catch {} }); state.localStream = null; }
     $('room').classList.remove('active'); $('waitingView').style.display = 'none'; $('lobby').style.display = '';
     $('lobbyErr').textContent = errText || ''; resetEnter();
