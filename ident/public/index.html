@@ -50,6 +50,13 @@
   textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px #5b8cff44}
   textarea::placeholder{color:#6c7d99}
   .introtext{white-space:pre-wrap;line-height:1.65;font-size:.96rem;color:var(--ink);max-height:52vh;overflow:auto;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:1rem 1.1rem;margin:.2rem 0 1.2rem}
+  .obteam{display:flex;gap:.7rem;justify-content:center;flex-wrap:wrap;margin:.2rem 0 .8rem}
+  .obteam .fig{text-align:center}
+  .obteam .fig svg{width:118px;height:130px;max-width:100%}
+  .obteam .nm{font-size:.78rem;color:var(--dim);margin-top:.15rem}
+  .obsub{min-height:3.4em;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:.75rem 1rem;font-size:1rem;line-height:1.5;margin-bottom:.9rem}
+  .obrow{display:flex;gap:.6rem;flex-wrap:wrap;margin-bottom:1rem}
+  .obrow button{flex:1;min-width:150px}
   input[type=checkbox]{width:auto;padding:0}
   a{color:var(--accent)}
   ::-webkit-scrollbar{width:10px;height:10px}
@@ -248,7 +255,11 @@
 <div id="onboarding" class="lobby" style="display:none">
   <div class="card">
     <h2>Willkommen 👋</h2>
-    <div class="introtext" id="introText"></div>
+    <p class="sub" style="margin:-.4rem 0 .8rem;color:var(--dim);font-size:.9rem">Dein Team der Agentur 4EVER1 erklärt dir kurz, wie deine Audition abläuft.</p>
+    <div class="obteam" id="obTeam"></div>
+    <div class="obsub" id="obSubtitle">Tippe auf „Erklären lassen" – dein Team führt dich durch den Ablauf. Ton bitte anlassen. 🔊</div>
+    <div class="obrow"><button id="obPlayBtn" class="primary">▶ Erklären lassen</button><button id="obStopBtn">⏹ Stopp</button></div>
+    <details style="margin-bottom:1rem"><summary style="cursor:pointer;color:var(--dim);font-size:.9rem">Text lieber lesen</summary><div class="introtext" id="introText" style="margin-top:.7rem"></div></details>
     <div class="actions"><button id="readyBtn" class="primary">Bereit – in den Warteraum</button></div>
     <button id="backToStart" class="linklike">← Zurück</button>
   </div>
@@ -374,6 +385,7 @@
 
 <div id="lightbox"><img id="lightboxImg" alt=""></div>
 <div class="toast" id="toast"></div>
+<script src="/figur-core.js"></script>
 <script src="/app.js"></script>
 </body>
 </html>

@@ -99,15 +99,42 @@
     loadIntro();
     $('onboarding').style.display = '';
   }
-  async function loadIntro() { try { const r = await api('GET', '/api/intro'); if (r.status === 200 && $('introText')) $('introText').textContent = r.body.intro || ''; } catch {} }
+  // ---- Warteraum: Team-Figuren erklären den Ablauf ------------------------
+  const Fig = window.Figuren;
+  let obTeam = Fig ? Fig.defaultTeam() : [];
+  let obIntroText = '';
+  let obPlayer = null;
+  function setupObPlayer() {
+    if (!Fig || obPlayer) return;
+    obPlayer = Fig.makePlayer({
+      teamHost: $('obTeam'), subtitle: $('obSubtitle'),
+      getTeam: () => obTeam,
+      getScript: () => obIntroText || Fig.DEFAULT_SCRIPT,
+      getRate: () => 1,
+      onState: (p) => { if ($('obPlayBtn')) $('obPlayBtn').disabled = p; },
+      doneText: 'Alles klar? Dann tippe auf „Bereit – in den Warteraum". 👍',
+    });
+  }
+  async function loadIntro() {
+    try { const r = await api('GET', '/api/intro'); if (r.status === 200) { obIntroText = r.body.intro || ''; if ($('introText')) $('introText').textContent = obIntroText; } } catch {}
+    if (Fig) {
+      try { const cfg = await Fig.loadServerConfig(); if (cfg.figures) obTeam = cfg.figures; } catch {}
+      setupObPlayer();
+      Fig.renderTeamInto($('obTeam'), obTeam);
+      if ($('obSubtitle')) $('obSubtitle').textContent = 'Tippe auf „Erklären lassen" – dein Team führt dich durch den Ablauf. Ton bitte anlassen. 🔊';
+    }
+  }
+  if ($('obPlayBtn')) $('obPlayBtn').addEventListener('click', () => { setupObPlayer(); if (obPlayer) obPlayer.start(); });
+  if ($('obStopBtn')) $('obStopBtn').addEventListener('click', () => { if (obPlayer) obPlayer.stop(); });
   if ($('readyBtn')) $('readyBtn').addEventListener('click', async () => {
+    if (obPlayer) obPlayer.stop();
     const b = $('readyBtn'); b.disabled = true; b.textContent = 'Kamera wird gestartet …';
     if (!(await startCamera())) { b.disabled = false; b.textContent = 'Bereit – in den Warteraum'; toast('Kein Zugriff auf Kamera/Mikrofon. Bitte erlauben.'); return; }
     localTag.textContent = 'Du'; $('onboarding').style.display = 'none';
     b.disabled = false; b.textContent = 'Bereit – in den Warteraum';
     startRoom();
   });
-  if ($('backToStart')) $('backToStart').addEventListener('click', () => { $('onboarding').style.display = 'none'; $('lobby').style.display = ''; });
+  if ($('backToStart')) $('backToStart').addEventListener('click', () => { if (obPlayer) obPlayer.stop(); $('onboarding').style.display = 'none'; $('lobby').style.display = ''; });
   // Textfelder mit "grow" wachsen mit dem Inhalt (Zeilenumbrüche).
   function autoGrow(el) { el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 280) + 'px'; }
   document.querySelectorAll('textarea.grow').forEach((t) => { t.addEventListener('input', () => autoGrow(t)); });

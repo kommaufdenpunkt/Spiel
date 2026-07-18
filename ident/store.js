@@ -308,9 +308,15 @@ function getIntro() { return typeof settings.intro === 'string' ? settings.intro
 function setIntro(text) { settings.intro = String(text || '').slice(0, 8000); save('settings.json', settings); return true; }
 function getAdminTotp() { return typeof settings.adminTotp === 'string' ? settings.adminTotp : ''; }
 function setAdminTotp(secret) { settings.adminTotp = String(secret || ''); save('settings.json', settings); return true; }
+// Figuren (Team-Avatare) + zugehöriger Erklär-Text – null = Standard im Client verwenden
+function getFigures() { return Array.isArray(settings.figures) ? settings.figures : null; }
+function setFigures(arr) { settings.figures = Array.isArray(arr) ? arr.slice(0, 3) : null; save('settings.json', settings); return true; }
+function getFigureScript() { return typeof settings.figureScript === 'string' ? settings.figureScript : null; }
+function setFigureScript(text) { settings.figureScript = (typeof text === 'string') ? text.slice(0, 8000) : null; save('settings.json', settings); return true; }
 
 module.exports = {
   init, getScript, setScript, getIntro, setIntro, getAdminTotp, setAdminTotp,
+  getFigures, setFigures, getFigureScript, setFigureScript,
   listAgents, getAgentByUsername, getAgentById, addAgent, verifyAgent,
   setAgentPassword, changeOwnPassword, lockAgent, unlockAgent, deleteAgent, agentCount,
   addPasskey, getAgentByPasskeyId, setPasskeyCounter, agentPasskeys,
