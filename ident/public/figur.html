@@ -69,7 +69,16 @@
     <div class="ctrl"><span class="lbl">Shirt</span><div class="swatches" id="swShirt"></div></div>
     <div class="ctrl"><span class="lbl">Hintergrund</span><div class="swatches" id="swBg"></div></div>
     <div class="row"><button class="good" id="saveBtn">💾 Team speichern</button><span class="muted" id="saveMsg"></span></div>
-    <p class="muted" style="margin-top:.8rem">Baue nacheinander <b>Person 1–3</b> nach – so, dass sie euch ähneln. Speichern nicht vergessen.</p>
+    <details id="adminBox" style="margin-top:.7rem">
+      <summary class="muted" style="cursor:pointer;user-select:none">🔒 Für alle Bewerber speichern (Admin-Login)</summary>
+      <p class="muted" style="margin:.5rem 0">Ohne Login wird nur auf diesem Gerät gespeichert. Als Admin angemeldet, sehen die Figuren auch die Bewerber im Warteraum.</p>
+      <div class="row">
+        <input type="password" id="admPw" placeholder="Admin-Passwort" autocomplete="current-password" style="width:160px">
+        <input type="text" id="admTotp" placeholder="2FA-Code (falls aktiv)" inputmode="numeric" style="width:150px">
+        <button id="admLogin">Anmelden</button><span class="muted" id="admMsg"></span>
+      </div>
+    </details>
+    <p class="muted" style="margin-top:.8rem">Die Figuren sind schon nach eurem Foto voreingestellt. Änderungen jederzeit möglich – Speichern nicht vergessen.</p>
   </div>
 
   <!-- RECHTS: Erklär-Video -->
@@ -92,6 +101,7 @@
     <p class="muted"><a href="/admin">← zum Admin</a></p>
   </div>
 </div>
+<script src="/figur-core.js"></script>
 <script src="/figur.js"></script>
 </body>
 </html>

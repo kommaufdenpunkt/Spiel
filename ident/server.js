@@ -60,6 +60,22 @@ const MIME = {
   '.webmanifest': 'application/manifest+json; charset=utf-8',
 };
 
+// ---- Figuren-Konfiguration serverseitig absichern --------------------------
+function sanitizeFigures(arr) {
+  if (!Array.isArray(arr)) return null;
+  const numKeys = ['face', 'hair', 'brows', 'eyes', 'nose', 'beard', 'glass', 'mouth', 'phones', 'skin', 'hairColor', 'shirt', 'bg'];
+  const out = arr.slice(0, 3).map((f) => {
+    const o = {};
+    if (f && typeof f === 'object') {
+      numKeys.forEach((k) => { let n = parseInt(f[k], 10); if (!Number.isFinite(n) || n < 0) n = 0; o[k] = Math.min(n, 99); });
+      o.name = String(f.name || '').slice(0, 16);
+      o.role = String(f.role || '').slice(0, 48);
+    }
+    return o;
+  });
+  return out.length === 3 ? out : null;
+}
+
 // ---- ICE / TURN ------------------------------------------------------------
 function buildIceServers() {
   const list = [{ urls: ['stun:stun.l.google.com:19302'] }];
@@ -180,6 +196,8 @@ async function handleApi(req, res, urlPath, ip) {
   // ---- Audition-Text (Teleprompter) – Abruf öffentlich (Bewerber liest ihn) ----
   if (urlPath === '/api/script' && req.method === 'GET') { sendJson(res, 200, { script: store.getScript() }); return true; }
   if (urlPath === '/api/intro' && req.method === 'GET') { sendJson(res, 200, { intro: store.getIntro() }); return true; }
+  // Figuren (Team-Avatare) – Abruf öffentlich (Bewerber sieht sie im Warteraum)
+  if (urlPath === '/api/figures' && req.method === 'GET') { sendJson(res, 200, { figures: store.getFigures(), script: store.getFigureScript() }); return true; }
 
   // ---- ab hier: gültiges Login nötig ----
   if (!authed(req, ip)) { sendJson(res, 401, { reason: 'auth' }); return true; }
@@ -326,6 +344,15 @@ async function handleApi(req, res, urlPath, ip) {
     let body; try { body = await readJson(req, 16 * 1024); } catch { body = {}; }
     store.setIntro(body.intro || ''); sec.recordEvent('audit', ip, 'Begrüßungstext geändert');
     sendJson(res, 200, { ok: true, intro: store.getIntro() }); return true;
+  }
+  // ---- Figuren (Team-Avatare) speichern – nur Admin (GET ist oben öffentlich) --
+  if (urlPath === '/api/figures' && req.method === 'POST') {
+    if (!adminOnly()) return true;
+    let body; try { body = await readJson(req, 32 * 1024); } catch { body = {}; }
+    store.setFigures(sanitizeFigures(body.figures));
+    if (typeof body.script === 'string') store.setFigureScript(body.script);
+    sec.recordEvent('audit', ip, 'Figuren geändert');
+    sendJson(res, 200, { ok: true, figures: store.getFigures(), script: store.getFigureScript() }); return true;
   }
   // ---- Admin-2FA im Panel (Face-ID-frei, mit Notausgang ADMIN_2FA_OFF) ----
   if (urlPath === '/api/admin-2fa/status' && req.method === 'GET') {
