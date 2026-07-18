@@ -1,5 +1,6 @@
 /* figur-core.js – gemeinsame Figuren-Logik (Baukasten + Warteraum)
- * Reine Browser-Technik: SVG-Figuren + Sprachausgabe (speechSynthesis).
+ * Plastische SVG-Figuren mit Verläufen + selbstlaufender Animation (SMIL):
+ * sanftes Atmen/Wippen, Blinzeln, flüssiges Lippen-Sync beim Sprechen.
  * Stellt window.Figuren bereit. Kein externer Dienst.
  */
 (function () {
@@ -21,7 +22,6 @@
   var MOUTH  = ['laecheln', 'neutral', 'grinsen'];
   var PHONES = ['keine', 'an'];
 
-  // Zyklische Steuerungen (Label -> Optionen)
   var CYCLERS = [
     { key: 'face',   label: 'Kopfform',    opts: FACE },
     { key: 'hair',   label: 'Frisur',      opts: HAIRSTYLE },
@@ -34,11 +34,11 @@
     { key: 'phones', label: 'Kopfhörer',   opts: PHONES }
   ];
 
-  // Teamleitung 4EVER1 – nach dem Team-Foto voreingestellt (von links: Gino, Dennis, Lisa)
+  // Teamleitung 4EVER1 – nach dem Team-Foto voreingestellt (von links)
   var PRESET = [
     { name: 'eyfahrlehrer', role: 'Für euch & das Optische', face: 1, hair: 3, brows: 0, eyes: 0, nose: 1, beard: 0, glass: 0, mouth: 0, skin: 1, hairColor: 2, shirt: 5, bg: 0, phones: 1 },
     { name: 'eykeepcool',   role: 'Verwaltung & Konflikte', face: 0, hair: 7, brows: 0, eyes: 1, nose: 1, beard: 1, glass: 0, mouth: 0, skin: 1, hairColor: 4, shirt: 6, bg: 5, phones: 0 },
-    { name: 'Lisa',         role: 'Teamleitung & Events',            face: 1, hair: 6, brows: 2, eyes: 2, nose: 0, beard: 0, glass: 0, mouth: 0, skin: 0, hairColor: 1, shirt: 5, bg: 4, phones: 0 }
+    { name: 'Lisa',         role: 'Teamleitung & Events',    face: 1, hair: 6, brows: 2, eyes: 2, nose: 0, beard: 0, glass: 0, mouth: 0, skin: 0, hairColor: 1, shirt: 5, bg: 4, phones: 0 }
   ];
 
   var DEFAULT_SCRIPT = [
@@ -90,35 +90,80 @@
     return '#' + h(r) + h(g) + h(b);
   }
 
-  // ---- SVG-Rendering -------------------------------------------------------
+  var GID = 0; // eindeutige Verlaufs-IDs pro Figur
+
+  // ---- SVG-Rendering (plastisch + animiert) -------------------------------
+  var CX = 100, CY = 95;
   function renderFigure(f, opts) {
     opts = opts || {};
+    var seed = opts.seed || 0;
+    var id = 'g' + (GID++);
     var skin = SKIN[f.skin], hair = HAIR[f.hairColor], shirt = SHIRT[f.shirt], bg = BG[f.bg];
-    var dark = shade(skin, -0.18);
-    var cx = 100, cy = 95, rx = 46, ry = 52, corner = 46;
+    var dark = shade(skin, -0.2);
+    var skinFill = 'url(#sk' + id + ')', hairFill = 'url(#hr' + id + ')', shirtFill = 'url(#sh' + id + ')', bgFill = 'url(#bgg' + id + ')';
+    var cx = CX, cy = CY, rx = 46, ry = 52, corner = 46;
     if (FACE[f.face] === 'oval') { rx = 42; ry = 56; }
     if (FACE[f.face] === 'kantig') { rx = 46; ry = 50; corner = 22; }
 
     var s = '<svg viewBox="0 0 200 220" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Figur">';
-    s += '<rect x="0" y="0" width="200" height="220" rx="18" fill="' + bg + '"/>';
-    s += '<ellipse cx="100" cy="215" rx="70" ry="24" fill="' + shade(bg, 0.12) + '"/>';
-    s += '<path d="M40 220 q0 -46 60 -46 q60 0 60 46 Z" fill="' + shirt + '"/>';
-    s += '<path d="M78 178 q22 20 44 0 l0 14 q-22 16 -44 0 Z" fill="' + shade(shirt, -0.14) + '"/>';
-    s += '<rect x="86" y="150" width="28" height="30" rx="12" fill="' + dark + '"/>';
-    s += hairBack(f, hair, cx, cy, rx, ry);
-    s += '<ellipse cx="' + (cx - rx + 4) + '" cy="' + cy + '" rx="9" ry="13" fill="' + skin + '"/>';
-    s += '<ellipse cx="' + (cx + rx - 4) + '" cy="' + cy + '" rx="9" ry="13" fill="' + skin + '"/>';
-    s += roundedFace(cx, cy, rx, ry, corner, skin);
+    // Verläufe für plastischen Look
+    s += '<defs>';
+    s += '<radialGradient id="sk' + id + '" cx="40%" cy="30%" r="78%"><stop offset="0" stop-color="' + shade(skin, 0.17) + '"/><stop offset="0.58" stop-color="' + skin + '"/><stop offset="1" stop-color="' + shade(skin, -0.2) + '"/></radialGradient>';
+    s += '<linearGradient id="sh' + id + '" x1="0" y1="0" x2="0.15" y2="1"><stop offset="0" stop-color="' + shade(shirt, 0.16) + '"/><stop offset="1" stop-color="' + shade(shirt, -0.16) + '"/></linearGradient>';
+    s += '<radialGradient id="bgg' + id + '" cx="50%" cy="34%" r="82%"><stop offset="0" stop-color="' + shade(bg, 0.16) + '"/><stop offset="1" stop-color="' + shade(bg, -0.12) + '"/></radialGradient>';
+    s += '<linearGradient id="hr' + id + '" x1="0.2" y1="0" x2="0.4" y2="1"><stop offset="0" stop-color="' + shade(hair, 0.22) + '"/><stop offset="0.55" stop-color="' + hair + '"/><stop offset="1" stop-color="' + shade(hair, -0.1) + '"/></linearGradient>';
+    s += '</defs>';
+
+    // Hintergrund + Boden-Schatten (bleiben ruhig)
+    s += '<rect x="0" y="0" width="200" height="220" rx="18" fill="' + bgFill + '"/>';
+    s += '<ellipse cx="100" cy="216" rx="66" ry="20" fill="#000" opacity=".22"/>';
+
+    // Schultern / Shirt (ruhig)
+    s += '<path d="M38 220 q0 -48 62 -48 q62 0 62 48 Z" fill="' + shirtFill + '"/>';
+    s += '<path d="M100 172 q-24 2 -34 20 q22 -8 34 -8 q12 0 34 8 q-10 -18 -34 -20 Z" fill="' + shade(shirt, 0.1) + '" opacity=".5"/>';
+    s += '<path d="M78 176 q22 20 44 0 l0 14 q-22 16 -44 0 Z" fill="' + shade(shirt, -0.18) + '"/>';
+
+    // ---- Kopf-Baugruppe: atmet + wippt sanft (SMIL) ----
+    s += '<g>';
+    s += anim('translate', '0 0;0 -2.6;0 0', 3.8, -seed * 0.9);
+    s += anim('rotate', '-1.2 100 150;1.2 100 150;-1.2 100 150', 6.6, -seed * 1.7);
+    // Hals
+    s += '<rect x="86" y="150" width="28" height="30" rx="12" fill="' + shade(skin, -0.16) + '"/>';
+    // Haare hinten
+    s += hairBack(f, hairFill, cx, cy, rx, ry);
+    // Ohren
+    s += '<ellipse cx="' + (cx - rx + 4) + '" cy="' + cy + '" rx="9" ry="13" fill="' + skin + '"/><ellipse cx="' + (cx - rx + 4) + '" cy="' + cy + '" rx="4" ry="7" fill="' + dark + '" opacity=".4"/>';
+    s += '<ellipse cx="' + (cx + rx - 4) + '" cy="' + cy + '" rx="9" ry="13" fill="' + skin + '"/><ellipse cx="' + (cx + rx - 4) + '" cy="' + cy + '" rx="4" ry="7" fill="' + dark + '" opacity=".4"/>';
+    // Kopf
+    s += roundedFace(cx, cy, rx, ry, corner, skinFill);
+    // weiche Wangen-/Kinnschattierung für Tiefe
+    s += '<ellipse cx="' + cx + '" cy="' + (cy + ry * 0.5) + '" rx="' + (rx * 0.82) + '" ry="' + (ry * 0.45) + '" fill="' + dark + '" opacity=".13"/>';
+    // Bart
     s += beard(f, cx, cy, ry, hair);
+    // Augenbrauen
     s += brows(f, cx, cy, hair);
-    s += eyes(f, cx, cy);
+    // Augen (inkl. Blinzeln)
+    s += eyes(f, cx, cy, skin, seed);
+    // Nase
     s += nose(f, cx, cy, dark);
-    s += mouth(f, cx, cy, opts.mouthOpen);
-    s += hairFront(f, hair, cx, cy, rx, ry);
+    // Mund (wird beim Sprechen aktualisiert)
+    s += '<g class="mouthg">' + mouth(f, cx, cy, 0) + '</g>';
+    // Haare vorne
+    s += hairFront(f, hairFill, hair, cx, cy, rx, ry);
+    // Brille
     s += glasses(f, cx, cy);
+    // Kopfhörer
     s += headphones(f, cx, cy, rx, ry);
+    s += '</g>'; // Ende Kopf-Baugruppe
     s += '</svg>';
     return s;
+  }
+
+  // SMIL-Transform-Baustein (additiv, weich)
+  function anim(type, values, dur, begin) {
+    return '<animateTransform attributeName="transform" type="' + type + '" additive="sum" ' +
+      'dur="' + dur + 's" repeatCount="indefinite" calcMode="spline" keyTimes="0;0.5;1" ' +
+      'keySplines="0.45 0 0.55 1;0.45 0 0.55 1" values="' + values + '" begin="' + begin.toFixed(2) + 's"/>';
   }
 
   function headphones(f, cx, cy, rx, ry) {
@@ -132,12 +177,12 @@
     });
     return s;
   }
-  function roundedFace(cx, cy, rx, ry, corner, skin) {
-    if (corner < 30) return '<rect x="' + (cx - rx) + '" y="' + (cy - ry) + '" width="' + (rx * 2) + '" height="' + (ry * 2) + '" rx="' + corner + '" fill="' + skin + '"/>';
-    return '<ellipse cx="' + cx + '" cy="' + cy + '" rx="' + rx + '" ry="' + ry + '" fill="' + skin + '"/>';
+  function roundedFace(cx, cy, rx, ry, corner, skinFill) {
+    if (corner < 30) return '<rect x="' + (cx - rx) + '" y="' + (cy - ry) + '" width="' + (rx * 2) + '" height="' + (ry * 2) + '" rx="' + corner + '" fill="' + skinFill + '"/>';
+    return '<ellipse cx="' + cx + '" cy="' + cy + '" rx="' + rx + '" ry="' + ry + '" fill="' + skinFill + '"/>';
   }
   function eyeXs(cx) { return [cx - 18, cx + 18]; }
-  function eyes(f, cx, cy) {
+  function eyes(f, cx, cy, skin, seed) {
     var xs = eyeXs(cx), ey = cy + 2, kind = EYES[f.eyes], s = '';
     xs.forEach(function (x) {
       if (kind === 'schmal') {
@@ -147,8 +192,11 @@
         var r = kind === 'gross' ? 9 : 7;
         s += '<ellipse cx="' + x + '" cy="' + ey + '" rx="' + r + '" ry="' + (r + 1) + '" fill="#fff"/>';
         s += '<circle cx="' + x + '" cy="' + (ey + 1) + '" r="' + (r - 3.4) + '" fill="#26313f"/>';
-        s += '<circle cx="' + (x + 1.5) + '" cy="' + (ey - 1) + '" r="1.3" fill="#fff"/>';
+        s += '<circle cx="' + (x + 1.6) + '" cy="' + (ey - 1.2) + '" r="1.4" fill="#fff"/>';
       }
+      // Lid zum Blinzeln (kurzes Aufblitzen in Hautfarbe)
+      s += '<rect x="' + (x - 10) + '" y="' + (ey - 12) + '" width="20" height="16" rx="7" fill="' + skin + '" opacity="0">' +
+        '<animate attributeName="opacity" dur="5.2s" repeatCount="indefinite" keyTimes="0;0.93;0.955;0.985;1" values="0;0;1;0;0" begin="' + (-seed * 2.1 - 0.6).toFixed(2) + 's"/></rect>';
     });
     return s;
   }
@@ -164,11 +212,19 @@
     var w = kind === 'breit' ? 11 : (kind === 'klein' ? 5 : 8);
     return '<path d="M' + cx + ' ' + (cy + 2) + ' q-' + (w / 2) + ' ' + (ny - cy) + ' 0 ' + (ny - cy - 2) +
            ' q' + (w / 2) + ' 2 ' + (w / 2) + ' -2" fill="none" stroke="' + dark + '" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>' +
-           '<ellipse cx="' + cx + '" cy="' + (ny - 1) + '" rx="' + (w / 2 + 1) + '" ry="2.6" fill="' + dark + '" opacity=".35"/>';
+           '<ellipse cx="' + cx + '" cy="' + (ny - 1) + '" rx="' + (w / 2 + 1) + '" ry="2.6" fill="' + dark + '" opacity=".32"/>';
   }
-  function mouth(f, cx, cy, open) {
-    var my = cy + 32;
-    if (open) return '<ellipse cx="' + cx + '" cy="' + my + '" rx="10" ry="8" fill="#5c2b2b"/><ellipse cx="' + cx + '" cy="' + (my + 3) + '" rx="6" ry="3.4" fill="#c0566a"/>';
+  // level 0 = ruhend (laecheln/neutral/grinsen), 1..3 = zunehmend geöffnet (Sprechen)
+  function mouth(f, cx, cy, level) {
+    var my = cy + 32; level = level | 0;
+    if (level > 0) {
+      var open = [0, 3, 6, 9][level] || 6, w = 10;
+      var s = '<ellipse cx="' + cx + '" cy="' + my + '" rx="' + w + '" ry="' + open + '" fill="#571f24"/>';
+      s += '<path d="M' + (cx - w) + ' ' + my + ' q' + w + ' -5 ' + (2 * w) + ' 0" fill="none" stroke="#7a3b3b" stroke-width="2" stroke-linecap="round"/>';
+      s += '<rect x="' + (cx - w + 2) + '" y="' + (my - open) + '" width="' + (2 * w - 4) + '" height="' + Math.max(2, open * 0.45) + '" rx="1.5" fill="#fff" opacity=".92"/>';
+      if (level >= 2) s += '<ellipse cx="' + cx + '" cy="' + (my + open * 0.45) + '" rx="' + (w * 0.55) + '" ry="' + (open * 0.4) + '" fill="#c0566a"/>';
+      return s;
+    }
     var kind = MOUTH[f.mouth];
     if (kind === 'neutral') return '<rect x="' + (cx - 12) + '" y="' + (my - 1.5) + '" width="24" height="3.4" rx="1.7" fill="#7a3b3b"/>';
     if (kind === 'grinsen') return '<path d="M' + (cx - 15) + ' ' + my + ' q15 20 30 0 q-15 6 -30 0 Z" fill="#fff" stroke="#7a3b3b" stroke-width="2"/>';
@@ -199,44 +255,51 @@
     s += '<line x1="' + (xs[0] + 12) + '" y1="' + ey + '" x2="' + (xs[1] - 12) + '" y2="' + ey + '" stroke="' + stroke + '" stroke-width="2.6"/>';
     return s;
   }
-  function hairBack(f, hair, cx, cy, rx, ry) {
+  function hairBack(f, hairFill, cx, cy, rx, ry) {
     var style = HAIRSTYLE[f.hair];
-    if (style === 'lang') return '<path d="M' + (cx - rx - 4) + ' ' + (cy - 10) + ' q-8 70 18 88 l' + (2 * rx + 8) + ' 0 q26 -18 18 -88 Z" fill="' + hair + '"/>';
-    if (style === 'zopf') return '<ellipse cx="' + (cx + rx + 2) + '" cy="' + (cy + 30) + '" rx="10" ry="26" fill="' + hair + '"/>';
+    if (style === 'lang') return '<path d="M' + (cx - rx - 4) + ' ' + (cy - 10) + ' q-8 70 18 88 l' + (2 * rx + 8) + ' 0 q26 -18 18 -88 Z" fill="' + hairFill + '"/>';
+    if (style === 'zopf') return '<ellipse cx="' + (cx + rx + 2) + '" cy="' + (cy + 30) + '" rx="10" ry="26" fill="' + hairFill + '"/>';
     return '';
   }
-  function hairFront(f, hair, cx, cy, rx, ry) {
+  function hairFront(f, hairFill, hair, cx, cy, rx, ry) {
     var style = HAIRSTYLE[f.hair];
     if (style === 'glatze') return '';
-    var s = '', hl = shade(hair, 0.12);
-    if (style === 'buerste') return '<path d="M' + (cx - rx) + ' ' + (cy - 18) + ' q0 -46 ' + rx + ' -46 q' + rx + ' 0 ' + rx + ' 46 q-' + rx + ' -22 -' + (2 * rx) + ' 0 Z" fill="' + hair + '"/>';
+    var s = '', hl = shade(hair, 0.16);
+    if (style === 'buerste') return '<path d="M' + (cx - rx) + ' ' + (cy - 18) + ' q0 -46 ' + rx + ' -46 q' + rx + ' 0 ' + rx + ' 46 q-' + rx + ' -22 -' + (2 * rx) + ' 0 Z" fill="' + hairFill + '"/>';
     if (style === 'undercut') {
-      s += '<path d="M' + (cx - rx) + ' ' + (cy - 20) + ' q6 -44 ' + rx + ' -44 q' + rx + ' 0 ' + rx + ' 44 q-30 -18 -' + (2 * rx) + ' 6 Z" fill="' + hair + '"/>';
+      s += '<path d="M' + (cx - rx) + ' ' + (cy - 20) + ' q6 -44 ' + rx + ' -44 q' + rx + ' 0 ' + rx + ' 44 q-30 -18 -' + (2 * rx) + ' 6 Z" fill="' + hairFill + '"/>';
       s += '<path d="M' + (cx + 6) + ' ' + (cy - 40) + ' q' + (rx - 6) + ' 4 ' + (rx - 6) + ' 30" fill="none" stroke="' + hl + '" stroke-width="3" opacity=".5"/>';
       return s;
     }
-    if (style === 'seitenscheitel') return '<path d="M' + (cx - rx) + ' ' + (cy - 14) + ' q-2 -50 ' + rx + ' -50 q' + rx + ' 0 ' + rx + ' 44 q-18 -30 -' + (rx + 10) + ' -22 q-' + (rx - 10) + ' 6 -' + (rx - 10) + ' 28 Z" fill="' + hair + '"/>';
-    if (style === 'lockig') return '<path d="M' + (cx - rx) + ' ' + (cy - 12) + ' q-4 -30 12 -40 q6 -14 22 -10 q14 -12 30 -2 q18 -4 20 16 q10 8 4 34 q-14 -20 -44 -20 q-30 0 -44 22 Z" fill="' + hair + '"/>';
-    if (style === 'zopf' || style === 'lang') return '<path d="M' + (cx - rx) + ' ' + (cy - 6) + ' q-4 -54 ' + rx + ' -54 q' + rx + ' 0 ' + rx + ' 54 q-14 -34 -' + rx + ' -34 q-' + rx + ' 0 -' + rx + ' 34 Z" fill="' + hair + '"/>';
-    return '<path d="M' + (cx - rx) + ' ' + (cy - 12) + ' q0 -48 ' + rx + ' -48 q' + rx + ' 0 ' + rx + ' 48 q-16 -26 -' + rx + ' -26 q-' + rx + ' 0 -' + rx + ' 26 Z" fill="' + hair + '"/>';
+    if (style === 'seitenscheitel') return '<path d="M' + (cx - rx) + ' ' + (cy - 14) + ' q-2 -50 ' + rx + ' -50 q' + rx + ' 0 ' + rx + ' 44 q-18 -30 -' + (rx + 10) + ' -22 q-' + (rx - 10) + ' 6 -' + (rx - 10) + ' 28 Z" fill="' + hairFill + '"/>';
+    if (style === 'lockig') return '<path d="M' + (cx - rx) + ' ' + (cy - 12) + ' q-4 -30 12 -40 q6 -14 22 -10 q14 -12 30 -2 q18 -4 20 16 q10 8 4 34 q-14 -20 -44 -20 q-30 0 -44 22 Z" fill="' + hairFill + '"/>';
+    if (style === 'zopf' || style === 'lang') return '<path d="M' + (cx - rx) + ' ' + (cy - 6) + ' q-4 -54 ' + rx + ' -54 q' + rx + ' 0 ' + rx + ' 54 q-14 -34 -' + rx + ' -34 q-' + rx + ' 0 -' + rx + ' 34 Z" fill="' + hairFill + '"/>';
+    return '<path d="M' + (cx - rx) + ' ' + (cy - 12) + ' q0 -48 ' + rx + ' -48 q' + rx + ' 0 ' + rx + ' 48 q-16 -26 -' + rx + ' -26 q-' + rx + ' 0 -' + rx + ' 26 Z" fill="' + hairFill + '"/>';
   }
 
-  // ---- Team-Kacheln rendern ------------------------------------------------
-  function renderTeamInto(host, team, activeIdx, mouthOpen) {
+  // Nur die Mund-Innereien (zum Live-Aktualisieren beim Sprechen)
+  function renderMouth(f, level) { return mouth(f, CX, CY, level); }
+
+  // ---- Team-Kacheln rendern (einmalig aufbauen) ---------------------------
+  function renderTeamInto(host, team, activeIdx, mouthLevel) {
     if (!host) return;
     host.innerHTML = '';
     team.forEach(function (f, i) {
-      var wrap = document.createElement('div'); wrap.className = 'fig';
+      var wrap = document.createElement('div'); wrap.className = 'fig'; wrap.setAttribute('data-idx', i);
       var active = (i === activeIdx);
-      wrap.innerHTML = renderFigure(f, { mouthOpen: active && mouthOpen });
-      if (active) { wrap.style.transform = 'translateY(-6px) scale(1.06)'; wrap.style.filter = 'drop-shadow(0 8px 18px rgba(91,140,255,.5))'; }
-      wrap.style.transition = 'transform .18s ease, filter .18s ease';
+      wrap.innerHTML = renderFigure(f, { seed: i, mouthLevel: active ? (mouthLevel || 0) : 0 });
+      wrap.style.transition = 'transform .2s ease, filter .2s ease';
+      if (active) applyHighlight(wrap, true);
       var nm = document.createElement('div'); nm.className = 'nm'; nm.textContent = f.name || ('Person ' + (i + 1));
       if (active) nm.style.color = 'var(--accent)';
       wrap.appendChild(nm);
       if (f.role) { var rl = document.createElement('div'); rl.className = 'nm'; rl.style.fontSize = '.68rem'; rl.style.opacity = '.75'; rl.textContent = f.role; wrap.appendChild(rl); }
       host.appendChild(wrap);
     });
+  }
+  function applyHighlight(wrap, on) {
+    if (on) { wrap.style.transform = 'translateY(-6px) scale(1.06)'; wrap.style.filter = 'drop-shadow(0 10px 20px rgba(91,140,255,.5))'; wrap.style.zIndex = '2'; }
+    else { wrap.style.transform = ''; wrap.style.filter = ''; wrap.style.zIndex = ''; }
   }
 
   // ---- Skript zerlegen -----------------------------------------------------
@@ -269,33 +332,52 @@
   // ---- Player --------------------------------------------------------------
   // cfg: { teamHost, subtitle, getTeam(), getScript(), getRate?(), onState?(playing), doneText? }
   function makePlayer(cfg) {
-    var st = { on: false, timer: 0, mouthTimer: 0, idx: 0, entries: [], team: [] };
+    var st = { on: false, timer: 0, mouthTimer: 0, idx: 0, entries: [], team: [], who: -1 };
     function rate() { try { var r = cfg.getRate ? cfg.getRate() : 1; return parseFloat(r) || 1; } catch (e) { return 1; } }
-    function draw(active, open) { renderTeamInto(cfg.teamHost, st.team, active, open); }
     function setSub(html) { if (cfg.subtitle) cfg.subtitle.innerHTML = html; }
     function state(p) { if (cfg.onState) try { cfg.onState(p); } catch (e) {} }
+    function tiles() { return (cfg.teamHost && cfg.teamHost.children) ? cfg.teamHost.children : []; }
 
-    function clearMouth() { if (st.mouthTimer) { clearInterval(st.mouthTimer); st.mouthTimer = 0; } }
+    function build() { st.team = sanitizeTeam(cfg.getTeam()); renderTeamInto(cfg.teamHost, st.team); }
+    function highlight(active) {
+      var ts = tiles();
+      for (var i = 0; i < ts.length; i++) {
+        applyHighlight(ts[i], i === active);
+        var nm = ts[i].querySelector('.nm');
+        if (nm) nm.style.color = (i === active) ? 'var(--accent)' : '';
+      }
+    }
+    function setMouth(idx, level) {
+      var ts = tiles(); if (!ts[idx]) return;
+      var mg = ts[idx].querySelector('.mouthg');
+      if (mg) mg.innerHTML = renderMouth(st.team[idx], level);
+    }
+    function clearMouth() { if (st.mouthTimer) { clearInterval(st.mouthTimer); st.mouthTimer = 0; } if (st.who >= 0) setMouth(st.who, 0); }
     function clearTimer() { if (st.timer) { clearTimeout(st.timer); st.timer = 0; } }
 
+    var VISEMES = [1, 2, 3, 2, 3, 1, 2, 3, 2, 1];
     function next() {
       if (!st.on) return;
       clearMouth(); st.idx++;
-      st.timer = setTimeout(speak, 260);
+      st.timer = setTimeout(speak, 240);
     }
     function speak() {
       if (!st.on) return;
       if (st.idx >= st.entries.length) { finish(); return; }
       var e = st.entries[st.idx], text = e.text, who = e.speaker;
+      st.who = who;
       var nm = (st.team[who] && st.team[who].name) ? st.team[who].name : '';
       setSub((nm ? '<b style="color:var(--accent)">' + esc(nm) + ':</b> ' : '') + esc(text));
-      var mo = false; clearMouth();
-      st.mouthTimer = setInterval(function () { mo = !mo; draw(who, mo); }, 160);
-      draw(who, true);
+      highlight(who);
+      var k = 0;
+      if (st.mouthTimer) clearInterval(st.mouthTimer);
+      st.mouthTimer = setInterval(function () { setMouth(who, VISEMES[k % VISEMES.length]); k++; }, 125);
+      setMouth(who, 2);
 
       var r = rate();
       var minMs = Math.max(1400, Math.min(8000, text.length * 60 / r));
       var started = perfNow(), advanced = false;
+      // Mund weiter animieren lassen, bis wirklich zum nächsten Satz gewechselt wird
       function advance() { if (advanced) return; advanced = true; var rest = minMs - (perfNow() - started); st.timer = setTimeout(next, rest > 0 ? rest : 0); }
 
       var hasTTS = ('speechSynthesis' in window) && ('SpeechSynthesisUtterance' in window);
@@ -307,30 +389,28 @@
         try { window.speechSynthesis.speak(u); } catch (ex) { st.timer = setTimeout(next, minMs); return; }
         st.timer = setTimeout(advance, minMs + Math.min(9000, text.length * 90));
       } else {
-        st.timer = setTimeout(next, minMs);
+        st.timer = setTimeout(function () { clearMouth(); next(); }, minMs);
       }
     }
     function finish() {
-      st.on = false; clearMouth();
+      st.on = false; clearMouth(); highlight(-1); st.who = -1;
       setSub(esc(cfg.doneText || 'Fertig – willkommen bei 4EVER1! 👍'));
-      draw(); state(false);
+      state(false);
     }
     function start() {
       if (st.on) return;
-      st.team = sanitizeTeam(cfg.getTeam());
+      build();
       st.entries = parseScript(cfg.getScript(), st.team);
-      draw();
       if (!st.entries.length) { setSub('Kein Text vorhanden.'); return; }
-      st.idx = 0; st.on = true; state(true);
+      st.idx = 0; st.on = true; st.who = -1; state(true);
       try { window.speechSynthesis.getVoices(); } catch (e) {}
       speak();
     }
     function stop() {
-      st.on = false; clearMouth(); clearTimer();
+      st.on = false; clearMouth(); clearTimer(); highlight(-1); st.who = -1;
       try { window.speechSynthesis.cancel(); } catch (e) {}
-      draw(); state(false);
     }
-    function render() { st.team = sanitizeTeam(cfg.getTeam()); draw(); }
+    function render() { build(); }
     return { start: start, stop: stop, render: render, isOn: function () { return st.on; } };
   }
 
@@ -352,7 +432,7 @@
     SKIN: SKIN, HAIR: HAIR, SHIRT: SHIRT, BG: BG, CYCLERS: CYCLERS,
     PRESET: PRESET, DEFAULT_SCRIPT: DEFAULT_SCRIPT,
     defaultTeam: defaultTeam, sanitize: sanitize, sanitizeTeam: sanitizeTeam,
-    renderFigure: renderFigure, renderTeamInto: renderTeamInto,
+    renderFigure: renderFigure, renderTeamInto: renderTeamInto, renderMouth: renderMouth,
     parseScript: parseScript, makePlayer: makePlayer, loadServerConfig: loadServerConfig
   };
 })();
