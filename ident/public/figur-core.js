@@ -72,6 +72,7 @@
     out.bg = clampIdx(out.bg, BG.length);
     out.name = String(out.name || '').slice(0, 16);
     out.role = String(out.role || '').slice(0, 48);
+    out.img = (f && typeof f.img === 'string' && /^data:image\/(png|jpe?g|webp);base64,/.test(f.img) && f.img.length <= 700000) ? f.img : '';
     return out;
   }
   function sanitizeTeam(arr) {
@@ -98,6 +99,7 @@
     opts = opts || {};
     var seed = opts.seed || 0;
     var id = 'g' + (GID++);
+    if (f.img) return renderPhoto(f, id, seed);
     var skin = SKIN[f.skin], hair = HAIR[f.hairColor], shirt = SHIRT[f.shirt], bg = BG[f.bg];
     var dark = shade(skin, -0.2);
     var skinFill = 'url(#sk' + id + ')', hairFill = 'url(#hr' + id + ')', shirtFill = 'url(#sh' + id + ')', bgFill = 'url(#bgg' + id + ')';
@@ -138,6 +140,9 @@
     s += roundedFace(cx, cy, rx, ry, corner, skinFill);
     // weiche Wangen-/Kinnschattierung für Tiefe
     s += '<ellipse cx="' + cx + '" cy="' + (cy + ry * 0.5) + '" rx="' + (rx * 0.82) + '" ry="' + (ry * 0.45) + '" fill="' + dark + '" opacity=".13"/>';
+    // zarte Wangenröte
+    s += '<ellipse cx="' + (cx - 22) + '" cy="' + (cy + 18) + '" rx="8" ry="5" fill="#e8836b" opacity=".18"/>';
+    s += '<ellipse cx="' + (cx + 22) + '" cy="' + (cy + 18) + '" rx="8" ry="5" fill="#e8836b" opacity=".18"/>';
     // Bart
     s += beard(f, cx, cy, ry, hair);
     // Augenbrauen
@@ -155,6 +160,29 @@
     // Kopfhörer
     s += headphones(f, cx, cy, rx, ry);
     s += '</g>'; // Ende Kopf-Baugruppe
+    s += '</svg>';
+    return s;
+  }
+
+  // Foto-/KI-Bild-Modus: das hochgeladene Bild als Figur (mit sanfter Bewegung)
+  function renderPhoto(f, id, seed) {
+    var bg = BG[f.bg];
+    var s = '<svg viewBox="0 0 200 220" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Figur">';
+    s += '<defs>';
+    s += '<radialGradient id="bgg' + id + '" cx="50%" cy="34%" r="82%"><stop offset="0" stop-color="' + shade(bg, 0.16) + '"/><stop offset="1" stop-color="' + shade(bg, -0.12) + '"/></radialGradient>';
+    s += '<clipPath id="cl' + id + '"><rect x="12" y="12" width="176" height="196" rx="20"/></clipPath>';
+    s += '</defs>';
+    s += '<rect x="0" y="0" width="200" height="220" rx="18" fill="url(#bgg' + id + ')"/>';
+    s += '<ellipse cx="100" cy="214" rx="66" ry="18" fill="#000" opacity=".22"/>';
+    s += '<g>';
+    s += anim('translate', '0 0;0 -2.4;0 0', 3.8, -seed * 0.9);
+    s += anim('rotate', '-0.9 100 150;0.9 100 150;-0.9 100 150', 6.6, -seed * 1.7);
+    s += '<g class="avtalk">';
+    s += '<image class="avimg" href="' + esc(f.img) + '" x="12" y="12" width="176" height="196" preserveAspectRatio="xMidYMid slice" clip-path="url(#cl' + id + ')"/>';
+    s += '</g>';
+    s += '<rect x="12" y="12" width="176" height="196" rx="20" fill="none" stroke="#ffffff22" stroke-width="2"/>';
+    s += '</g>';
+    s += '<g class="mouthg"></g>'; // Platzhalter (Foto-Modus animiert per Bounce)
     s += '</svg>';
     return s;
   }
@@ -184,18 +212,31 @@
   function eyeXs(cx) { return [cx - 18, cx + 18]; }
   function eyes(f, cx, cy, skin, seed) {
     var xs = eyeXs(cx), ey = cy + 2, kind = EYES[f.eyes], s = '';
-    xs.forEach(function (x) {
+    var iris = '#5b3b26'; // warmes Braun
+    xs.forEach(function (x, i) {
       if (kind === 'schmal') {
-        s += '<rect x="' + (x - 8) + '" y="' + (ey - 3) + '" width="16" height="7" rx="3.5" fill="#fff"/>';
-        s += '<circle cx="' + x + '" cy="' + (ey + 0.5) + '" r="3.4" fill="#26313f"/>';
+        s += '<rect x="' + (x - 8) + '" y="' + (ey - 3) + '" width="16" height="7" rx="3.5" fill="#f3f6fb"/>';
+        s += '<circle cx="' + x + '" cy="' + (ey + 0.5) + '" r="3.6" fill="' + iris + '"/>';
+        s += '<circle cx="' + x + '" cy="' + (ey + 0.5) + '" r="2" fill="#1c242e"/>';
+        s += '<circle cx="' + (x + 1.2) + '" cy="' + (ey - 0.6) + '" r="1" fill="#fff"/>';
+        s += '<path d="M' + (x - 8) + ' ' + (ey - 3.5) + ' q8 -3 16 0" fill="none" stroke="#6a4a34" stroke-width="1.4" stroke-linecap="round" opacity=".7"/>';
       } else {
-        var r = kind === 'gross' ? 9 : 7;
-        s += '<ellipse cx="' + x + '" cy="' + ey + '" rx="' + r + '" ry="' + (r + 1) + '" fill="#fff"/>';
-        s += '<circle cx="' + x + '" cy="' + (ey + 1) + '" r="' + (r - 3.4) + '" fill="#26313f"/>';
-        s += '<circle cx="' + (x + 1.6) + '" cy="' + (ey - 1.2) + '" r="1.4" fill="#fff"/>';
+        var r = kind === 'gross' ? 9 : 7.5;
+        s += '<ellipse cx="' + x + '" cy="' + ey + '" rx="' + r + '" ry="' + (r + 1) + '" fill="#f3f6fb"/>';
+        s += '<ellipse cx="' + x + '" cy="' + ey + '" rx="' + r + '" ry="' + (r + 1) + '" fill="none" stroke="#00000018" stroke-width="1"/>';
+        s += '<circle cx="' + x + '" cy="' + (ey + 1) + '" r="' + (r - 2) + '" fill="' + iris + '"/>';
+        s += '<circle cx="' + x + '" cy="' + (ey + 1) + '" r="' + (r - 4) + '" fill="#1c242e"/>';
+        s += '<circle cx="' + (x + 1.8) + '" cy="' + (ey - 1.4) + '" r="1.7" fill="#fff"/>';
+        s += '<circle cx="' + (x - 1.6) + '" cy="' + (ey + 2.4) + '" r="0.9" fill="#ffffffcc"/>';
+        // Oberlid-Linie
+        s += '<path d="M' + (x - r) + ' ' + (ey - r * 0.7) + ' q' + r + ' -3 ' + (2 * r) + ' 0" fill="none" stroke="#00000022" stroke-width="1.6" stroke-linecap="round"/>';
+        if (kind === 'gross') { // Wimpern (weiblicher Look)
+          s += '<path d="M' + (x - r) + ' ' + (ey - r * 0.6) + ' q' + r + ' -5 ' + (2 * r) + ' 0" fill="none" stroke="#2a2320" stroke-width="1.8" stroke-linecap="round"/>';
+          s += '<path d="M' + (x + r - 1) + ' ' + (ey - r * 0.5) + ' l3 -2.5" stroke="#2a2320" stroke-width="1.4" stroke-linecap="round"/>';
+        }
       }
       // Lid zum Blinzeln (kurzes Aufblitzen in Hautfarbe)
-      s += '<rect x="' + (x - 10) + '" y="' + (ey - 12) + '" width="20" height="16" rx="7" fill="' + skin + '" opacity="0">' +
+      s += '<rect x="' + (x - 11) + '" y="' + (ey - 13) + '" width="22" height="17" rx="8" fill="' + skin + '" opacity="0">' +
         '<animate attributeName="opacity" dur="5.2s" repeatCount="indefinite" keyTimes="0;0.93;0.955;0.985;1" values="0;0;1;0;0" begin="' + (-seed * 2.1 - 0.6).toFixed(2) + 's"/></rect>';
     });
     return s;
@@ -226,9 +267,13 @@
       return s;
     }
     var kind = MOUTH[f.mouth];
-    if (kind === 'neutral') return '<rect x="' + (cx - 12) + '" y="' + (my - 1.5) + '" width="24" height="3.4" rx="1.7" fill="#7a3b3b"/>';
-    if (kind === 'grinsen') return '<path d="M' + (cx - 15) + ' ' + my + ' q15 20 30 0 q-15 6 -30 0 Z" fill="#fff" stroke="#7a3b3b" stroke-width="2"/>';
-    return '<path d="M' + (cx - 14) + ' ' + my + ' q14 16 28 0" fill="none" stroke="#7a3b3b" stroke-width="3" stroke-linecap="round"/>';
+    if (kind === 'neutral') return '<path d="M' + (cx - 12) + ' ' + my + ' q12 3 24 0" fill="none" stroke="#9a4b4b" stroke-width="3.2" stroke-linecap="round"/>';
+    if (kind === 'grinsen') return '<path d="M' + (cx - 15) + ' ' + (my - 1) + ' q15 21 30 0 q-15 6 -30 0 Z" fill="#fff"/>' +
+      '<path d="M' + (cx - 15) + ' ' + (my - 1) + ' q15 21 30 0" fill="none" stroke="#8a4141" stroke-width="2"/>' +
+      '<path d="M' + (cx - 14) + ' ' + (my - 1.5) + ' q14 4 28 0" fill="none" stroke="#c56a6a" stroke-width="2.4" stroke-linecap="round"/>';
+    // laecheln: vollere Lippen
+    return '<path d="M' + (cx - 14) + ' ' + my + ' q14 15 28 0" fill="none" stroke="#b95c5c" stroke-width="4.2" stroke-linecap="round"/>' +
+      '<path d="M' + (cx - 12) + ' ' + (my + 1) + ' q12 7 24 0" fill="none" stroke="#8a4141" stroke-width="1.6" stroke-linecap="round" opacity=".6"/>';
   }
   function beard(f, cx, cy, ry, hair) {
     var kind = BEARD[f.beard]; if (kind === 'keiner') return '';
@@ -349,6 +394,8 @@
     }
     function setMouth(idx, level) {
       var ts = tiles(); if (!ts[idx]) return;
+      var av = ts[idx].querySelector('.avtalk'); // Foto-Modus: sanfter Bounce
+      if (av) { av.setAttribute('transform', level > 0 ? 'translate(0 ' + (-level * 0.9).toFixed(1) + ')' : ''); return; }
       var mg = ts[idx].querySelector('.mouthg');
       if (mg) mg.innerHTML = renderMouth(st.team[idx], level);
     }

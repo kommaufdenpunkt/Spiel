@@ -82,6 +82,27 @@
   function drawPreview() { $('preview').innerHTML = F.renderFigure(team[cur], {}); }
   function drawVideoTeam() { if (player) player.render(); else F.renderTeamInto($('videoTeam'), team); }
 
+  // Bild laden, quadratisch zuschneiden, verkleinern -> data-URL (kompakt)
+  function resizeImage(file, size, q) {
+    return new Promise(function (resolve, reject) {
+      var img = new Image();
+      img.onload = function () {
+        var c = document.createElement('canvas'); c.width = size; c.height = size;
+        var ctx = c.getContext('2d');
+        var s = Math.min(img.width, img.height);
+        ctx.drawImage(img, (img.width - s) / 2, (img.height - s) / 2, s, s, 0, 0, size, size);
+        var out = c.toDataURL('image/jpeg', q), qq = q;
+        while (out.length > 640000 && qq > 0.4) { qq -= 0.12; out = c.toDataURL('image/jpeg', qq); }
+        resolve(out);
+      };
+      img.onerror = reject;
+      var fr = new FileReader();
+      fr.onload = function () { img.src = fr.result; };
+      fr.onerror = reject;
+      fr.readAsDataURL(file);
+    });
+  }
+
   function renderAll() {
     buildTabs();
     $('figName').value = team[cur].name || '';
@@ -91,6 +112,7 @@
     buildSwatches('swHair', F.HAIR, 'hairColor');
     buildSwatches('swShirt', F.SHIRT, 'shirt');
     buildSwatches('swBg', F.BG, 'bg');
+    if ($('imgHint')) $('imgHint').textContent = team[cur].img ? 'Bild aktiv – die Zeichnungs-Einstellungen unten werden dann ignoriert.' : '';
     drawPreview();
     drawVideoTeam();
   }
@@ -124,6 +146,19 @@
 
     $('playBtn').onclick = function () { player.start(); };
     $('stopBtn').onclick = function () { player.stop(); };
+
+    // Bild-Upload / -Entfernen
+    if ($('uploadBtn')) $('uploadBtn').onclick = function () { $('figImg').click(); };
+    if ($('figImg')) $('figImg').onchange = function (e) {
+      var file = e.target.files && e.target.files[0]; if (!file) return;
+      $('imgHint').textContent = 'Bild wird verarbeitet …';
+      resizeImage(file, 512, 0.82).then(function (url) {
+        team[cur].img = url; renderAll();
+        $('imgHint').textContent = 'Bild aktiv – „Team speichern" nicht vergessen (für alle: als Admin anmelden).';
+      }).catch(function () { $('imgHint').textContent = 'Bild konnte nicht geladen werden.'; });
+      e.target.value = '';
+    };
+    if ($('clearImgBtn')) $('clearImgBtn').onclick = function () { team[cur].img = ''; renderAll(); };
 
     $('scriptBox').value = loadLocalScript();
     $('scriptSaveBtn').onclick = function () {
