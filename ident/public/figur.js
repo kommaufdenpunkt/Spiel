@@ -48,18 +48,19 @@
   // ---- Standard-Erklärtext (Team + PK Board) ------------------------------
   // Zeilen mit "Name:" werden von dieser Figur gesprochen, sonst abwechselnd.
   var DEFAULT_SCRIPT = [
-    'Gino: Hey, schön dass du da bist! Ich bin Gino und kümmere mich um euch und um alles Optische zusammen mit dem Team.',
-    'Lisa: Ich bin Lisa, die Teamleitung. Ich organisiere die Piccos, halte die Events und bin für eure Fragen da.',
-    'Dennis: Und ich bin Dennis. Ich verwalte die Agentur und bin da, wenn es mal Konflikte gibt.',
-    'Gino: Wir drei sind zusammen die Teamleitung von 4EVER1 und immer für euch ansprechbar.',
-    'Dennis: Wenn wir etwas ankündigen oder euch auszahlen, achtet bitte darauf und macht keinen Quatsch.',
-    'Lisa: Beleidigungen oder Aussagen gegen die Agentur dulden wir nicht – bleibt bitte fair und respektvoll.',
-    'Gino: Ganz wichtig ist unsere App: das PK Board. Dort findet einfach alles statt.',
-    'Lisa: Im PK Board gibt es die PK-Cards und alle Ankündigungen. Bitte nutzt die App wirklich.',
-    'Dennis: WhatsApp-Gruppen laufen jetzt noch, aber sobald die App online ist, verschwinden sie.',
-    'Gino: Das schützt euch – ihr müsst eure Telefonnummer nicht mehr rausgeben.',
-    'Lisa: Datenschutz ist uns sehr wichtig. Wir sind niemals verpflichtet, Handynummern weiterzugeben.',
-    'Dennis: Lade dir also das PK Board – dort machen wir alles zusammen. Willkommen bei 4EVER1!'
+    'Gino: Herzlich willkommen bei 4EVER1! Ich bin Gino und begleite dich – gemeinsam mit dem Team kümmere ich mich um euch und um alles rund ums Optische.',
+    'Lisa: Ich bin Lisa, eure Teamleitung. Ich organisiere die Piccos, plane unsere Events und bin jederzeit für eure Fragen da.',
+    'Dennis: Und ich bin Dennis. Ich halte die Agentur am Laufen und bin für euch da, wenn es einmal Klärungsbedarf gibt.',
+    'Gino: Wir drei sind die Teamleitung von 4EVER1 – und immer nur eine Nachricht von dir entfernt.',
+    'Lisa: Ein fairer und respektvoller Umgang ist uns wichtig. Beleidigungen oder Aussagen gegen die Agentur haben bei uns keinen Platz.',
+    'Dennis: Wenn wir etwas ankündigen oder eine Auszahlung ansteht, gib uns bitte kurz Bescheid – so bleibt alles verlässlich.',
+    'Gino: Unser Herzstück ist unsere App: das PK Board. Dort läuft ab jetzt alles zusammen.',
+    'Lisa: Im PK Board findest du alle PK-Cards, Ankündigungen und Neuigkeiten – an einem Ort und immer aktuell.',
+    'Dennis: Unsere WhatsApp-Gruppen laufen noch, doch sobald das PK Board online ist, ziehen wir vollständig dorthin um.',
+    'Gino: Das schützt dich: Deine Telefonnummer musst du niemandem mehr weitergeben.',
+    'Lisa: Datenschutz nehmen wir ernst. Niemand ist verpflichtet, seine Handynummer herauszugeben – bei uns ganz sicher nicht.',
+    'Dennis: Lade dir also das PK Board herunter – dort gestalten wir alles gemeinsam.',
+    'Gino: Willkommen in der 4EVER1-Familie. Wir freuen uns riesig auf dich!'
   ].join('\n');
 
   // ---- Speicher ------------------------------------------------------------
