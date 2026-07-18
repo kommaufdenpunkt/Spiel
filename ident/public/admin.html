@@ -15,10 +15,14 @@
   *{box-sizing:border-box}html,body{margin:0;height:100%}
   body{color:var(--ink);min-height:100%;display:flex;flex-direction:column;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
     background:radial-gradient(1100px 580px at 82% -12%,#3a2a1566,transparent 60%),radial-gradient(900px 540px at -6% 108%,#16265066,transparent 55%),var(--bg)}
-  button{font-family:inherit;cursor:pointer;border:1px solid var(--line);background:var(--panel2);color:var(--ink);padding:.55rem .95rem;border-radius:10px;font-size:.88rem;font-weight:550;transition:.12s;box-shadow:0 1px 2px rgba(0,0,0,.25)}
-  button:hover:not(:disabled){border-color:var(--accent);transform:translateY(-1px)}button:disabled{opacity:.5;cursor:default}
-  button.primary{background:linear-gradient(180deg,#4a7bf5,#2a55c8);border-color:#2a55c8;color:#fff}
-  button.danger{background:#3a1e1e;border-color:#6e3b39;color:#ff9b97}
+  button{font-family:inherit;cursor:pointer;border:1px solid var(--line);background:linear-gradient(180deg,#232e46,#1a2336);color:var(--ink);padding:.58rem 1rem;border-radius:12px;font-size:.88rem;font-weight:600;letter-spacing:.01em;transition:transform .14s cubic-bezier(.2,.7,.3,1),border-color .14s,filter .14s,box-shadow .14s;box-shadow:0 1px 0 rgba(255,255,255,.05) inset,0 2px 6px rgba(0,0,0,.35)}
+  button:hover:not(:disabled){border-color:var(--accent);transform:translateY(-1px);box-shadow:0 1px 0 rgba(255,255,255,.07) inset,0 12px 24px -12px rgba(0,0,0,.65)}
+  button:active:not(:disabled){transform:translateY(0);filter:brightness(.95)}button:disabled{opacity:.45;cursor:default;box-shadow:none}
+  button:focus-visible{outline:none;box-shadow:0 0 0 3px #5b8cff55}
+  button.primary{background:linear-gradient(180deg,#6a97ff,#3b6ef0 52%,#2a55c8);border-color:#2a55c8;color:#fff;box-shadow:0 1px 0 rgba(255,255,255,.30) inset,0 14px 28px -12px rgba(59,110,240,.75)}
+  button.primary:hover:not(:disabled){filter:brightness(1.06)}
+  button.danger{background:linear-gradient(180deg,#4c2828,#3a1e1e);border-color:#6e3b39;color:#ff9b97}
+  button.danger:hover:not(:disabled){filter:brightness(1.12);border-color:#8a4744}
   input{font-family:inherit;font-size:.95rem;padding:.6rem .8rem;border-radius:10px;border:1px solid var(--line);background:#0f1728;color:var(--ink);width:100%}
   input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px #3b6ef033}
   header{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:.7rem 1.1rem;border-bottom:1px solid var(--line);background:#0f1626d9;position:sticky;top:0;z-index:5}
