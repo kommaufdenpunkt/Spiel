@@ -36,25 +36,25 @@
 
   // Teamleitung 4EVER1 – nach dem Team-Foto voreingestellt (von links: Gino, Dennis, Lisa)
   var PRESET = [
-    { name: 'Gino',   role: 'Für euch & das Optische', face: 1, hair: 3, brows: 0, eyes: 0, nose: 1, beard: 0, glass: 0, mouth: 0, skin: 1, hairColor: 2, shirt: 5, bg: 0, phones: 1 },
-    { name: 'Dennis', role: 'Verwaltung & Konflikte',   face: 0, hair: 7, brows: 0, eyes: 1, nose: 1, beard: 1, glass: 0, mouth: 0, skin: 1, hairColor: 4, shirt: 6, bg: 5, phones: 0 },
-    { name: 'Lisa',   role: 'Teamleitung & Events',     face: 1, hair: 6, brows: 2, eyes: 2, nose: 0, beard: 0, glass: 0, mouth: 0, skin: 0, hairColor: 1, shirt: 5, bg: 4, phones: 0 }
+    { name: 'eyfahrlehrer', role: 'Für euch & das Optische', face: 1, hair: 3, brows: 0, eyes: 0, nose: 1, beard: 0, glass: 0, mouth: 0, skin: 1, hairColor: 2, shirt: 5, bg: 0, phones: 1 },
+    { name: 'eykeepcool',   role: 'Verwaltung & Konflikte', face: 0, hair: 7, brows: 0, eyes: 1, nose: 1, beard: 1, glass: 0, mouth: 0, skin: 1, hairColor: 4, shirt: 6, bg: 5, phones: 0 },
+    { name: 'Lisa',         role: 'Teamleitung & Events',            face: 1, hair: 6, brows: 2, eyes: 2, nose: 0, beard: 0, glass: 0, mouth: 0, skin: 0, hairColor: 1, shirt: 5, bg: 4, phones: 0 }
   ];
 
   var DEFAULT_SCRIPT = [
-    'Gino: Herzlich willkommen bei 4EVER1! Ich bin Gino und begleite dich – gemeinsam mit dem Team kümmere ich mich um euch und um alles rund ums Optische.',
+    'eyfahrlehrer: Herzlich willkommen bei 4EVER1! Ich bin eyfahrlehrer und begleite dich – gemeinsam mit dem Team kümmere ich mich um euch und um alles rund ums Optische.',
     'Lisa: Ich bin Lisa, eure Teamleitung. Ich organisiere die Piccos, plane unsere Events und bin jederzeit für eure Fragen da.',
-    'Dennis: Und ich bin Dennis. Ich halte die Agentur am Laufen und bin für euch da, wenn es einmal Klärungsbedarf gibt.',
-    'Gino: Wir drei sind die Teamleitung von 4EVER1 – und immer nur eine Nachricht von dir entfernt.',
+    'eykeepcool: Und ich bin eykeepcool. Ich halte die Agentur am Laufen und bin für euch da, wenn es einmal Klärungsbedarf gibt.',
+    'eyfahrlehrer: Wir drei sind die Teamleitung von 4EVER1 – und immer nur eine Nachricht von dir entfernt.',
     'Lisa: Ein fairer und respektvoller Umgang ist uns wichtig. Beleidigungen oder Aussagen gegen die Agentur haben bei uns keinen Platz.',
-    'Dennis: Wenn wir etwas ankündigen oder eine Auszahlung ansteht, gib uns bitte kurz Bescheid – so bleibt alles verlässlich.',
-    'Gino: Unser Herzstück ist unsere App: das PK Board. Dort läuft ab jetzt alles zusammen.',
+    'eykeepcool: Wenn wir etwas ankündigen oder eine Auszahlung ansteht, gib uns bitte kurz Bescheid – so bleibt alles verlässlich.',
+    'eyfahrlehrer: Unser Herzstück ist unsere App: das PK Board. Dort läuft ab jetzt alles zusammen.',
     'Lisa: Im PK Board findest du alle PK-Cards, Ankündigungen und Neuigkeiten – an einem Ort und immer aktuell.',
-    'Dennis: Unsere WhatsApp-Gruppen laufen noch, doch sobald das PK Board online ist, ziehen wir vollständig dorthin um.',
-    'Gino: Das schützt dich: Deine Telefonnummer musst du niemandem mehr weitergeben.',
+    'eykeepcool: Unsere WhatsApp-Gruppen laufen noch, doch sobald das PK Board online ist, ziehen wir vollständig dorthin um.',
+    'eyfahrlehrer: Das schützt dich: Deine Telefonnummer musst du niemandem mehr weitergeben.',
     'Lisa: Datenschutz nehmen wir ernst. Niemand ist verpflichtet, seine Handynummer herauszugeben – bei uns ganz sicher nicht.',
-    'Dennis: Lade dir also das PK Board herunter – dort gestalten wir alles gemeinsam.',
-    'Gino: Willkommen in der 4EVER1-Familie. Wir freuen uns riesig auf dich!'
+    'eykeepcool: Lade dir also das PK Board herunter – dort gestalten wir alles gemeinsam.',
+    'eyfahrlehrer: Willkommen in der 4EVER1-Familie. Wir freuen uns riesig auf dich!'
   ].join('\n');
 
   // ---- Helpers ------------------------------------------------------------
