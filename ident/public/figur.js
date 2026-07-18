@@ -20,6 +20,7 @@
   var BEARD  = ['keiner', 'stoppeln', 'schnauzer', 'ziege', 'vollbart'];
   var GLASS  = ['keine', 'rund', 'eckig', 'sonne'];
   var MOUTH  = ['laecheln', 'neutral', 'grinsen'];
+  var PHONES = ['keine', 'an'];
 
   // Zyklische Steuerungen (Label -> Optionen), landen in #controls
   var CYCLERS = [
@@ -30,14 +31,18 @@
     { key: 'nose',   label: 'Nase',        opts: NOSE },
     { key: 'beard',  label: 'Bart',        opts: BEARD },
     { key: 'glass',  label: 'Brille',      opts: GLASS },
-    { key: 'mouth',  label: 'Mund',        opts: MOUTH }
+    { key: 'mouth',  label: 'Mund',        opts: MOUTH },
+    { key: 'phones', label: 'Kopfhörer',   opts: PHONES }
   ];
 
-  // Teamleitung 4EVER1 (Foto-Reihenfolge von links: Gino, Dennis, Lisa)
+  // Teamleitung 4EVER1 – nach dem Team-Foto voreingestellt (von links: Gino, Dennis, Lisa)
   var PRESET = [
-    { name: 'Gino',   role: 'Für euch & das Optische', face: 0, hair: 1, brows: 0, eyes: 0, nose: 1, beard: 1, glass: 0, mouth: 0, skin: 1, hairColor: 0, shirt: 0, bg: 0 },
-    { name: 'Dennis', role: 'Verwaltung & Konflikte',   face: 2, hair: 3, brows: 1, eyes: 1, nose: 1, beard: 4, glass: 0, mouth: 1, skin: 2, hairColor: 1, shirt: 5, bg: 0 },
-    { name: 'Lisa',   role: 'Teamleitung & Events',     face: 1, hair: 6, brows: 2, eyes: 2, nose: 0, beard: 0, glass: 0, mouth: 0, skin: 0, hairColor: 5, shirt: 4, bg: 0 }
+    // Gino (links): helle Haut, mittelbraunes Haar mit Seitenscheitel, glatt rasiert, dunkles Shirt, Kopfhörer
+    { name: 'Gino',   role: 'Für euch & das Optische', face: 1, hair: 3, brows: 0, eyes: 0, nose: 1, beard: 0, glass: 0, mouth: 0, skin: 1, hairColor: 2, shirt: 5, bg: 0, phones: 1 },
+    // Dennis (Mitte): helle Haut, dunkelblonder Undercut, leichte Stoppeln, heller Hoodie
+    { name: 'Dennis', role: 'Verwaltung & Konflikte',   face: 0, hair: 7, brows: 0, eyes: 1, nose: 1, beard: 1, glass: 0, mouth: 0, skin: 1, hairColor: 4, shirt: 6, bg: 5, phones: 0 },
+    // Lisa (rechts): helle Haut, lange dunkelbraune Haare, dezentes Make-up, dunkle Jacke
+    { name: 'Lisa',   role: 'Teamleitung & Events',     face: 1, hair: 6, brows: 2, eyes: 2, nose: 0, beard: 0, glass: 0, mouth: 0, skin: 0, hairColor: 1, shirt: 5, bg: 4, phones: 0 }
   ];
   function defaultFig(i) {
     var p = PRESET[i] || PRESET[0];
@@ -64,7 +69,7 @@
   ].join('\n');
 
   // ---- Speicher ------------------------------------------------------------
-  var KEY = 'ident.figuren.v1';
+  var KEY = 'ident.figuren.v2';
   var SCRIPT_KEY = 'ident.figuren.script.v1';
   var team = load();
   var cur = 0; // aktiver Tab
@@ -160,7 +165,25 @@
     // Brille (ganz oben)
     s += glasses(f, cx, cy);
 
+    // Kopfhörer (über allem)
+    s += headphones(f, cx, cy, rx, ry);
+
     s += '</svg>';
+    return s;
+  }
+
+  function headphones(f, cx, cy, rx, ry) {
+    if (!f.phones || PHONES[f.phones] !== 'an') return '';
+    var band = '#20242b', cup = '#171a20', pad = '#0e1116';
+    var s = '';
+    // Bügel über den Kopf
+    s += '<path d="M' + (cx - rx - 1) + ' ' + cy + ' q0 -' + (ry + 16) + ' ' + (rx + 1) + ' -' + (ry + 16) +
+         ' q' + (rx + 1) + ' 0 ' + (rx + 1) + ' ' + (ry + 16) + '" fill="none" stroke="' + band + '" stroke-width="8" stroke-linecap="round"/>';
+    // Ohrmuscheln links/rechts
+    [cx - rx - 2, cx + rx + 2].forEach(function (x) {
+      s += '<rect x="' + (x - 9) + '" y="' + (cy - 12) + '" width="18" height="30" rx="9" fill="' + cup + '"/>';
+      s += '<rect x="' + (x - 5) + '" y="' + (cy - 8) + '" width="10" height="22" rx="5" fill="' + pad + '"/>';
+    });
     return s;
   }
 
