@@ -37,7 +37,7 @@
   // Teamleitung 4EVER1 – nach dem Team-Foto voreingestellt (von links)
   var PRESET = [
     { name: 'eyfahrlehrer', role: 'Für euch & das Optische', face: 1, hair: 3, brows: 0, eyes: 0, nose: 1, beard: 0, glass: 0, mouth: 0, skin: 1, hairColor: 2, shirt: 5, bg: 0, phones: 1 },
-    { name: 'eykeepcool',   role: 'Verwaltung & Konflikte', face: 0, hair: 7, brows: 0, eyes: 1, nose: 1, beard: 1, glass: 0, mouth: 0, skin: 1, hairColor: 4, shirt: 6, bg: 5, phones: 0 },
+    { name: 'eykeepcool',   role: 'Verwaltung & Konflikte', face: 0, hair: 7, brows: 0, eyes: 1, nose: 1, beard: 1, glass: 0, mouth: 0, skin: 1, hairColor: 4, shirt: 6, bg: 5, phones: 0, eyeCol: '#6b93b0' },
     { name: 'Lisa',         role: 'Teamleitung & Events',    face: 1, hair: 6, brows: 2, eyes: 2, nose: 0, beard: 0, glass: 0, mouth: 0, skin: 0, hairColor: 1, shirt: 5, bg: 4, phones: 0 }
   ];
 
@@ -73,6 +73,7 @@
     out.name = String(out.name || '').slice(0, 16);
     out.role = String(out.role || '').slice(0, 48);
     out.img = (f && typeof f.img === 'string' && /^data:image\/(png|jpe?g|webp);base64,/.test(f.img) && f.img.length <= 700000) ? f.img : '';
+    out.eyeCol = (f && /^#[0-9a-fA-F]{6}$/.test(f.eyeCol || '')) ? f.eyeCol : '';
     return out;
   }
   function sanitizeTeam(arr) {
@@ -140,6 +141,10 @@
     s += roundedFace(cx, cy, rx, ry, corner, skinFill);
     // weiche Wangen-/Kinnschattierung für Tiefe
     s += '<ellipse cx="' + cx + '" cy="' + (cy + ry * 0.5) + '" rx="' + (rx * 0.82) + '" ry="' + (ry * 0.45) + '" fill="' + dark + '" opacity=".13"/>';
+    // Stirn-Glanz (Licht von oben-links)
+    s += '<ellipse cx="' + (cx - 10) + '" cy="' + (cy - ry * 0.42) + '" rx="' + (rx * 0.42) + '" ry="' + (ry * 0.26) + '" fill="#fff" opacity=".1"/>';
+    // Rand-Licht rechts (Kontur, gibt Plastizität)
+    s += '<path d="M' + (cx + rx - 3) + ' ' + (cy - ry * 0.5) + ' q6 ' + (ry * 0.5) + ' 0 ' + ry + '" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" opacity=".14"/>';
     // zarte Wangenröte
     s += '<ellipse cx="' + (cx - 22) + '" cy="' + (cy + 18) + '" rx="8" ry="5" fill="#e8836b" opacity=".18"/>';
     s += '<ellipse cx="' + (cx + 22) + '" cy="' + (cy + 18) + '" rx="8" ry="5" fill="#e8836b" opacity=".18"/>';
@@ -212,7 +217,7 @@
   function eyeXs(cx) { return [cx - 18, cx + 18]; }
   function eyes(f, cx, cy, skin, seed) {
     var xs = eyeXs(cx), ey = cy + 2, kind = EYES[f.eyes], s = '';
-    var iris = '#5b3b26'; // warmes Braun
+    var iris = /^#[0-9a-fA-F]{6}$/.test(f.eyeCol || '') ? f.eyeCol : '#5b3b26'; // Standard: warmes Braun
     xs.forEach(function (x, i) {
       if (kind === 'schmal') {
         s += '<rect x="' + (x - 8) + '" y="' + (ey - 3) + '" width="16" height="7" rx="3.5" fill="#f3f6fb"/>';
@@ -309,17 +314,24 @@
   function hairFront(f, hairFill, hair, cx, cy, rx, ry) {
     var style = HAIRSTYLE[f.hair];
     if (style === 'glatze') return '';
-    var s = '', hl = shade(hair, 0.16);
-    if (style === 'buerste') return '<path d="M' + (cx - rx) + ' ' + (cy - 18) + ' q0 -46 ' + rx + ' -46 q' + rx + ' 0 ' + rx + ' 46 q-' + rx + ' -22 -' + (2 * rx) + ' 0 Z" fill="' + hairFill + '"/>';
+    var s = '', hl = shade(hair, 0.3), dk = shade(hair, -0.14);
+    // Glanz-Strähne (Gloss) – gibt den "edlen" Look
+    var sheen = '<path d="M' + (cx - rx + 12) + ' ' + (cy - ry * 0.72) + ' q' + (rx * 0.5) + ' -12 ' + (rx * 1.05) + ' -2" fill="none" stroke="' + hl + '" stroke-width="4" stroke-linecap="round" opacity=".55"/>';
+
+    if (style === 'buerste') { s += '<path d="M' + (cx - rx) + ' ' + (cy - 18) + ' q0 -46 ' + rx + ' -46 q' + rx + ' 0 ' + rx + ' 46 q-' + rx + ' -22 -' + (2 * rx) + ' 0 Z" fill="' + hairFill + '"/>'; return s + sheen; }
     if (style === 'undercut') {
       s += '<path d="M' + (cx - rx) + ' ' + (cy - 20) + ' q6 -44 ' + rx + ' -44 q' + rx + ' 0 ' + rx + ' 44 q-30 -18 -' + (2 * rx) + ' 6 Z" fill="' + hairFill + '"/>';
       s += '<path d="M' + (cx + 6) + ' ' + (cy - 40) + ' q' + (rx - 6) + ' 4 ' + (rx - 6) + ' 30" fill="none" stroke="' + hl + '" stroke-width="3" opacity=".5"/>';
-      return s;
+      return s + sheen;
     }
-    if (style === 'seitenscheitel') return '<path d="M' + (cx - rx) + ' ' + (cy - 14) + ' q-2 -50 ' + rx + ' -50 q' + rx + ' 0 ' + rx + ' 44 q-18 -30 -' + (rx + 10) + ' -22 q-' + (rx - 10) + ' 6 -' + (rx - 10) + ' 28 Z" fill="' + hairFill + '"/>';
-    if (style === 'lockig') return '<path d="M' + (cx - rx) + ' ' + (cy - 12) + ' q-4 -30 12 -40 q6 -14 22 -10 q14 -12 30 -2 q18 -4 20 16 q10 8 4 34 q-14 -20 -44 -20 q-30 0 -44 22 Z" fill="' + hairFill + '"/>';
-    if (style === 'zopf' || style === 'lang') return '<path d="M' + (cx - rx) + ' ' + (cy - 6) + ' q-4 -54 ' + rx + ' -54 q' + rx + ' 0 ' + rx + ' 54 q-14 -34 -' + rx + ' -34 q-' + rx + ' 0 -' + rx + ' 34 Z" fill="' + hairFill + '"/>';
-    return '<path d="M' + (cx - rx) + ' ' + (cy - 12) + ' q0 -48 ' + rx + ' -48 q' + rx + ' 0 ' + rx + ' 48 q-16 -26 -' + rx + ' -26 q-' + rx + ' 0 -' + rx + ' 26 Z" fill="' + hairFill + '"/>';
+    if (style === 'seitenscheitel') {
+      s += '<path d="M' + (cx - rx) + ' ' + (cy - 14) + ' q-2 -50 ' + rx + ' -50 q' + rx + ' 0 ' + rx + ' 44 q-18 -30 -' + (rx + 10) + ' -22 q-' + (rx - 10) + ' 6 -' + (rx - 10) + ' 28 Z" fill="' + hairFill + '"/>';
+      return s + sheen;
+    }
+    if (style === 'lockig') { s += '<path d="M' + (cx - rx) + ' ' + (cy - 12) + ' q-4 -30 12 -40 q6 -14 22 -10 q14 -12 30 -2 q18 -4 20 16 q10 8 4 34 q-14 -20 -44 -20 q-30 0 -44 22 Z" fill="' + hairFill + '"/>'; return s + sheen; }
+    if (style === 'zopf' || style === 'lang') { s += '<path d="M' + (cx - rx) + ' ' + (cy - 6) + ' q-4 -54 ' + rx + ' -54 q' + rx + ' 0 ' + rx + ' 54 q-14 -34 -' + rx + ' -34 q-' + rx + ' 0 -' + rx + ' 34 Z" fill="' + hairFill + '"/>'; return s + sheen; }
+    s += '<path d="M' + (cx - rx) + ' ' + (cy - 12) + ' q0 -48 ' + rx + ' -48 q' + rx + ' 0 ' + rx + ' 48 q-16 -26 -' + rx + ' -26 q-' + rx + ' 0 -' + rx + ' 26 Z" fill="' + hairFill + '"/>';
+    return s + sheen;
   }
 
   // Nur die Mund-Innereien (zum Live-Aktualisieren beim Sprechen)
