@@ -1,6 +1,6 @@
 {
   "name": "ginoco",
-  "version": "3.2.0",
+  "version": "3.2.1",
   "description": "ginoco - Buchungsportal fuer die Fahrschule: Fahrstunden buchen, Ziele im Blick",
   "type": "module",
   "main": "server.js",

@@ -124,6 +124,19 @@ main{max-width:1080px;margin:0 auto;padding:1.4rem 1.2rem 4rem}
 @media(max-width:560px){.tc-items{grid-template-columns:1fr}}
 .tc-item{display:flex;align-items:flex-start;gap:.5rem;font-size:.86rem;font-weight:500;color:var(--ink);margin:0;padding:.25rem 0;cursor:pointer}
 .tc-item input{width:auto;margin-top:.15rem;flex:none}
+/* Fahrschüler-Liste: am Handy Karten statt breiter Tabelle */
+@media(max-width:760px){
+  #s-list table,#s-list tbody,#s-list tr,#s-list td{display:block;width:auto}
+  #s-list thead,#s-list tr>th{display:none}
+  #s-list tr[data-search]{border:1px solid var(--line);border-radius:12px;background:var(--card2);
+    margin-bottom:.8rem;padding:.7rem .85rem}
+  #s-list td{border:none!important;padding:.4rem 0}
+  #s-list td.s-name-cell{padding-top:0;font-size:1.02rem}
+  #s-list td.s-name-cell strong{font-size:1.05rem}
+  #s-list td[data-label]::before{content:attr(data-label);display:block;font-size:.68rem;
+    text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:700;margin-bottom:.2rem}
+  #s-list td[data-label]:not(:last-child){border-bottom:1px solid var(--line)!important;padding-bottom:.55rem}
+}
 .badge.schalt{background:rgba(150,110,220,.2);color:#b79cf0}
 .badge.automatik{background:rgba(50,160,220,.2);color:#6fc3f0}
 .badge.done{background:var(--good-bg);color:var(--good)}

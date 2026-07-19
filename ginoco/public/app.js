@@ -1472,7 +1472,7 @@ async function tabSchueler(scope) {
           : `<span class="muted">– nicht vereinbart –</span>`;
         const isArch = !!s.archived_at;
         return `<tr data-search="${esc(searchStr)}">
-          <td><strong>${esc(s.name)}</strong>${s.birth_year ? ` <span class="muted">(${s.birth_year})</span>` : ''}
+          <td class="s-name-cell"><strong>${esc(s.name)}</strong>${s.birth_year ? ` <span class="muted">(${s.birth_year})</span>` : ''}
             ${isArch ? '<br><span class="pill" style="background:var(--good-bg);color:var(--good)">✅ bestanden</span>' : ''}
             ${s.notes ? `<br><span class="muted" title="${esc(s.notes)}" style="font-size:.78rem">📝 ${esc(s.notes.length > 40 ? s.notes.slice(0, 40) + '…' : s.notes)}</span>` : ''}
             <div class="inline" style="margin-top:.3rem;gap:.3rem;flex-wrap:wrap">
@@ -1483,12 +1483,12 @@ async function tabSchueler(scope) {
                 : `<button class="ghost sm" data-arch="${s.id}" data-aname="${esc(s.name)}" style="color:var(--good)">✅ Bestanden</button>`}
               <button class="ghost sm" data-del="${s.id}" data-dname="${esc(s.name)}" style="color:var(--bad)">🗑️</button>
             </div></td>
-          <td><span class="codechip">${esc(s.username || '–')}</span><br><button class="ghost sm" data-reset="${s.id}" data-uname="${esc(s.username || '')}" data-sname="${esc(s.name)}" style="margin-top:.3rem">🔑 Zugangsdaten</button></td>
-          <td>${esc(s.email || '')}<br><span class="muted">${esc(s.phone || '–')}</span>${s.phone ? '<br>' + contactButtons(s.phone, `Hallo ${s.name.split(' ')[0]}, hier ${state.settings?.instructor_name || 'deine Fahrschule'}:`) : ''}</td>
-          <td>${homeCell}<br><button class="ghost sm" data-home="${s.id}" data-sname="${esc(s.name)}" data-hlabel="${esc(s.home_label || '')}" data-hlat="${s.home_lat != null ? s.home_lat : ''}" data-hlng="${s.home_lng != null ? s.home_lng : ''}" style="margin-top:.3rem">Treffpunkt festlegen</button></td>
-          <td>${s.done_count} Std.<br><span class="pill" style="background:${s.rank >= 2 ? 'var(--good-bg);color:var(--good)' : ''}">Rang ${s.rank} · ${s.horizon} Tage</span></td>
-          <td>${sonderCell(s)}</td>
-          <td><div class="inline">${boxes} <button class="sec sm" data-savedur="${s.id}">Speichern</button></div></td>
+          <td data-label="Login-Name"><span class="codechip">${esc(s.username || '–')}</span><br><button class="ghost sm" data-reset="${s.id}" data-uname="${esc(s.username || '')}" data-sname="${esc(s.name)}" style="margin-top:.3rem">🔑 Zugangsdaten</button></td>
+          <td data-label="Kontakt">${esc(s.email || '')}<br><span class="muted">${esc(s.phone || '–')}</span>${s.phone ? '<br>' + contactButtons(s.phone, `Hallo ${s.name.split(' ')[0]}, hier ${state.settings?.instructor_name || 'deine Fahrschule'}:`) : ''}</td>
+          <td data-label="Treffpunkt">${homeCell}<br><button class="ghost sm" data-home="${s.id}" data-sname="${esc(s.name)}" data-hlabel="${esc(s.home_label || '')}" data-hlat="${s.home_lat != null ? s.home_lat : ''}" data-hlng="${s.home_lng != null ? s.home_lng : ''}" style="margin-top:.3rem">Treffpunkt festlegen</button></td>
+          <td data-label="Gefahren / Rang">${s.done_count} Std.<br><span class="pill" style="background:${s.rank >= 2 ? 'var(--good-bg);color:var(--good)' : ''}">Rang ${s.rank} · ${s.horizon} Tage</span></td>
+          <td data-label="Sonderfahrten">${sonderCell(s)}</td>
+          <td data-label="Erlaubte Längen (Min)"><div class="inline">${boxes} <button class="sec sm" data-savedur="${s.id}">Speichern</button></div></td>
         </tr>`;
       }).join('')}
     </table>`;
