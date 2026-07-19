@@ -2,8 +2,8 @@
  * Strategie: Netzwerk zuerst (immer aktueller Stand), Cache nur als Fallback,
  * damit ein neues Deploy sofort ankommt. API-/Live-Aufrufe werden NIE gecacht.
  */
-const CACHE = 'ident-v3';
-const SHELL = ['/', '/index.html', '/app.js', '/figur-core.js', '/figur-photos.js', '/manifest.webmanifest', '/icon-192.png', '/icon-512.png'];
+const CACHE = 'ident-v4';
+const SHELL = ['/', '/index.html', '/app.js', '/figur-core.js', '/manifest.webmanifest', '/icon-192.png', '/icon-512.png'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));

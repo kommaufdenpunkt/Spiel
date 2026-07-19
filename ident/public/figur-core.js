@@ -40,8 +40,6 @@
     { name: 'eykeepcool',   role: 'Verwaltung & Konflikte', face: 0, hair: 7, brows: 0, eyes: 1, nose: 1, beard: 1, glass: 0, mouth: 0, skin: 1, hairColor: 4, shirt: 6, bg: 5, phones: 0 },
     { name: 'Lisa',         role: 'Teamleitung & Events',    face: 1, hair: 6, brows: 2, eyes: 2, nose: 0, beard: 0, glass: 0, mouth: 0, skin: 0, hairColor: 1, shirt: 5, bg: 4, phones: 0 }
   ];
-  // Standard-Fotos (aus dem Team-Foto, in figur-photos.js) als Voreinstellung
-  try { var PH = window.FIGUREN_PHOTOS; if (PH) PRESET.forEach(function (p, i) { if (PH[i]) p.img = PH[i]; }); } catch (e) {}
 
   var DEFAULT_SCRIPT = [
     'eyfahrlehrer: Herzlich willkommen bei 4EVER1! Ich bin eyfahrlehrer und begleite dich – gemeinsam mit dem Team kümmere ich mich um euch und um alles rund ums Optische.',
