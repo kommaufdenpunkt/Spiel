@@ -1,16 +1,47 @@
 # coturn – TURN/STUN-Server für ident (turn.4ever1.tv)
 #
-# Direkt auf dem Server starten (NICHT hinter den Coolify-Webproxy hängen –
-# TURN läuft auf UDP/TCP 3478 + 5349, das ist kein HTTP):
-#     cp turnserver.conf.example turnserver.conf   # dann Geheimnis + IP eintragen
-#     docker compose up -d
+# Zweck: stabiles Video auch in Mobilfunk-Netzen und hinter strengen Firewalls.
+# Läuft als EIGENE Ressource neben ident – NICHT hinter den Coolify-Webproxy,
+# denn TURN spricht kein HTTP (UDP/TCP 3478/5349 + Relay-UDP-Ports).
 #
-# Host-Networking ist nötig, weil TURN einen breiten UDP-Portbereich (Relay) braucht.
+# --- In Coolify einrichten -------------------------------------------------
+# 0) Hinweis: TURN läuft hier auf DEMSELBEN Server wie ident (178.104.82.169).
+#    Die IP ist unten schon eingetragen – nichts zu ändern.
+# 1) DNS (empfohlen): A-Record  turn.4ever1.tv  ->  178.104.82.169
+#    (zeigt aktuell auf eine andere IP – bitte anpassen). Alternativ ohne DNS:
+#    in ident TURN_HOST direkt auf 178.104.82.169 setzen.
+# 2) Firewall öffnen (Hetzner-Firewall UND/ODER Host):
+#       UDP 3478, TCP 3478, TCP 5349, UDP 49160-49200
+# 3) In Coolify:  + New Resource  ->  Docker Compose  ->  diese Datei einfügen. Deploy.
+# 4) In der ident-App (Environment Variables):
+#       TURN_HOST=turn.4ever1.tv          (oder 178.104.82.169, falls DNS nicht geändert)
+#       TURN_SECRET=a456bcb2acdc50cc89a5ae9abeccf7e6e07141c552db639f8774869ee6658acd
+#    danach ident neu deployen.
+#
+# Das Geheimnis unten (--static-auth-secret) MUSS exakt dem TURN_SECRET der
+# ident-App entsprechen – sonst lehnt TURN die Zugangsdaten ab.
 services:
   coturn:
     image: coturn/coturn:4.6
     container_name: coturn
     restart: unless-stopped
+    # Host-Networking: coturn braucht den öffentlichen Port-Bereich direkt.
     network_mode: host
-    volumes:
-      - ./turnserver.conf:/etc/coturn/turnserver.conf:ro
+    command: >
+      -n --log-file=stdout --no-cli
+      --listening-port=3478
+      --tls-listening-port=5349
+      --realm=turn.4ever1.tv
+      --server-name=turn.4ever1.tv
+      --external-ip=178.104.82.169
+      --use-auth-secret
+      --static-auth-secret=a456bcb2acdc50cc89a5ae9abeccf7e6e07141c552db639f8774869ee6658acd
+      --min-port=49160
+      --max-port=49200
+      --fingerprint
+      --no-tlsv1 --no-tlsv1_1
+      --no-multicast-peers --no-loopback-peers
+      --denied-peer-ip=10.0.0.0-10.255.255.255
+      --denied-peer-ip=172.16.0.0-172.31.255.255
+      --denied-peer-ip=192.168.0.0-192.168.255.255
+      --denied-peer-ip=169.254.0.0-169.254.255.255

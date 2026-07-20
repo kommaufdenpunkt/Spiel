@@ -8,15 +8,15 @@ tls-listening-port=5349
 realm=turn.4ever1.tv
 server-name=turn.4ever1.tv
 
-# Öffentliche IP dieses Servers (laut deinem DNS: 178.105.238.222).
+# Öffentliche IP dieses Servers eintragen (auf die turn.4ever1.tv zeigt).
 # Bei Cloud/NAT zwingend nötig, sonst kommt kein Video zustande.
-external-ip=178.105.238.222
+external-ip=<SERVER-IP>
 
 # Ephemere Zugangsdaten (TURN-REST-API, HMAC). Dieses Geheimnis MUSS exakt
 # gleich sein wie TURN_SECRET in der ident-App. Lang & zufällig wählen, z. B.:
 #   openssl rand -hex 32
 use-auth-secret
-static-auth-secret=HIER_LANGES_ZUFAELLIGES_GEHEIMNIS_EINTRAGEN
+static-auth-secret=a456bcb2acdc50cc89a5ae9abeccf7e6e07141c552db639f8774869ee6658acd
 
 # Relay-Portbereich (zusätzlich in der Firewall als UDP 49160-49200 öffnen)
 min-port=49160
