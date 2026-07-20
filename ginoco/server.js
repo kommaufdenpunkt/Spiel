@@ -15,7 +15,7 @@ const PUBLIC = join(__dirname, 'public');
 const PORT = Number(process.env.PORT || 3000);
 const HOST = process.env.HOST || '0.0.0.0'; // hinter Caddy: HOST=127.0.0.1 (nur Proxy erreicht Node)
 const SESSION_DAYS = 30;
-const APP_VERSION = "3.3.0";
+const APP_VERSION = "3.4.0";
 // Einstellungen, die Schueler/Oeffentlichkeit sehen duerfen (Rest bleibt beim Fahrlehrer)
 const PUBLIC_SETTINGS = ['instructor_name', 'instructor_phone', 'policy_text',
   'cancel_hours', 'lock_hours', 'booking_horizon_days', 'booking_horizon_days_rank2',
@@ -364,6 +364,15 @@ async function handleApi(req, res, url) {
     if (!requireStudent() && !requireInstructor()) return bad(res, 'Bitte anmelden', 401);
     const body = await readBody(req);
     return createBooking(res, sess, body);
+  }
+
+  // Sammel-Import bestehender Termine (Fahrlehrer). Zwei Schritte:
+  //   commit:false  -> Vorschau (nichts wird gespeichert, nur geprueft)
+  //   commit:true   -> die gueltigen Zeilen werden angelegt
+  if (p === '/api/instructor/bookings/bulk' && method === 'POST') {
+    if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer darf das', 403);
+    const body = await readBody(req);
+    return bulkInstructorBookings(res, body);
   }
 
   // /api/bookings/:id  (DELETE = stornieren, PATCH = aktualisieren)
@@ -1287,6 +1296,135 @@ function misalignedDays() {
     if (off.length) days.push({ date, count: off.length });
   }
   return { total: days.reduce((a, d) => a + d.count, 0), days };
+}
+
+// ---- Sammel-Import: Namen/Datum/Uhrzeit robust erkennen ----
+const _normN = (s) => String(s || '').trim().toLowerCase().replace(/\s+/g, ' ');
+function matchStudent(students, raw) {
+  const q = _normN(raw);
+  if (!q) return { error: 'kein Name angegeben' };
+  const eq = (v) => _normN(v) === q;
+  let hits = students.filter((s) => eq(s.name));
+  if (hits.length === 1) return { student: hits[0] };
+  hits = students.filter((s) => eq(s.username));
+  if (hits.length === 1) return { student: hits[0] };
+  const parts = q.split(' ');
+  if (parts.length >= 2) {
+    const rev = parts.slice().reverse().join(' ');
+    hits = students.filter((s) => _normN(s.name) === rev);
+    if (hits.length === 1) return { student: hits[0] };
+  }
+  // alle Namensteile kommen im Schuelernamen vor
+  hits = students.filter((s) => { const n = _normN(s.name); return parts.every((p) => n.includes(p)); });
+  if (hits.length === 1) return { student: hits[0] };
+  if (parts.length === 1) {
+    hits = students.filter((s) => _normN(s.name).split(' ').some((w) => w === q));
+    if (hits.length === 1) return { student: hits[0] };
+    hits = students.filter((s) => _normN(s.name).split(' ').some((w) => w.startsWith(q)));
+    if (hits.length === 1) return { student: hits[0] };
+  }
+  if (hits.length > 1) return { error: `mehrdeutig – ${hits.length} Schüler passen` };
+  return { error: 'kein passender Schüler gefunden' };
+}
+function parseImportDate(str, today) {
+  const m = String(str || '').trim().match(/^(\d{1,2})\.(\d{1,2})\.?(\d{2,4})?$/);
+  if (!m) return null;
+  const d = +m[1], mo = +m[2];
+  if (d < 1 || d > 31 || mo < 1 || mo > 12) return null;
+  const p2 = (n) => String(n).padStart(2, '0');
+  const ty = +today.slice(0, 4);
+  let year = m[3] ? (+m[3] < 100 ? 2000 + +m[3] : +m[3]) : ty;
+  let out = `${year}-${p2(mo)}-${p2(d)}`;
+  if (!m[3] && out < today) { year = ty + 1; out = `${year}-${p2(mo)}-${p2(d)}`; } // ohne Jahr: nächstes Vorkommen
+  const dt = new Date(out + 'T00:00:00');
+  if (dt.getMonth() + 1 !== mo || dt.getDate() !== d) return null; // echtes Datum (z.B. 31.2. abfangen)
+  return out;
+}
+function parseImportTime(str) {
+  const m = String(str || '').trim().match(/^(\d{1,2})[:.h](\d{2})$/) || String(str || '').trim().match(/^(\d{1,2})$/);
+  if (!m) return null;
+  const h = +m[1], mi = m[2] != null ? +m[2] : 0;
+  if (h > 23 || mi > 59) return null;
+  return `${String(h).padStart(2, '0')}:${String(mi).padStart(2, '0')}`;
+}
+// Eine Zeile zerlegen – mit Komma/Semikolon/Tab ODER nur mit Leerzeichen.
+// Ohne Trennzeichen werden Datum- und Uhrzeit-Token am Muster erkannt,
+// alles davor ist der Name (darf Leerzeichen enthalten).
+function splitBulkLine(line) {
+  if (/[,;\t]/.test(line)) {
+    const p = line.split(/\s*[,;\t]\s*/);
+    return { name: p[0] || '', date: p[1] || '', time: p[2] || '', dur: p[3] || '' };
+  }
+  const toks = line.split(/\s+/);
+  const dateIdx = toks.findIndex((t) => /^\d{1,2}\.\d{1,2}\.?(\d{2,4})?$/.test(t));
+  if (dateIdx < 1) return { name: dateIdx === 0 ? '' : line, date: '', time: '', dur: '' };
+  const timeIdx = toks.findIndex((t, i) => i > dateIdx && /^\d{1,2}([:.h]\d{2})?$/.test(t));
+  return {
+    name: toks.slice(0, dateIdx).join(' '),
+    date: toks[dateIdx] || '',
+    time: timeIdx >= 0 ? toks[timeIdx] : '',
+    dur: timeIdx >= 0 ? (toks[timeIdx + 1] || '') : '',
+  };
+}
+function bulkInstructorBookings(res, body) {
+  const commit = !!body.commit;
+  const s = getSettings();
+  const students = db.prepare('SELECT id,name,username FROM students WHERE archived_at IS NULL').all();
+  const today = todayStr();
+  const lines = String(body.text || '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  const planned = {}; // Datum -> belegte Intervalle (bestehende Buchungen, Blöcke + in diesem Lauf akzeptierte)
+  const dayIntervals = (date) => {
+    if (!planned[date]) {
+      const iv = db.prepare("SELECT start_time,duration_min FROM bookings WHERE date=? AND status!='cancelled'").all(date)
+        .map((b) => ({ s: toMin(b.start_time), e: toMin(b.start_time) + b.duration_min }));
+      for (const bl of db.prepare('SELECT start_time,end_time FROM blocks WHERE date=?').all(date))
+        iv.push({ s: toMin(bl.start_time), e: toMin(bl.end_time) });
+      planned[date] = iv;
+    }
+    return planned[date];
+  };
+  const rows = [];
+  for (const line of lines) {
+    const f = splitBulkLine(line);
+    const row = { input: line };
+    if (!f.name || !f.date || !f.time) { row.status = 'error'; row.msg = 'Format: Name, Datum, Uhrzeit[, Dauer]'; rows.push(row); continue; }
+    const match = matchStudent(students, f.name);
+    const date = parseImportDate(f.date, today);
+    const time = parseImportTime(f.time);
+    let dur = f.dur ? parseInt(String(f.dur).replace(/[^\d]/g, ''), 10) : s.lesson_min;
+    if (!dur || dur < 20) dur = s.lesson_min;
+    if (match.error) { row.status = 'error'; row.msg = 'Name: ' + match.error; rows.push(row); continue; }
+    row.student = match.student.name; row.studentId = match.student.id;
+    if (!date) { row.status = 'error'; row.msg = 'Datum unklar (z. B. 22.7. oder 22.07.2026)'; rows.push(row); continue; }
+    if (!time) { row.status = 'error'; row.msg = 'Uhrzeit unklar (z. B. 14:00)'; rows.push(row); continue; }
+    row.date = date; row.time = time; row.dur = dur;
+    if (date < today || (date === today && toMin(time) <= toMin(nowHHMM()))) {
+      row.status = 'error'; row.msg = 'liegt in der Vergangenheit'; rows.push(row); continue;
+    }
+    const ns = toMin(time), ne = ns + dur;
+    const iv = dayIntervals(date);
+    // Import bildet die Realität ab: nur echte Zeit-Überschneidung blockt
+    // (die Pausen-Regel ist eine Planungsvorgabe, kein physisches Muss).
+    if (iv.some((x) => overlaps(ns, ne, x.s, x.e))) {
+      row.status = 'error'; row.msg = 'Überschneidet einen vorhandenen Termin'; rows.push(row); continue;
+    }
+    row.status = 'ok'; row.msg = 'wird eingetragen';
+    iv.push({ s: ns, e: ne }); // für Folgezeilen als belegt vormerken
+    rows.push(row);
+  }
+  const okRows = rows.filter((r) => r.status === 'ok');
+  const summary = { rows, okCount: okRows.length, errCount: rows.length - okRows.length };
+  if (!commit) return ok(res, { dryRun: true, ...summary });
+  let created = 0;
+  for (const r of okRows) {
+    const info = db.prepare(
+      `INSERT INTO bookings(student_id,date,start_time,duration_min,status,created_at) VALUES(?,?,?,?,?,?)`
+    ).run(r.studentId, r.date, r.time, r.dur, 'booked', new Date().toISOString());
+    logEvent('book', { actor: 'instructor', studentId: r.studentId, bookingId: Number(info.lastInsertRowid), date: r.date,
+      detail: `${wdShort(r.date)} ${dmy(r.date)} ${r.time} Uhr (${r.dur} Min) – Sammel-Import` });
+    created++;
+  }
+  return ok(res, { committed: true, created, ...summary });
 }
 
 function createBooking(res, sess, body) {

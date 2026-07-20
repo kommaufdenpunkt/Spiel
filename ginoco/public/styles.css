@@ -167,9 +167,12 @@ th{color:var(--muted);font-weight:600;font-size:.78rem;text-transform:uppercase;
 .modal-bg{position:fixed;inset:0;background:rgba(4,7,11,.65);display:flex;align-items:center;
   justify-content:center;padding:1.2rem;z-index:50;backdrop-filter:blur(3px)}
 .modal{background:var(--card);border:1px solid var(--line);border-radius:16px;max-width:460px;width:100%;
-  padding:1.4rem;box-shadow:0 20px 60px rgba(0,0,0,.6)}
+  padding:1.4rem;box-shadow:0 20px 60px rgba(0,0,0,.6);
+  max-height:88vh;max-height:calc(100dvh - 2rem);overflow-y:auto;-webkit-overflow-scrolling:touch}
 .modal h3{margin:0 0 1rem}
-.modal .actions{display:flex;gap:.6rem;justify-content:flex-end;margin-top:1.2rem}
+/* Aktionsleiste bleibt am unteren Rand sichtbar – auch bei langen Dialogen am Handy */
+.modal .actions{display:flex;gap:.6rem;justify-content:flex-end;position:sticky;bottom:0;
+  margin:1.2rem -1.4rem -1.4rem;padding:.85rem 1.4rem;background:var(--card);border-top:1px solid var(--line)}
 .modal .warnbox{background:var(--warn-bg);border:1px solid rgba(230,178,58,.3);color:#f0d089;
   padding:.7rem .9rem;border-radius:10px;font-size:.86rem;margin-bottom:.4rem}
 
@@ -199,6 +202,28 @@ th{color:var(--muted);font-weight:600;font-size:.78rem;text-transform:uppercase;
 .slots-hint{grid-column:1/-1;display:flex;gap:.6rem;align-items:center;flex-wrap:wrap;
   justify-content:center;background:var(--card2);border:1px solid var(--line);
   border-radius:11px;padding:.75rem .9rem;color:var(--muted);font-size:.88rem;margin-top:.2rem}
+
+/* ---- Sammel-Eintragen (Fahrlehrer) ---- */
+.bulk-help{background:var(--card2);border:1px solid var(--line);border-radius:11px;
+  padding:.7rem .85rem;margin:.2rem 0 .7rem;font-size:.86rem}
+.bulk-help .bh-row{display:flex;gap:.6rem;align-items:baseline;padding:.15rem 0}
+.bulk-help .bh-k{color:var(--muted);min-width:5.5rem;flex-shrink:0}
+.bulk-help code{background:var(--bg2);border:1px solid var(--line);border-radius:6px;
+  padding:.1rem .4rem;font-size:.85rem;color:var(--ink)}
+.bulk-names{margin:0 0 .7rem;font-size:.85rem}
+.bulk-names summary{cursor:pointer;color:var(--brand)}
+.bulk-names .bn-list{margin-top:.4rem;color:var(--muted);line-height:1.7}
+#bk-text{width:100%;font-family:inherit;font-size:1rem;line-height:1.5;resize:vertical}
+.bulk-summary{display:flex;gap:.5rem;flex-wrap:wrap;margin:.3rem 0 .6rem}
+.bulk-list{display:flex;flex-direction:column;gap:.4rem;max-height:38vh;overflow-y:auto;
+  margin-bottom:.3rem;-webkit-overflow-scrolling:touch}
+.bulk-row{display:flex;gap:.6rem;align-items:flex-start;background:var(--card2);
+  border:1px solid var(--line);border-radius:10px;padding:.55rem .7rem;font-size:.9rem}
+.bulk-row.ok{border-color:var(--good-b,#2c6b46)}
+.bulk-row.error{border-color:var(--bad-b,#7a3b3b)}
+.bulk-row .br-ic{font-size:1rem;line-height:1.3}
+.bulk-row .br-msg{font-size:.78rem;color:var(--muted);margin-top:.1rem}
+.bulk-row .br-msg.error{color:var(--bad)}
 
 /* ---- Kennzahl-Kacheln ---- */
 .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:.7rem;margin-top:1rem}

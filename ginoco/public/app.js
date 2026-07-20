@@ -765,7 +765,13 @@ function renderSlots(slots, mine) {
     const mineHere = mineToday.has(s.start);
     let cls = s.state, inner = '';
     if (mineHere) {
-      inner = `<span class="tag b">Dein Termin</span><button class="ghost sm" data-cancel-time="${s.start}">Stornieren</button>`;
+      // Nur frei stornierbar, solange die Storno-Frist nicht erreicht ist –
+      // sonst 🔒 (Verwalten/Anbieten geht oben unter „Meine Fahrstunden").
+      const cancelH = state.settings?.cancel_hours || 48;
+      const freeCancel = hoursUntil(state.date, s.start) >= cancelH;
+      inner = `<span class="tag b">Dein Termin</span>`
+        + (freeCancel ? `<button class="ghost sm" data-cancel-time="${s.start}">Stornieren</button>`
+                      : `<span class="pill">🔒 gebucht</span>`);
       cls = 'booked';
     } else if (s.state === 'free') {
       inner = `<span class="tag g">frei</span><button class="sm" data-book="${s.start}" data-dur="${s.duration}">Buchen</button>`;
@@ -1177,6 +1183,7 @@ async function tabKalender() {
       <input type="date" id="k-date" style="max-width:160px">
       <button class="ghost sm" id="k-late" style="margin-left:auto">⏱️ Ich komme später</button>
       <button class="ghost sm" id="k-gap">🧩 Lücken schließen</button>
+      <button class="ghost sm" id="k-bulk">📋 Sammel-Eintragen</button>
       <button class="sm" id="k-add">+ Eigener Termin</button>
     </div>
     <div id="k-list"></div>
@@ -1193,8 +1200,72 @@ async function tabKalender() {
   $('#k-date').onchange = (e) => { state.date = e.target.value; loadK(); };
   $('#k-add').onclick = () => openAddBooking();
   $('#k-gap').onclick = () => openGapModal();
+  $('#k-bulk').onclick = () => openBulkBooking();
   $('#k-late').onclick = () => openLateModal();
   loadK();
+}
+
+// ---- Sammel-Eintragen: bestehende Termine schnell übernehmen ----
+async function openBulkBooking() {
+  let students = [];
+  try { students = (await api('/api/students')).students; } catch {}
+  const nameList = students.map((s) => esc(s.name)).join(' · ');
+  modal(`<h3>📋 Termine sammeln eintragen</h3>
+    <p class="hint" style="margin-bottom:.5rem">Trag deine schon vereinbarten Fahrstunden hier untereinander ein – eine pro Zeile. Ich prüfe alles und zeige dir erst eine Vorschau, bevor etwas gespeichert wird.</p>
+    <div class="bulk-help">
+      <div class="bh-row"><span class="bh-k">Aufbau</span><span><b>Name, Datum, Uhrzeit, Dauer</b> <span class="muted">(Dauer optional → ${state.settings?.lesson_min || 80} Min)</span></span></div>
+      <div class="bh-row"><span class="bh-k">Beispiel</span><code>Maria, 22.7., 14:00, 80</code></div>
+      <div class="bh-row"><span class="bh-k">Geht auch</span><span class="muted">22.07.2026 · 14 Uhr ohne Jahr (nimmt das nächste Vorkommen)</span></div>
+    </div>
+    ${students.length ? `<details class="bulk-names"><summary>Deine ${students.length} Fahrschüler anzeigen</summary><div class="bn-list">${nameList}</div></details>` : '<p class="hint">Noch keine Fahrschüler angelegt.</p>'}
+    <div class="field"><label>Termine (eine pro Zeile)</label>
+      <textarea id="bk-text" rows="7" placeholder="Maria, 22.7., 14:00, 80&#10;Jason, 22.7., 16:00&#10;Lea, 24.7., 12:00, 120"></textarea></div>
+    <div id="bk-preview"></div>
+    <div class="actions" style="justify-content:space-between">
+      <button class="sec" onclick="window.__closeModal()">Abbrechen</button>
+      <div class="inline" style="gap:.5rem">
+        <button class="sec" id="bk-check">Vorschau prüfen</button>
+        <button id="bk-commit" disabled>Eintragen</button>
+      </div>
+    </div>`, 'wide');
+  const preview = $('#bk-preview');
+  const commitBtn = $('#bk-commit');
+  const runCheck = async (commit) => {
+    const text = $('#bk-text').value;
+    if (!text.trim()) { toast('Bitte erst Termine eintragen', 'err'); return; }
+    try {
+      const r = await api('/api/instructor/bookings/bulk', { method: 'POST', body: { text, commit } });
+      if (commit && r.committed) {
+        closeModal();
+        toast(`${r.created} Termin${r.created === 1 ? '' : 'e'} eingetragen ✓`, 'ok');
+        if (state.instrTab === 'kalender') loadK(); else drawInstrTab();
+        return;
+      }
+      renderBulkPreview(preview, r);
+      commitBtn.disabled = r.okCount === 0;
+      commitBtn.textContent = r.okCount ? `${r.okCount} Termin${r.okCount === 1 ? '' : 'e'} eintragen` : 'Eintragen';
+    } catch (e) { toast(e.message, 'err'); }
+  };
+  $('#bk-check').onclick = () => runCheck(false);
+  commitBtn.onclick = () => runCheck(true);
+}
+function renderBulkPreview(el, r) {
+  const icon = (st) => st === 'ok' ? '✅' : '⚠️';
+  const line = (row) => {
+    const head = row.status === 'ok'
+      ? `<b>${esc(row.student)}</b> · ${WD[isoDow(row.date) - 1]} ${fmtShort(row.date)} · ${row.time} <span class="muted">(${row.dur} Min)</span>`
+      : `<span class="muted">${esc(row.input)}</span>`;
+    return `<div class="bulk-row ${row.status}">
+      <span class="br-ic">${icon(row.status)}</span>
+      <div><div>${head}</div><div class="br-msg ${row.status}">${esc(row.msg)}${row.status !== 'ok' && row.student ? ' · erkannt: ' + esc(row.student) : ''}</div></div>
+    </div>`;
+  };
+  el.innerHTML = `<div class="bulk-summary">
+      <span class="pill" style="background:var(--good-bg);color:var(--good)">✅ ${r.okCount} bereit</span>
+      ${r.errCount ? `<span class="pill" style="background:var(--bad-bg);color:var(--bad)">⚠️ ${r.errCount} zu prüfen</span>` : ''}
+    </div>
+    <div class="bulk-list">${r.rows.map(line).join('')}</div>
+    ${r.errCount ? '<p class="hint">Zeilen mit ⚠️ werden übersprungen. Korrigier sie oben und prüfe erneut – oder trag den Rest schon mal ein.</p>' : ''}`;
 }
 async function loadK() {
   const mode = state.calMode || 'tag';
