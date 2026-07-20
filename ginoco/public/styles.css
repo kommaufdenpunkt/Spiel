@@ -187,6 +187,19 @@ th{color:var(--muted);font-weight:600;font-size:.78rem;text-transform:uppercase;
 .hint{font-size:.82rem;color:var(--muted);margin:.3rem 0 .8rem}
 .inline{display:flex;gap:.5rem;align-items:center;flex-wrap:wrap}
 
+/* ---- Begrüßung + freundliche Leer-Zustände (Fahrschüler) ---- */
+.greet{font-size:.95rem;color:var(--muted);margin:0 0 .35rem}
+.greet strong{color:var(--ink)}
+.empty-book{grid-column:1/-1;text-align:center;background:var(--card2);border:1px dashed var(--line);
+  border-radius:14px;padding:1.4rem 1rem 1.5rem;margin-top:.4rem}
+.empty-book .eb-icon{font-size:2.4rem;line-height:1;margin-bottom:.4rem}
+.empty-book .eb-title{font-size:1.05rem;font-weight:700;color:var(--ink);margin-bottom:.3rem}
+.empty-book .eb-text{font-size:.9rem;color:var(--muted);line-height:1.55;margin:0 auto .9rem;max-width:34ch}
+.empty-book button{font-size:1rem;padding:.7rem 1.1rem}
+.slots-hint{grid-column:1/-1;display:flex;gap:.6rem;align-items:center;flex-wrap:wrap;
+  justify-content:center;background:var(--card2);border:1px solid var(--line);
+  border-radius:11px;padding:.75rem .9rem;color:var(--muted);font-size:.88rem;margin-top:.2rem}
+
 /* ---- Kennzahl-Kacheln ---- */
 .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:.7rem;margin-top:1rem}
 .tile{background:var(--card2);border:1px solid var(--line);border-radius:11px;padding:.8rem .9rem}

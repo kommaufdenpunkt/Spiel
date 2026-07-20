@@ -89,7 +89,7 @@ window.__openProfile = openProfileModal;
 // ---------- Geführter Einstieg (Tutorial) für Fahrschüler ----------
 const TOUR = [
   { icon: '👋', title: 'Willkommen bei ginoco', text: 'Hier buchst du deine Fahrstunden selbst – schnell und von überall. In ein paar kurzen Schritten zeige ich dir, wie es geht. Du kannst jederzeit auf „Überspringen“ tippen.' },
-  { icon: '📅', title: '1. Fahrstunde buchen', text: 'Wähle oben einen Tag (mit ‹ › oder über das Datum). Freie Zeiten sind <strong>grün</strong> und mit „FREI“ markiert. Tippe auf <strong>Buchen</strong>, wähle die Dauer (z. B. 80 Min) und bestätige mit „Ja, verbindlich buchen“. Fertig! ✅' },
+  { icon: '📅', title: '1. Fahrstunde buchen', text: 'Am schnellsten geht’s mit <strong>🔎 Nächster freier Termin</strong> – ein Tipp und du landest direkt beim nächsten freien Tag. Oder blättere mit ‹ › durch die Tage. Freie Zeiten sind <strong>grün</strong> und mit „FREI“ markiert. Tippe auf <strong>Buchen</strong>, wähle die Dauer (z. B. 80 Min) und bestätige mit „Ja, verbindlich buchen“. Fertig! ✅' },
   { icon: '📋', title: '2. Deine Termine', text: 'Oben unter <strong>„Meine Termine“</strong> siehst du alle gebuchten Stunden mit Datum, Uhrzeit und Treffpunkt. Über <strong>„Zum Kalender hinzufügen“</strong> landen sie in deinem Handy-Kalender.' },
   { icon: '🔄', title: '3. Doch keine Zeit?', text: 'Kannst du an dem Tag nicht: Tippe bei der Stunde auf <strong>„Zur Übernahme anbieten“</strong> – ein anderer Fahrschüler kann sie dann übernehmen (anonym, keiner sieht deinen Namen). Ist es noch früh genug, kannst du auch einfach <strong>„Stornieren“</strong>.' },
   { icon: '👤', title: '4. Dein Profil', text: 'Tippe oben auf <strong>👤</strong> und vervollständige deine Daten (Name, Handynummer, Jahrgang). Die sieht <strong>nur dein Fahrlehrer</strong> – kein anderer Fahrschüler.' },
@@ -451,6 +451,10 @@ async function renderStudent() {
         <button class="sec sm" id="next">›</button>
         <input type="date" id="dpick" style="max-width:170px">
       </div>
+      <div class="inline" style="margin:.1rem 0 .7rem">
+        <button class="sec sm" id="find-free">🔎 Nächsten freien Termin</button>
+        <button class="ghost sm" id="go-today">Heute</button>
+      </div>
       <div class="slots" id="slots"></div>
     </div>
   </main>`;
@@ -461,6 +465,8 @@ async function renderStudent() {
   $('#prev').onclick = () => { state.date = addDays(state.date, -1); syncStudent(); };
   $('#next').onclick = () => { state.date = addDays(state.date, 1); syncStudent(); };
   $('#dpick').onchange = (e) => { state.date = e.target.value; syncStudent(); };
+  $('#find-free').onclick = () => jumpToNextFree();
+  $('#go-today').onclick = () => { state.date = todayStr(); syncStudent(); };
   mountEdgeMenus('student');
   syncStudent();
   // Beim ersten Mal automatisch die kurze Einführung zeigen
@@ -489,13 +495,38 @@ async function syncStudent() {
   } catch (e) { toast(e.message, 'err'); }
 }
 
+function greetWord() {
+  const h = new Date().getHours();
+  if (h < 5) return 'Schön, dass du da bist';
+  if (h < 11) return 'Guten Morgen';
+  if (h < 18) return 'Guten Tag';
+  return 'Guten Abend';
+}
+function firstName(n) { return String(n || '').trim().split(/\s+/)[0] || ''; }
+
+// Naechsten freien Termin vom Server holen und dorthin springen.
+async function jumpToNextFree(fromDate) {
+  toast('Suche nächsten freien Termin …');
+  let next = null;
+  try { next = (await api('/api/next-free' + (fromDate ? '?from=' + fromDate : ''))).next; } catch (e) { toast(e.message, 'err'); return; }
+  if (!next) { toast('In den nächsten Tagen ist leider kein Termin frei. Schau später nochmal.', 'err'); return; }
+  state.date = next.date;
+  syncStudent();
+  const el = document.getElementById('slots');
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  toast(`Freier Termin: ${WD_LONG[isoDow(next.date) - 1]}, ${fmtShort(next.date)} ✓`, 'ok');
+}
+window.__jumpNextFree = jumpToNextFree;
+
 function renderWeekCard(wi, bookings, progress) {
   const allUpcoming = bookings.filter((b) => b.date >= todayStr() && b.status !== 'done')
     .sort((a, b) => (a.date + a.start_time).localeCompare(b.date + b.start_time));
   const upcoming = bookings.filter((b) => b.date >= todayStr()).sort((a, b) => (a.date + a.start_time).localeCompare(b.date + b.start_time));
   const remainColor = wi.remaining > 0 ? 'good' : 'bad';
   const next = allUpcoming.find((b) => b.status === 'booked');
+  const gname = firstName(state.user?.name);
   $('#week-card').innerHTML = `
+    <div class="greet">${greetWord()}${gname ? ', <strong>' + esc(gname) + '</strong>' : ''} 👋</div>
     <h2>Meine Fahrstunden <span class="sub">diese Woche (${fmtShort(wi.from)}–${fmtShort(wi.to)})</span></h2>
     ${next ? `<div class="bitem" style="background:var(--booked);border-color:var(--booked-b);margin-bottom:.8rem">
       <div><div class="meta" style="color:var(--muted)">Deine nächste Fahrstunde</div>
@@ -510,13 +541,20 @@ function renderWeekCard(wi, bookings, progress) {
     </div>
     ${progress ? studentProgress(progress) : ''}
     ${upcoming.length ? `<div class="blist">${upcoming.map(studentBookingItem).join('')}</div>`
-      : '<p class="muted">Noch keine kommenden Termine gebucht.</p>'}`;
+      : `<div class="empty-book">
+          <div class="eb-icon">🚗</div>
+          <div class="eb-title">Noch keine Fahrstunde gebucht</div>
+          <p class="eb-text">Bereit für die nächste Stunde? Ich springe dir direkt zum nächsten freien Termin – dann nur noch Uhrzeit antippen und buchen.</p>
+          <button id="eb-find">🔎 Nächsten freien Termin finden</button>
+        </div>`}`;
   const c = $('#week-card');
   c.querySelectorAll('[data-cancel]').forEach((b) => b.onclick = () => cancelBooking(b.dataset.cancel));
   c.querySelectorAll('[data-offer]').forEach((b) => b.onclick = () => offerBooking(b.dataset.offer));
   c.querySelectorAll('[data-withdraw]').forEach((b) => b.onclick = () => withdrawOffer(b.dataset.withdraw));
   const ic = $('#ical-btn');
   if (ic) ic.onclick = () => exportICS(upcoming);
+  const ef = $('#eb-find');
+  if (ef) ef.onclick = () => jumpToNextFree();
 }
 
 function studentProgress(p) {
@@ -712,7 +750,17 @@ async function declineOffer(id) {
 function renderSlots(slots, mine) {
   const mineToday = new Set(mine.filter((b) => b.date === state.date && b.status !== 'cancelled').map((b) => b.start_time));
   const el = $('#slots');
-  if (!slots.length) { el.innerHTML = '<p class="muted">Für diesen Tag gibt es keine Slots.</p>'; return; }
+  const dayName = WD_LONG[isoDow(state.date) - 1];
+  if (!slots.length) {
+    el.innerHTML = `<div class="empty-book">
+      <div class="eb-icon">📅</div>
+      <div class="eb-title">${dayName} keine Fahrstunden</div>
+      <p class="eb-text">An diesem Tag bietet dein Fahrlehrer keine Termine an. Lass mich den nächsten freien Tag für dich suchen.</p>
+      <button data-find-next="${state.date}">🔎 Nächsten freien Termin finden</button>
+    </div>`;
+    el.querySelector('[data-find-next]').onclick = () => jumpToNextFree(addDays(state.date, 1));
+    return;
+  }
   el.innerHTML = slots.map((s) => {
     const mineHere = mineToday.has(s.start);
     let cls = s.state, inner = '';
@@ -740,6 +788,17 @@ function renderSlots(slots, mine) {
       ${inner}
     </div>`;
   }).join('');
+  // Tag hat Slots, aber nichts Freies (alles belegt/vorbei) und keiner gehört mir:
+  // sanfter Hinweis + Sprung zum nächsten freien Termin.
+  const anyFree = slots.some((s) => s.state === 'free');
+  const anyMine = slots.some((s) => mineToday.has(s.start));
+  if (!anyFree && !anyMine) {
+    el.insertAdjacentHTML('beforeend', `<div class="slots-hint">
+      An diesem Tag ist gerade nichts frei.
+      <button class="sec sm" data-find-next>🔎 Nächsten freien Termin</button>
+    </div>`);
+    el.querySelector('[data-find-next]').onclick = () => jumpToNextFree(addDays(state.date, 1));
+  }
   el.querySelectorAll('[data-book]').forEach((b) => b.onclick = () => bookSlot(b.dataset.book, Number(b.dataset.dur)));
   el.querySelectorAll('[data-cancel-time]').forEach((b) => b.onclick = () => {
     const bk = myBookingsCache.find((x) => x.date === state.date && x.start_time === b.dataset.cancelTime);

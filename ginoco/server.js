@@ -15,7 +15,7 @@ const PUBLIC = join(__dirname, 'public');
 const PORT = Number(process.env.PORT || 3000);
 const HOST = process.env.HOST || '0.0.0.0'; // hinter Caddy: HOST=127.0.0.1 (nur Proxy erreicht Node)
 const SESSION_DAYS = 30;
-const APP_VERSION = "3.2.1";
+const APP_VERSION = "3.3.0";
 // Einstellungen, die Schueler/Oeffentlichkeit sehen duerfen (Rest bleibt beim Fahrlehrer)
 const PUBLIC_SETTINGS = ['instructor_name', 'instructor_phone', 'policy_text',
   'cancel_hours', 'lock_hours', 'booking_horizon_days', 'booking_horizon_days_rank2',
@@ -308,6 +308,23 @@ async function handleApi(req, res, url) {
     if (!requireStudent() && !requireInstructor()) return bad(res, 'Bitte anmelden', 401);
     const date = url.searchParams.get('date') || todayStr();
     return ok(res, { date, ...buildDaySlots(date, sess.kind === 'student' ? sess.student_id : null) });
+  }
+
+  // Naechsten buchbaren Tag finden (fuers "reibungslose" Buchen) – scannt ab
+  // heute (oder ?from=) vorwaerts bis zum Buchungshorizont des Schuelers.
+  if (p === '/api/next-free' && method === 'GET') {
+    if (!requireStudent() && !requireInstructor()) return bad(res, 'Bitte anmelden', 401);
+    const studentId = sess.kind === 'student' ? sess.student_id : null;
+    const horizon = studentId ? studentRank(studentId).horizon : Number(getSettingRaw('booking_horizon_days'));
+    let d = url.searchParams.get('from') || todayStr();
+    if (daysAhead(d) < 0) d = todayStr();
+    let next = null;
+    for (let i = 0; i <= horizon + 1; i++) {
+      const free = buildDaySlots(d, studentId).slots.filter((s) => s.state === 'free');
+      if (free.length) { next = { date: d, freeCount: free.length, first: free[0].start }; break; }
+      d = addDays(d, 1);
+    }
+    return ok(res, { next, horizon });
   }
 
   if (p === '/api/my/bookings' && method === 'GET') {
