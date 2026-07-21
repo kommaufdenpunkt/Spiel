@@ -494,6 +494,7 @@ function wireAuth(tab) {
 // ====================== FAHRSCHÜLER ======================
 async function renderStudent() {
   app.innerHTML = header() + `<main>
+    <div class="card hidden" id="lesson-card"></div>
     <div class="card hidden" id="live-card"></div>
     <div class="card hidden" id="notif-card"></div>
     <div class="card" id="week-card"></div>
@@ -542,6 +543,7 @@ async function syncStudent() {
     myBookingsCache = mine.bookings;
     renderAway(away.away);
     renderNotifications(notif.notifications, notif.unread);
+    renderLessonTimer(mine.bookings);
     refreshStudentLive();
     renderWeekCard(mine.weekInfo, mine.bookings, mine.progress);
     { const hn = $('#horizon-note'); if (hn && mine.progress) hn.textContent = `(bis ${mine.progress.horizon} Tage im Voraus · Rang ${mine.progress.rank})`; }
@@ -710,11 +712,16 @@ async function refreshStudentLive() {
   card.classList.remove('hidden');
   const phone = state.settings?.instructor_phone;
   const contact = phone ? `<div class="inline" style="margin-top:.6rem">${contactButtons(phone, 'Hallo, ich warte am Treffpunkt auf dich.')}</div>` : '';
+  // "Ich bin in X Min da" – vom Fahrlehrer gesagt (hat Vorrang, ist verlässlicher als die GPS-Schätzung)
+  const announce = d.announce
+    ? `<div class="announce">🚗 Dein Fahrlehrer ist ${d.announce.remaining > 0 ? `in <strong>~${d.announce.remaining} Min</strong> da` : '<strong>gleich da</strong>'}</div>`
+    : '';
   if (!d.active) {
     const note = d.busy
       ? 'Dein Fahrlehrer ist gerade noch in einer Fahrstunde. Sein Standort wird geteilt, sobald er unterwegs zu dir ist.'
       : `Sobald dein Fahrlehrer seinen Standort teilt (ca. ${d.lead} Min vorher), kannst du hier live sehen, wo er ist und wann er da ist.`;
     card.innerHTML = `<h2>📍 Treffpunkt</h2>
+      ${announce}
       <p>Deine Fahrstunde beginnt in <strong>${d.booking.minutesToStart} Min</strong> (${d.booking.start_time} Uhr).</p>
       ${d.meet?.label ? `<p class="meta">Treffpunkt: <strong>${esc(d.meet.label)}</strong></p>` : ''}
       <p class="hint">${note}</p>${contact}`;
@@ -727,6 +734,7 @@ async function refreshStudentLive() {
       : `https://www.google.com/maps/search/?api=1&query=${loc.lat},${loc.lng}`;
     const upd = new Date(loc.updated_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
     card.innerHTML = `<h2>🛰️ Dein Fahrlehrer ist unterwegs</h2>
+      ${announce}
       <div class="inline" style="margin-bottom:.6rem">
         ${d.etaMin != null ? `<span class="pill" style="background:var(--good-bg);color:var(--good);font-size:.95rem">🚗 ca. ${d.etaMin} Min</span>` : ''}
         ${d.distanceKm != null ? `<span class="pill">${d.distanceKm < 1 ? Math.round(d.distanceKm * 1000) + ' m' : d.distanceKm.toFixed(1) + ' km'} entfernt</span>` : ''}
@@ -740,6 +748,77 @@ async function refreshStudentLive() {
       <p class="hint" style="margin-top:.4rem">Entfernung ist Luftlinie, ETA eine Schätzung.</p>${contact}`;
   }
   if (!studentLivePoll) studentLivePoll = setInterval(refreshStudentLive, 15000);
+}
+
+// ---------- Fahrstunden-Timer (Schüler drückt „Start", Fahrzeit läuft) ----------
+let lessonTick = null;
+// Welche Fahrstunde ist gerade „dran"? Heute, kurz vor Beginn bis kurz nach Ende.
+function currentLessonInfo(bookings) {
+  const today = todayStr(), now = Date.now();
+  const cands = bookings.filter((b) => b.date === today && (b.status === 'booked' || b.status === 'done'))
+    .sort((a, z) => a.start_time.localeCompare(z.start_time));
+  for (const b of cands) {
+    if (b.started_at) {
+      const elapsedMin = (now - new Date(b.started_at).getTime()) / 60000;
+      if (elapsedMin < b.duration_min + 15) return { b, started: true };
+      continue; // schon lange vorbei
+    }
+    const minsToStart = (new Date(`${b.date}T${b.start_time}:00`).getTime() - now) / 60000;
+    if (minsToStart <= 10 && minsToStart >= -30) return { b, started: false };
+  }
+  return null;
+}
+function renderLessonTimer(bookings) {
+  const card = $('#lesson-card'); if (!card) return;
+  if (lessonTick) { clearInterval(lessonTick); lessonTick = null; }
+  const info = currentLessonInfo(bookings);
+  if (!info) { card.classList.add('hidden'); return; }
+  card.classList.remove('hidden');
+  const b = info.b;
+  const draw = () => {
+    if (!info.started) {
+      card.innerHTML = `<h2>🚗 Deine Fahrstunde</h2>
+        <p>Heute um <strong>${b.start_time} Uhr</strong> · ${b.duration_min} Min Fahrzeit.</p>
+        <p class="hint">Drück auf Start, sobald deine Fahrstunde beginnt – dann läuft deine Fahrzeit.</p>
+        <button class="lesson-start" id="lt-start">▶️ Fahrstunde starten</button>`;
+      $('#lt-start').onclick = () => startLesson(b.id);
+      return;
+    }
+    const elapsedSec = Math.floor((Date.now() - new Date(b.started_at).getTime()) / 1000);
+    const totalSec = b.duration_min * 60;
+    const remain = Math.max(0, totalSec - elapsedSec);
+    const mm = Math.floor(remain / 60), ss = remain % 60;
+    const pct = Math.min(100, Math.round(elapsedSec / totalSec * 100));
+    const startedLbl = new Date(b.started_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+    card.innerHTML = `<h2>🚗 Fahrstunde läuft</h2>
+      ${remain <= 0
+        ? `<div class="lesson-timer done"><span class="lt-clock">✅ Zeit um</span></div>
+           <p class="hint">Deine ${b.duration_min}-Minuten-Fahrstunde ist abgelaufen. Super gemacht!</p>`
+        : `<div class="lesson-timer"><span class="lt-clock">${mm}:${String(ss).padStart(2, '0')}</span><span class="lt-sub">Fahrzeit übrig</span></div>
+           <div class="lt-bar"><div style="width:${pct}%"></div></div>`}
+      <div class="inline" style="margin-top:.7rem;justify-content:space-between">
+        <span class="muted" style="font-size:.82rem">Start ${startedLbl} · ${b.duration_min} Min</span>
+        <button class="ghost sm" id="lt-reset">Zurücksetzen</button>
+      </div>`;
+    $('#lt-reset').onclick = () => resetLesson(b.id);
+  };
+  draw();
+  if (info.started) lessonTick = setInterval(draw, 1000);
+}
+async function startLesson(id) {
+  try {
+    const r = await api('/api/bookings/' + id + '/start', { method: 'POST' });
+    const bk = myBookingsCache.find((x) => x.id == id); if (bk) bk.started_at = r.started_at;
+    renderLessonTimer(myBookingsCache); toast('Fahrstunde gestartet – gute Fahrt! 🚗', 'ok');
+  } catch (e) { toast(e.message, 'err'); }
+}
+async function resetLesson(id) {
+  if (!confirm('Timer zurücksetzen? Die Fahrzeit beginnt dann neu.')) return;
+  try {
+    await api('/api/bookings/' + id + '/start', { method: 'POST', body: { reset: true } });
+    const bk = myBookingsCache.find((x) => x.id == id); if (bk) bk.started_at = null;
+    renderLessonTimer(myBookingsCache); toast('Zurückgesetzt', 'ok');
+  } catch (e) { toast(e.message, 'err'); }
 }
 
 function renderAway(away) {
@@ -987,9 +1066,17 @@ async function renderLiveInstr() {
   const soon = st.upcoming[0];
   if (!sharing && !soon) { card.classList.add('hidden'); return; }
   card.classList.remove('hidden');
+  const etaSaid = st.eta ? `<span class="pill" style="background:var(--good-bg);color:var(--good)">✅ gesagt: in ${st.eta.remaining} Min</span>` : '';
   card.innerHTML = `<h2>🛰️ Live-Standort</h2>
     ${soon ? `<p class="hint">In <strong>${soon.minutes} Min</strong> beginnt die Fahrstunde mit <strong>${esc(soon.student_name)}</strong> (${soon.start_time} Uhr). Teile deinen Standort, damit ${esc(soon.student_name.split(' ')[0])} sieht, wann du da bist.</p>`
       : '<p class="hint">Du kannst deinen Standort mit dem nächsten Fahrschüler teilen.</p>'}
+    <div class="eta-row">
+      <span class="muted" style="font-size:.85rem">Bescheid geben:</span>
+      <button class="sec sm" data-eta="5">in 5 Min da</button>
+      <button class="sec sm" data-eta="10">in 10 Min</button>
+      <button class="sec sm" data-eta="15">in 15 Min</button>
+      ${etaSaid}${st.eta ? '<button class="ghost sm" data-eta="0">zurücknehmen</button>' : ''}
+    </div>
     ${sharing
       ? `<div class="inline"><span class="pill" style="background:var(--good-bg);color:var(--good)" id="live-instr" data-ts="">📍 Standort wird geteilt …</span>
          <button class="danger sm" id="live-stop">Teilen beenden</button></div>`
@@ -997,6 +1084,14 @@ async function renderLiveInstr() {
          <p class="hint" style="margin-top:.5rem">Dein Browser fragt einmal nach der Standort-Erlaubnis. Läuft, solange die App offen ist.</p>`}`;
   if (sharing) $('#live-stop').onclick = () => stopLiveShare();
   else $('#live-start').onclick = () => startLiveShare();
+  card.querySelectorAll('[data-eta]').forEach((b) => b.onclick = async () => {
+    const m = Number(b.dataset.eta);
+    try {
+      await api('/api/instructor/eta', { method: 'POST', body: { minutes: m } });
+      toast(m ? `Dem Schüler gesagt: in ${m} Min da ✓` : 'Ansage zurückgenommen', 'ok');
+      renderLiveInstr();
+    } catch (e) { toast(e.message, 'err'); }
+  });
 }
 
 function renderTiles(el, stats) {

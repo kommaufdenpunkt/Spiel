@@ -171,6 +171,7 @@ ensureColumn('bookings', 'meet_lat', 'meet_lat REAL');       // Treffpunkt-Koord
 ensureColumn('bookings', 'meet_lng', 'meet_lng REAL');
 ensureColumn('bookings', 'lesson_type', 'lesson_type TEXT'); // normal | ueberland | autobahn | nacht
 ensureColumn('bookings', 'offer_named', 'offer_named INTEGER NOT NULL DEFAULT 0'); // 1 = Anbieter zeigt beim Feed-Angebot freiwillig seinen Vornamen
+ensureColumn('bookings', 'started_at', 'started_at TEXT');   // Fahrstunden-Timer: Zeitpunkt, an dem "Start" gedrueckt wurde
 
 // Live-Standort des Fahrlehrers (genau eine Zeile)
 db.exec(`CREATE TABLE IF NOT EXISTS live_location (
@@ -178,6 +179,8 @@ db.exec(`CREATE TABLE IF NOT EXISTS live_location (
   lat REAL, lng REAL, updated_at TEXT, active INTEGER NOT NULL DEFAULT 0
 );`);
 db.exec('INSERT OR IGNORE INTO live_location(id,active) VALUES(1,0)');
+ensureColumn('live_location', 'eta_min', 'eta_min INTEGER');  // "Ich bin in X Min da" (vom Fahrlehrer gesagt)
+ensureColumn('live_location', 'eta_at', 'eta_at TEXT');       // wann gesagt (zum Runterzaehlen)
 
 // ---- Voreinstellungen (einmalig setzen) ----
 const DEFAULTS = {

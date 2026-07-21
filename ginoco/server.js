@@ -15,7 +15,7 @@ const PUBLIC = join(__dirname, 'public');
 const PORT = Number(process.env.PORT || 3000);
 const HOST = process.env.HOST || '0.0.0.0'; // hinter Caddy: HOST=127.0.0.1 (nur Proxy erreicht Node)
 const SESSION_DAYS = 30;
-const APP_VERSION = "3.5.0";
+const APP_VERSION = "3.6.0";
 // Einstellungen, die Schueler/Oeffentlichkeit sehen duerfen (Rest bleibt beim Fahrlehrer)
 const PUBLIC_SETTINGS = ['instructor_name', 'instructor_phone', 'policy_text',
   'cancel_hours', 'lock_hours', 'booking_horizon_days', 'booking_horizon_days_rank2',
@@ -345,7 +345,7 @@ async function handleApi(req, res, url) {
   if (p === '/api/my/bookings' && method === 'GET') {
     if (!requireStudent()) return bad(res, 'Bitte anmelden', 401);
     const rows = db.prepare(
-      `SELECT id,date,start_time,duration_min,status,gearbox,plate,note
+      `SELECT id,date,start_time,duration_min,status,gearbox,plate,note,started_at
        FROM bookings WHERE student_id = ? AND status != 'cancelled' ORDER BY date, start_time`
     ).all(sess.student_id);
     return ok(res, { bookings: rows, weekInfo: weekInfoForStudent(sess.student_id),
@@ -603,6 +603,24 @@ async function handleApi(req, res, url) {
     return ok(res);
   }
 
+  // Fahrstunden-Timer: "Start" druecken, wenn die Stunde beginnt (Schueler oder Fahrlehrer).
+  // Zaehlt danach die Fahrzeit herunter. reset:true macht einen Fehlklick rueckgaengig.
+  const startm = p.match(/^\/api\/bookings\/(\d+)\/start$/);
+  if (startm && method === 'POST') {
+    if (!requireStudent() && !requireInstructor()) return bad(res, 'Bitte anmelden', 401);
+    const bk = db.prepare('SELECT * FROM bookings WHERE id=?').get(Number(startm[1]));
+    if (!bk) return bad(res, 'Buchung nicht gefunden', 404);
+    if (requireStudent() && bk.student_id !== sess.student_id) return bad(res, 'Keine Berechtigung', 403);
+    const b = await readBody(req);
+    if (b && b.reset) {
+      db.prepare('UPDATE bookings SET started_at=NULL WHERE id=?').run(bk.id);
+      return ok(res, { started_at: null, duration_min: bk.duration_min });
+    }
+    if (!bk.started_at) db.prepare('UPDATE bookings SET started_at=? WHERE id=?').run(new Date().toISOString(), bk.id);
+    const fresh = db.prepare('SELECT started_at,duration_min FROM bookings WHERE id=?').get(bk.id);
+    return ok(res, fresh);
+  }
+
   // ===== FAHRLEHRER =====
   if (p === '/api/instructor/overview' && method === 'GET') {
     if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
@@ -692,6 +710,15 @@ async function handleApi(req, res, url) {
     db.prepare('UPDATE live_location SET active=0 WHERE id=1').run();
     return ok(res);
   }
+  // "Ich bin in X Min da" – kurze Ankunfts-Ansage an den wartenden Schueler
+  if (p === '/api/instructor/eta' && method === 'POST') {
+    if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
+    const b = await readBody(req);
+    const mins = Math.max(0, Math.min(180, Math.round(Number(b.minutes) || 0)));
+    if (!mins) { db.prepare('UPDATE live_location SET eta_min=NULL, eta_at=NULL WHERE id=1').run(); return ok(res, { cleared: true }); }
+    db.prepare('UPDATE live_location SET eta_min=?, eta_at=? WHERE id=1').run(mins, new Date().toISOString());
+    return ok(res, { minutes: mins });
+  }
   // Fahrlehrer sieht, ob eine Stunde ansteht (fuer den Start-Hinweis)
   if (p === '/api/instructor/live-status' && method === 'GET') {
     if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
@@ -702,8 +729,13 @@ async function handleApi(req, res, url) {
       .map((b) => ({ ...b, h: hoursUntil(b.date, b.start_time) }))
       .filter((b) => b.h > -0.5 && b.h * 60 <= lead)
       .map((b) => ({ id: b.id, student_name: b.student_name, start_time: b.start_time, minutes: Math.round(b.h * 60) }));
-    const live = db.prepare('SELECT active,updated_at FROM live_location WHERE id=1').get();
-    return ok(res, { lead, upcoming: soon, active: !!live.active });
+    const live = db.prepare('SELECT active,updated_at,eta_min,eta_at FROM live_location WHERE id=1').get();
+    let eta = null;
+    if (live.eta_min != null && live.eta_at) {
+      const ageMin = (Date.now() - new Date(live.eta_at).getTime()) / 60000;
+      if (ageMin < 30) eta = { minutes: live.eta_min, remaining: Math.max(0, Math.round(live.eta_min - ageMin)), at: live.eta_at };
+    }
+    return ok(res, { lead, upcoming: soon, active: !!live.active, eta });
   }
 
   // Schueler verfolgt den Live-Standort (nur im Zeitfenster vor der eigenen Stunde)
@@ -739,11 +771,17 @@ async function handleApi(req, res, url) {
       const speed = Math.max(5, Number(getSettingRaw('avg_speed_kmh')) || 30);
       etaMin = Math.max(1, Math.ceil((distanceKm / speed) * 60));
     }
+    // Manuelle Ankunfts-Ansage ("Ich bin in X Min da"), solange sie frisch ist
+    let announce = null;
+    if (live.eta_min != null && live.eta_at) {
+      const ageMin = (Date.now() - new Date(live.eta_at).getTime()) / 60000;
+      if (ageMin < 30) announce = { minutes: live.eta_min, remaining: Math.max(0, Math.round(live.eta_min - ageMin)), at: live.eta_at };
+    }
     return ok(res, {
       window: true, active, busy: otherInProgress,
       booking: { date: bk.date, start_time: bk.start_time, minutesToStart: Math.round(upcoming.h * 60) },
       location: active ? { lat: live.lat, lng: live.lng, updated_at: live.updated_at } : null,
-      meet, distanceKm, etaMin, lead,
+      meet, distanceKm, etaMin, lead, announce,
     });
   }
 
