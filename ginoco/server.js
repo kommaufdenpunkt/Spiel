@@ -15,7 +15,7 @@ const PUBLIC = join(__dirname, 'public');
 const PORT = Number(process.env.PORT || 3000);
 const HOST = process.env.HOST || '0.0.0.0'; // hinter Caddy: HOST=127.0.0.1 (nur Proxy erreicht Node)
 const SESSION_DAYS = 30;
-const APP_VERSION = "3.4.0";
+const APP_VERSION = "3.5.0";
 // Einstellungen, die Schueler/Oeffentlichkeit sehen duerfen (Rest bleibt beim Fahrlehrer)
 const PUBLIC_SETTINGS = ['instructor_name', 'instructor_phone', 'policy_text',
   'cancel_hours', 'lock_hours', 'booking_horizon_days', 'booking_horizon_days_rank2',
@@ -63,6 +63,21 @@ const json = (res, code, data) => {
 };
 const ok = (res, data = {}) => json(res, 200, data);
 const bad = (res, msg, code = 400) => json(res, code, { error: msg });
+
+// Profilfoto als data-URL pruefen (klein halten – Client verkleinert vor dem Upload)
+function validPhoto(dataUrl) {
+  return typeof dataUrl === 'string'
+    && /^data:image\/(jpeg|png|webp);base64,/.test(dataUrl)
+    && dataUrl.length <= 700000; // ~500 KB Bild
+}
+// Ein gespeichertes data-URL-Bild als echte Bilddatei ausliefern
+function sendDataUrl(res, dataUrl) {
+  const m = /^data:([\w/+.-]+);base64,(.+)$/s.exec(dataUrl || '');
+  if (!m) { res.writeHead(404); return res.end(); }
+  const buf = Buffer.from(m[2], 'base64');
+  res.writeHead(200, { 'Content-Type': m[1], 'Cache-Control': 'private, max-age=30' });
+  res.end(buf);
+}
 
 function readBody(req) {
   return new Promise((resolve) => {
@@ -490,10 +505,15 @@ async function handleApi(req, res, url) {
     const lockH = Number(getSettingRaw('lock_hours'));
     if (hoursUntil(bk.date, bk.start_time) < lockH)
       return bad(res, `Ab ${lockH} Std. vorher steht der Termin fest und kann nicht mehr abgegeben werden.`);
-    db.prepare("UPDATE bookings SET status='offered' WHERE id = ?").run(bk.id);
+    const oBody = await readBody(req);
+    const named = oBody && oBody.named ? 1 : 0; // freiwillig: Vorname im Feed zeigen
+    db.prepare("UPDATE bookings SET status='offered', offer_named=? WHERE id = ?").run(named, bk.id);
     db.prepare('DELETE FROM offer_declines WHERE booking_id = ?').run(bk.id); // frische Runde
-    // andere Schueler informieren
-    const msg = `Eine Fahrstunde am ${wdShort(bk.date)} ${dmy(bk.date)} um ${bk.start_time} Uhr ist frei geworden – möchtest du sie übernehmen?`;
+    // andere Schueler informieren (mit Vorname nur, wenn der Anbieter das wollte)
+    const who = named ? (db.prepare('SELECT name FROM students WHERE id=?').get(bk.student_id)?.name || '').split(' ')[0] : '';
+    const msg = who
+      ? `${who} gibt eine Fahrstunde am ${wdShort(bk.date)} ${dmy(bk.date)} um ${bk.start_time} Uhr ab – möchtest du sie übernehmen?`
+      : `Eine Fahrstunde am ${wdShort(bk.date)} ${dmy(bk.date)} um ${bk.start_time} Uhr ist frei geworden – möchtest du sie übernehmen?`;
     for (const sid of otherStudentIds(sess.student_id)) notify(sid, 'offer', msg, bk.date, bk.id);
     logEvent('offer', { actor: 'student', studentId: bk.student_id, bookingId: bk.id, date: bk.date,
       detail: `zur Übernahme angeboten: ${wdShort(bk.date)} ${dmy(bk.date)} ${bk.start_time} Uhr` });
@@ -535,11 +555,15 @@ async function handleApi(req, res, url) {
   if (p === '/api/offers' && method === 'GET') {
     if (!requireStudent()) return bad(res, 'Bitte anmelden', 401);
     const rows = db.prepare(
-      `SELECT id,date,start_time,duration_min FROM bookings
-       WHERE status='offered' AND student_id != ? AND date >= ?
-         AND id NOT IN (SELECT booking_id FROM offer_declines WHERE student_id = ?)
-       ORDER BY date, start_time`).all(sess.student_id, todayStr(), sess.student_id);
-    const offers = rows.filter((r) => hoursUntil(r.date, r.start_time) > 0);
+      `SELECT b.id,b.date,b.start_time,b.duration_min,b.offer_named,s.name AS sname
+       FROM bookings b LEFT JOIN students s ON s.id = b.student_id
+       WHERE b.status='offered' AND b.student_id != ? AND b.date >= ?
+         AND b.id NOT IN (SELECT booking_id FROM offer_declines WHERE student_id = ?)
+       ORDER BY b.date, b.start_time`).all(sess.student_id, todayStr(), sess.student_id);
+    // Datenschutz: Vorname nur, wenn der Anbieter ihn freigegeben hat. Nie Fotos/Nachname.
+    const offers = rows.filter((r) => hoursUntil(r.date, r.start_time) > 0)
+      .map((r) => ({ id: r.id, date: r.date, start_time: r.start_time, duration_min: r.duration_min,
+        from: r.offer_named ? (r.sname || '').split(' ')[0] : null }));
     return ok(res, { offers });
   }
   // Angebotene Stunde uebernehmen
@@ -727,8 +751,23 @@ async function handleApi(req, res, url) {
   // Eigenes Profil ansehen (nur der Schüler selbst)
   if (p === '/api/my/profile' && method === 'GET') {
     if (!requireStudent()) return bad(res, 'Bitte anmelden', 401);
-    const st = db.prepare('SELECT name,email,phone,birth_year,username FROM students WHERE id=?').get(sess.student_id);
+    const st = db.prepare('SELECT name,email,phone,birth_year,username,(photo IS NOT NULL) AS has_photo FROM students WHERE id=?').get(sess.student_id);
     return ok(res, { profile: st || {} });
+  }
+  // Eigenes Profilfoto ausliefern (nur der Schueler selbst)
+  if (p === '/api/my/photo' && method === 'GET') {
+    if (!requireStudent()) return bad(res, 'Bitte anmelden', 401);
+    const r = db.prepare('SELECT photo FROM students WHERE id=?').get(sess.student_id);
+    if (!r || !r.photo) { res.writeHead(404); return res.end(); }
+    return sendDataUrl(res, r.photo);
+  }
+  // Profilfoto eines Schuelers – NUR fuer den Fahrlehrer (Datenschutz: Schueler sehen sich nicht)
+  const phm = p.match(/^\/api\/students\/(\d+)\/photo$/);
+  if (phm && method === 'GET') {
+    if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
+    const r = db.prepare('SELECT photo FROM students WHERE id=?').get(Number(phm[1]));
+    if (!r || !r.photo) { res.writeHead(404); return res.end(); }
+    return sendDataUrl(res, r.photo);
   }
   // Eigenes Profil vervollständigen (Name/Telefon/E-Mail/Jahrgang) – nur der Schüler selbst
   if (p === '/api/my/profile' && method === 'PATCH') {
@@ -743,6 +782,11 @@ async function handleApi(req, res, url) {
       fields.push('email=?'); vals.push(em);
     }
     if ('birth_year' in b) { fields.push('birth_year=?'); vals.push(b.birth_year ? Number(b.birth_year) : null); }
+    if ('photo' in b) {
+      if (b.photo === null || b.photo === '') { fields.push('photo=?'); vals.push(null); }
+      else if (validPhoto(b.photo)) { fields.push('photo=?'); vals.push(b.photo); }
+      else return bad(res, 'Foto ungültig oder zu groß (bitte ein normales Foto, JPG/PNG).');
+    }
     if (fields.length) db.prepare(`UPDATE students SET ${fields.join(', ')} WHERE id=?`).run(...vals, sess.student_id);
     return ok(res);
   }
@@ -809,6 +853,7 @@ async function handleApi(req, res, url) {
     const rows = db.prepare(
       `SELECT s.id,s.name,s.email,s.phone,s.username,s.birth_year,s.allowed_durations,s.created_at,
         s.home_label,s.home_lat,s.home_lng,s.archived_at,s.notes,
+        (s.photo IS NOT NULL) AS has_photo,
         (SELECT COUNT(*) FROM bookings b WHERE b.student_id=s.id AND b.status='done') AS done_count
        FROM students s WHERE s.archived_at IS ${archived ? 'NOT NULL' : 'NULL'} ORDER BY s.name`
     ).all().map((s) => ({ ...s, ...studentRank(s.id), sonder: sonderCounts(s.id) }));

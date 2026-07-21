@@ -225,6 +225,24 @@ th{color:var(--muted);font-weight:600;font-size:.78rem;text-transform:uppercase;
 .bulk-row .br-msg{font-size:.78rem;color:var(--muted);margin-top:.1rem}
 .bulk-row .br-msg.error{color:var(--bad)}
 
+/* ---- Profilfoto / Avatare ---- */
+.pf-photo{display:flex;gap:.9rem;align-items:center;margin:.2rem 0 1rem}
+.pf-avatar{width:76px;height:76px;border-radius:50%;overflow:hidden;flex-shrink:0;
+  background:var(--card2);border:1px solid var(--line);display:flex;align-items:center;
+  justify-content:center;font-size:1.6rem;font-weight:800;color:var(--muted)}
+.pf-avatar img{width:100%;height:100%;object-fit:cover;display:block}
+.pf-photo-actions{display:flex;flex-direction:column;gap:.35rem;align-items:flex-start}
+.pf-filebtn{display:inline-flex;align-items:center;cursor:pointer;margin:0}
+.mini-avatar{display:inline-flex;width:30px;height:30px;border-radius:50%;overflow:hidden;
+  vertical-align:middle;margin-right:.45rem;background:var(--card2);border:1px solid var(--line);
+  align-items:center;justify-content:center;font-size:.72rem;font-weight:800;color:var(--muted)}
+.mini-avatar img{width:100%;height:100%;object-fit:cover;display:block}
+/* ---- Angebot abgeben: anonym / mit Vorname ---- */
+.offer-choice{display:flex;flex-direction:column;gap:.5rem;margin:.3rem 0 .2rem}
+.offer-choice button{display:flex;flex-direction:column;align-items:flex-start;gap:.15rem;
+  text-align:left;padding:.7rem .9rem;line-height:1.3}
+.offer-choice .oc-sub{font-size:.78rem;color:var(--muted);font-weight:400}
+
 /* ---- Kennzahl-Kacheln ---- */
 .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:.7rem;margin-top:1rem}
 .tile{background:var(--card2);border:1px solid var(--line);border-radius:11px;padding:.8rem .9rem}

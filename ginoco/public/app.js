@@ -57,13 +57,46 @@ function openThemePicker() {
 }
 window.__openThemePicker = openThemePicker;
 
+function initials(name) {
+  return String(name || '').trim().split(/\s+/).map((w) => w[0]).slice(0, 2).join('').toUpperCase() || '🙂';
+}
+// Bild vor dem Hochladen im Browser verkleinern (spart Speicher & Datenvolumen)
+function fileToResizedDataUrl(file, maxPx = 400, quality = 0.82) {
+  return new Promise((resolve, reject) => {
+    if (!file || !/^image\//.test(file.type)) return reject(new Error('Bitte ein Bild auswählen'));
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      let w = img.width, h = img.height;
+      const scale = Math.min(1, maxPx / Math.max(w, h));
+      w = Math.max(1, Math.round(w * scale)); h = Math.max(1, Math.round(h * scale));
+      const c = document.createElement('canvas'); c.width = w; c.height = h;
+      c.getContext('2d').drawImage(img, 0, 0, w, h);
+      resolve(c.toDataURL('image/jpeg', quality));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Bild konnte nicht geladen werden')); };
+    img.src = url;
+  });
+}
 async function openProfileModal() {
   const ip = state.settings?.instructor_phone;
-  let pr = { name: state.user?.name || '', email: '', phone: state.user?.phone || '', birth_year: '', username: state.user?.username || '' };
+  let pr = { name: state.user?.name || '', email: '', phone: state.user?.phone || '', birth_year: '', username: state.user?.username || '', has_photo: false };
   try { const r = await api('/api/my/profile'); if (r.profile) pr = { ...pr, ...r.profile }; } catch {}
+  const avatar = (hasPhoto) => hasPhoto
+    ? `<img src="/api/my/photo?t=${Date.now()}" alt="Profilfoto">`
+    : `<span>${esc(initials(pr.name))}</span>`;
   modal(`<h3>Mein Profil</h3>
     <div class="err hidden" id="pf-err"></div>
     <p class="hint">Vervollständige deine Daten. Sie sind <strong>nur für deinen Fahrlehrer</strong> sichtbar – kein anderer Fahrschüler sieht sie.</p>
+    <div class="pf-photo">
+      <div class="pf-avatar" id="pf-avatar">${avatar(!!pr.has_photo)}</div>
+      <div class="pf-photo-actions">
+        <label class="sec sm pf-filebtn">📷 Foto wählen<input type="file" id="pf-file" accept="image/*" hidden></label>
+        <button class="ghost sm ${pr.has_photo ? '' : 'hidden'}" id="pf-photo-del">Entfernen</button>
+        <div class="hint" style="margin:.35rem 0 0">Nur dein Fahrlehrer sieht dein Foto.</div>
+      </div>
+    </div>
     <div class="field"><label>Name</label><input id="pf-name" value="${esc(pr.name || '')}" placeholder="Vor- und Nachname"></div>
     <div class="row">
       <div class="field"><label>Handynummer</label><input id="pf-phone" value="${esc(pr.phone || '')}" placeholder="z.B. 0151 23456789"></div>
@@ -73,6 +106,29 @@ async function openProfileModal() {
     <div class="field"><label>Login-Name (fest, ändert sich nicht)</label><input value="${esc(pr.username || '')}" readonly></div>
     ${ip ? `<div class="field"><label>Fahrschule erreichen</label><div class="inline">${contactButtons(ip)}</div></div>` : ''}
     <div class="actions"><button class="sec" onclick="window.__closeModal()">Schließen</button><button id="pf-save">Speichern</button></div>`);
+  const avEl = $('#pf-avatar'), delBtn = $('#pf-photo-del');
+  $('#pf-file').onchange = async (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    try {
+      const dataUrl = await fileToResizedDataUrl(file);
+      await api('/api/my/profile', { method: 'PATCH', body: { photo: dataUrl } });
+      pr.has_photo = true;
+      avEl.innerHTML = `<img src="${dataUrl}" alt="Profilfoto">`;
+      delBtn.classList.remove('hidden');
+      toast('Foto gespeichert ✓', 'ok');
+    } catch (err) { toast(err.message, 'err'); }
+    e.target.value = '';
+  };
+  delBtn.onclick = async () => {
+    try {
+      await api('/api/my/profile', { method: 'PATCH', body: { photo: null } });
+      pr.has_photo = false;
+      avEl.innerHTML = `<span>${esc(initials($('#pf-name').value || pr.name))}</span>`;
+      delBtn.classList.add('hidden');
+      toast('Foto entfernt', 'ok');
+    } catch (err) { toast(err.message, 'err'); }
+  };
   $('#pf-save').onclick = async () => {
     try {
       await api('/api/my/profile', { method: 'PATCH', body: {
@@ -716,11 +772,11 @@ function renderOffers(offers, wi) {
   if (!offers.length) { card.classList.add('hidden'); return; }
   card.classList.remove('hidden');
   const canTake = wi.remaining > 0;
-  card.innerHTML = `<h2>🔄 Freie Übernahme-Angebote <span class="sub">Fahrstunden, die andere abgeben</span></h2>
+  card.innerHTML = `<h2>🎁 Feed <span class="sub">Fahrstunden, die andere abgeben</span></h2>
     ${!canTake ? '<p class="hint">Du hast diese Woche schon dein Limit erreicht – Übernahme aus dieser Woche ist gesperrt.</p>' : ''}
     <div class="blist">${offers.map((o) => `<div class="bitem warm">
       <div><div class="when">${WD[isoDow(o.date) - 1]} ${fmtShort(o.date)} · ${o.start_time} <span class="muted" style="font-weight:400">(${o.duration_min} Min)</span></div>
-      <div class="meta">Möchtest du diese Fahrstunde übernehmen?</div></div>
+      <div class="meta">${o.from ? `<span class="pill">🙋 von ${esc(o.from)}</span>` : '<span class="pill">🕶️ anonym</span>'} <span class="muted">· möchtest du übernehmen?</span></div></div>
       <div class="inline">
         ${canTake ? `<button class="sm" data-take="${o.id}">Übernehmen</button>` : ''}
         <button class="ghost sm" data-decline="${o.id}">Keine Zeit</button>
@@ -729,10 +785,22 @@ function renderOffers(offers, wi) {
   card.querySelectorAll('[data-decline]').forEach((b) => b.onclick = () => declineOffer(b.dataset.decline));
 }
 
-async function offerBooking(id) {
-  if (!confirm('Diese Fahrstunde anderen Fahrschülern zur Übernahme anbieten?')) return;
-  try { await api('/api/bookings/' + id + '/offer', { method: 'POST' }); toast('Angeboten – andere können jetzt übernehmen', 'ok'); syncStudent(); }
-  catch (e) { toast(e.message, 'err'); }
+function offerBooking(id) {
+  const vorname = firstName(state.user?.name);
+  modal(`<h3>Fahrstunde abgeben</h3>
+    <p class="hint">Deine Stunde erscheint im <strong>Feed</strong> – andere Fahrschüler können sie übernehmen. Kann niemand, bleibt sie bei dir.</p>
+    <p style="margin:.5rem 0 .3rem">Möchtest du dabei erkennbar sein?</p>
+    <div class="offer-choice">
+      <button class="sec" id="of-anon">🕶️ Anonym abgeben<span class="oc-sub">Niemand sieht, dass die Stunde von dir ist</span></button>
+      ${vorname ? `<button class="sec" id="of-named">🙋 Mit „${esc(vorname)}" abgeben<span class="oc-sub">Andere sehen nur deinen Vornamen</span></button>` : ''}
+    </div>
+    <div class="actions"><button class="sec" onclick="window.__closeModal()">Abbrechen</button></div>`);
+  const go = async (named) => {
+    try { await api('/api/bookings/' + id + '/offer', { method: 'POST', body: { named } }); closeModal(); toast('Im Feed abgegeben ✓', 'ok'); syncStudent(); }
+    catch (e) { toast(e.message, 'err'); }
+  };
+  $('#of-anon').onclick = () => go(false);
+  const n = $('#of-named'); if (n) n.onclick = () => go(true);
 }
 async function withdrawOffer(id) {
   try { await api('/api/bookings/' + id + '/withdraw', { method: 'POST' }); toast('Angebot zurückgenommen', 'ok'); syncStudent(); }
@@ -1601,8 +1669,9 @@ async function tabSchueler(scope) {
           ? `<span class="pill" style="background:var(--good-bg);color:var(--good)">📍 ${esc(s.home_label || 'gesetzt')}</span>`
           : `<span class="muted">– nicht vereinbart –</span>`;
         const isArch = !!s.archived_at;
+        const av = s.has_photo ? `<img src="/api/students/${s.id}/photo" alt="">` : `<span>${esc(initials(s.name))}</span>`;
         return `<tr data-search="${esc(searchStr)}">
-          <td class="s-name-cell"><strong>${esc(s.name)}</strong>${s.birth_year ? ` <span class="muted">(${s.birth_year})</span>` : ''}
+          <td class="s-name-cell"><span class="mini-avatar">${av}</span><strong>${esc(s.name)}</strong>${s.birth_year ? ` <span class="muted">(${s.birth_year})</span>` : ''}
             ${isArch ? '<br><span class="pill" style="background:var(--good-bg);color:var(--good)">✅ bestanden</span>' : ''}
             ${s.notes ? `<br><span class="muted" title="${esc(s.notes)}" style="font-size:.78rem">📝 ${esc(s.notes.length > 40 ? s.notes.slice(0, 40) + '…' : s.notes)}</span>` : ''}
             <div class="inline" style="margin-top:.3rem;gap:.3rem;flex-wrap:wrap">

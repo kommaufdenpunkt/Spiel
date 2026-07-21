@@ -151,6 +151,7 @@ ensureColumn('students', 'home_lng', 'home_lng REAL');
 ensureColumn('students', 'archived_at', 'archived_at TEXT');   // gesetzt = bestanden/archiviert (aus aktiver Liste)
 ensureColumn('students', 'notes', 'notes TEXT');               // Karteikarte / Notizen des Fahrlehrers
 ensureColumn('students', 'training', 'training TEXT');         // Ausbildungsdiagrammkarte (JSON: abgehakte Punkte)
+ensureColumn('students', 'photo', 'photo TEXT');               // Profilfoto (data-URL, vom Schueler selbst hochgeladen; nur fuer den Fahrlehrer sichtbar)
 
 // Absagen ("keine Zeit") auf ein Uebernahme-Angebot
 db.exec(`CREATE TABLE IF NOT EXISTS offer_declines (
@@ -169,6 +170,7 @@ ensureColumn('bookings', 'meet_label', 'meet_label TEXT');   // Treffpunkt (Text
 ensureColumn('bookings', 'meet_lat', 'meet_lat REAL');       // Treffpunkt-Koordinaten (optional)
 ensureColumn('bookings', 'meet_lng', 'meet_lng REAL');
 ensureColumn('bookings', 'lesson_type', 'lesson_type TEXT'); // normal | ueberland | autobahn | nacht
+ensureColumn('bookings', 'offer_named', 'offer_named INTEGER NOT NULL DEFAULT 0'); // 1 = Anbieter zeigt beim Feed-Angebot freiwillig seinen Vornamen
 
 // Live-Standort des Fahrlehrers (genau eine Zeile)
 db.exec(`CREATE TABLE IF NOT EXISTS live_location (
