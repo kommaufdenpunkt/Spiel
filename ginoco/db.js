@@ -172,6 +172,10 @@ ensureColumn('bookings', 'meet_lng', 'meet_lng REAL');
 ensureColumn('bookings', 'lesson_type', 'lesson_type TEXT'); // normal | ueberland | autobahn | nacht
 ensureColumn('bookings', 'offer_named', 'offer_named INTEGER NOT NULL DEFAULT 0'); // 1 = Anbieter zeigt beim Feed-Angebot freiwillig seinen Vornamen
 ensureColumn('bookings', 'started_at', 'started_at TEXT');   // Fahrstunden-Timer: Zeitpunkt, an dem "Start" gedrueckt wurde
+// confirmed: hat der Schueler den Termin bestaetigt? DEFAULT 1, damit bestehende
+// Buchungen als bestaetigt gelten – nur NEUE vom Fahrlehrer eingetragene Termine
+// starten als "reserviert" (0) und muessen vom Schueler bestaetigt werden.
+ensureColumn('bookings', 'confirmed', 'confirmed INTEGER NOT NULL DEFAULT 1');
 
 // Live-Standort des Fahrlehrers (genau eine Zeile)
 db.exec(`CREATE TABLE IF NOT EXISTS live_location (

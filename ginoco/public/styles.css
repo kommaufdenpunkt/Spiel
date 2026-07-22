@@ -142,6 +142,7 @@ main{max-width:1080px;margin:0 auto;padding:1.4rem 1.2rem 4rem}
 .badge.done{background:var(--good-bg);color:var(--good)}
 .badge.booked{background:var(--booked);color:#8fb4ff}
 .badge.offer{background:var(--warn-bg);color:var(--warn)}
+.badge.reserved{background:rgba(230,150,58,.18);color:#f0b459}
 .pill{background:#212b38;border-radius:20px;padding:.15rem .55rem;font-size:.75rem;color:var(--muted);font-weight:600}
 
 /* ---- Tacho ---- */
@@ -256,6 +257,11 @@ th{color:var(--muted);font-weight:600;font-size:.78rem;text-transform:uppercase;
 .lt-bar{height:10px;background:var(--card2);border:1px solid var(--line);border-radius:6px;
   overflow:hidden;margin-top:.7rem}
 .lt-bar>div{height:100%;background:var(--brand);transition:width 1s linear}
+
+/* ---- Reservierte Termine (Hinweis oben in der Wochenkarte) ---- */
+.reserve-note{background:rgba(230,150,58,.12);border:1px solid rgba(230,150,58,.35);
+  color:#f0c07a;border-radius:11px;padding:.6rem .85rem;font-size:.9rem;margin:0 0 .9rem;line-height:1.5}
+.reserve-note strong{color:#ffd9a0}
 
 /* ---- Kennzahl-Kacheln ---- */
 .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:.7rem;margin-top:1rem}

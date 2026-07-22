@@ -15,7 +15,7 @@ const PUBLIC = join(__dirname, 'public');
 const PORT = Number(process.env.PORT || 3000);
 const HOST = process.env.HOST || '0.0.0.0'; // hinter Caddy: HOST=127.0.0.1 (nur Proxy erreicht Node)
 const SESSION_DAYS = 30;
-const APP_VERSION = "3.6.0";
+const APP_VERSION = "3.7.0";
 // Einstellungen, die Schueler/Oeffentlichkeit sehen duerfen (Rest bleibt beim Fahrlehrer)
 const PUBLIC_SETTINGS = ['instructor_name', 'instructor_phone', 'policy_text',
   'cancel_hours', 'lock_hours', 'booking_horizon_days', 'booking_horizon_days_rank2',
@@ -345,7 +345,7 @@ async function handleApi(req, res, url) {
   if (p === '/api/my/bookings' && method === 'GET') {
     if (!requireStudent()) return bad(res, 'Bitte anmelden', 401);
     const rows = db.prepare(
-      `SELECT id,date,start_time,duration_min,status,gearbox,plate,note,started_at
+      `SELECT id,date,start_time,duration_min,status,gearbox,plate,note,started_at,confirmed
        FROM bookings WHERE student_id = ? AND status != 'cancelled' ORDER BY date, start_time`
     ).all(sess.student_id);
     return ok(res, { bookings: rows, weekInfo: weekInfoForStudent(sess.student_id),
@@ -600,6 +600,19 @@ async function handleApi(req, res, url) {
     const from = db.prepare('SELECT name FROM students WHERE id = ?').get(bk.student_id);
     logEvent('take', { actor: 'student', studentId: sess.student_id, bookingId: bk.id, date: bk.date,
       detail: `${taker?.name || '?'} übernimmt Stunde von ${from?.name || '?'} · ${wdShort(bk.date)} ${dmy(bk.date)} ${bk.start_time} Uhr` });
+    return ok(res);
+  }
+
+  // Schueler bestaetigt einen reservierten Termin (den der Fahrlehrer eingetragen hat)
+  const confm = p.match(/^\/api\/bookings\/(\d+)\/confirm$/);
+  if (confm && method === 'POST') {
+    if (!requireStudent()) return bad(res, 'Bitte anmelden', 401);
+    const bk = db.prepare('SELECT * FROM bookings WHERE id=?').get(Number(confm[1]));
+    if (!bk || bk.student_id !== sess.student_id) return bad(res, 'Buchung nicht gefunden', 404);
+    if (bk.status === 'cancelled') return bad(res, 'Dieser Termin ist storniert');
+    db.prepare('UPDATE bookings SET confirmed=1 WHERE id=?').run(bk.id);
+    logEvent('confirm', { actor: 'student', studentId: bk.student_id, bookingId: bk.id, date: bk.date,
+      detail: `${wdShort(bk.date)} ${dmy(bk.date)} ${bk.start_time} Uhr bestätigt` });
     return ok(res);
   }
 
@@ -1500,11 +1513,14 @@ function bulkInstructorBookings(res, body) {
   if (!commit) return ok(res, { dryRun: true, ...summary });
   let created = 0;
   for (const r of okRows) {
+    // Vom Fahrlehrer eingetragen -> reserviert (confirmed=0): der Schueler bestaetigt.
     const info = db.prepare(
-      `INSERT INTO bookings(student_id,date,start_time,duration_min,status,created_at) VALUES(?,?,?,?,?,?)`
+      `INSERT INTO bookings(student_id,date,start_time,duration_min,status,confirmed,created_at) VALUES(?,?,?,?,?,0,?)`
     ).run(r.studentId, r.date, r.time, r.dur, 'booked', new Date().toISOString());
     logEvent('book', { actor: 'instructor', studentId: r.studentId, bookingId: Number(info.lastInsertRowid), date: r.date,
-      detail: `${wdShort(r.date)} ${dmy(r.date)} ${r.time} Uhr (${r.dur} Min) – Sammel-Import` });
+      detail: `${wdShort(r.date)} ${dmy(r.date)} ${r.time} Uhr (${r.dur} Min) – Sammel-Import (reserviert)` });
+    if (r.studentId) notify(r.studentId, 'info',
+      `Neuer Termin für dich reserviert: ${wdShort(r.date)} ${dmy(r.date)} um ${r.time} Uhr (${r.dur} Min). Bitte in der App bestätigen.`, r.date, Number(info.lastInsertRowid));
     created++;
   }
   return ok(res, { committed: true, created, ...summary });
@@ -1589,15 +1605,20 @@ function createBooking(res, sess, body) {
       return bad(res, `Pro Woche sind nur ${wi.max} Fahrstunden moeglich. Diese Woche ist voll.`);
   }
 
+  // Vom Fahrlehrer FÜR EINEN SCHÜLER eingetragen -> reserviert (confirmed=0), der
+  // Schüler bestätigt. Selbst gebucht oder Fahrlehrer-eigener Block -> gleich bestätigt (1).
+  const confirmed = (isInstructor && studentId) ? 0 : 1;
   const info = db.prepare(
-    `INSERT INTO bookings(student_id,date,start_time,duration_min,status,title,note,created_at)
-     VALUES(?,?,?,?,?,?,?,?)`
+    `INSERT INTO bookings(student_id,date,start_time,duration_min,status,title,note,confirmed,created_at)
+     VALUES(?,?,?,?,?,?,?,?,?)`
   ).run(studentId, date, start, duration, 'booked',
     body.title ? String(body.title).trim() : null,
-    body.note ? String(body.note).trim() : null, new Date().toISOString());
+    body.note ? String(body.note).trim() : null, confirmed, new Date().toISOString());
   const bid = Number(info.lastInsertRowid);
   logEvent('book', { actor: isInstructor ? 'instructor' : 'student', studentId, bookingId: bid, date,
-    detail: `${wdShort(date)} ${dmy(date)} ${start} Uhr (${duration} Min)${isInstructor ? ' – vom Fahrlehrer eingetragen' : ''}` });
+    detail: `${wdShort(date)} ${dmy(date)} ${start} Uhr (${duration} Min)${isInstructor ? ' – vom Fahrlehrer eingetragen' + (studentId ? ' (reserviert)' : '') : ''}` });
+  if (isInstructor && studentId) notify(studentId, 'info',
+    `Neuer Termin für dich reserviert: ${wdShort(date)} ${dmy(date)} um ${start} Uhr (${duration} Min). Bitte in der App bestätigen.`, date, bid);
   return ok(res, { id: bid });
 }
 

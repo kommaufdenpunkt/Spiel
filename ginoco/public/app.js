@@ -583,9 +583,11 @@ function renderWeekCard(wi, bookings, progress) {
   const remainColor = wi.remaining > 0 ? 'good' : 'bad';
   const next = allUpcoming.find((b) => b.status === 'booked');
   const gname = firstName(state.user?.name);
+  const reservedCount = upcoming.filter((b) => b.status === 'booked' && b.confirmed === 0).length;
   $('#week-card').innerHTML = `
     <div class="greet">${greetWord()}${gname ? ', <strong>' + esc(gname) + '</strong>' : ''} 👋</div>
     <h2>Meine Fahrstunden <span class="sub">diese Woche (${fmtShort(wi.from)}–${fmtShort(wi.to)})</span></h2>
+    ${reservedCount ? `<div class="reserve-note">🔶 <strong>${reservedCount} Termin${reservedCount === 1 ? '' : 'e'}</strong> von deinem Fahrlehrer eingetragen – bitte unten mit <strong>✅ Bestätigen</strong> zusagen.</div>` : ''}
     ${next ? `<div class="bitem" style="background:var(--booked);border-color:var(--booked-b);margin-bottom:.8rem">
       <div><div class="meta" style="color:var(--muted)">Deine nächste Fahrstunde</div>
       <div class="when" style="font-size:1.05rem">${WD_LONG[isoDow(next.date) - 1]}, ${fmtShort(next.date)} · ${next.start_time} Uhr</div></div>
@@ -606,6 +608,7 @@ function renderWeekCard(wi, bookings, progress) {
           <button id="eb-find">🔎 Nächsten freien Termin finden</button>
         </div>`}`;
   const c = $('#week-card');
+  c.querySelectorAll('[data-confirm]').forEach((b) => b.onclick = () => confirmBooking(b.dataset.confirm));
   c.querySelectorAll('[data-cancel]').forEach((b) => b.onclick = () => cancelBooking(b.dataset.cancel));
   c.querySelectorAll('[data-offer]').forEach((b) => b.onclick = () => offerBooking(b.dataset.offer));
   c.querySelectorAll('[data-withdraw]').forEach((b) => b.onclick = () => withdrawOffer(b.dataset.withdraw));
@@ -674,8 +677,13 @@ function studentBookingItem(b) {
   } else if (b.status === 'offered') {
     st = '<span class="badge offer">🔄 zur Übernahme angeboten</span>';
     actions = `<button class="ghost sm" data-withdraw="${b.id}">Angebot zurücknehmen</button>`;
+  } else if (b.confirmed === 0) {
+    // Vom Fahrlehrer reservierter Termin – der Schüler bestätigt ihn zuerst.
+    st = '<span class="badge reserved">🔶 reserviert</span>';
+    actions = `<button class="sm" data-confirm="${b.id}">✅ Bestätigen</button>`
+      + (h >= cancelH ? ` <button class="ghost sm" data-cancel="${b.id}">Passt nicht</button>` : '');
   } else {
-    st = '<span class="badge booked">gebucht</span>';
+    st = '<span class="badge booked">✅ bestätigt</span>';
     const lockH = state.settings?.lock_hours || 36;
     if (h < lockH) {
       // gesperrt: Termin steht fest
@@ -1006,6 +1014,10 @@ async function cancelBooking(id) {
   try { await api('/api/bookings/' + id, { method: 'DELETE' }); toast('Storniert', 'ok'); syncStudent(); }
   catch (e) { toast(e.message, 'err'); }
 }
+async function confirmBooking(id) {
+  try { await api('/api/bookings/' + id + '/confirm', { method: 'POST' }); toast('Termin bestätigt ✓', 'ok'); syncStudent(); }
+  catch (e) { toast(e.message, 'err'); }
+}
 
 // ====================== FAHRLEHRER ======================
 function renderInstructor() {
@@ -1197,7 +1209,8 @@ function instrBookingItem(b) {
   const gear = b.gearbox ? `<span class="badge ${b.gearbox}">${b.gearbox === 'schalt' ? 'Schalter' : 'Automatik'}</span>` : '';
   const st = b.status === 'done' ? '<span class="badge done">gefahren</span>'
     : b.status === 'offered' ? '<span class="badge offer">🔄 wird abgegeben</span>'
-    : '<span class="badge booked">gebucht</span>';
+    : b.confirmed === 0 ? '<span class="badge reserved">🔶 reserviert (wartet auf Bestätigung)</span>'
+    : '<span class="badge booked">✅ bestätigt</span>';
   const who = b.student_name ? esc(b.student_name) : (b.title ? esc(b.title) : 'Eigener Termin');
   const end = addMin(b.start_time, b.duration_min);
   return `<div class="bitem">
