@@ -15,7 +15,7 @@ html,body{margin:0;height:100%}
 body{background:
     radial-gradient(120% 90% at 50% -10%,var(--bg-glow),transparent 55%),var(--bg);
   color:var(--ink);
-  font-family:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  font-family:var(--font,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif);
   -webkit-font-smoothing:antialiased;line-height:1.5;min-height:100%}
 .boot{padding:4rem;text-align:center;color:var(--muted)}
 button{font-family:inherit;font-size:.95rem;cursor:pointer;border:none;border-radius:9px;
@@ -262,6 +262,18 @@ th{color:var(--muted);font-weight:600;font-size:.78rem;text-transform:uppercase;
 .reserve-note{background:rgba(230,150,58,.12);border:1px solid rgba(230,150,58,.35);
   color:#f0c07a;border-radius:11px;padding:.6rem .85rem;font-size:.9rem;margin:0 0 .9rem;line-height:1.5}
 .reserve-note strong{color:#ffd9a0}
+
+/* ---- Aussehen-Panel (Farbe, Schrift, Größe) ---- */
+.ap-sec{margin:.2rem 0 .9rem}
+.ap-label{font-size:.85rem;font-weight:700;color:var(--ink);margin-bottom:.45rem}
+.ap-label .muted{font-weight:400}
+.ap-grid2{display:grid;grid-template-columns:1fr 1fr;gap:.5rem}
+.ap-fonts{display:grid;grid-template-columns:1fr 1fr;gap:.5rem}
+.ap-swatches{display:flex;gap:.55rem;flex-wrap:wrap;align-items:center}
+.ap-swatches button{padding:0;cursor:pointer;background:none}
+.ap-free{display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;
+  border:1px dashed var(--line);border-radius:50%;cursor:pointer;position:relative;font-size:.9rem}
+.ap-free input[type=color]{position:absolute;inset:0;opacity:0;cursor:pointer;border:none;padding:0}
 
 /* ---- Kennzahl-Kacheln ---- */
 .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:.7rem;margin-top:1rem}

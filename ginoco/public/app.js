@@ -31,29 +31,130 @@ const THEMES = {
     '--bg': '#08090c', '--bg2': '#050609', '--bg-glow': '#141821', '--card': '#111319', '--card2': '#161922',
     '--line': '#262a34', '--brand': '#5aa0ff', '--brand-dark': '#3f7fd6', '--ink': '#e9edf3', '--muted': '#8b93a2' } },
 };
-function applyTheme(key) {
+// Schriftarten (nur systemeigene Stacks – nichts wird nachgeladen, funktioniert offline)
+const FONTS = {
+  system:   { label: 'Standard',   stack: 'system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif' },
+  rounded:  { label: 'Abgerundet', stack: 'ui-rounded,"SF Pro Rounded","Segoe UI",system-ui,sans-serif' },
+  modern:   { label: 'Modern',     stack: '"Segoe UI",Roboto,"Helvetica Neue",system-ui,sans-serif' },
+  klassisch:{ label: 'Klassisch',  stack: 'Georgia,"Times New Roman",Times,serif' },
+  technisch:{ label: 'Technisch',  stack: 'ui-monospace,"SF Mono",Menlo,Consolas,monospace' },
+};
+// Freie Akzentfarben (Buttons, Reiter, Hervorhebungen)
+const ACCENTS = ['#4d8dff', '#35c07d', '#a877f0', '#ec6ba6', '#e6934d', '#3fb6c4', '#e5605f', '#c9a13b'];
+// Textfarben – bewusst nur helle, gut lesbare Töne (alle Themes sind dunkel)
+const INKS = {
+  standard: { label: 'Standard', dot: '#e7edf5', val: '' },
+  weiss:    { label: 'Kräftig',  dot: '#ffffff', val: '#ffffff' },
+  warm:     { label: 'Warm',     dot: '#f2e7d6', val: '#f2e7d6' },
+  kuehl:    { label: 'Kühl',     dot: '#d8e6fb', val: '#d8e6fb' },
+  mint:     { label: 'Mint',     dot: '#d6f2e4', val: '#d6f2e4' },
+  rose:     { label: 'Rosé',     dot: '#f7dcea', val: '#f7dcea' },
+};
+const SIZES = { klein: '93%', normal: '100%', gross: '112%', xl: '125%' };
+const SIZE_LABEL = { klein: 'Klein', normal: 'Normal', gross: 'Groß', xl: 'Sehr groß' };
+
+function shade(hex, pct) { // pct<0 dunkelt ab
+  const n = parseInt(String(hex).replace('#', ''), 16);
+  const ch = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((c) => Math.max(0, Math.min(255, Math.round(c * (1 + pct / 100)))));
+  return '#' + ch.map((x) => x.toString(16).padStart(2, '0')).join('');
+}
+function applyThemeVars(key) {
   const t = THEMES[key] || THEMES.nachtblau;
   for (const [k, v] of Object.entries(t.vars)) document.documentElement.style.setProperty(k, v);
-  try { localStorage.setItem('fsp-theme', key); } catch {}
-  state.theme = THEMES[key] ? key : 'nachtblau';
 }
-function loadTheme() {
-  let key = 'nachtblau';
-  try { key = localStorage.getItem('fsp-theme') || 'nachtblau'; } catch {}
-  applyTheme(key);
+function applyAppearance() {
+  applyThemeVars(state.theme || 'nachtblau');
+  const p = state.prefs || {}, root = document.documentElement;
+  if (p.accent) { root.style.setProperty('--brand', p.accent); root.style.setProperty('--brand-dark', shade(p.accent, -16)); }
+  if (p.ink) root.style.setProperty('--ink', p.ink);
+  root.style.setProperty('--font', (FONTS[p.font] || FONTS.system).stack);
+  root.style.fontSize = SIZES[p.size] || '100%';
 }
-loadTheme();
+function loadAppearance() {
+  const p = {};
+  try {
+    state.theme = localStorage.getItem('fsp-theme') || 'nachtblau';
+    p.accent = localStorage.getItem('fsp-accent') || '';
+    p.font = localStorage.getItem('fsp-font') || 'system';
+    p.ink = localStorage.getItem('fsp-ink') || '';
+    p.size = localStorage.getItem('fsp-size') || 'normal';
+  } catch {}
+  state.prefs = p;
+  applyAppearance();
+}
+loadAppearance();
+
+function setTheme(key) { state.theme = THEMES[key] ? key : 'nachtblau'; try { localStorage.setItem('fsp-theme', state.theme); } catch {} applyAppearance(); }
+function savePref(k, v) {
+  state.prefs = state.prefs || {};
+  state.prefs[k] = v;
+  try { if (v) localStorage.setItem('fsp-' + k, v); else localStorage.removeItem('fsp-' + k); } catch {}
+  applyAppearance();
+}
+function resetAppearance() {
+  state.theme = 'nachtblau'; state.prefs = { font: 'system', size: 'normal', accent: '', ink: '' };
+  try { ['fsp-theme', 'fsp-accent', 'fsp-font', 'fsp-ink', 'fsp-size'].forEach((k) => localStorage.removeItem(k)); } catch {}
+  applyAppearance();
+}
 
 function openThemePicker() {
   const cur = state.theme || 'nachtblau';
-  modal(`<h3>Farbe wählen</h3>
-    <p class="hint">Alle Themes sind dunkel und augenschonend (kein grelles Weiß, guter Kontrast). Deine Wahl wird auf diesem Gerät gespeichert.</p>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem">
-      ${Object.entries(THEMES).map(([k, t]) => `<button class="sec" data-theme="${k}" style="justify-content:flex-start;display:flex;align-items:center;gap:.5rem;${k === cur ? 'outline:2px solid ' + t.dot : ''}">
-        <span style="width:16px;height:16px;border-radius:50%;background:${t.dot};display:inline-block"></span>${t.label}${k === cur ? ' ✓' : ''}</button>`).join('')}
+  const p = state.prefs || {};
+  const accent = p.accent || (THEMES[cur] || THEMES.nachtblau).dot;
+  const swatch = (bg, on, extra = '') => `width:30px;height:30px;border-radius:50%;background:${bg};display:inline-block;border:2px solid ${on ? 'var(--ink)' : 'transparent'};${extra}`;
+  modal(`<h3>🎨 Aussehen</h3>
+    <p class="hint">Gestalte ginoco, wie es dir gefällt – alles wird auf diesem Gerät gespeichert.</p>
+
+    <div class="ap-sec"><div class="ap-label">Thema</div>
+      <div class="ap-grid2">
+        ${Object.entries(THEMES).map(([k, t]) => `<button class="sec" data-theme="${k}" style="justify-content:flex-start;display:flex;align-items:center;gap:.5rem;${k === cur ? 'outline:2px solid ' + t.dot : ''}">
+          <span style="width:16px;height:16px;border-radius:50%;background:${t.dot}"></span>${t.label}${k === cur ? ' ✓' : ''}</button>`).join('')}
+      </div>
     </div>
-    <div class="actions"><button class="sec" onclick="window.__closeModal()">Schließen</button></div>`);
-  document.querySelectorAll('[data-theme]').forEach((b) => b.onclick = () => { applyTheme(b.dataset.theme); toast('Farbe geändert ✓', 'ok'); openThemePicker(); });
+
+    <div class="ap-sec"><div class="ap-label">Akzentfarbe <span class="muted">(Buttons & Reiter)</span></div>
+      <div class="ap-swatches">
+        ${ACCENTS.map((c) => `<button data-accent="${c}" title="${c}" style="${swatch(c, (p.accent || '').toLowerCase() === c.toLowerCase())}"></button>`).join('')}
+        <label class="ap-free" title="Eigene Farbe">🎨<input type="color" id="ap-accent-free" value="${accent}"></label>
+      </div>
+    </div>
+
+    <div class="ap-sec"><div class="ap-label">Schriftart</div>
+      <div class="ap-fonts">
+        ${Object.entries(FONTS).map(([k, f]) => `<button class="sec" data-font="${k}" style="font-family:${f.stack};${(p.font || 'system') === k ? 'outline:2px solid var(--brand)' : ''}">${f.label}${(p.font || 'system') === k ? ' ✓' : ''}</button>`).join('')}
+      </div>
+    </div>
+
+    <div class="ap-sec"><div class="ap-label">Textfarbe</div>
+      <div class="ap-swatches">
+        ${Object.entries(INKS).map(([k, i]) => `<button data-ink="${i.val}" title="${i.label}" style="${swatch(i.dot, (p.ink || '') === i.val)}"></button>`).join('')}
+      </div>
+    </div>
+
+    <div class="ap-sec"><div class="ap-label">Schriftgröße</div>
+      <div class="ap-grid2">
+        ${Object.keys(SIZES).map((k) => `<button class="sec" data-size="${k}" style="${(p.size || 'normal') === k ? 'outline:2px solid var(--brand)' : ''}">${SIZE_LABEL[k]}${(p.size || 'normal') === k ? ' ✓' : ''}</button>`).join('')}
+      </div>
+    </div>
+
+    <div class="actions" style="justify-content:space-between">
+      <button class="ghost sm" id="ap-reset">Zurücksetzen</button>
+      <button class="sec" onclick="window.__closeModal()">Fertig</button>
+    </div>`, 'wide');
+
+  const reopen = () => openThemePicker();
+  document.querySelectorAll('[data-theme]').forEach((b) => b.onclick = () => { setTheme(b.dataset.theme); reopen(); });
+  document.querySelectorAll('[data-accent]').forEach((b) => b.onclick = () => { savePref('accent', b.dataset.accent); reopen(); });
+  document.querySelectorAll('[data-font]').forEach((b) => b.onclick = () => { savePref('font', b.dataset.font); reopen(); });
+  document.querySelectorAll('[data-ink]').forEach((b) => b.onclick = () => { savePref('ink', b.dataset.ink); reopen(); });
+  document.querySelectorAll('[data-size]').forEach((b) => b.onclick = () => { savePref('size', b.dataset.size); reopen(); });
+  const free = $('#ap-accent-free');
+  if (free) {
+    free.oninput = () => { state.prefs.accent = free.value; applyAppearance(); };           // live-Vorschau
+    free.onchange = () => { savePref('accent', free.value); reopen(); };                     // festhalten
+  }
+  const rst = $('#ap-reset');
+  if (rst) rst.onclick = () => { resetAppearance(); toast('Auf Standard zurückgesetzt', 'ok'); reopen(); };
 }
 window.__openThemePicker = openThemePicker;
 
@@ -303,7 +404,7 @@ function header() {
       ${state.liveSharing ? '<button class="ghost sm" onclick="window.__stopLive()" title="Standort-Teilen beenden" style="color:var(--good)">🛰️ Live · Stopp</button>' : ''}
       ${u.role === 'student' ? '<button class="ghost sm" onclick="window.__openTour()" title="Kurze Einführung">❓</button>' : ''}
       ${u.role === 'student' ? '<button class="ghost sm" onclick="window.__openProfile()" title="Mein Profil">👤</button>' : ''}
-      <button class="ghost sm" onclick="window.__openThemePicker()" title="Farbe wählen">🎨</button>
+      <button class="ghost sm" onclick="window.__openThemePicker()" title="Aussehen & Farben">🎨</button>
       <button class="ghost sm" id="logout">Abmelden</button>
     </div>
   </header>`;
@@ -338,7 +439,7 @@ function mountEdgeMenus(role) {
        ['offers-card', '🎁 Angebote'], ['slots', '🚗 Termin buchen']]
         .map(([id, l]) => `<button data-scroll="${id}">${l}</button>`).join('');
   const rightItems = [
-    '<button data-act="theme">🎨 Farbe wählen</button>',
+    '<button data-act="theme">🎨 Aussehen</button>',
     role === 'student' ? '<button data-act="phone">👤 Mein Profil</button>' : '',
     state.liveSharing ? '<button data-act="live">🛰️ Live-Standort beenden</button>' : '',
     '<button data-act="reload">🔄 Aktualisieren</button>',
@@ -410,7 +511,7 @@ function renderAuth() {
         </div>` : ''}
         <div id="authbody"></div>
       </div>
-      <div class="center"><button class="ghost sm" onclick="window.__openThemePicker()">🎨 Farbe wählen</button></div>
+      <div class="center"><button class="ghost sm" onclick="window.__openThemePicker()">🎨 Aussehen</button></div>
     </div></div>`;
     app.querySelectorAll('.tabs button').forEach((b) => b.onclick = () => { tab = b.dataset.t; draw(); });
     const body = $('#authbody');
