@@ -15,7 +15,7 @@ const PUBLIC = join(__dirname, 'public');
 const PORT = Number(process.env.PORT || 3000);
 const HOST = process.env.HOST || '0.0.0.0'; // hinter Caddy: HOST=127.0.0.1 (nur Proxy erreicht Node)
 const SESSION_DAYS = 30;
-const APP_VERSION = "3.8.0";
+const APP_VERSION = "3.9.0";
 // Einstellungen, die Schueler/Oeffentlichkeit sehen duerfen (Rest bleibt beim Fahrlehrer)
 const PUBLIC_SETTINGS = ['instructor_name', 'instructor_phone', 'policy_text',
   'cancel_hours', 'lock_hours', 'booking_horizon_days', 'booking_horizon_days_rank2',

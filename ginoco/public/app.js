@@ -415,36 +415,54 @@ function wireLogout() {
 }
 
 // ---------- Edge-Menüs (links: Navigation, rechts: Aktionen) ----------
-// Wie die Kantenleisten am Samsung-Edge: kleiner Griff am Bildschirmrand,
-// antippen -> Leiste fährt herein. Große Tap-Flächen, ideal am Handy.
-// Logisch gruppiert: Übersicht → Fahrschüler → Planung → System.
-// Einträge mit '__group' sind nur Überschriften (nicht anklickbar).
+// Kachel-Menüs am Bildschirmrand: kleiner Griff antippen -> Leiste fährt herein.
+// Jeder Eintrag ist eine Kachel (Icon oben, Text drunter), logisch gruppiert.
+// Einträge [key, icon, label]; ['__group', Titel] ist eine Gruppen-Überschrift.
 const INSTR_NAV = [
   ['__group', 'Übersicht'],
-  ['heute', '📊 Heute & Ziele'], ['kalender', '📅 Kalender'],
+  ['heute', '📊', 'Heute & Ziele'], ['kalender', '📅', 'Kalender'],
   ['__group', 'Fahrschüler'],
-  ['schueler', '🧑‍🎓 Fahrschüler'], ['codes', '🔑 Zugangscodes'],
+  ['schueler', '🧑‍🎓', 'Fahrschüler'], ['codes', '🔑', 'Zugangscodes'],
   ['__group', 'Planung'],
-  ['arbeitszeiten', '🕒 Arbeitszeiten'], ['theorie', '📚 Theorie & Ausnahmen'],
+  ['arbeitszeiten', '🕒', 'Arbeitszeiten'], ['theorie', '📚', 'Theorie'],
   ['__group', 'System'],
-  ['protokoll', '📋 Protokoll'], ['einstellungen', '⚙️ Einstellungen'],
+  ['protokoll', '📋', 'Protokoll'], ['einstellungen', '⚙️', 'Einstellungen'],
 ];
+const STUDENT_NAV = [
+  ['__group', 'Übersicht'],
+  ['week-card', '📅', 'Meine Woche'], ['slots', '🚗', 'Termin buchen'],
+  ['__group', 'Mehr'],
+  ['notif-card', '🔔', 'Mitteilungen'], ['offers-card', '🎁', 'Feed'],
+];
+// Flache Liste (mit '__group'-Markern) -> gruppierte Kacheln
+function edgeTilesHTML(items, attr) {
+  let html = '', open = false;
+  for (const it of items) {
+    if (it[0] === '__group') {
+      if (open) html += '</div></div>';
+      html += `<div class="edge-groupwrap"><div class="edge-group">${esc(it[1])}</div><div class="edge-tiles">`;
+      open = true;
+    } else {
+      const [key, icon, label] = it;
+      const badge = key === 'protokoll' ? '<span id="ev-badge" class="et-badge"></span>' : '';
+      html += `<button class="edge-tile" ${attr}="${key}"><span class="et-ic">${icon}</span><span class="et-lb">${esc(label)}</span>${badge}</button>`;
+    }
+  }
+  if (open) html += '</div></div>';
+  return html;
+}
 function mountEdgeMenus(role) {
   document.querySelectorAll('.edge-root').forEach((n) => n.remove());
   const leftItems = role === 'instructor'
-    ? INSTR_NAV.map(([tab, l]) => tab === '__group'
-        ? `<div class="edge-group">${l}</div>`
-        : `<button data-nav="${tab}">${l}${tab === 'protokoll' ? ' <span id="ev-badge"></span>' : ''}</button>`).join('')
-    : [['week-card', '📅 Meine Woche'], ['notif-card', '🔔 Mitteilungen'],
-       ['offers-card', '🎁 Angebote'], ['slots', '🚗 Termin buchen']]
-        .map(([id, l]) => `<button data-scroll="${id}">${l}</button>`).join('');
-  const rightItems = [
-    '<button data-act="theme">🎨 Aussehen</button>',
-    role === 'student' ? '<button data-act="phone">👤 Mein Profil</button>' : '',
-    state.liveSharing ? '<button data-act="live">🛰️ Live-Standort beenden</button>' : '',
-    '<button data-act="reload">🔄 Aktualisieren</button>',
-    '<button data-act="logout">🚪 Abmelden</button>',
-  ].filter(Boolean).join('');
+    ? edgeTilesHTML(INSTR_NAV, 'data-nav')
+    : edgeTilesHTML(STUDENT_NAV, 'data-scroll');
+  const live = state.liveSharing ? [['live', '🛰️', 'Live beenden']] : [];
+  const rightGroups = role === 'student'
+    ? [['__group', 'Anpassen'], ['theme', '🎨', 'Aussehen'], ['phone', '👤', 'Mein Profil'], ['tour', '❓', 'Einführung'],
+       ['__group', 'Konto'], ...live, ['reload', '🔄', 'Aktualisieren'], ['logout', '🚪', 'Abmelden']]
+    : [['__group', 'Anpassen'], ['theme', '🎨', 'Aussehen'],
+       ['__group', 'Konto'], ...live, ['reload', '🔄', 'Aktualisieren'], ['logout', '🚪', 'Abmelden']];
+  const rightItems = edgeTilesHTML(rightGroups, 'data-act');
   const root = document.createElement('div');
   root.className = 'edge-root';
   root.innerHTML = `
@@ -458,7 +476,7 @@ function mountEdgeMenus(role) {
   root.querySelector('.edge-handle.left').onclick = () => { close(); root.classList.add('open-left'); };
   root.querySelector('.edge-handle.right').onclick = () => { close(); root.classList.add('open-right'); };
   root.querySelector('.edge-overlay').onclick = close;
-  // aktiven Tab markieren (Fahrlehrer)
+  // aktive Kachel markieren (Fahrlehrer)
   if (role === 'instructor') root.querySelectorAll('[data-nav]').forEach((b) =>
     b.classList.toggle('active', b.dataset.nav === state.instrTab));
   root.querySelectorAll('[data-nav]').forEach((b) => b.onclick = () => {
@@ -474,6 +492,7 @@ function mountEdgeMenus(role) {
     close(); const a = b.dataset.act;
     if (a === 'theme') window.__openThemePicker?.();
     else if (a === 'phone') window.__openPhone?.();
+    else if (a === 'tour') window.__openTour?.();
     else if (a === 'live') window.__stopLive?.();
     else if (a === 'reload') location.reload();
     else if (a === 'logout') { await api('/api/auth/logout', { method: 'POST' }); state.user = null; render(); }
