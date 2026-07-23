@@ -228,6 +228,16 @@ th{color:var(--muted);font-weight:600;font-size:.78rem;text-transform:uppercase;
 .bulk-past{display:flex;gap:.5rem;align-items:flex-start;font-size:.86rem;margin:.2rem 0 .3rem;line-height:1.4;cursor:pointer}
 .bulk-past input{width:auto;margin-top:.15rem;flex-shrink:0}
 
+/* ---- Segmentierte Auswahl (Arbeitszeiten: Kürzer / Frei / Urlaub) ---- */
+.seg{display:grid;grid-template-columns:repeat(3,1fr);gap:.5rem;margin:.2rem 0 1rem}
+.seg button{display:flex;flex-direction:column;align-items:center;gap:.15rem;background:var(--card2);
+  color:var(--ink);border:1px solid var(--line);border-radius:13px;padding:.75rem .4rem;text-align:center}
+.seg button .seg-ic{font-size:1.5rem;line-height:1}
+.seg button .seg-lb{font-weight:700;font-size:.92rem}
+.seg button .seg-sub{font-size:.72rem;color:var(--muted)}
+.seg button.active{background:linear-gradient(var(--brand),var(--brand-dark));border-color:var(--brand)}
+.seg button.active .seg-lb,.seg button.active .seg-sub{color:#fff}
+
 /* ---- Profilfoto / Avatare ---- */
 .pf-photo{display:flex;gap:.9rem;align-items:center;margin:.2rem 0 1rem}
 .pf-avatar{width:76px;height:76px;border-radius:50%;overflow:hidden;flex-shrink:0;

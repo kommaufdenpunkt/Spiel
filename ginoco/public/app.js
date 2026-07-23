@@ -2279,20 +2279,26 @@ function openResetModal(id, name, username) {
 }
 
 // ---- Tab: Arbeitszeiten / Dienstplan (kurze Tage, freie Tage) ----
+const WTYPES = [
+  ['short', '✂️', 'Kürzer', 'früher Feierabend'],
+  ['free', '🏖️', 'Frei', 'ganzer Tag zu'],
+  ['vacation', '🌴', 'Urlaub', 'zählt als Arbeitszeit'],
+];
 async function tabArbeitszeiten() {
   const s = state.settings;
   const box = $('#itab');
+  state.wType = state.wType || 'short';
   box.innerHTML = `<div class="card">
     <h2>Arbeitszeiten & Dienstplan <span class="sub">Resturlaub: ${s.vacation_days_left ?? '–'} Tage</span></h2>
-    <p class="hint">Trage hier ein, wenn ein Tag <strong>kürzer</strong> sein soll (z.B. wenn deine Frau frei hat – früher Feierabend), du ganz <strong>frei</strong> hast oder <strong>Urlaub</strong> nimmst. Urlaubstage zählen je ${s.vacation_credit_min} Min als Arbeitszeit. Die buchbaren Slots passen sich für Schüler automatisch an.</p>
+    <p class="hint">Trag ein, wenn ein Tag anders läuft – die buchbaren Zeiten passen sich für die Schüler automatisch an.</p>
+    <div class="ap-label">Was ist an dem Tag / den Tagen?</div>
+    <div class="seg" id="w-seg">
+      ${WTYPES.map(([t, ic, lb, sub]) => `<button data-t="${t}" class="${state.wType === t ? 'active' : ''}">
+        <span class="seg-ic">${ic}</span><span class="seg-lb">${lb}</span><span class="seg-sub">${sub}</span></button>`).join('')}
+    </div>
     <div class="row">
       <div class="field"><label>Datum</label><input type="date" id="w-date" value="${state.date}"></div>
-      <div class="field" style="max-width:210px"><label>Art</label>
-        <select id="w-type">
-          <option value="short">Kurzer Tag (früher Feierabend)</option>
-          <option value="free">Ganzer Tag frei</option>
-          <option value="vacation">Urlaub (${s.vacation_credit_min} Min)</option>
-        </select></div>
+      <div class="field" id="w-tofield"><label>bis (optional)</label><input type="date" id="w-dateto"></div>
     </div>
     <div class="row" id="w-times">
       <div class="field"><label>Arbeitsbeginn</label><input id="w-start" value="${s.start_time}"></div>
@@ -2302,37 +2308,44 @@ async function tabArbeitszeiten() {
       <span class="hint" style="margin:0" id="w-preview"></span></div>
     <div id="w-list"></div>
   </div>`;
-  const typeSel = $('#w-type');
-  const times = $('#w-times');
-  const syncType = () => {
-    const t = typeSel.value;
-    times.style.display = (t === 'free' || t === 'vacation') ? 'none' : 'flex';
+  const times = $('#w-times'), toField = $('#w-tofield');
+  const sync = () => {
+    const t = state.wType;
+    times.style.display = t === 'short' ? 'flex' : 'none';
+    toField.style.display = t === 'short' ? 'none' : 'block'; // Zeitraum v.a. für Frei/Urlaub
     if (t === 'short') { $('#w-start').value = s.start_time; $('#w-last').value = s.short_day_last_start || '13:35'; }
     updateWPreview();
   };
   const updateWPreview = () => {
-    if (typeSel.value === 'free') { $('#w-preview').textContent = 'Ganzer Tag frei – keine Slots.'; return; }
-    if (typeSel.value === 'vacation') { $('#w-preview').textContent = `Urlaub – zählt ${s.vacation_credit_min} Min als Arbeitszeit.`; return; }
+    const t = state.wType, to = $('#w-dateto').value;
+    const range = to && to > $('#w-date').value ? ` (${fmtShort($('#w-date').value)}–${fmtShort(to)})` : '';
+    if (t === 'free') { $('#w-preview').textContent = 'Ganzer Tag frei – keine Slots' + range + '.'; return; }
+    if (t === 'vacation') { $('#w-preview').textContent = `Urlaub${range} – je ${s.vacation_credit_min} Min Arbeitszeit.`; return; }
     const step = s.lesson_min + s.break_min;
-    const toM = (t) => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
-    const times2 = [];
-    for (let t = toM($('#w-start').value); t <= toM($('#w-last').value); t += step) times2.push(`${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`);
-    $('#w-preview').textContent = `${times2.length} Slots: ${times2.join(', ') || '–'}`;
+    const toM = (x) => { const [h, m] = x.split(':').map(Number); return h * 60 + m; };
+    const list = [];
+    for (let x = toM($('#w-start').value); x <= toM($('#w-last').value); x += step) list.push(`${String(Math.floor(x / 60)).padStart(2, '0')}:${String(x % 60).padStart(2, '0')}`);
+    $('#w-preview').textContent = `${list.length} Slots: ${list.join(', ') || '–'}`;
   };
-  typeSel.onchange = syncType;
-  ['w-start', 'w-last'].forEach((id) => $('#' + id).oninput = updateWPreview);
-  syncType();
+  $('#w-seg').querySelectorAll('[data-t]').forEach((b) => b.onclick = () => {
+    state.wType = b.dataset.t;
+    $('#w-seg').querySelectorAll('[data-t]').forEach((x) => x.classList.toggle('active', x === b));
+    sync();
+  });
+  ['w-start', 'w-last', 'w-date', 'w-dateto'].forEach((id) => $('#' + id).oninput = updateWPreview);
+  sync();
   $('#w-add').onclick = async () => {
-    const t = typeSel.value;
+    const t = state.wType;
     const body = { date: $('#w-date').value, type: t };
+    if (t !== 'short' && $('#w-dateto').value && $('#w-dateto').value > $('#w-date').value) body.date_to = $('#w-dateto').value;
     if (t === 'short') { body.start_time = $('#w-start').value; body.last_start = $('#w-last').value; }
+    const send = async (force) => api('/api/day-overrides', { method: 'POST', body: force ? { ...body, force: true } : body });
     try {
-      await api('/api/day-overrides', { method: 'POST', body });
-      toast('Eingetragen ✓', 'ok'); loadOverrides();
+      const r = await send(false);
+      toast(`Eingetragen ✓${r.days > 1 ? ` (${r.days} Tage)` : ''}`, 'ok'); loadOverrides();
     } catch (e) {
-      // Bei bestehenden Terminen nachfragen, ob trotzdem
       if (/schon .* Termin/.test(e.message) && confirm(e.message + '\n\nTrotzdem eintragen?')) {
-        try { await api('/api/day-overrides', { method: 'POST', body: { ...body, force: true } }); toast('Eingetragen ✓', 'ok'); loadOverrides(); }
+        try { const r = await send(true); toast(`Eingetragen ✓${r.days > 1 ? ` (${r.days} Tage)` : ''}`, 'ok'); loadOverrides(); }
         catch (e2) { toast(e2.message, 'err'); }
       } else { toast(e.message, 'err'); }
     }
@@ -2342,10 +2355,11 @@ async function tabArbeitszeiten() {
 async function loadOverrides() {
   try {
     const { overrides } = await api('/api/day-overrides');
-    $('#w-list').innerHTML = overrides.length ? `<h2 style="font-size:.95rem">Eingetragene Tage</h2><div class="blist">${
+    $('#w-list').innerHTML = overrides.length ? `<div class="inline" style="justify-content:space-between;margin-bottom:.5rem">
+        <h2 style="font-size:.95rem;margin:0">Eingetragene Tage</h2><span class="pill">${overrides.length}</span></div><div class="blist">${
       overrides.map((o) => `<div class="bitem warm">
-        <div><div class="when">${WD[isoDow(o.date) - 1]} ${fmtShort(o.date)}</div>
-        <div class="meta">${o.type === 'vacation' ? '🌴 Urlaub' : o.closed ? '🏖️ ganzer Tag frei' : `✂️ kurzer Tag · ${o.start_time || state.settings.start_time}–letzter Slot ${o.last_start || '?'}`}</div></div>
+        <div><div class="when">${o.type === 'vacation' ? '🌴' : o.closed ? '🏖️' : '✂️'} ${WD_LONG[isoDow(o.date) - 1]}, ${fmtShort(o.date)}</div>
+        <div class="meta">${o.type === 'vacation' ? 'Urlaub' : o.closed ? 'ganzer Tag frei' : `kurzer Tag · ${o.start_time || state.settings.start_time}–${o.last_start || '?'}`}</div></div>
         <button class="ghost sm" data-delov="${o.date}">Löschen</button></div>`).join('')
     }</div>` : '<p class="muted">Keine besonderen Tage eingetragen.</p>';
     $('#w-list').querySelectorAll('[data-delov]').forEach((b) => b.onclick = async () => {
@@ -2355,11 +2369,12 @@ async function loadOverrides() {
 }
 
 // ---- Tab: Theorie & Ausnahmen ----
+const BLOCK_META = { theorie: ['📚', 'Theorie'], block: ['⛔', 'Blockiert'], frei: ['🌴', 'Frei / Urlaub'] };
 async function tabTheorie() {
   const box = $('#itab');
   box.innerHTML = `<div class="card">
     <h2>Theorie & Ausnahmen</h2>
-    <p class="hint">Blockiere Zeiten, in denen keine Fahrstunden buchbar sein sollen – z.B. Theorieunterricht, Urlaub oder Sondertermine.</p>
+    <p class="hint">Blockiere Zeiten, in denen keine Fahrstunden buchbar sein sollen – z.B. Theorieunterricht (auch als <strong>Serie</strong>), Sondertermine oder Freistunden.</p>
     <div class="row">
       <div class="field"><label>Datum</label><input type="date" id="t-date" value="${state.date}"></div>
       <div class="field"><label>Von</label><input id="t-from" value="17:00"></div>
@@ -2369,38 +2384,64 @@ async function tabTheorie() {
       <div class="field"><label>Titel</label><input id="t-title" placeholder="z.B. Theorieunterricht"></div>
       <div class="field" style="max-width:180px"><label>Art</label>
         <select id="t-type">
-          <option value="theorie">Theorie</option>
-          <option value="block">Blockiert</option>
-          <option value="frei">Frei / Urlaub</option>
+          <option value="theorie">📚 Theorie</option>
+          <option value="block">⛔ Blockiert</option>
+          <option value="frei">🌴 Frei / Urlaub</option>
         </select></div>
     </div>
-    <div class="inline" style="margin:.4rem 0 1rem">
-      <label style="margin:0"><input type="checkbox" id="t-count" checked style="width:auto"> zählt als Arbeitszeit (fürs Wochenziel)</label>
-      <button id="t-add" style="margin-left:auto">Eintragen</button>
+    <div class="row">
+      <div class="field" style="max-width:230px"><label>Wiederholen</label>
+        <select id="t-repeat">
+          <option value="1">Einmalig</option>
+          <option value="4">Wöchentlich · 4 Wochen</option>
+          <option value="6">Wöchentlich · 6 Wochen</option>
+          <option value="8">Wöchentlich · 8 Wochen</option>
+          <option value="12">Wöchentlich · 12 Wochen</option>
+        </select></div>
+      <div class="field"><label style="opacity:0">.</label>
+        <label class="inline" style="margin:0;font-weight:600"><input type="checkbox" id="t-count" checked style="width:auto"> zählt als Arbeitszeit</label></div>
+    </div>
+    <div class="inline" style="margin:.2rem 0 1rem">
+      <button id="t-add">Eintragen</button>
+      <span class="hint" style="margin:0" id="t-preview"></span>
     </div>
     <div id="t-list"></div>
   </div>`;
+  const updatePreview = () => {
+    const n = Number($('#t-repeat').value);
+    if (n <= 1) { $('#t-preview').textContent = ''; return; }
+    const days = Array.from({ length: n }, (_, i) => fmtShort(addDays($('#t-date').value, i * 7)));
+    $('#t-preview').textContent = `Legt ${n} Termine an: ${days.slice(0, 5).join(', ')}${n > 5 ? ' …' : ''}`;
+  };
+  $('#t-repeat').onchange = updatePreview;
+  $('#t-date').oninput = updatePreview;
   $('#t-add').onclick = async () => {
     try {
-      await api('/api/blocks', { method: 'POST', body: {
+      const r = await api('/api/blocks', { method: 'POST', body: {
         date: $('#t-date').value, start_time: $('#t-from').value, end_time: $('#t-to').value,
-        title: $('#t-title').value, type: $('#t-type').value, count_hours: $('#t-count').checked } });
-      $('#t-title').value = ''; toast('Eingetragen ✓', 'ok'); loadBlocks();
+        title: $('#t-title').value, type: $('#t-type').value, count_hours: $('#t-count').checked,
+        repeat_weekly: Number($('#t-repeat').value) } });
+      $('#t-title').value = ''; $('#t-repeat').value = '1'; updatePreview();
+      toast(`Eingetragen ✓${r.created > 1 ? ` (${r.created} Termine)` : ''}`, 'ok'); loadBlocks();
     } catch (e) { toast(e.message, 'err'); }
   };
   loadBlocks();
 }
 async function loadBlocks() {
   try {
-    const from = todayStr(), to = addDays(from, 60);
+    const from = todayStr(), to = addDays(from, 120);
     const ov = await api('/api/instructor/overview?from=' + from + '&to=' + to);
     const bl = ov.blocks;
-    $('#t-list').innerHTML = bl.length ? `<h2 style="font-size:.95rem">Kommende Einträge</h2><div class="blist">${
-      bl.map((b) => `<div class="bitem warm">
-        <div><div class="when">${WD[isoDow(b.date) - 1]} ${fmtShort(b.date)} · ${b.start_time}–${b.end_time}</div>
-        <div class="meta"><strong>${esc(b.title)}</strong> · ${b.type} ${b.count_hours ? '<span class="pill">Arbeitszeit</span>' : ''}</div></div>
-        <button class="ghost sm" data-delblock="${b.id}">Löschen</button></div>`).join('')
-    }</div>` : '<p class="muted">Keine kommenden Ausnahmen.</p>';
+    // nach Datum gruppiert, mit Icons – übersichtlicher
+    $('#t-list').innerHTML = bl.length ? `<div class="inline" style="justify-content:space-between;margin-bottom:.5rem">
+        <h2 style="font-size:.95rem;margin:0">Kommende Einträge</h2><span class="pill">${bl.length}</span></div>
+      <div class="blist">${bl.map((b) => {
+        const [ic, lb] = BLOCK_META[b.type] || ['⛔', b.type];
+        return `<div class="bitem warm">
+          <div><div class="when">${ic} ${WD_LONG[isoDow(b.date) - 1]}, ${fmtShort(b.date)} · ${b.start_time}–${b.end_time}</div>
+          <div class="meta"><strong>${esc(b.title)}</strong> · ${lb} ${b.count_hours ? '<span class="pill">Arbeitszeit</span>' : ''}</div></div>
+          <button class="ghost sm" data-delblock="${b.id}">Löschen</button></div>`;
+      }).join('')}</div>` : '<p class="muted">Keine kommenden Ausnahmen.</p>';
     $('#t-list').querySelectorAll('[data-delblock]').forEach((b) => b.onclick = () => delBlock(b.dataset.delblock));
   } catch (e) { toast(e.message, 'err'); }
 }

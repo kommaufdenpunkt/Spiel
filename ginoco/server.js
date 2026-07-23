@@ -15,7 +15,7 @@ const PUBLIC = join(__dirname, 'public');
 const PORT = Number(process.env.PORT || 3000);
 const HOST = process.env.HOST || '0.0.0.0'; // hinter Caddy: HOST=127.0.0.1 (nur Proxy erreicht Node)
 const SESSION_DAYS = 30;
-const APP_VERSION = "3.11.0";
+const APP_VERSION = "3.12.0";
 // Einstellungen, die Schueler/Oeffentlichkeit sehen duerfen (Rest bleibt beim Fahrlehrer)
 const PUBLIC_SETTINGS = ['instructor_name', 'instructor_phone', 'policy_text',
   'cancel_hours', 'lock_hours', 'booking_horizon_days', 'booking_horizon_days_rank2',
@@ -1120,21 +1120,34 @@ async function handleApi(req, res, url) {
     if (!closed && lastStart && b.start_time && toMin(lastStart) < toMin(b.start_time))
       return bad(res, 'Letzter Slot darf nicht vor dem Arbeitsbeginn liegen');
 
-    // Kurzer Tag / Schliessung: bestehende Termine, die dadurch heraus fallen, zuerst pruefen
-    const affected = db.prepare("SELECT b.*, s.name AS student_name FROM bookings b LEFT JOIN students s ON s.id=b.student_id WHERE b.date = ? AND b.status IN ('booked','offered')").all(b.date)
-      .filter((bk) => closed || (lastStart && toMin(bk.start_time) > toMin(lastStart)));
+    // Zeitraum von–bis (z.B. Urlaubswoche); ohne date_to nur der eine Tag.
+    const from = b.date;
+    const to = (b.date_to && b.date_to >= from) ? b.date_to : from;
+    const dates = [];
+    for (let d = from; d <= to && dates.length < 370; d = addDays(d, 1)) dates.push(d);
+
+    // Bestehende Termine, die durch kürzeren Tag / Schließung herausfallen – erst prüfen
+    const affected = [];
+    for (const date of dates) {
+      const aff = db.prepare("SELECT b.*, s.name AS student_name FROM bookings b LEFT JOIN students s ON s.id=b.student_id WHERE b.date = ? AND b.status IN ('booked','offered')").all(date)
+        .filter((bk) => closed || (lastStart && toMin(bk.start_time) > toMin(lastStart)));
+      for (const a of aff) affected.push({ ...a, _d: date });
+    }
     if (affected.length && !b.force) {
-      return bad(res, `An diesem Tag liegen schon ${affected.length} Termin(e), die dann keinen Platz mehr haben `
-        + `(${affected.map((a) => `${a.start_time} ${a.student_name || a.title || ''}`.trim()).join(', ')}). `
-        + `Verschiebe diese zuerst – oder bestätige mit „trotzdem".`);
+      const list = affected.slice(0, 6).map((a) => `${dmy(a._d)} ${a.start_time} ${a.student_name || a.title || ''}`.trim()).join(', ');
+      return bad(res, `Es liegen schon ${affected.length} Termin(e), die dann keinen Platz mehr haben `
+        + `(${list}${affected.length > 6 ? ' …' : ''}). Verschiebe diese zuerst – oder bestätige mit „trotzdem".`);
     }
 
-    db.prepare(`INSERT INTO day_overrides(date,start_time,last_start,closed,type,note,created_at)
+    const ins = db.prepare(`INSERT INTO day_overrides(date,start_time,last_start,closed,type,note,created_at)
       VALUES(?,?,?,?,?,?,?)
-      ON CONFLICT(date) DO UPDATE SET start_time=excluded.start_time,last_start=excluded.last_start,closed=excluded.closed,type=excluded.type,note=excluded.note`)
-      .run(b.date, closed ? null : (b.start_time || null), lastStart, closed, type, b.note ? String(b.note).trim() : null, new Date().toISOString());
-    if (type === 'vacation') logEvent('vacation', { actor: 'instructor', date: b.date, detail: `Urlaub am ${wdShort(b.date)} ${dmy(b.date)}` });
-    return ok(res, { affected: affected.length });
+      ON CONFLICT(date) DO UPDATE SET start_time=excluded.start_time,last_start=excluded.last_start,closed=excluded.closed,type=excluded.type,note=excluded.note`);
+    const stamp = new Date().toISOString();
+    for (const date of dates) {
+      ins.run(date, closed ? null : (b.start_time || null), lastStart, closed, type, b.note ? String(b.note).trim() : null, stamp);
+      if (type === 'vacation') logEvent('vacation', { actor: 'instructor', date, detail: `Urlaub am ${wdShort(date)} ${dmy(date)}` });
+    }
+    return ok(res, { affected: affected.length, days: dates.length });
   }
   const dom = p.match(/^\/api\/day-overrides\/(\d{4}-\d{2}-\d{2})$/);
   if (dom && method === 'DELETE') {
@@ -1146,13 +1159,19 @@ async function handleApi(req, res, url) {
   // -- Bloecke / Ausnahmen (Theorie etc.) --
   if (p === '/api/blocks' && method === 'POST') {
     if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
-    const { date, start_time, end_time, title, type, count_hours } = await readBody(req);
+    const { date, start_time, end_time, title, type, count_hours, repeat_weekly } = await readBody(req);
     if (!date || !start_time || !end_time || !title) return bad(res, 'Datum, Zeit und Titel noetig');
     if (toMin(end_time) <= toMin(start_time)) return bad(res, 'Ende muss nach dem Start liegen');
-    db.prepare('INSERT INTO blocks(date,start_time,end_time,title,type,count_hours,created_at) VALUES(?,?,?,?,?,?,?)')
-      .run(date, start_time, end_time, String(title).trim(), type || 'block',
-        count_hours === false ? 0 : 1, new Date().toISOString());
-    return ok(res);
+    // Serie: wöchentlich wiederholen (z.B. Theorie über mehrere Wochen)
+    const weeks = Math.max(1, Math.min(52, Number(repeat_weekly) || 1));
+    const ins = db.prepare('INSERT INTO blocks(date,start_time,end_time,title,type,count_hours,created_at) VALUES(?,?,?,?,?,?,?)');
+    const stamp = new Date().toISOString();
+    let created = 0;
+    for (let i = 0; i < weeks; i++) {
+      ins.run(addDays(date, i * 7), start_time, end_time, String(title).trim(), type || 'block', count_hours === false ? 0 : 1, stamp);
+      created++;
+    }
+    return ok(res, { created });
   }
   const blm = p.match(/^\/api\/blocks\/(\d+)$/);
   if (blm && method === 'DELETE') {
