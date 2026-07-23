@@ -15,7 +15,7 @@ const PUBLIC = join(__dirname, 'public');
 const PORT = Number(process.env.PORT || 3000);
 const HOST = process.env.HOST || '0.0.0.0'; // hinter Caddy: HOST=127.0.0.1 (nur Proxy erreicht Node)
 const SESSION_DAYS = 30;
-const APP_VERSION = "3.9.0";
+const APP_VERSION = "3.10.0";
 // Einstellungen, die Schueler/Oeffentlichkeit sehen duerfen (Rest bleibt beim Fahrlehrer)
 const PUBLIC_SETTINGS = ['instructor_name', 'instructor_phone', 'policy_text',
   'cancel_hours', 'lock_hours', 'booking_horizon_days', 'booking_horizon_days_rank2',
@@ -1464,6 +1464,7 @@ function splitBulkLine(line) {
 }
 function bulkInstructorBookings(res, body) {
   const commit = !!body.commit;
+  const pastAsDone = body.pastAsDone !== false; // vergangene Termine als "gefahren" übernehmen (Standard: ja)
   const s = getSettings();
   const students = db.prepare('SELECT id,name,username FROM students WHERE archived_at IS NULL').all();
   const today = todayStr();
@@ -1488,14 +1489,16 @@ function bulkInstructorBookings(res, body) {
     const date = parseImportDate(f.date, today);
     const time = parseImportTime(f.time);
     let dur = f.dur ? parseInt(String(f.dur).replace(/[^\d]/g, ''), 10) : s.lesson_min;
-    if (!dur || dur < 20) dur = s.lesson_min;
+    if (!dur || dur < 10) dur = s.lesson_min; // echte Dauer erhalten (auch kurze Historien-Stunden)
     if (match.error) { row.status = 'error'; row.msg = 'Name: ' + match.error; rows.push(row); continue; }
     row.student = match.student.name; row.studentId = match.student.id;
     if (!date) { row.status = 'error'; row.msg = 'Datum unklar (z. B. 22.7. oder 22.07.2026)'; rows.push(row); continue; }
     if (!time) { row.status = 'error'; row.msg = 'Uhrzeit unklar (z. B. 14:00)'; rows.push(row); continue; }
     row.date = date; row.time = time; row.dur = dur;
-    if (date < today || (date === today && toMin(time) <= toMin(nowHHMM()))) {
-      row.status = 'error'; row.msg = 'liegt in der Vergangenheit'; rows.push(row); continue;
+    const isPast = date < today || (date === today && toMin(time) <= toMin(nowHHMM()));
+    if (isPast) {
+      if (!pastAsDone) { row.status = 'error'; row.msg = 'liegt in der Vergangenheit'; rows.push(row); continue; }
+      row.done = true; // wird als gefahrene Stunde übernommen
     }
     const ns = toMin(time), ne = ns + dur;
     const iv = dayIntervals(date);
@@ -1504,22 +1507,28 @@ function bulkInstructorBookings(res, body) {
     if (iv.some((x) => overlaps(ns, ne, x.s, x.e))) {
       row.status = 'error'; row.msg = 'Überschneidet einen vorhandenen Termin'; rows.push(row); continue;
     }
-    row.status = 'ok'; row.msg = 'wird eingetragen';
+    row.status = 'ok'; row.msg = row.done ? 'wird als gefahren übernommen' : 'wird eingetragen';
     iv.push({ s: ns, e: ne }); // für Folgezeilen als belegt vormerken
     rows.push(row);
   }
   const okRows = rows.filter((r) => r.status === 'ok');
-  const summary = { rows, okCount: okRows.length, errCount: rows.length - okRows.length };
+  const doneCount = okRows.filter((r) => r.done).length;
+  const summary = { rows, okCount: okRows.length, errCount: rows.length - okRows.length, doneCount, futureCount: okRows.length - doneCount };
   if (!commit) return ok(res, { dryRun: true, ...summary });
   let created = 0;
   for (const r of okRows) {
-    // Vom Fahrlehrer eingetragen -> reserviert (confirmed=0): der Schueler bestaetigt.
+    // Vergangene Stunde -> als "gefahren" (done, bestätigt, anwesend) übernehmen.
+    // Zukünftige -> reserviert (confirmed=0), der Schüler bestätigt.
+    const status = r.done ? 'done' : 'booked';
+    const confirmed = r.done ? 1 : 0;
+    const attended = r.done ? 1 : null;
     const info = db.prepare(
-      `INSERT INTO bookings(student_id,date,start_time,duration_min,status,confirmed,created_at) VALUES(?,?,?,?,?,0,?)`
-    ).run(r.studentId, r.date, r.time, r.dur, 'booked', new Date().toISOString());
+      `INSERT INTO bookings(student_id,date,start_time,duration_min,status,confirmed,attended,created_at) VALUES(?,?,?,?,?,?,?,?)`
+    ).run(r.studentId, r.date, r.time, r.dur, status, confirmed, attended, new Date().toISOString());
     logEvent('book', { actor: 'instructor', studentId: r.studentId, bookingId: Number(info.lastInsertRowid), date: r.date,
-      detail: `${wdShort(r.date)} ${dmy(r.date)} ${r.time} Uhr (${r.dur} Min) – Sammel-Import (reserviert)` });
-    if (r.studentId) notify(r.studentId, 'info',
+      detail: `${wdShort(r.date)} ${dmy(r.date)} ${r.time} Uhr (${r.dur} Min) – Sammel-Import ${r.done ? '(gefahren)' : '(reserviert)'}` });
+    // Nur bei zukünftigen Terminen den Schüler zum Bestätigen anstupsen (nicht bei Historie).
+    if (!r.done && r.studentId) notify(r.studentId, 'info',
       `Neuer Termin für dich reserviert: ${wdShort(r.date)} ${dmy(r.date)} um ${r.time} Uhr (${r.dur} Min). Bitte in der App bestätigen.`, r.date, Number(info.lastInsertRowid));
     created++;
   }

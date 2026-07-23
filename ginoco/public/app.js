@@ -1516,6 +1516,7 @@ async function openBulkBooking() {
     ${students.length ? `<details class="bulk-names"><summary>Deine ${students.length} Fahrschüler anzeigen</summary><div class="bn-list">${nameList}</div></details>` : '<p class="hint">Noch keine Fahrschüler angelegt.</p>'}
     <div class="field"><label>Termine (eine pro Zeile)</label>
       <textarea id="bk-text" rows="7" placeholder="Maria, 22.7., 14:00, 80&#10;Jason, 22.7., 16:00&#10;Lea, 24.7., 12:00, 120"></textarea></div>
+    <label class="bulk-past"><input type="checkbox" id="bk-past" checked> Vergangene Termine als <strong>„gefahren"</strong> übernehmen <span class="muted">(für die Historie / gefahrene Stunden)</span></label>
     <div id="bk-preview"></div>
     <div class="actions" style="justify-content:space-between">
       <button class="sec" onclick="window.__closeModal()">Abbrechen</button>
@@ -1529,11 +1530,13 @@ async function openBulkBooking() {
   const runCheck = async (commit) => {
     const text = $('#bk-text').value;
     if (!text.trim()) { toast('Bitte erst Termine eintragen', 'err'); return; }
+    const pastAsDone = $('#bk-past') ? $('#bk-past').checked : true;
     try {
-      const r = await api('/api/instructor/bookings/bulk', { method: 'POST', body: { text, commit } });
+      const r = await api('/api/instructor/bookings/bulk', { method: 'POST', body: { text, commit, pastAsDone } });
       if (commit && r.committed) {
         closeModal();
-        toast(`${r.created} Termin${r.created === 1 ? '' : 'e'} eingetragen ✓`, 'ok');
+        const extra = r.doneCount ? ` (${r.futureCount} neu · ${r.doneCount} als gefahren)` : '';
+        toast(`${r.created} Termin${r.created === 1 ? '' : 'e'} eingetragen ✓${extra}`, 'ok');
         if (state.instrTab === 'kalender') loadK(); else drawInstrTab();
         return;
       }
@@ -1546,18 +1549,20 @@ async function openBulkBooking() {
   commitBtn.onclick = () => runCheck(true);
 }
 function renderBulkPreview(el, r) {
-  const icon = (st) => st === 'ok' ? '✅' : '⚠️';
+  const icon = (row) => row.status !== 'ok' ? '⚠️' : row.done ? '🅿️' : '✅';
   const line = (row) => {
     const head = row.status === 'ok'
-      ? `<b>${esc(row.student)}</b> · ${WD[isoDow(row.date) - 1]} ${fmtShort(row.date)} · ${row.time} <span class="muted">(${row.dur} Min)</span>`
+      ? `<b>${esc(row.student)}</b> · ${WD[isoDow(row.date) - 1]} ${fmtShort(row.date)} · ${row.time} <span class="muted">(${row.dur} Min)</span>${row.done ? ' <span class="pill" style="background:var(--good-bg);color:var(--good)">gefahren</span>' : ''}`
       : `<span class="muted">${esc(row.input)}</span>`;
     return `<div class="bulk-row ${row.status}">
-      <span class="br-ic">${icon(row.status)}</span>
+      <span class="br-ic">${icon(row)}</span>
       <div><div>${head}</div><div class="br-msg ${row.status}">${esc(row.msg)}${row.status !== 'ok' && row.student ? ' · erkannt: ' + esc(row.student) : ''}</div></div>
     </div>`;
   };
   el.innerHTML = `<div class="bulk-summary">
-      <span class="pill" style="background:var(--good-bg);color:var(--good)">✅ ${r.okCount} bereit</span>
+      ${r.futureCount ? `<span class="pill" style="background:var(--booked);color:#8fb4ff">🗓️ ${r.futureCount} neu</span>` : ''}
+      ${r.doneCount ? `<span class="pill" style="background:var(--good-bg);color:var(--good)">🅿️ ${r.doneCount} gefahren</span>` : ''}
+      ${!r.futureCount && !r.doneCount ? `<span class="pill">0 bereit</span>` : ''}
       ${r.errCount ? `<span class="pill" style="background:var(--bad-bg);color:var(--bad)">⚠️ ${r.errCount} zu prüfen</span>` : ''}
     </div>
     <div class="bulk-list">${r.rows.map(line).join('')}</div>
