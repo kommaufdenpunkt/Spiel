@@ -238,6 +238,32 @@ th{color:var(--muted);font-weight:600;font-size:.78rem;text-transform:uppercase;
 .seg button.active{background:linear-gradient(var(--brand),var(--brand-dark));border-color:var(--brand)}
 .seg button.active .seg-lb,.seg button.active .seg-sub{color:#fff}
 
+/* ---- Buchungs-Kalender (Ampel: grün frei / rot ausgebucht) ---- */
+.bcal{background:var(--card2);border:1px solid var(--line);border-radius:14px;padding:.7rem;margin:.2rem 0 1rem}
+.bcal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem;font-size:.98rem}
+.bcal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:.32rem}
+.bcal-wd{margin-bottom:.28rem}
+.bcal-wd span{text-align:center;font-size:.7rem;color:var(--muted);font-weight:700}
+.bcal-empty{aspect-ratio:1}
+.bcal-day{position:relative;aspect-ratio:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:1px;border-radius:11px;border:1px solid var(--line);background:var(--card);color:var(--ink);
+  font-weight:700;font-size:1rem;padding:0;min-height:42px;line-height:1}
+.bcal-day .bc-free{font-size:.58rem;font-weight:700;letter-spacing:-.02em}
+.bcal-day.free{background:rgba(53,192,125,.18);border-color:rgba(53,192,125,.5)}
+.bcal-day.free .bc-free{color:var(--good)}
+.bcal-day.full{background:rgba(229,96,95,.16);border-color:rgba(229,96,95,.42);color:#e6a3a2}
+.bcal-day.toofar{color:var(--muted);opacity:.7}
+.bcal-day.closed,.bcal-day.past{color:var(--muted);opacity:.32}
+.bcal-day.today{box-shadow:inset 0 0 0 2px var(--brand)}
+.bcal-day.sel{outline:2px solid var(--brand);outline-offset:1px}
+.bcal-day:disabled{cursor:default}
+.bcal-day:not(:disabled):active{transform:scale(.94)}
+.bcal-legend{display:flex;gap:1rem;justify-content:center;margin-top:.6rem;font-size:.72rem;color:var(--muted);flex-wrap:wrap}
+.bcal-legend i.lg{display:inline-block;width:11px;height:11px;border-radius:3px;vertical-align:-1px;margin-right:.25rem}
+.bcal-legend i.lg.free{background:rgba(53,192,125,.6)}
+.bcal-legend i.lg.full{background:rgba(229,96,95,.55)}
+.bcal-legend i.lg.off{background:var(--line)}
+
 /* ---- Profilfoto / Avatare ---- */
 .pf-photo{display:flex;gap:.9rem;align-items:center;margin:.2rem 0 1rem}
 .pf-avatar{width:76px;height:76px;border-radius:50%;overflow:hidden;flex-shrink:0;

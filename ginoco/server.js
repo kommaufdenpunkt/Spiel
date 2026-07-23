@@ -15,7 +15,7 @@ const PUBLIC = join(__dirname, 'public');
 const PORT = Number(process.env.PORT || 3000);
 const HOST = process.env.HOST || '0.0.0.0'; // hinter Caddy: HOST=127.0.0.1 (nur Proxy erreicht Node)
 const SESSION_DAYS = 30;
-const APP_VERSION = "3.12.1";
+const APP_VERSION = "3.13.0";
 // Einstellungen, die Schueler/Oeffentlichkeit sehen duerfen (Rest bleibt beim Fahrlehrer)
 const PUBLIC_SETTINGS = ['instructor_name', 'instructor_phone', 'policy_text',
   'cancel_hours', 'lock_hours', 'booking_horizon_days', 'booking_horizon_days_rank2',
@@ -323,6 +323,34 @@ async function handleApi(req, res, url) {
     if (!requireStudent() && !requireInstructor()) return bad(res, 'Bitte anmelden', 401);
     const date = url.searchParams.get('date') || todayStr();
     return ok(res, { date, ...buildDaySlots(date, sess.kind === 'student' ? sess.student_id : null) });
+  }
+
+  // Monats-Verfügbarkeit für den Kalender: pro Tag frei/ausgebucht/geschlossen.
+  if (p === '/api/availability' && method === 'GET') {
+    if (!requireStudent() && !requireInstructor()) return bad(res, 'Bitte anmelden', 401);
+    const studentId = sess.kind === 'student' ? sess.student_id : null;
+    const today = todayStr();
+    const from = url.searchParams.get('from') || today;
+    const to = url.searchParams.get('to') || from;
+    const days = [];
+    let d = from, guard = 0;
+    while (d <= to && guard++ < 70) {
+      const day = buildDaySlots(d, studentId);
+      let st, free = 0;
+      if (d < today) st = 'past';
+      else if (!day.isWorkday) st = 'closed';
+      else {
+        free = day.slots.filter((sl) => sl.state === 'free').length;
+        const beyond = day.slots.length > 0 && day.slots.every((sl) => sl.state === 'toofar');
+        if (free > 0) st = 'free';
+        else if (beyond) st = 'toofar';
+        else if (d === today) st = 'past';
+        else st = 'full';
+      }
+      days.push({ date: d, state: st, free });
+      d = addDays(d, 1);
+    }
+    return ok(res, { days });
   }
 
   // Naechsten buchbaren Tag finden (fuers "reibungslose" Buchen) – scannt ab
@@ -1113,18 +1141,24 @@ async function handleApi(req, res, url) {
   if (p === '/api/day-overrides' && method === 'POST') {
     if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
     const b = await readBody(req);
-    if (!b.date) return bad(res, 'Datum noetig');
     const type = ['short', 'free', 'vacation'].includes(b.type) ? b.type : (b.closed ? 'free' : 'short');
     const closed = (type === 'free' || type === 'vacation') ? 1 : 0;
     let lastStart = closed ? null : (b.last_start || null);
     if (!closed && lastStart && b.start_time && toMin(lastStart) < toMin(b.start_time))
       return bad(res, 'Letzter Slot darf nicht vor dem Arbeitsbeginn liegen');
 
-    // Zeitraum von–bis (z.B. Urlaubswoche); ohne date_to nur der eine Tag.
-    const from = b.date;
-    const to = (b.date_to && b.date_to >= from) ? b.date_to : from;
-    const dates = [];
-    for (let d = from; d <= to && dates.length < 370; d = addDays(d, 1)) dates.push(d);
+    // Mehrere angeklickte Tage (dates:[…]) ODER Zeitraum von–bis ODER ein einzelner Tag.
+    let dates;
+    if (Array.isArray(b.dates) && b.dates.length) {
+      dates = [...new Set(b.dates.filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d)))].sort().slice(0, 370);
+    } else {
+      if (!b.date) return bad(res, 'Datum noetig');
+      const from = b.date;
+      const to = (b.date_to && b.date_to >= from) ? b.date_to : from;
+      dates = [];
+      for (let d = from; d <= to && dates.length < 370; d = addDays(d, 1)) dates.push(d);
+    }
+    if (!dates.length) return bad(res, 'Kein Datum gewählt');
 
     // Bestehende Termine, die durch kürzeren Tag / Schließung herausfallen – erst prüfen
     const affected = [];

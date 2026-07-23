@@ -642,9 +642,11 @@ async function renderStudent() {
         <button class="sec sm" id="find-free">🔎 Nächsten freien Termin</button>
         <button class="ghost sm" id="go-today">Heute</button>
       </div>
+      <div id="book-cal"></div>
       <div class="slots" id="slots"></div>
     </div>
   </main>`;
+  state.calMonth = firstOfMonth(state.date);
   const horizon = state.settings?.booking_horizon_days || 14;
   $('#horizon-note').textContent = `(bis ${horizon} Tage im Voraus)`;
   wireLogout();
@@ -680,7 +682,41 @@ async function syncStudent() {
     renderOffers(off.offers, mine.weekInfo);
     state.lastSlotStart = day.slots.length ? day.slots[day.slots.length - 1].start : null;
     renderSlots(day.slots, mine.bookings);
+    renderBookingCalendar();
   } catch (e) { toast(e.message, 'err'); }
+}
+
+// Monatskalender mit Ampel-Tagen: grün = frei, rot = ausgebucht, grau = zu/vorbei.
+async function renderBookingCalendar() {
+  const el = $('#book-cal'); if (!el) return;
+  if (!state.calMonth) state.calMonth = firstOfMonth(state.date);
+  const first = parseD(state.calMonth);
+  const y = first.getFullYear(), mo = first.getMonth();
+  const fromD = ymd(new Date(y, mo, 1)), toD = ymd(new Date(y, mo + 1, 0));
+  let days = [];
+  try { days = (await api(`/api/availability?from=${fromD}&to=${toD}`)).days; } catch { return; }
+  const map = {}; days.forEach((d) => map[d.date] = d);
+  const startDow = isoDow(fromD), inMonth = new Date(y, mo + 1, 0).getDate(), today = todayStr();
+  let cells = '';
+  for (let i = 1; i < startDow; i++) cells += '<span class="bcal-empty"></span>';
+  for (let dd = 1; dd <= inMonth; dd++) {
+    const ds = ymd(new Date(y, mo, dd));
+    const info = map[ds] || { state: 'closed', free: 0 };
+    const clickable = ['free', 'full', 'toofar'].includes(info.state);
+    const cls = ['bcal-day', info.state, ds === state.date ? 'sel' : '', ds === today ? 'today' : ''].filter(Boolean).join(' ');
+    cells += `<button class="${cls}" data-day="${ds}" ${clickable ? '' : 'disabled'}>
+      <span class="bc-num">${dd}</span>${info.state === 'free' ? `<span class="bc-free">${info.free} frei</span>` : ''}</button>`;
+  }
+  el.innerHTML = `<div class="bcal">
+    <div class="bcal-head">
+      <button class="sec sm" data-cmo="-1">‹</button><strong>${MON_LONG[mo]} ${y}</strong><button class="sec sm" data-cmo="1">›</button>
+    </div>
+    <div class="bcal-grid bcal-wd">${WD.map((w) => `<span>${w}</span>`).join('')}</div>
+    <div class="bcal-grid">${cells}</div>
+    <div class="bcal-legend"><span><i class="lg free"></i> frei</span><span><i class="lg full"></i> ausgebucht</span><span><i class="lg off"></i> zu / vorbei</span></div>
+  </div>`;
+  el.querySelectorAll('[data-day]').forEach((b) => b.onclick = () => { state.date = b.dataset.day; syncStudent(); const s = $('#slots'); if (s) s.scrollIntoView({ behavior: 'smooth', block: 'center' }); });
+  el.querySelectorAll('[data-cmo]').forEach((b) => b.onclick = () => { state.calMonth = addMonths(state.calMonth, Number(b.dataset.cmo)); renderBookingCalendar(); });
 }
 
 function greetWord() {

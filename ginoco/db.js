@@ -178,6 +178,8 @@ ensureColumn('bookings', 'started_at', 'started_at TEXT');   // Fahrstunden-Time
 // Buchungen als bestaetigt gelten – nur NEUE vom Fahrlehrer eingetragene Termine
 // starten als "reserviert" (0) und muessen vom Schueler bestaetigt werden.
 ensureColumn('bookings', 'confirmed', 'confirmed INTEGER NOT NULL DEFAULT 1');
+ensureColumn('bookings', 'ended_at', 'ended_at TEXT');       // Fahrstunde beendet (fürs Protokoll: von–bis)
+ensureColumn('bookings', 'feedback', 'feedback TEXT');       // Rückmeldung an den Schüler ("das haben wir gemacht")
 
 // Live-Standort des Fahrlehrers (genau eine Zeile)
 db.exec(`CREATE TABLE IF NOT EXISTS live_location (
