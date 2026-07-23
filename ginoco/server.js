@@ -15,7 +15,7 @@ const PUBLIC = join(__dirname, 'public');
 const PORT = Number(process.env.PORT || 3000);
 const HOST = process.env.HOST || '0.0.0.0'; // hinter Caddy: HOST=127.0.0.1 (nur Proxy erreicht Node)
 const SESSION_DAYS = 30;
-const APP_VERSION = "3.10.0";
+const APP_VERSION = "3.11.0";
 // Einstellungen, die Schueler/Oeffentlichkeit sehen duerfen (Rest bleibt beim Fahrlehrer)
 const PUBLIC_SETTINGS = ['instructor_name', 'instructor_phone', 'policy_text',
   'cancel_hours', 'lock_hours', 'booking_horizon_days', 'booking_horizon_days_rank2',
@@ -902,7 +902,7 @@ async function handleApi(req, res, url) {
     if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
     const archived = url.searchParams.get('scope') === 'archived';
     const rows = db.prepare(
-      `SELECT s.id,s.name,s.email,s.phone,s.username,s.birth_year,s.allowed_durations,s.created_at,
+      `SELECT s.id,s.name,s.first_name,s.last_name,s.email,s.phone,s.username,s.birth_year,s.allowed_durations,s.created_at,
         s.home_label,s.home_lat,s.home_lng,s.archived_at,s.notes,
         (s.photo IS NOT NULL) AS has_photo,
         (SELECT COUNT(*) FROM bookings b WHERE b.student_id=s.id AND b.status='done') AS done_count
@@ -918,12 +918,17 @@ async function handleApi(req, res, url) {
     if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
     const b = await readBody(req);
     const sid = Number(stm[1]);
-    // Stammdaten bearbeiten (Name / Telefon / E-Mail / Jahrgang / Notiz)
-    if ('name' in b || 'phone' in b || 'email' in b || 'birth_year' in b || 'notes' in b) {
+    // Stammdaten bearbeiten (Vorname/Nachname bzw. Name / Telefon / E-Mail / Jahrgang / Notiz)
+    if ('first_name' in b || 'last_name' in b || 'name' in b || 'phone' in b || 'email' in b || 'birth_year' in b || 'notes' in b) {
       const st = db.prepare('SELECT id FROM students WHERE id=?').get(sid);
       if (!st) return bad(res, 'Schueler nicht gefunden', 404);
       const fields = [], vals = [];
-      if ('name' in b) { const nm = String(b.name || '').trim(); if (!nm) return bad(res, 'Name darf nicht leer sein'); fields.push('name=?'); vals.push(nm); }
+      if ('first_name' in b || 'last_name' in b) {
+        const first = String(b.first_name || '').trim(), last = String(b.last_name || '').trim();
+        const nm = combineName(first, last);
+        if (!nm) return bad(res, 'Name darf nicht leer sein');
+        fields.push('first_name=?', 'last_name=?', 'name=?'); vals.push(first || null, last || null, nm);
+      } else if ('name' in b) { const nm = String(b.name || '').trim(); if (!nm) return bad(res, 'Name darf nicht leer sein'); const sp = splitName(nm); fields.push('name=?', 'first_name=?', 'last_name=?'); vals.push(nm, sp.first || null, sp.last || null); }
       if ('phone' in b) { fields.push('phone=?'); vals.push(b.phone ? String(b.phone).trim() : null); }
       if ('notes' in b) { fields.push('notes=?'); vals.push(b.notes ? String(b.notes).trim() : null); }
       if ('email' in b) {
@@ -973,8 +978,13 @@ async function handleApi(req, res, url) {
   if (p === '/api/students' && method === 'POST') {
     if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
     const b = await readBody(req);
-    const name = String(b.name || '').trim();
+    // Vorname/Nachname bevorzugt; sonst der kombinierte Name (Abwärtskompatibilität)
+    const hasParts = ('first_name' in b) || ('last_name' in b);
+    const first = String(b.first_name || '').trim();
+    const last = String(b.last_name || '').trim();
+    const name = (hasParts ? combineName(first, last) : String(b.name || '').trim());
     if (!name) return bad(res, 'Bitte einen Namen angeben');
+    const sp = hasParts ? { first, last } : splitName(name);
     const by = b.birth_year ? Number(b.birth_year) : null;
     const email = b.email ? String(b.email).trim() : null;
     const phone = b.phone ? String(b.phone).trim() : null;
@@ -990,8 +1000,8 @@ async function handleApi(req, res, url) {
     if (prob) return bad(res, 'Passwort braucht ' + prob + '.');
     const durs = Array.isArray(b.allowed_durations) ? b.allowed_durations : String(b.allowed_durations || '80').split(',');
     const clean = [...new Set(durs.map(Number).filter((n) => n > 0))].sort((a, z) => a - z);
-    const info = db.prepare('INSERT INTO students(name,email,phone,pass,username,birth_year,allowed_durations,created_at) VALUES(?,?,?,?,?,?,?,?)')
-      .run(name, email, phone, hashPassword(password), username, by, (clean.length ? clean : [80]).join(','), new Date().toISOString());
+    const info = db.prepare('INSERT INTO students(name,first_name,last_name,email,phone,pass,username,birth_year,allowed_durations,created_at) VALUES(?,?,?,?,?,?,?,?,?,?)')
+      .run(name, sp.first || null, sp.last || null, email, phone, hashPassword(password), username, by, (clean.length ? clean : [80]).join(','), new Date().toISOString());
     logEvent('info', { actor: 'instructor', studentId: Number(info.lastInsertRowid), detail: `Fahrschüler angelegt (${username})` });
     return ok(res, { id: Number(info.lastInsertRowid), name, username, password });
   }
@@ -1010,17 +1020,19 @@ async function handleApi(req, res, url) {
         let rest = line, by = null;
         const ym = rest.match(/(?:^|[\s,;])((?:19|20)\d{2})\s*$/);
         if (ym) { by = Number(ym[1]); rest = rest.slice(0, ym.index).trim().replace(/[;,]\s*$/, ''); }
-        let name = rest;
+        let name = rest, first = '', last = '';
         if (rest.includes(',')) {
-          const [last, first] = rest.split(',');
-          name = `${(first || '').trim()} ${(last || '').trim()}`.trim();
+          const parts = rest.split(',');
+          last = (parts[0] || '').trim(); first = (parts[1] || '').trim();
+          name = `${first} ${last}`.trim();
         }
         name = name.replace(/\s+/g, ' ').trim();
         if (!name) { errors.push({ line, error: 'kein Name' }); continue; }
+        if (!first && !last) { const sp = splitName(name); first = sp.first; last = sp.last; }
         const username = genUsername(name, by);
         const password = genStudentPassword();
-        const info = db.prepare('INSERT INTO students(name,pass,username,birth_year,allowed_durations,created_at) VALUES(?,?,?,?,?,?)')
-          .run(name, hashPassword(password), username, by, '80', new Date().toISOString());
+        const info = db.prepare('INSERT INTO students(name,first_name,last_name,pass,username,birth_year,allowed_durations,created_at) VALUES(?,?,?,?,?,?,?,?)')
+          .run(name, first || null, last || null, hashPassword(password), username, by, '80', new Date().toISOString());
         logEvent('info', { actor: 'instructor', studentId: Number(info.lastInsertRowid), detail: `Fahrschüler angelegt (${username})` });
         created.push({ name, username, password });
       } catch (e) { errors.push({ line, error: e.message }); }
@@ -1209,6 +1221,16 @@ function genStudentPassword() {
 }
 
 // Login-Handle aus Initialen + Jahrgang, z.B. "Max Mustermann" 1997 -> "MM1997"
+// Vor-/Nachname zu einem Anzeigenamen zusammensetzen
+function combineName(first, last) {
+  return [String(first || '').trim(), String(last || '').trim()].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
+}
+// Fallback: kombinierten Namen in Vor-/Nachname zerlegen (letztes Wort = Nachname)
+function splitName(name) {
+  const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
+  if (parts.length <= 1) return { first: parts[0] || '', last: '' };
+  return { first: parts.slice(0, -1).join(' '), last: parts[parts.length - 1] };
+}
 function genUsername(name, year) {
   const parts = name.split(/\s+/).filter(Boolean);
   const clean = (ch) => (ch || '').replace(/[^A-Za-zÄÖÜäöü]/g, '').toUpperCase();

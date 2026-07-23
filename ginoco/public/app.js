@@ -1970,7 +1970,10 @@ async function tabSchueler(scope) {
 function openCreateStudentModal() {
   modal(`<h3>Fahrschüler anlegen</h3>
     ${errBox()}
-    <div class="field"><label>Name *</label><input id="cs-name" placeholder="Vor- und Nachname" autocomplete="off"></div>
+    <div class="row">
+      <div class="field"><label>Vorname *</label><input id="cs-first" placeholder="z.B. Maria" autocomplete="off"></div>
+      <div class="field"><label>Nachname *</label><input id="cs-last" placeholder="z.B. Bieber" autocomplete="off"></div>
+    </div>
     <div class="row">
       <div class="field" style="max-width:130px"><label>Jahrgang (optional)</label><input id="cs-year" type="number" placeholder="1997" min="1930" max="2015"></div>
       <div class="field"><label>Telefon (optional)</label><input id="cs-phone" placeholder="0151 …"></div>
@@ -1983,10 +1986,10 @@ function openCreateStudentModal() {
       <button id="cs-go">Anlegen</button>
     </div>`);
   $('#cs-go').onclick = async () => {
-    const name = $('#cs-name').value.trim();
-    if (!name) { showErr('Bitte einen Namen eingeben.'); return; }
+    const first = $('#cs-first').value.trim(), last = $('#cs-last').value.trim();
+    if (!first || !last) { showErr('Bitte Vor- und Nachname eingeben.'); return; }
     const durs = [...document.querySelectorAll('.cs-dur')].filter((c) => c.checked).map((c) => Number(c.value));
-    const body = { name, birth_year: $('#cs-year').value || undefined, phone: $('#cs-phone').value || undefined,
+    const body = { first_name: first, last_name: last, birth_year: $('#cs-year').value || undefined, phone: $('#cs-phone').value || undefined,
       username: $('#cs-user').value.trim() || undefined, allowed_durations: durs.length ? durs : [80] };
     try {
       const r = await api('/api/students', { method: 'POST', body });
@@ -2042,9 +2045,15 @@ function showBulkResults(r) {
 // Stammdaten bearbeiten
 function openEditStudentModal(s) {
   if (!s) return;
+  // Vorname/Nachname aus den Feldern; Fallback: kombinierten Namen zerlegen (letztes Wort = Nachname)
+  let first = s.first_name || '', last = s.last_name || '';
+  if (!first && !last) { const parts = String(s.name || '').trim().split(/\s+/); last = parts.length > 1 ? parts.pop() : ''; first = parts.join(' '); }
   modal(`<h3>${esc(s.name)} bearbeiten</h3>
     ${errBox()}
-    <div class="field"><label>Name</label><input id="es-name" value="${esc(s.name)}"></div>
+    <div class="row">
+      <div class="field"><label>Vorname</label><input id="es-first" value="${esc(first)}"></div>
+      <div class="field"><label>Nachname</label><input id="es-last" value="${esc(last)}"></div>
+    </div>
     <div class="row">
       <div class="field" style="max-width:130px"><label>Jahrgang</label><input id="es-year" type="number" value="${s.birth_year || ''}" min="1930" max="2015"></div>
       <div class="field"><label>Telefon</label><input id="es-phone" value="${esc(s.phone || '')}"></div>
@@ -2059,7 +2068,8 @@ function openEditStudentModal(s) {
   $('#es-go').onclick = async () => {
     try {
       await api('/api/students/' + s.id, { method: 'PATCH', body: {
-        name: $('#es-name').value, birth_year: $('#es-year').value || null,
+        first_name: $('#es-first').value, last_name: $('#es-last').value,
+        birth_year: $('#es-year').value || null,
         phone: $('#es-phone').value || null, email: $('#es-email').value || null,
         notes: $('#es-notes').value || null } });
       closeModal(); toast('Gespeichert ✓', 'ok'); tabSchueler();

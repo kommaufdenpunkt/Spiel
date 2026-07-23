@@ -152,6 +152,8 @@ ensureColumn('students', 'archived_at', 'archived_at TEXT');   // gesetzt = best
 ensureColumn('students', 'notes', 'notes TEXT');               // Karteikarte / Notizen des Fahrlehrers
 ensureColumn('students', 'training', 'training TEXT');         // Ausbildungsdiagrammkarte (JSON: abgehakte Punkte)
 ensureColumn('students', 'photo', 'photo TEXT');               // Profilfoto (data-URL, vom Schueler selbst hochgeladen; nur fuer den Fahrlehrer sichtbar)
+ensureColumn('students', 'first_name', 'first_name TEXT');     // Vorname (getrennt gepflegt; name bleibt der kombinierte Anzeigename)
+ensureColumn('students', 'last_name', 'last_name TEXT');       // Nachname
 
 // Absagen ("keine Zeit") auf ein Uebernahme-Angebot
 db.exec(`CREATE TABLE IF NOT EXISTS offer_declines (
