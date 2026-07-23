@@ -483,10 +483,20 @@ function mountEdgeMenus(role) {
     state.instrTab = b.dataset.nav; close(); drawInstrTab();
     root.querySelectorAll('[data-nav]').forEach((x) => x.classList.toggle('active', x === b));
   });
+  // Leere Bereiche (Feed/Mitteilungen) nicht mit Fehler abweisen, sondern
+  // freundlich mit Leer-Zustand zeigen. Beim nächsten Sync werden sie – falls
+  // weiterhin leer – wieder ausgeblendet.
+  const EMPTY_SECTION = {
+    'offers-card': '<h2>🎁 Feed</h2><p class="muted">Gerade gibt niemand eine Fahrstunde ab. Schau später wieder rein – hier erscheinen freie Stunden, die du übernehmen kannst.</p>',
+    'notif-card': '<h2>🔔 Mitteilungen</h2><p class="muted">Keine neuen Mitteilungen. Hier landen z.B. neue Termine, Verschiebungen oder Angebote.</p>',
+    'lesson-card': '<h2>🚗 Deine Fahrstunde</h2><p class="muted">Rund um deine nächste Fahrstunde erscheint hier der Start-Knopf und der Fahrzeit-Timer.</p>',
+    'live-card': '<h2>📍 Treffpunkt</h2><p class="muted">Kurz vor deiner Fahrstunde siehst du hier den Treffpunkt und wo dein Fahrlehrer gerade ist.</p>',
+  };
   root.querySelectorAll('[data-scroll]').forEach((b) => b.onclick = () => {
-    close(); const el = document.getElementById(b.dataset.scroll);
-    if (el && !el.classList.contains('hidden')) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    else toast('Dieser Bereich ist gerade nicht verfügbar', 'err');
+    close(); const id = b.dataset.scroll; const el = document.getElementById(id);
+    if (!el) { toast('Dieser Bereich ist gerade nicht verfügbar', 'err'); return; }
+    if (el.classList.contains('hidden') && EMPTY_SECTION[id]) { el.innerHTML = EMPTY_SECTION[id]; el.classList.remove('hidden'); }
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
   root.querySelectorAll('[data-act]').forEach((b) => b.onclick = async () => {
     close(); const a = b.dataset.act;
