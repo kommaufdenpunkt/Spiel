@@ -154,6 +154,10 @@ ensureColumn('students', 'training', 'training TEXT');         // Ausbildungsdia
 ensureColumn('students', 'photo', 'photo TEXT');               // Profilfoto (data-URL, vom Schueler selbst hochgeladen; nur fuer den Fahrlehrer sichtbar)
 ensureColumn('students', 'first_name', 'first_name TEXT');     // Vorname (getrennt gepflegt; name bleibt der kombinierte Anzeigename)
 ensureColumn('students', 'last_name', 'last_name TEXT');       // Nachname
+ensureColumn('students', 'live_lat', 'live_lat REAL');         // Live-Standort des Schülers (nur im Abhol-Fenster, auf Tipp)
+ensureColumn('students', 'live_lng', 'live_lng REAL');
+ensureColumn('students', 'live_at', 'live_at TEXT');
+ensureColumn('students', 'live_active', 'live_active INTEGER NOT NULL DEFAULT 0');
 
 // Absagen ("keine Zeit") auf ein Uebernahme-Angebot
 db.exec(`CREATE TABLE IF NOT EXISTS offer_declines (

@@ -161,6 +161,20 @@ window.__openThemePicker = openThemePicker;
 function initials(name) {
   return String(name || '').trim().split(/\s+/).map((w) => w[0]).slice(0, 2).join('').toUpperCase() || '🙂';
 }
+// Durchsuchbare Fahrschüler-Auswahl (tippen -> Vorschläge / Auto-Fill) statt langer Dropdowns.
+function studentPicker(id, students, { placeholder = 'Name tippen …', style = '' } = {}) {
+  const listId = id + '-dl';
+  return `<input id="${id}" list="${listId}" placeholder="${esc(placeholder)}" autocomplete="off" style="${style}">
+    <datalist id="${listId}">${students.map((s) => `<option value="${esc(s.name)}"></option>`).join('')}</datalist>`;
+}
+function resolveStudentId(el, students) {
+  const v = String((el && el.value) || '').trim().toLowerCase();
+  if (!v) return '';
+  let hit = students.find((s) => String(s.name || '').toLowerCase() === v)
+    || students.find((s) => String(s.username || '').toLowerCase() === v);
+  if (!hit) { const m = students.filter((s) => String(s.name || '').toLowerCase().includes(v)); if (m.length === 1) hit = m[0]; }
+  return hit ? String(hit.id) : '';
+}
 // Bild vor dem Hochladen im Browser verkleinern (spart Speicher & Datenvolumen)
 function fileToResizedDataUrl(file, maxPx = 400, quality = 0.82) {
   return new Promise((resolve, reject) => {
@@ -1823,10 +1837,8 @@ async function openAddBooking() {
       <div class="field"><label>Uhrzeit</label><input id="a-time" value="${s.start_time || '12:00'}" placeholder="HH:MM"></div>
       <div class="field"><label>Dauer (Min)</label><input id="a-dur" type="number" value="${s.lesson_min}" step="5" min="10"></div>
     </div>
-    <div class="field"><label>Fahrschüler (optional)</label>
-      <select id="a-student"><option value="">– kein Schüler / Sonstiges –</option>
-        ${students.map((st) => `<option value="${st.id}">${esc(st.name)}</option>`).join('')}
-      </select></div>
+    <div class="field"><label>Fahrschüler (optional – Namen tippen)</label>
+      ${studentPicker('a-student', students, { placeholder: '🔍 Schüler suchen … (leer = Sonstiges)' })}</div>
     <div class="field"><label>Titel (falls kein Schüler)</label><input id="a-title" placeholder="z.B. Prüfung, Sonderfahrt"></div>
     <div class="actions">
       <button class="sec" onclick="window.__closeModal()">Abbrechen</button>
@@ -1836,7 +1848,7 @@ async function openAddBooking() {
     try {
       await api('/api/bookings', { method: 'POST', body: {
         date: $('#a-date').value, start_time: $('#a-time').value, duration_min: Number($('#a-dur').value),
-        student_id: $('#a-student').value || null, title: $('#a-title').value } });
+        student_id: resolveStudentId($('#a-student'), students) || null, title: $('#a-title').value } });
       closeModal(); toast('Termin angelegt ✓', 'ok');
       state.date = $('#a-date').value; if (state.instrTab === 'kalender') loadK(); else drawInstrTab();
     } catch (e) { toast(e.message, 'err'); }
@@ -2503,11 +2515,11 @@ async function tabProtokoll() {
   const box = $('#itab');
   let students = [];
   try { students = (await api('/api/students')).students; } catch {}
+  state._students = students;
   box.innerHTML = `<div class="card">
     <h2>Protokoll <span class="sub">alle Vorgänge – für deine Unterlagen</span></h2>
     <div class="inline" style="margin-bottom:1rem">
-      <select id="pr-student" style="max-width:220px"><option value="">Alle Fahrschüler</option>
-        ${students.map((s) => `<option value="${s.id}">${esc(s.name)}</option>`).join('')}</select>
+      ${studentPicker('pr-student', students, { placeholder: '🔍 Alle Fahrschüler – oder Namen tippen', style: 'max-width:240px' })}
       <input type="date" id="pr-from" style="max-width:160px">
       <input type="date" id="pr-to" style="max-width:160px">
       <button class="sec sm" id="pr-go">Filtern</button>
@@ -2523,7 +2535,8 @@ async function tabProtokoll() {
 }
 async function loadProtokoll() {
   const q = new URLSearchParams();
-  if ($('#pr-student').value) q.set('student_id', $('#pr-student').value);
+  const sid = resolveStudentId($('#pr-student'), state._students || []);
+  if (sid) q.set('student_id', sid);
   if ($('#pr-from').value) q.set('from', $('#pr-from').value);
   if ($('#pr-to').value) q.set('to', $('#pr-to').value);
   try {
@@ -2547,7 +2560,8 @@ async function loadProtokoll() {
 
 async function exportProtokollCSV() {
   const q = new URLSearchParams();
-  if ($('#pr-student').value) q.set('student_id', $('#pr-student').value);
+  const sid = resolveStudentId($('#pr-student'), state._students || []);
+  if (sid) q.set('student_id', sid);
   if ($('#pr-from').value) q.set('from', $('#pr-from').value);
   if ($('#pr-to').value) q.set('to', $('#pr-to').value);
   try {
