@@ -135,6 +135,19 @@ main{max-width:1080px;margin:0 auto;padding:1.4rem 1.2rem 4rem}
 .daypick{display:flex;flex-wrap:wrap;gap:.35rem}
 .ck-line{display:flex;align-items:flex-start;gap:.5rem;font-size:.9rem;font-weight:600;color:var(--ink);margin:0;cursor:pointer}
 .ck-line input{width:auto;flex:0 0 auto;margin-top:.15rem}
+/* ---- Live-Abholung: großer "Wann rausgehen?"-Banner + Verkehr-Knopf ---- */
+.live-hero{display:flex;align-items:center;gap:.8rem;background:var(--card2);border:1px solid var(--line);
+  border-radius:12px;padding:.75rem .9rem;margin:.2rem 0 .7rem}
+.live-hero.go{background:var(--good-bg);border-color:rgba(53,192,125,.5);animation:hero-pulse 1.4s ease-in-out infinite}
+@keyframes hero-pulse{0%,100%{box-shadow:0 0 0 0 rgba(53,192,125,.35)}50%{box-shadow:0 0 0 8px rgba(53,192,125,0)}}
+.lh-ic{font-size:2rem;flex:0 0 auto}
+.lh-big{font-size:1.15rem;font-weight:800;color:var(--ink);line-height:1.15}
+.live-hero.go .lh-big{color:var(--good)}
+.lh-sub{font-size:.82rem;color:var(--muted);margin-top:.1rem}
+.live-traffic-btn{display:flex;align-items:center;justify-content:center;gap:.4rem;margin-top:.6rem;
+  padding:.7rem;border-radius:11px;background:linear-gradient(135deg,#35c07d,#2aa568);color:#fff;
+  font-weight:700;text-decoration:none;font-size:.95rem}
+.live-traffic-btn:hover{filter:brightness(1.06)}
 
 /* ---- Slots ---- */
 .dateline{display:flex;align-items:center;gap:.6rem;margin-bottom:1rem;flex-wrap:wrap}

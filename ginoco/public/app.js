@@ -1071,24 +1071,28 @@ async function refreshStudentLive() {
     const loc = d.location;
     const dd = 0.008, bbox = [loc.lng - dd, loc.lat - dd, loc.lng + dd, loc.lat + dd].join(',');
     const mapSrc = `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${loc.lat},${loc.lng}`;
-    const route = d.meet?.lat != null
-      ? `https://www.google.com/maps/dir/?api=1&origin=${loc.lat},${loc.lng}&destination=${d.meet.lat},${d.meet.lng}`
+    // Google Maps-Route zeigt echten Live-Verkehr + genaue Ankunftszeit
+    const traffic = d.meet?.lat != null
+      ? `https://www.google.com/maps/dir/?api=1&origin=${loc.lat},${loc.lng}&destination=${d.meet.lat},${d.meet.lng}&travelmode=driving`
       : `https://www.google.com/maps/search/?api=1&query=${loc.lat},${loc.lng}`;
     const upd = new Date(loc.updated_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+    // "Wann rausgehen?" – Ansage des Fahrlehrers hat Vorrang, sonst GPS-Schätzung
+    const etaShown = d.announce ? d.announce.remaining : d.etaMin;
+    const soon = etaShown != null && etaShown <= 2;
+    const hero = soon
+      ? `<div class="live-hero go"><span class="lh-ic">🚶</span><div><div class="lh-big">Jetzt rausgehen!</div><div class="lh-sub">Dein Fahrlehrer ist gleich da</div></div></div>`
+      : `<div class="live-hero"><span class="lh-ic">🚗</span><div><div class="lh-big">${etaShown != null ? `in ~${etaShown} Min da` : 'ist unterwegs'}</div><div class="lh-sub">Noch entspannt warten – wir sagen Bescheid</div></div></div>`;
     card.innerHTML = `<h2>🛰️ Dein Fahrlehrer ist unterwegs</h2>
-      ${announce}
+      ${hero}
       <div class="inline" style="margin-bottom:.6rem">
-        ${d.etaMin != null ? `<span class="pill" style="background:var(--good-bg);color:var(--good);font-size:.95rem">🚗 ca. ${d.etaMin} Min</span>` : ''}
-        ${d.distanceKm != null ? `<span class="pill">${d.distanceKm < 1 ? Math.round(d.distanceKm * 1000) + ' m' : d.distanceKm.toFixed(1) + ' km'} entfernt</span>` : ''}
+        ${d.distanceKm != null ? `<span class="pill">${d.distanceKm < 1 ? Math.round(d.distanceKm * 1000) + ' m' : d.distanceKm.toFixed(1) + ' km'} Luftlinie</span>` : ''}
         <span class="pill">aktualisiert ${upd}</span>
       </div>
-      <iframe title="Karte" src="${mapSrc}" style="width:100%;height:300px;border:1px solid var(--line);border-radius:10px" loading="lazy"></iframe>
-      <div class="inline" style="margin-top:.6rem">
-        ${d.meet?.label ? `<span class="pill">📍 ${esc(d.meet.label)}</span>` : ''}
-        <a class="pill" href="${route}" target="_blank" rel="noopener" style="text-decoration:none;background:var(--brand);color:#fff">🧭 Route öffnen</a>
-      </div>
+      <iframe title="Karte" src="${mapSrc}" style="width:100%;height:280px;border:1px solid var(--line);border-radius:10px" loading="lazy"></iframe>
+      <a class="live-traffic-btn" href="${traffic}" target="_blank" rel="noopener">🚦 Live-Verkehr & genaue Ankunft in Google Maps</a>
+      ${d.meet?.label ? `<div class="inline" style="margin-top:.5rem"><span class="pill">📍 Treffpunkt: ${esc(d.meet.label)}</span></div>` : ''}
       ${pickupControls}
-      <p class="hint" style="margin-top:.4rem">Entfernung ist Luftlinie, ETA eine Schätzung.</p>${contact}`;
+      <p class="hint" style="margin-top:.4rem">Karte zeigt die aktuelle Position (Luftlinie). Für Verkehr & präzise Ankunftszeit den grünen Knopf tippen.</p>${contact}`;
   }
   const pe = $('#pk-edit'); if (pe) pe.onclick = () => openPickupModal(d.meet?.label);
   const ms = $('#my-share'); if (ms) ms.onclick = () => startMyShare();
