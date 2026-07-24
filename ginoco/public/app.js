@@ -2040,15 +2040,15 @@ async function openAddBooking() {
   try { students = (await api('/api/students')).students; } catch {}
   const s = state.settings;
   modal(`<h3>Eigenen Termin anlegen</h3>
-    <p class="hint">Als Fahrlehrer kannst du frei buchen (z.B. für einen Schüler eintragen oder eine Sonderstunde).</p>
+    <p class="hint">Frei buchen – für einen Fahrschüler oder als Sondertermin (z.B. Prüfung).</p>
     <div class="field"><label>Datum</label><input type="date" id="a-date" value="${state.date}"></div>
     <div class="row">
       <div class="field"><label>Uhrzeit</label><input id="a-time" value="${s.start_time || '12:00'}" placeholder="HH:MM"></div>
       <div class="field"><label>Dauer (Min)</label><input id="a-dur" type="number" value="${s.lesson_min}" step="5" min="10"></div>
     </div>
-    <div class="field"><label>Fahrschüler (optional – Namen tippen)</label>
-      ${studentPicker('a-student', students, { placeholder: '🔍 Schüler suchen … (leer = Sonstiges)' })}</div>
-    <div class="field"><label>Titel (falls kein Schüler)</label><input id="a-title" placeholder="z.B. Prüfung, Sonderfahrt"></div>
+    <div class="field"><label>Fahrschüler <span class="muted" style="font-weight:400">(optional)</span></label>
+      ${studentPicker('a-student', students, { placeholder: '🔍 Namen tippen …' })}</div>
+    <div class="field" style="margin-bottom:0"><label>Titel <span class="muted" style="font-weight:400">(wenn kein Fahrschüler)</span></label><input id="a-title" placeholder="z.B. Prüfung, Sonderfahrt"></div>
     <div class="actions">
       <button class="sec" onclick="window.__closeModal()">Abbrechen</button>
       <button id="a-save">Anlegen</button>

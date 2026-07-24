@@ -206,7 +206,7 @@ th{color:var(--muted);font-weight:600;font-size:.78rem;text-transform:uppercase;
 .modal h3{margin:0 0 1rem}
 /* Aktionsleiste bleibt am unteren Rand sichtbar – auch bei langen Dialogen am Handy */
 .modal .actions{display:flex;gap:.6rem;justify-content:flex-end;position:sticky;bottom:0;
-  margin:1.2rem -1.4rem -1.4rem;padding:.85rem 1.4rem;background:var(--card);border-top:1px solid var(--line)}
+  margin:1.6rem -1.4rem -1.4rem;padding:1rem 1.4rem;background:var(--card);border-top:1px solid var(--line)}
 .modal .warnbox{background:var(--warn-bg);border:1px solid rgba(230,178,58,.3);color:#f0d089;
   padding:.7rem .9rem;border-radius:10px;font-size:.86rem;margin-bottom:.4rem}
 
