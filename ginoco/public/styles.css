@@ -238,6 +238,20 @@ th{color:var(--muted);font-weight:600;font-size:.78rem;text-transform:uppercase;
 .seg button.active{background:linear-gradient(var(--brand),var(--brand-dark));border-color:var(--brand)}
 .seg button.active .seg-lb,.seg button.active .seg-sub{color:#fff}
 
+/* ---- Mini-Kalender: mehrere Tage antippen (Frei/Urlaub) ---- */
+.minical{background:var(--card2);border:1px solid var(--line);border-radius:14px;padding:.7rem}
+.mc-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem;font-size:.98rem}
+.mc-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:.32rem}
+.mc-wd{margin-bottom:.28rem}
+.mc-wd span{text-align:center;font-size:.7rem;color:var(--muted);font-weight:700}
+.mc-empty{aspect-ratio:1}
+.mc-day{aspect-ratio:1;display:flex;align-items:center;justify-content:center;border-radius:11px;
+  border:1px solid var(--line);background:var(--card);color:var(--ink);font-weight:700;font-size:1rem;padding:0;min-height:42px}
+.mc-day.today{box-shadow:inset 0 0 0 2px var(--brand)}
+.mc-day.sel{background:linear-gradient(var(--brand),var(--brand-dark));border-color:var(--brand);color:#fff}
+.mc-day:disabled{color:var(--muted);opacity:.32;cursor:default}
+.mc-day:not(:disabled):active{transform:scale(.94)}
+
 /* ---- Buchungs-Kalender (Ampel: grün frei / rot ausgebucht) ---- */
 .bcal{background:var(--card2);border:1px solid var(--line);border-radius:14px;padding:.7rem;margin:.2rem 0 1rem}
 .bcal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem;font-size:.98rem}

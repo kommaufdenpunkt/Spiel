@@ -2457,6 +2457,8 @@ async function tabArbeitszeiten() {
   const s = state.settings;
   const box = $('#itab');
   state.wType = state.wType || 'short';
+  state.wMonth = firstOfMonth(state.date);
+  state.wSelected = new Set();
   box.innerHTML = `<div class="card">
     <h2>Arbeitszeiten & Dienstplan <span class="sub">Resturlaub: ${s.vacation_days_left ?? '–'} Tage</span></h2>
     <p class="hint">Trag ein, wenn ein Tag anders läuft – die buchbaren Zeiten passen sich für die Schüler automatisch an.</p>
@@ -2465,57 +2467,92 @@ async function tabArbeitszeiten() {
       ${WTYPES.map(([t, ic, lb, sub]) => `<button data-t="${t}" class="${state.wType === t ? 'active' : ''}">
         <span class="seg-ic">${ic}</span><span class="seg-lb">${lb}</span><span class="seg-sub">${sub}</span></button>`).join('')}
     </div>
-    <div class="row">
-      <div class="field"><label>Datum</label><input type="date" id="w-date" value="${state.date}"></div>
-      <div class="field" id="w-tofield"><label>bis (optional)</label><input type="date" id="w-dateto"></div>
+    <div id="w-single">
+      <div class="row"><div class="field"><label>Datum</label><input type="date" id="w-date" value="${state.date}"></div></div>
+      <div class="row" id="w-times">
+        <div class="field"><label>Arbeitsbeginn</label><input id="w-start" value="${s.start_time}"></div>
+        <div class="field"><label>Letzter Slot</label><input id="w-last" value="${s.short_day_last_start || '13:35'}"></div>
+      </div>
     </div>
-    <div class="row" id="w-times">
-      <div class="field"><label>Arbeitsbeginn</label><input id="w-start" value="${s.start_time}"></div>
-      <div class="field"><label>Letzter Slot</label><input id="w-last" value="${s.short_day_last_start || '13:35'}"></div>
+    <div id="w-multi" class="hidden">
+      <p class="hint" style="margin:.1rem 0 .5rem">Tippe die Tage an – auch mehrere. Nochmal tippen hebt die Auswahl auf.</p>
+      <div id="w-cal"></div>
+      <div id="w-selinfo" style="margin:.5rem 0 0"></div>
     </div>
-    <div class="inline" style="margin:.2rem 0 1rem"><button id="w-add">Eintragen</button>
+    <div class="inline" style="margin:.6rem 0 1rem"><button id="w-add">Eintragen</button>
       <span class="hint" style="margin:0" id="w-preview"></span></div>
     <div id="w-list"></div>
   </div>`;
-  const times = $('#w-times'), toField = $('#w-tofield');
-  const sync = () => {
-    const t = state.wType;
-    times.style.display = t === 'short' ? 'flex' : 'none';
-    toField.style.display = t === 'short' ? 'none' : 'block'; // Zeitraum v.a. für Frei/Urlaub
-    if (t === 'short') { $('#w-start').value = s.start_time; $('#w-last').value = s.short_day_last_start || '13:35'; }
-    updateWPreview();
+  const single = $('#w-single'), multi = $('#w-multi');
+  const updateSel = () => {
+    const n = state.wSelected.size;
+    $('#w-selinfo').innerHTML = n
+      ? `<span class="pill" style="background:var(--good-bg);color:var(--good)">${n} Tag${n === 1 ? '' : 'e'} gewählt</span> <button class="ghost sm" id="w-clear">leeren</button>`
+      : '<span class="muted" style="font-size:.85rem">Noch keine Tage gewählt.</span>';
+    const c = $('#w-clear'); if (c) c.onclick = () => { state.wSelected.clear(); drawWorkCal(); updateWPreview(); };
+  };
+  const drawWorkCal = () => {
+    const first = parseD(state.wMonth), y = first.getFullYear(), mo = first.getMonth();
+    const startDow = isoDow(ymd(new Date(y, mo, 1))), inMonth = new Date(y, mo + 1, 0).getDate(), today = todayStr();
+    let cells = '';
+    for (let i = 1; i < startDow; i++) cells += '<span class="mc-empty"></span>';
+    for (let d = 1; d <= inMonth; d++) {
+      const ds = ymd(new Date(y, mo, d)), past = ds < today, sel = state.wSelected.has(ds);
+      cells += `<button class="mc-day${sel ? ' sel' : ''}${ds === today ? ' today' : ''}" data-day="${ds}" ${past ? 'disabled' : ''}>${d}</button>`;
+    }
+    $('#w-cal').innerHTML = `<div class="minical">
+      <div class="mc-head"><button class="sec sm" data-wmo="-1">‹</button><strong>${MON_LONG[mo]} ${y}</strong><button class="sec sm" data-wmo="1">›</button></div>
+      <div class="mc-grid mc-wd">${WD.map((w) => `<span>${w}</span>`).join('')}</div>
+      <div class="mc-grid">${cells}</div></div>`;
+    $('#w-cal').querySelectorAll('[data-day]').forEach((el) => el.onclick = () => {
+      const d = el.dataset.day;
+      if (state.wSelected.has(d)) state.wSelected.delete(d); else state.wSelected.add(d);
+      el.classList.toggle('sel'); updateSel(); updateWPreview();
+    });
+    $('#w-cal').querySelectorAll('[data-wmo]').forEach((el) => el.onclick = () => { state.wMonth = addMonths(state.wMonth, Number(el.dataset.wmo)); drawWorkCal(); });
+    updateSel();
   };
   const updateWPreview = () => {
-    const t = state.wType, to = $('#w-dateto').value;
-    const range = to && to > $('#w-date').value ? ` (${fmtShort($('#w-date').value)}–${fmtShort(to)})` : '';
-    if (t === 'free') { $('#w-preview').textContent = 'Ganzer Tag frei – keine Slots' + range + '.'; return; }
-    if (t === 'vacation') { $('#w-preview').textContent = `Urlaub${range} – je ${s.vacation_credit_min} Min Arbeitszeit.`; return; }
-    const step = s.lesson_min + s.break_min;
-    const toM = (x) => { const [h, m] = x.split(':').map(Number); return h * 60 + m; };
-    const list = [];
-    for (let x = toM($('#w-start').value); x <= toM($('#w-last').value); x += step) list.push(`${String(Math.floor(x / 60)).padStart(2, '0')}:${String(x % 60).padStart(2, '0')}`);
-    $('#w-preview').textContent = `${list.length} Slots: ${list.join(', ') || '–'}`;
+    const t = state.wType;
+    if (t === 'short') {
+      const step = s.lesson_min + s.break_min, toM = (x) => { const [h, m] = x.split(':').map(Number); return h * 60 + m; };
+      const list = [];
+      for (let x = toM($('#w-start').value); x <= toM($('#w-last').value); x += step) list.push(`${String(Math.floor(x / 60)).padStart(2, '0')}:${String(x % 60).padStart(2, '0')}`);
+      $('#w-preview').textContent = `${list.length} Slots: ${list.join(', ') || '–'}`;
+    } else {
+      const n = state.wSelected.size;
+      $('#w-preview').textContent = n ? `${t === 'vacation' ? 'Urlaub' : 'Frei'}: ${n} Tag${n === 1 ? '' : 'e'}${t === 'vacation' ? ` · je ${s.vacation_credit_min} Min` : ''}` : '';
+    }
+  };
+  const sync = () => {
+    const t = state.wType;
+    single.classList.toggle('hidden', t !== 'short');
+    multi.classList.toggle('hidden', t === 'short');
+    if (t === 'short') { $('#w-start').value = s.start_time; $('#w-last').value = s.short_day_last_start || '13:35'; }
+    else drawWorkCal();
+    updateWPreview();
   };
   $('#w-seg').querySelectorAll('[data-t]').forEach((b) => b.onclick = () => {
     state.wType = b.dataset.t;
     $('#w-seg').querySelectorAll('[data-t]').forEach((x) => x.classList.toggle('active', x === b));
     sync();
   });
-  ['w-start', 'w-last', 'w-date', 'w-dateto'].forEach((id) => $('#' + id).oninput = updateWPreview);
+  ['w-start', 'w-last', 'w-date'].forEach((id) => $('#' + id).oninput = updateWPreview);
   sync();
   $('#w-add').onclick = async () => {
     const t = state.wType;
-    const body = { date: $('#w-date').value, type: t };
-    if (t !== 'short' && $('#w-dateto').value && $('#w-dateto').value > $('#w-date').value) body.date_to = $('#w-dateto').value;
-    if (t === 'short') { body.start_time = $('#w-start').value; body.last_start = $('#w-last').value; }
+    let body;
+    if (t === 'short') { body = { date: $('#w-date').value, type: 'short', start_time: $('#w-start').value, last_start: $('#w-last').value }; }
+    else {
+      if (!state.wSelected.size) { toast('Bitte erst Tage antippen', 'err'); return; }
+      body = { type: t, dates: [...state.wSelected] };
+    }
     const send = async (force) => api('/api/day-overrides', { method: 'POST', body: force ? { ...body, force: true } : body });
-    try {
-      const r = await send(false);
-      toast(`Eingetragen ✓${r.days > 1 ? ` (${r.days} Tage)` : ''}`, 'ok'); loadOverrides();
-    } catch (e) {
+    const done = (r) => { toast(`Eingetragen ✓${r.days > 1 ? ` (${r.days} Tage)` : ''}`, 'ok'); state.wSelected.clear(); loadOverrides(); if (t !== 'short') drawWorkCal(); updateWPreview(); };
+    try { done(await send(false)); }
+    catch (e) {
       if (/schon .* Termin/.test(e.message) && confirm(e.message + '\n\nTrotzdem eintragen?')) {
-        try { const r = await send(true); toast(`Eingetragen ✓${r.days > 1 ? ` (${r.days} Tage)` : ''}`, 'ok'); loadOverrides(); }
-        catch (e2) { toast(e2.message, 'err'); }
+        try { done(await send(true)); } catch (e2) { toast(e2.message, 'err'); }
       } else { toast(e.message, 'err'); }
     }
   };
