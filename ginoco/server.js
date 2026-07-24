@@ -15,7 +15,7 @@ const PUBLIC = join(__dirname, 'public');
 const PORT = Number(process.env.PORT || 3000);
 const HOST = process.env.HOST || '0.0.0.0'; // hinter Caddy: HOST=127.0.0.1 (nur Proxy erreicht Node)
 const SESSION_DAYS = 30;
-const APP_VERSION = "3.14.0";
+const APP_VERSION = "3.15.0";
 // Einstellungen, die Schueler/Oeffentlichkeit sehen duerfen (Rest bleibt beim Fahrlehrer)
 const PUBLIC_SETTINGS = ['instructor_name', 'instructor_phone', 'policy_text',
   'cancel_hours', 'lock_hours', 'booking_horizon_days', 'booking_horizon_days_rank2',
@@ -373,7 +373,7 @@ async function handleApi(req, res, url) {
   if (p === '/api/my/bookings' && method === 'GET') {
     if (!requireStudent()) return bad(res, 'Bitte anmelden', 401);
     const rows = db.prepare(
-      `SELECT id,date,start_time,duration_min,status,gearbox,plate,note,started_at,confirmed
+      `SELECT id,date,start_time,duration_min,status,gearbox,plate,note,started_at,ended_at,confirmed,feedback,lesson_type
        FROM bookings WHERE student_id = ? AND status != 'cancelled' ORDER BY date, start_time`
     ).all(sess.student_id);
     return ok(res, { bookings: rows, weekInfo: weekInfoForStudent(sess.student_id),
@@ -487,6 +487,7 @@ async function handleApi(req, res, url) {
       if ('plate' in b) { fields.push('plate=?'); vals.push(b.plate ? String(b.plate).trim() : null); }
       if ('note' in b) { fields.push('note=?'); vals.push(b.note ? String(b.note).trim() : null); }
       if ('reason' in b) { fields.push('reason=?'); vals.push(b.reason ? String(b.reason).trim() : null); }
+      if ('feedback' in b) { fields.push('feedback=?'); vals.push(b.feedback ? String(b.feedback).trim() : null); }
       if ('lesson_type' in b) { fields.push('lesson_type=?'); vals.push(['ueberland', 'autobahn', 'nacht', 'normal'].includes(b.lesson_type) ? b.lesson_type : null); }
       if ('meet_label' in b) { fields.push('meet_label=?'); vals.push(b.meet_label ? String(b.meet_label).trim() : null); }
       if ('meet_lat' in b) { fields.push('meet_lat=?'); vals.push(b.meet_lat == null || b.meet_lat === '' ? null : Number(b.meet_lat)); }
@@ -497,6 +498,20 @@ async function handleApi(req, res, url) {
       if (!fields.length) return bad(res, 'Nichts zu aendern');
       vals.push(id);
       db.prepare(`UPDATE bookings SET ${fields.join(',')} WHERE id = ?`).run(...vals);
+
+      // Beim Abschließen die tatsächliche Endzeit festhalten (echter Zeitpunkt).
+      // started_at kommt – falls genutzt – vom Timer; wir leiten hier NICHTS ab
+      // (Zeitzonen-Falle). Fürs Protokoll zählt sonst das geplante Zeitfenster.
+      if (b.status === 'done') {
+        const f0 = db.prepare('SELECT ended_at FROM bookings WHERE id=?').get(id);
+        if (!f0.ended_at) db.prepare('UPDATE bookings SET ended_at=? WHERE id=?').run(new Date().toISOString(), id);
+      }
+      // Rückmeldung/Vermerk an den Schüler (nur wenn neu/geändert und nicht leer)
+      if ('feedback' in b && String(b.feedback || '').trim()
+          && String(b.feedback).trim() !== String(bk.feedback || '').trim() && bk.student_id) {
+        notify(bk.student_id, 'info',
+          `📝 Rückmeldung zu deiner Fahrstunde am ${wdShort(bk.date)} ${dmy(bk.date)}: ${String(b.feedback).trim()}`, bk.date, id);
+      }
 
       // Protokoll: Verschieben / Abschluss
       if ((b.date && newDate !== bk.date) || (b.start_time && newStart !== bk.start_time)) {

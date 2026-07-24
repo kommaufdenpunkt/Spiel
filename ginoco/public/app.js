@@ -876,11 +876,13 @@ function studentBookingItem(b) {
         <button class="ghost sm" data-offer="${b.id}">Anbieten</button>`;
     }
   }
+  const fb = (b.status === 'done' && b.feedback) ? `<div class="lesson-fb">📝 ${esc(b.feedback)}</div>` : '';
   return `<div class="bitem">
     <div>
       <div class="when">${WD[isoDow(b.date) - 1]} ${fmtShort(b.date)} · ${b.start_time} <span class="muted" style="font-weight:400">(${b.duration_min} Min)</span></div>
       <div class="meta">${st} ${typeBadge(b.lesson_type)} ${gear} ${b.plate ? '· ' + esc(b.plate) : ''}
         ${b.status === 'booked' && soon ? `<span class="muted">· in ${h < 1 ? '<1' : Math.round(h)} h</span>` : ''}</div>
+      ${fb}
     </div>
     <div class="inline">${actions}</div>
   </div>`;
@@ -1544,8 +1546,10 @@ function openMarkModal(id) {
           <option value="done" ${b.status === 'done' ? 'selected' : ''}>abgeschlossen ✓</option>
         </select></div>
     </div>
+    <div class="field"><label>📝 Rückmeldung an den Schüler <span class="muted">(sieht der Schüler – „das haben wir gemacht")</span></label>
+      <textarea id="m-feedback" rows="3" placeholder="z.B. Heute Kreisverkehr & Vorfahrt geübt – nächstes Mal Einparken." style="resize:vertical">${esc(b.feedback || '')}</textarea></div>
     <div class="field"><label>Grund (bei Absage/Nichterscheinen, optional)</label><input id="m-reason" value="${esc(b.reason || '')}"></div>
-    <div class="field"><label>Notiz (optional)</label><input id="m-note" value="${esc(b.note || '')}"></div>
+    <div class="field"><label>Interne Notiz (nur für dich)</label><input id="m-note" value="${esc(b.note || '')}"></div>
     <div class="field"><label>Treffpunkt (für Live-Standort & Navigation)</label>
       <div class="inline"><input id="m-meet" value="${esc(b.meet_label || '')}" placeholder="z.B. vor der Schule" style="flex:1">
         <button class="sec sm" id="m-meet-here" type="button">📍 Standort</button></div>
@@ -1579,6 +1583,7 @@ function openMarkModal(id) {
       const att = $('#m-att').value;
       const body = { gearbox: $('#m-gear').value, plate: $('#m-plate').value, duration_min: Number($('#m-dur').value),
         status: $('#m-status').value, note: $('#m-note').value, reason: $('#m-reason').value,
+        feedback: $('#m-feedback').value,
         late_minutes: Number($('#m-late').value) || 0, attended: att === '' ? null : (att === '1'),
         lesson_type: $('#m-type').value || 'normal',
         meet_label: $('#m-meet').value, meet_lat: meetLat ?? '', meet_lng: meetLng ?? '' };

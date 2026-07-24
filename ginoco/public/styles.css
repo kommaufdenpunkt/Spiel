@@ -282,6 +282,10 @@ th{color:var(--muted);font-weight:600;font-size:.78rem;text-transform:uppercase;
   text-align:left;padding:.7rem .9rem;line-height:1.3}
 .offer-choice .oc-sub{font-size:.78rem;color:var(--muted);font-weight:400}
 
+/* ---- Rückmeldung/Vermerk zur Fahrstunde ---- */
+.lesson-fb{margin-top:.4rem;background:var(--card2);border:1px solid var(--line);border-left:3px solid var(--brand);
+  border-radius:8px;padding:.5rem .7rem;font-size:.88rem;color:var(--ink);line-height:1.5}
+
 /* ---- Abholung / Live-Standort ---- */
 .pickup-box{background:var(--card2);border:1px solid var(--line);border-radius:12px;
   padding:.75rem .85rem;margin:.7rem 0}
