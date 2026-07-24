@@ -15,7 +15,7 @@ const PUBLIC = join(__dirname, 'public');
 const PORT = Number(process.env.PORT || 3000);
 const HOST = process.env.HOST || '0.0.0.0'; // hinter Caddy: HOST=127.0.0.1 (nur Proxy erreicht Node)
 const SESSION_DAYS = 30;
-const APP_VERSION = "3.13.2";
+const APP_VERSION = "3.14.0";
 // Einstellungen, die Schueler/Oeffentlichkeit sehen duerfen (Rest bleibt beim Fahrlehrer)
 const PUBLIC_SETTINGS = ['instructor_name', 'instructor_phone', 'policy_text',
   'cancel_hours', 'lock_hours', 'booking_horizon_days', 'booking_horizon_days_rank2',
@@ -768,8 +768,19 @@ async function handleApi(req, res, url) {
       `SELECT b.*, s.name AS student_name FROM bookings b LEFT JOIN students s ON s.id=b.student_id
        WHERE b.date = ? AND b.status='booked' AND b.student_id IS NOT NULL ORDER BY b.start_time`).all(todayStr())
       .map((b) => ({ ...b, h: hoursUntil(b.date, b.start_time) }))
-      .filter((b) => b.h > -0.5 && b.h * 60 <= lead)
-      .map((b) => ({ id: b.id, student_name: b.student_name, start_time: b.start_time, minutes: Math.round(b.h * 60) }));
+      .filter((b) => b.h > -0.5 && b.h * 60 <= Math.max(lead, 45))
+      .map((b) => {
+        const s = db.prepare('SELECT home_label,home_lat,home_lng,live_lat,live_lng,live_at,live_active FROM students WHERE id=?').get(b.student_id) || {};
+        const meet = {
+          label: b.meet_label || s.home_label || null,
+          lat: b.meet_lat != null ? b.meet_lat : (s.home_lat != null ? s.home_lat : null),
+          lng: b.meet_lng != null ? b.meet_lng : (s.home_lng != null ? s.home_lng : null),
+        };
+        let studentLive = null;
+        if (s.live_active && s.live_at && (Date.now() - new Date(s.live_at).getTime()) < 3 * 60 * 1000)
+          studentLive = { lat: s.live_lat, lng: s.live_lng, updated_at: s.live_at };
+        return { id: b.id, student_name: b.student_name, start_time: b.start_time, minutes: Math.round(b.h * 60), meet, studentLive };
+      });
     const live = db.prepare('SELECT active,updated_at,eta_min,eta_at FROM live_location WHERE id=1').get();
     let eta = null;
     if (live.eta_min != null && live.eta_at) {
@@ -821,12 +832,43 @@ async function handleApi(req, res, url) {
       const ageMin = (Date.now() - new Date(live.eta_at).getTime()) / 60000;
       if (ageMin < 30) announce = { minutes: live.eta_min, remaining: Math.max(0, Math.round(live.eta_min - ageMin)), at: live.eta_at };
     }
+    const meLive = db.prepare('SELECT live_active FROM students WHERE id=?').get(bk.student_id);
     return ok(res, {
       window: true, active, busy: otherInProgress,
       booking: { date: bk.date, start_time: bk.start_time, minutesToStart: Math.round(upcoming.h * 60) },
       location: active ? { lat: live.lat, lng: live.lng, updated_at: live.updated_at } : null,
       meet, distanceKm, etaMin, lead, announce,
+      sharing: !!(meLive && meLive.live_active),
     });
+  }
+
+  // Schüler setzt/ändert seinen Abholort für die anstehende Fahrstunde
+  if (p === '/api/my/pickup' && method === 'POST') {
+    if (!requireStudent()) return bad(res, 'Bitte anmelden', 401);
+    const b = await readBody(req);
+    const bk = db.prepare("SELECT * FROM bookings WHERE student_id=? AND date=? AND status='booked' ORDER BY start_time")
+      .all(sess.student_id, todayStr()).find((x) => hoursUntil(x.date, x.start_time) > -0.25);
+    if (!bk) return bad(res, 'Gerade keine anstehende Fahrstunde');
+    const label = b.label ? String(b.label).trim() : null;
+    const lat = (b.lat == null || b.lat === '') ? null : Number(b.lat);
+    const lng = (b.lng == null || b.lng === '') ? null : Number(b.lng);
+    db.prepare('UPDATE bookings SET meet_label=?, meet_lat=?, meet_lng=? WHERE id=?').run(label, lat, lng, bk.id);
+    return ok(res, { label, lat, lng });
+  }
+  // Schüler teilt seinen Live-Standort (nur im Abhol-Fenster, auf Tipp)
+  if (p === '/api/my/location' && method === 'POST') {
+    if (!requireStudent()) return bad(res, 'Bitte anmelden', 401);
+    const b = await readBody(req);
+    const lat = Number(b.lat), lng = Number(b.lng);
+    if (!isFinite(lat) || !isFinite(lng)) return bad(res, 'Ungueltige Koordinaten');
+    db.prepare('UPDATE students SET live_lat=?, live_lng=?, live_at=?, live_active=1 WHERE id=?')
+      .run(lat, lng, new Date().toISOString(), sess.student_id);
+    return ok(res);
+  }
+  if (p === '/api/my/location/stop' && method === 'POST') {
+    if (!requireStudent()) return bad(res, 'Bitte anmelden', 401);
+    db.prepare('UPDATE students SET live_active=0 WHERE id=?').run(sess.student_id);
+    return ok(res);
   }
 
   // Schueler aktualisiert eigene Handynummer

@@ -886,6 +886,51 @@ function studentBookingItem(b) {
   </div>`;
 }
 
+// ---------- Abholung: Schüler teilt Standort / setzt Abholort ----------
+let myWatchId = null;
+function startMyShare() {
+  if (!navigator.geolocation) { toast('GPS nicht verfügbar', 'err'); return; }
+  myWatchId = navigator.geolocation.watchPosition(async (pos) => {
+    try { await api('/api/my/location', { method: 'POST', body: { lat: pos.coords.latitude, lng: pos.coords.longitude } }); } catch {}
+  }, (e) => { toast('Standort-Fehler: ' + e.message, 'err'); stopMyShare(); },
+    { enableHighAccuracy: true, maximumAge: 8000, timeout: 20000 });
+  state.myShareActive = true;
+  toast('Dein Standort wird geteilt 📍', 'ok');
+  refreshStudentLive();
+}
+function stopMyShare() {
+  if (myWatchId != null) navigator.geolocation.clearWatch(myWatchId);
+  myWatchId = null; state.myShareActive = false;
+  api('/api/my/location/stop', { method: 'POST' }).catch(() => {});
+  refreshStudentLive();
+}
+window.__startMyShare = startMyShare;
+window.__stopMyShare = stopMyShare;
+async function openPickupModal(cur) {
+  modal(`<h3>📍 Wo sollen wir dich abholen?</h3>
+    <p class="hint">Sag deinem Fahrlehrer, von wo du abgeholt werden möchtest. Du kannst auch deinen aktuellen Standort übernehmen.</p>
+    <div class="field"><label>Abholort</label><input id="pk-label" value="${esc(cur || '')}" placeholder="z.B. vor der Schule, am Bahnhof …"></div>
+    <button class="sec sm" id="pk-here" type="button">📍 Aktuellen Standort übernehmen</button>
+    <div class="hint" id="pk-info" style="margin:.4rem 0 0"></div>
+    <div class="actions"><button class="sec" onclick="window.__closeModal()">Abbrechen</button><button id="pk-save">Speichern</button></div>`);
+  let lat = null, lng = null;
+  $('#pk-here').onclick = async () => {
+    try {
+      const c = await getPosOnce(); lat = c.latitude; lng = c.longitude;
+      const addr = await reverseGeocode(lat, lng);
+      if (addr && !$('#pk-label').value.trim()) $('#pk-label').value = addr;
+      $('#pk-info').innerHTML = `✓ Standort übernommen (${lat.toFixed(4)}, ${lng.toFixed(4)})`;
+    } catch (e) { toast(e.message, 'err'); }
+  };
+  $('#pk-save').onclick = async () => {
+    try {
+      await api('/api/my/pickup', { method: 'POST', body: { label: $('#pk-label').value, lat, lng } });
+      closeModal(); toast('Abholort gespeichert ✓', 'ok'); refreshStudentLive();
+    } catch (e) { toast(e.message, 'err'); }
+  };
+}
+window.__openPickup = openPickupModal;
+
 // ---------- Live-Verfolgung (Schüler) ----------
 let studentLivePoll = null;
 async function refreshStudentLive() {
@@ -904,6 +949,18 @@ async function refreshStudentLive() {
   const announce = d.announce
     ? `<div class="announce">🚗 Dein Fahrlehrer ist ${d.announce.remaining > 0 ? `in <strong>~${d.announce.remaining} Min</strong> da` : '<strong>gleich da</strong>'}</div>`
     : '';
+  // Abholung: Abholort setzen + eigenen Standort teilen (damit dich der Fahrlehrer genau findet)
+  const sharing = state.myShareActive;
+  const pickupControls = `<div class="pickup-box">
+    <div class="pb-line"><span class="muted">Dein Abholort:</span> <strong>${d.meet?.label ? esc(d.meet.label) : 'noch nicht gesetzt'}</strong></div>
+    <div class="inline" style="margin-top:.5rem;gap:.5rem">
+      <button class="sec sm" id="pk-edit">📍 Abholort ${d.meet?.label ? 'ändern' : 'wählen'}</button>
+      ${sharing
+        ? '<button class="danger sm" id="my-share-stop">📍 Standort-Teilen beenden</button>'
+        : '<button class="sm" id="my-share">📍 Meinen Standort teilen</button>'}
+    </div>
+    <div class="hint" style="margin:.4rem 0 0">${sharing ? '📍 Dein Standort wird geteilt – dein Fahrlehrer sieht jetzt genau, wo du bist.' : 'Teile deinen Standort, damit dich dein Fahrlehrer genau findet. Läuft nur jetzt und stoppt nach Beginn.'}</div>
+  </div>`;
   if (!d.active) {
     const note = d.busy
       ? 'Dein Fahrlehrer ist gerade noch in einer Fahrstunde. Sein Standort wird geteilt, sobald er unterwegs zu dir ist.'
@@ -911,7 +968,7 @@ async function refreshStudentLive() {
     card.innerHTML = `<h2>📍 Treffpunkt</h2>
       ${announce}
       <p>Deine Fahrstunde beginnt in <strong>${d.booking.minutesToStart} Min</strong> (${d.booking.start_time} Uhr).</p>
-      ${d.meet?.label ? `<p class="meta">Treffpunkt: <strong>${esc(d.meet.label)}</strong></p>` : ''}
+      ${pickupControls}
       <p class="hint">${note}</p>${contact}`;
   } else {
     const loc = d.location;
@@ -933,8 +990,12 @@ async function refreshStudentLive() {
         ${d.meet?.label ? `<span class="pill">📍 ${esc(d.meet.label)}</span>` : ''}
         <a class="pill" href="${route}" target="_blank" rel="noopener" style="text-decoration:none;background:var(--brand);color:#fff">🧭 Route öffnen</a>
       </div>
+      ${pickupControls}
       <p class="hint" style="margin-top:.4rem">Entfernung ist Luftlinie, ETA eine Schätzung.</p>${contact}`;
   }
+  const pe = $('#pk-edit'); if (pe) pe.onclick = () => openPickupModal(d.meet?.label);
+  const ms = $('#my-share'); if (ms) ms.onclick = () => startMyShare();
+  const mss = $('#my-share-stop'); if (mss) mss.onclick = () => stopMyShare();
   if (!studentLivePoll) studentLivePoll = setInterval(refreshStudentLive, 15000);
 }
 
@@ -1259,9 +1320,30 @@ async function renderLiveInstr() {
   if (!sharing && !soon) { card.classList.add('hidden'); return; }
   card.classList.remove('hidden');
   const etaSaid = st.eta ? `<span class="pill" style="background:var(--good-bg);color:var(--good)">✅ gesagt: in ${st.eta.remaining} Min</span>` : '';
+  // Abholort + Live-Standort des nächsten Schülers (Uber-Style)
+  let studentBox = '';
+  if (soon) {
+    const vn = esc((soon.student_name || '').split(' ')[0]);
+    const m = soon.meet || {}, sl = soon.studentLive;
+    studentBox = `<div class="pickup-box">
+      <div class="pb-line"><span class="muted">Abholort ${vn}:</span> <strong>${m.label ? esc(m.label) : '– noch nicht gesetzt –'}</strong></div>`;
+    if (sl) {
+      const dd = 0.006, bbox = [sl.lng - dd, sl.lat - dd, sl.lng + dd, sl.lat + dd].join(',');
+      const mapSrc = `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${sl.lat},${sl.lng}`;
+      const route = `https://www.google.com/maps/dir/?api=1&destination=${sl.lat},${sl.lng}`;
+      const upd = new Date(sl.updated_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+      studentBox += `<div class="inline" style="margin:.45rem 0"><span class="pill" style="background:var(--good-bg);color:var(--good)">📍 ${vn} teilt Standort · ${upd}</span></div>
+        <iframe title="Schüler-Standort" src="${mapSrc}" style="width:100%;height:220px;border:1px solid var(--line);border-radius:10px" loading="lazy"></iframe>
+        <a class="pill" href="${route}" target="_blank" rel="noopener" style="text-decoration:none;background:var(--brand);color:#fff;margin-top:.5rem;display:inline-block">🧭 Route zu ${vn}</a>`;
+    } else {
+      studentBox += `<div class="hint" style="margin:.35rem 0 0">Sobald ${vn} den Standort teilt, siehst du hier genau, wo er/sie steht.</div>`;
+    }
+    studentBox += `</div>`;
+  }
   card.innerHTML = `<h2>🛰️ Live-Standort</h2>
     ${soon ? `<p class="hint">In <strong>${soon.minutes} Min</strong> beginnt die Fahrstunde mit <strong>${esc(soon.student_name)}</strong> (${soon.start_time} Uhr). Teile deinen Standort, damit ${esc(soon.student_name.split(' ')[0])} sieht, wann du da bist.</p>`
       : '<p class="hint">Du kannst deinen Standort mit dem nächsten Fahrschüler teilen.</p>'}
+    ${studentBox}
     <div class="eta-row">
       <span class="muted" style="font-size:.85rem">Bescheid geben:</span>
       <button class="sec sm" data-eta="5">in 5 Min da</button>
