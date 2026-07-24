@@ -194,13 +194,22 @@ function fileToResizedDataUrl(file, maxPx = 400, quality = 0.82) {
     img.src = url;
   });
 }
+function ageFromDate(bd) {
+  if (!bd || !/^\d{4}-\d{2}-\d{2}$/.test(bd)) return null;
+  const [y, m, d] = bd.split('-').map(Number);
+  const now = new Date();
+  let a = now.getFullYear() - y;
+  if (now.getMonth() + 1 < m || (now.getMonth() + 1 === m && now.getDate() < d)) a--;
+  return (a >= 0 && a < 120) ? a : null;
+}
 async function openProfileModal() {
   const ip = state.settings?.instructor_phone;
-  let pr = { name: state.user?.name || '', email: '', phone: state.user?.phone || '', birth_year: '', username: state.user?.username || '', has_photo: false };
+  let pr = { name: state.user?.name || '', email: '', phone: state.user?.phone || '', birth_year: '', birth_date: '', street: '', house_no: '', zip: '', city: '', username: state.user?.username || '', has_photo: false };
   try { const r = await api('/api/my/profile'); if (r.profile) pr = { ...pr, ...r.profile }; } catch {}
   const avatar = (hasPhoto) => hasPhoto
     ? `<img src="/api/my/photo?t=${Date.now()}" alt="Profilfoto">`
     : `<span>${esc(initials(pr.name))}</span>`;
+  const ageBadge = (bd) => { const a = ageFromDate(bd); return a == null ? '' : `${a} Jahre`; };
   modal(`<div class="pf-hero">
       <div class="pf-avatar-lg">
         <span class="pf-av-inner" id="pf-av-inner">${avatar(!!pr.has_photo)}</span>
@@ -212,16 +221,39 @@ async function openProfileModal() {
     </div>
     <div class="pf-privacy">🔒 Nur dein Fahrlehrer sieht dein Profil – kein anderer Fahrschüler.</div>
     <div class="err hidden" id="pf-err"></div>
-    <div class="field"><label>Name</label><input id="pf-name" value="${esc(pr.name || '')}" placeholder="Vor- und Nachname"></div>
-    <div class="row">
-      <div class="field"><label>Handynummer</label><input id="pf-phone" value="${esc(pr.phone || '')}" placeholder="z.B. 0151 23456789"></div>
-      <div class="field" style="max-width:130px"><label>Jahrgang</label><input id="pf-year" type="number" value="${pr.birth_year || ''}" min="1930" max="2015" placeholder="1997"></div>
+    <div class="pf-sec">
+      <div class="pf-sec-h">👤 Persönliches</div>
+      <div class="field"><label>Name</label><input id="pf-name" value="${esc(pr.name || '')}" placeholder="Vor- und Nachname"></div>
+      <div class="row">
+        <div class="field"><label>Geburtsdatum</label><input id="pf-bdate" type="date" value="${esc(pr.birth_date || '')}" max="2015-12-31"></div>
+        <div class="field" style="max-width:110px"><label>Alter</label><input id="pf-age" value="${ageBadge(pr.birth_date)}" placeholder="—" readonly></div>
+      </div>
     </div>
-    <div class="field"><label>E-Mail (optional)</label><input id="pf-email" type="email" value="${esc(pr.email || '')}"></div>
-    <div class="field"><label>Login-Name (fest, ändert sich nicht)</label><input value="${esc(pr.username || '')}" readonly></div>
-    ${ip ? `<div class="field"><label>Fahrschule erreichen</label><div class="inline">${contactButtons(ip)}</div></div>` : ''}
+    <div class="pf-sec">
+      <div class="pf-sec-h">🏠 Adresse</div>
+      <div class="row">
+        <div class="field" style="flex:2"><label>Straße</label><input id="pf-street" value="${esc(pr.street || '')}" placeholder="z.B. Bahnhofstraße"></div>
+        <div class="field" style="max-width:110px"><label>Hausnr.</label><input id="pf-houseno" value="${esc(pr.house_no || '')}" placeholder="12a"></div>
+      </div>
+      <div class="row">
+        <div class="field" style="max-width:130px"><label>PLZ</label><input id="pf-zip" inputmode="numeric" value="${esc(pr.zip || '')}" placeholder="89073"></div>
+        <div class="field" style="flex:2"><label>Ort</label><input id="pf-city" value="${esc(pr.city || '')}" placeholder="z.B. Ulm"></div>
+      </div>
+    </div>
+    <div class="pf-sec">
+      <div class="pf-sec-h">📞 Kontakt</div>
+      <div class="field"><label>Handynummer</label><input id="pf-phone" inputmode="tel" value="${esc(pr.phone || '')}" placeholder="z.B. 0151 23456789"></div>
+      <div class="field"><label>E-Mail (optional)</label><input id="pf-email" type="email" value="${esc(pr.email || '')}" placeholder="name@mail.de"></div>
+    </div>
+    <div class="pf-sec">
+      <div class="pf-sec-h">🔑 Zugang</div>
+      <div class="field"><label>Login-Name (fest, ändert sich nicht)</label><input value="${esc(pr.username || '')}" readonly></div>
+      ${ip ? `<div class="field"><label>Fahrschule erreichen</label><div class="inline">${contactButtons(ip)}</div></div>` : ''}
+    </div>
     <div class="actions"><button class="sec" onclick="window.__closeModal()">Schließen</button><button id="pf-save">Speichern</button></div>`);
   const avEl = $('#pf-av-inner'), delBtn = $('#pf-photo-del');
+  // Alter live aus Geburtsdatum aktualisieren
+  $('#pf-bdate').oninput = () => { const a = ageFromDate($('#pf-bdate').value); $('#pf-age').value = a == null ? '' : a + ' Jahre'; };
   $('#pf-file').onchange = async (e) => {
     const file = e.target.files && e.target.files[0];
     if (!file) return;
@@ -250,7 +282,10 @@ async function openProfileModal() {
     try {
       await api('/api/my/profile', { method: 'PATCH', body: {
         name: $('#pf-name').value, phone: $('#pf-phone').value,
-        email: $('#pf-email').value || null, birth_year: $('#pf-year').value || null } });
+        email: $('#pf-email').value || null,
+        birth_date: $('#pf-bdate').value || null,
+        street: $('#pf-street').value || null, house_no: $('#pf-houseno').value || null,
+        zip: $('#pf-zip').value || null, city: $('#pf-city').value || null } });
       state.user.name = $('#pf-name').value.trim(); state.user.phone = $('#pf-phone').value.trim();
       closeModal(); toast('Profil gespeichert ✓', 'ok'); render();
     } catch (e) { const el = $('#pf-err'); if (el) { el.textContent = e.message; el.classList.remove('hidden'); } else toast(e.message, 'err'); }
@@ -2224,10 +2259,18 @@ function openEditStudentModal(s) {
       <div class="field"><label>Nachname</label><input id="es-last" value="${esc(last)}"></div>
     </div>
     <div class="row">
-      <div class="field" style="max-width:130px"><label>Jahrgang</label><input id="es-year" type="number" value="${s.birth_year || ''}" min="1930" max="2015"></div>
+      <div class="field"><label>Geburtsdatum</label><input id="es-bdate" type="date" value="${esc(s.birth_date || '')}" max="2015-12-31"></div>
       <div class="field"><label>Telefon</label><input id="es-phone" value="${esc(s.phone || '')}"></div>
     </div>
     <div class="field"><label>E-Mail</label><input id="es-email" type="email" value="${esc(s.email || '')}"></div>
+    <div class="row">
+      <div class="field" style="flex:2"><label>Straße</label><input id="es-street" value="${esc(s.street || '')}"></div>
+      <div class="field" style="max-width:110px"><label>Hausnr.</label><input id="es-houseno" value="${esc(s.house_no || '')}"></div>
+    </div>
+    <div class="row">
+      <div class="field" style="max-width:130px"><label>PLZ</label><input id="es-zip" inputmode="numeric" value="${esc(s.zip || '')}"></div>
+      <div class="field" style="flex:2"><label>Ort</label><input id="es-city" value="${esc(s.city || '')}"></div>
+    </div>
     <div class="field"><label>📝 Notiz / Karteikarte (nur für dich)</label>
       <textarea id="es-notes" rows="4" placeholder="z.B. Ausbildungsstand, was noch geübt werden muss, Besonderheiten …" style="resize:vertical">${esc(s.notes || '')}</textarea></div>
     <div class="actions">
@@ -2238,7 +2281,9 @@ function openEditStudentModal(s) {
     try {
       await api('/api/students/' + s.id, { method: 'PATCH', body: {
         first_name: $('#es-first').value, last_name: $('#es-last').value,
-        birth_year: $('#es-year').value || null,
+        birth_date: $('#es-bdate').value || null,
+        street: $('#es-street').value || null, house_no: $('#es-houseno').value || null,
+        zip: $('#es-zip').value || null, city: $('#es-city').value || null,
         phone: $('#es-phone').value || null, email: $('#es-email').value || null,
         notes: $('#es-notes').value || null } });
       closeModal(); toast('Gespeichert ✓', 'ok'); tabSchueler();

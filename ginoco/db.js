@@ -158,6 +158,12 @@ ensureColumn('students', 'live_lat', 'live_lat REAL');         // Live-Standort 
 ensureColumn('students', 'live_lng', 'live_lng REAL');
 ensureColumn('students', 'live_at', 'live_at TEXT');
 ensureColumn('students', 'live_active', 'live_active INTEGER NOT NULL DEFAULT 0');
+// Stammdaten fürs Profil (Adresse + Geburtsdatum). Nur der Fahrlehrer sieht sie (DSGVO).
+ensureColumn('students', 'birth_date', 'birth_date TEXT');    // Geburtsdatum YYYY-MM-DD (für exaktes Alter / Ausbildungsvertrag)
+ensureColumn('students', 'street', 'street TEXT');            // Straße
+ensureColumn('students', 'house_no', 'house_no TEXT');        // Hausnummer
+ensureColumn('students', 'zip', 'zip TEXT');                  // PLZ
+ensureColumn('students', 'city', 'city TEXT');                // Ort
 
 // Absagen ("keine Zeit") auf ein Uebernahme-Angebot
 db.exec(`CREATE TABLE IF NOT EXISTS offer_declines (

@@ -15,7 +15,7 @@ const PUBLIC = join(__dirname, 'public');
 const PORT = Number(process.env.PORT || 3000);
 const HOST = process.env.HOST || '0.0.0.0'; // hinter Caddy: HOST=127.0.0.1 (nur Proxy erreicht Node)
 const SESSION_DAYS = 30;
-const APP_VERSION = "3.17.0";
+const APP_VERSION = "3.19.0";
 // Einstellungen, die Schueler/Oeffentlichkeit sehen duerfen (Rest bleibt beim Fahrlehrer)
 const PUBLIC_SETTINGS = ['instructor_name', 'instructor_phone', 'policy_text',
   'cancel_hours', 'lock_hours', 'booking_horizon_days', 'booking_horizon_days_rank2',
@@ -890,7 +890,7 @@ async function handleApi(req, res, url) {
   // Eigenes Profil ansehen (nur der Schüler selbst)
   if (p === '/api/my/profile' && method === 'GET') {
     if (!requireStudent()) return bad(res, 'Bitte anmelden', 401);
-    const st = db.prepare('SELECT name,email,phone,birth_year,username,(photo IS NOT NULL) AS has_photo FROM students WHERE id=?').get(sess.student_id);
+    const st = db.prepare('SELECT name,email,phone,birth_year,birth_date,street,house_no,zip,city,username,(photo IS NOT NULL) AS has_photo FROM students WHERE id=?').get(sess.student_id);
     return ok(res, { profile: st || {} });
   }
   // Eigenes Profilfoto ausliefern (nur der Schueler selbst)
@@ -921,6 +921,15 @@ async function handleApi(req, res, url) {
       fields.push('email=?'); vals.push(em);
     }
     if ('birth_year' in b) { fields.push('birth_year=?'); vals.push(b.birth_year ? Number(b.birth_year) : null); }
+    if ('birth_date' in b) {
+      const bd = b.birth_date ? String(b.birth_date).trim() : null;
+      if (bd && !/^\d{4}-\d{2}-\d{2}$/.test(bd)) return bad(res, 'Geburtsdatum ungültig');
+      fields.push('birth_date=?'); vals.push(bd);
+      if (bd) { fields.push('birth_year=?'); vals.push(Number(bd.slice(0, 4))); }   // Jahrgang mitziehen
+    }
+    for (const k of ['street', 'house_no', 'zip', 'city']) {
+      if (k in b) { fields.push(`${k}=?`); vals.push(b[k] ? String(b[k]).trim() : null); }
+    }
     if ('photo' in b) {
       if (b.photo === null || b.photo === '') { fields.push('photo=?'); vals.push(null); }
       else if (validPhoto(b.photo)) { fields.push('photo=?'); vals.push(b.photo); }
@@ -990,7 +999,8 @@ async function handleApi(req, res, url) {
     if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
     const archived = url.searchParams.get('scope') === 'archived';
     const rows = db.prepare(
-      `SELECT s.id,s.name,s.first_name,s.last_name,s.email,s.phone,s.username,s.birth_year,s.allowed_durations,s.created_at,
+      `SELECT s.id,s.name,s.first_name,s.last_name,s.email,s.phone,s.username,s.birth_year,s.birth_date,
+        s.street,s.house_no,s.zip,s.city,s.allowed_durations,s.created_at,
         s.home_label,s.home_lat,s.home_lng,s.archived_at,s.notes,
         (s.photo IS NOT NULL) AS has_photo,
         (SELECT COUNT(*) FROM bookings b WHERE b.student_id=s.id AND b.status='done') AS done_count
@@ -1007,7 +1017,7 @@ async function handleApi(req, res, url) {
     const b = await readBody(req);
     const sid = Number(stm[1]);
     // Stammdaten bearbeiten (Vorname/Nachname bzw. Name / Telefon / E-Mail / Jahrgang / Notiz)
-    if ('first_name' in b || 'last_name' in b || 'name' in b || 'phone' in b || 'email' in b || 'birth_year' in b || 'notes' in b) {
+    if ('first_name' in b || 'last_name' in b || 'name' in b || 'phone' in b || 'email' in b || 'birth_year' in b || 'birth_date' in b || 'street' in b || 'house_no' in b || 'zip' in b || 'city' in b || 'notes' in b) {
       const st = db.prepare('SELECT id FROM students WHERE id=?').get(sid);
       if (!st) return bad(res, 'Schueler nicht gefunden', 404);
       const fields = [], vals = [];
@@ -1025,6 +1035,15 @@ async function handleApi(req, res, url) {
         fields.push('email=?'); vals.push(em);
       }
       if ('birth_year' in b) { fields.push('birth_year=?'); vals.push(b.birth_year ? Number(b.birth_year) : null); }
+      if ('birth_date' in b) {
+        const bd = b.birth_date ? String(b.birth_date).trim() : null;
+        if (bd && !/^\d{4}-\d{2}-\d{2}$/.test(bd)) return bad(res, 'Geburtsdatum ungültig');
+        fields.push('birth_date=?'); vals.push(bd);
+        if (bd) { fields.push('birth_year=?'); vals.push(Number(bd.slice(0, 4))); }
+      }
+      for (const k of ['street', 'house_no', 'zip', 'city']) {
+        if (k in b) { fields.push(`${k}=?`); vals.push(b[k] ? String(b[k]).trim() : null); }
+      }
       db.prepare(`UPDATE students SET ${fields.join(', ')} WHERE id=?`).run(...vals, sid);
       logEvent('info', { actor: 'instructor', studentId: sid, detail: 'Stammdaten bearbeitet' });
       return ok(res, { updated: true });
