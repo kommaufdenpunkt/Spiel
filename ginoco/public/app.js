@@ -1069,8 +1069,11 @@ async function refreshStudentLive() {
       <p class="hint">${note}</p>${contact}`;
   } else {
     const loc = d.location;
-    const dd = 0.008, bbox = [loc.lng - dd, loc.lat - dd, loc.lng + dd, loc.lat + dd].join(',');
-    const mapSrc = `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${loc.lat},${loc.lng}`;
+    // Google-Maps-Einbettung (ohne API-Key): volle Straßennamen. Mit Treffpunkt = Route,
+    // sonst nur die Live-Position des Fahrlehrers.
+    const mapSrc = d.meet?.lat != null
+      ? `https://maps.google.com/maps?saddr=${loc.lat},${loc.lng}&daddr=${d.meet.lat},${d.meet.lng}&hl=de&output=embed`
+      : `https://maps.google.com/maps?q=${loc.lat},${loc.lng}&z=15&hl=de&output=embed`;
     // Google Maps-Route zeigt echten Live-Verkehr + genaue Ankunftszeit
     const traffic = d.meet?.lat != null
       ? `https://www.google.com/maps/dir/?api=1&origin=${loc.lat},${loc.lng}&destination=${d.meet.lat},${d.meet.lng}&travelmode=driving`
