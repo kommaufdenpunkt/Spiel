@@ -767,6 +767,8 @@ async function syncStudent() {
     renderOffers(off.offers, mine.weekInfo);
     state.lastSlotStart = day.slots.length ? day.slots[day.slots.length - 1].start : null;
     renderSlots(day.slots, mine.bookings);
+    // Kalender folgt dem gewählten Tag: beim Blättern in einen neuen Monat springt er mit.
+    state.calMonth = firstOfMonth(state.date);
     renderBookingCalendar();
   } catch (e) { toast(e.message, 'err'); }
 }
