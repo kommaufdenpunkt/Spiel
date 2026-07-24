@@ -282,6 +282,30 @@ th{color:var(--muted);font-weight:600;font-size:.78rem;text-transform:uppercase;
   text-align:left;padding:.7rem .9rem;line-height:1.3}
 .offer-choice .oc-sub{font-size:.78rem;color:var(--muted);font-weight:400}
 
+/* ---- Fortschritts-Karte (Rang & Sonderfahrten) ---- */
+.progress-card{background:var(--card2);border:1px solid var(--line);border-radius:13px;padding:.85rem .95rem;margin-bottom:1rem}
+.pc-head{display:flex;align-items:center;justify-content:space-between;gap:.6rem;flex-wrap:wrap;margin-bottom:.7rem}
+.rank-badge{display:inline-flex;align-items:center;gap:.3rem;font-weight:800;font-size:.95rem;
+  background:linear-gradient(var(--brand),var(--brand-dark));color:#fff;padding:.3rem .7rem;border-radius:20px}
+.rank-badge.r2{background:linear-gradient(var(--good),#2aa568)}
+.pc-drives{font-size:.9rem;color:var(--muted)}
+.pc-drives strong{color:var(--ink);font-size:1.05rem}
+.pc-block{margin-bottom:.8rem}
+.pc-line{display:flex;justify-content:space-between;font-size:.85rem;font-weight:600;margin-bottom:.35rem}
+.pbar{height:9px;background:var(--bg2);border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.pbar>div{height:100%;border-radius:6px;transition:width .4s ease;min-width:2px}
+.pc-sonder-title{font-size:.72rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:.2rem 0 .5rem}
+.pc-tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:.5rem}
+.pc-tile{display:flex;flex-direction:column;align-items:center;gap:.2rem;text-align:center;
+  background:var(--card);border:1px solid var(--line);border-radius:12px;padding:.7rem .4rem .6rem}
+.pc-tile{border-color:color-mix(in srgb, var(--tc) 45%, var(--line))}
+.pc-tile-ic{font-size:1.5rem;line-height:1}
+.pc-tile-lb{font-size:.76rem;font-weight:700;line-height:1.1}
+.pc-tile-count{font-size:.8rem;font-weight:800;color:var(--muted);margin-bottom:.15rem}
+.pc-tile .pbar{width:100%}
+.pc-tile.done{background:var(--good-bg);border-color:var(--good-b,rgba(53,192,125,.5))}
+.pc-tile.done .pc-tile-count{color:var(--good)}
+
 /* ---- Rückmeldung/Vermerk zur Fahrstunde ---- */
 .lesson-fb{margin-top:.4rem;background:var(--card2);border:1px solid var(--line);border-left:3px solid var(--brand);
   border-radius:8px;padding:.5rem .7rem;font-size:.88rem;color:var(--ink);line-height:1.5}

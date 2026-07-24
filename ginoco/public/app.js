@@ -798,18 +798,40 @@ function renderWeekCard(wi, bookings, progress) {
   if (ef) ef.onclick = () => jumpToNextFree();
 }
 
+function pbar(have, need, color) {
+  const pct = need > 0 ? Math.min(100, Math.round((have / need) * 100)) : 100;
+  return `<div class="pbar"><div style="width:${pct}%;background:${color}"></div></div>`;
+}
 function studentProgress(p) {
   const toRank2 = Math.max(0, p.rank2Min - p.doneCount);
-  const sonder = ['ueberland', 'autobahn', 'nacht'].map((k) => {
-    const have = p.sonder?.[k] || 0, need = p.req[k], done = have >= need;
-    return `<span class="pill" style="${done ? 'background:var(--good-bg);color:var(--good)' : ''}">${TYPE_ICON[k]} ${TYPE_LABEL[k]} ${have}/${need}</span>`;
-  }).join(' ');
-  return `<div style="background:var(--card2);border:1px solid var(--line);border-radius:11px;padding:.7rem .9rem;margin-bottom:1rem">
-    <div class="inline" style="margin-bottom:.4rem">
-      <span class="pill" style="background:${p.rank >= 2 ? 'var(--good-bg);color:var(--good)' : 'var(--brand);color:#fff'}">🏅 Rang ${p.rank}</span>
-      <span class="muted" style="font-size:.82rem">${p.doneCount} Fahrstunden gefahren · ${p.rank >= 2 ? `du siehst ${p.horizon} Tage im Voraus` : `noch ${toRank2} bis Rang 2 (dann ${state.settings?.booking_horizon_days_rank2 || 21} Tage voraus)`}</span>
+  const sonder = [['ueberland', p.sonder?.ueberland || 0, p.req.ueberland],
+    ['autobahn', p.sonder?.autobahn || 0, p.req.autobahn], ['nacht', p.sonder?.nacht || 0, p.req.nacht]];
+  return `<div class="progress-card">
+    <div class="pc-head">
+      <span class="rank-badge ${p.rank >= 2 ? 'r2' : ''}">🏅 Rang ${p.rank}</span>
+      <span class="pc-drives"><strong>${p.doneCount}</strong> Fahrstunden gefahren</span>
     </div>
-    <div class="inline">${sonder}</div>
+    ${p.rank < 2
+      ? `<div class="pc-block">
+          <div class="pc-line"><span>Weg zu Rang 2</span><span class="muted">${p.doneCount}/${p.rank2Min}</span></div>
+          ${pbar(p.doneCount, p.rank2Min, 'var(--brand)')}
+          <div class="hint" style="margin:.3rem 0 0">Noch <strong>${toRank2}</strong> Fahrstunde${toRank2 === 1 ? '' : 'n'} – dann siehst du <strong>${state.settings?.booking_horizon_days_rank2 || 21} Tage</strong> im Voraus.</div>
+        </div>`
+      : `<div class="pc-block"><span class="pill" style="background:var(--good-bg);color:var(--good)">✅ Rang 2 – du siehst ${p.horizon} Tage im Voraus</span></div>`}
+    <div class="pc-sonder">
+      <div class="pc-sonder-title">Sonderfahrten</div>
+      <div class="pc-tiles">
+      ${sonder.map(([k, have, need]) => {
+        const done = have >= need;
+        return `<div class="pc-tile ${done ? 'done' : ''}" style="--tc:${TYPE_COLORS[k]}">
+          <span class="pc-tile-ic">${TYPE_ICON[k]}</span>
+          <span class="pc-tile-lb">${TYPE_LABEL[k]}</span>
+          <span class="pc-tile-count">${done ? '✓ ' : ''}${have}/${need}</span>
+          ${pbar(have, need, done ? 'var(--good)' : TYPE_COLORS[k])}
+        </div>`;
+      }).join('')}
+      </div>
+    </div>
   </div>`;
 }
 
