@@ -49,6 +49,11 @@ const INKS = {
   kuehl:    { label: 'Kühl',     dot: '#d8e6fb', val: '#d8e6fb' },
   mint:     { label: 'Mint',     dot: '#d6f2e4', val: '#d6f2e4' },
   rose:     { label: 'Rosé',     dot: '#f7dcea', val: '#f7dcea' },
+  // Metallic-Töne (Farbpunkt schimmert, Schrift bleibt auf dem dunklen Design gut lesbar)
+  gold:     { label: 'Gold',     dot: 'linear-gradient(135deg,#9a7b1e,#f0d675,#b58f28)', val: '#e7c860' },
+  bronze:   { label: 'Bronze',   dot: 'linear-gradient(135deg,#7a4a22,#d99a5c,#8a5a2a)', val: '#daa066' },
+  carbon:   { label: 'Carbon',   dot: 'linear-gradient(135deg,#3a4048,#aeb6c2,#2c313a)', val: '#c3cad6' },
+  schwarz:  { label: 'Metallic Schwarz', dot: 'linear-gradient(135deg,#14171c,#565c66,#0c0e12)', val: '#b3b9c2' },
 };
 const SIZES = { klein: '93%', normal: '100%', gross: '112%', xl: '125%' };
 const SIZE_LABEL = { klein: 'Klein', normal: 'Normal', gross: 'Groß', xl: 'Sehr groß' };
