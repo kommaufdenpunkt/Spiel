@@ -251,6 +251,8 @@ async function renderProfileCard() {
       </div>
       <div class="pf-sec">
         <div class="pf-sec-h">🏠 Adresse</div>
+        <button class="geo-btn" id="pf-geo" type="button">📍 Aktuellen Standort übernehmen</button>
+        <div class="hint" style="margin:.35rem 0 .7rem">Faul zuhause? Ein Tipp füllt Straße, PLZ und Ort automatisch – du ergänzt nur die Hausnummer.</div>
         <div class="row">
           <div class="field" style="flex:2"><label>Straße</label><input id="pf-street" value="${esc(pr.street || '')}" placeholder="z.B. Bahnhofstraße"></div>
           <div class="field" style="max-width:110px"><label>Hausnr.</label><input id="pf-houseno" value="${esc(pr.house_no || '')}" placeholder="12a"></div>
@@ -303,6 +305,22 @@ async function renderProfileCard() {
       delBtn.classList.add('hidden');
       toast('Foto entfernt', 'ok');
     } catch (err) { toast(err.message, 'err'); }
+  };
+  const geoBtn = $('#pf-geo');
+  if (geoBtn) geoBtn.onclick = async () => {
+    const orig = geoBtn.textContent;
+    geoBtn.disabled = true; geoBtn.textContent = '📍 Suche deinen Standort …';
+    try {
+      const c = await getPosOnce();
+      const parts = await geocodeAddressParts(c.latitude, c.longitude);
+      if (!parts || (!parts.street && !parts.city)) { toast('Adresse nicht gefunden – bitte manuell eintragen.', 'err'); return; }
+      if (parts.street) $('#pf-street').value = parts.street;
+      if (parts.house_no) $('#pf-houseno').value = parts.house_no;
+      if (parts.zip) $('#pf-zip').value = parts.zip;
+      if (parts.city) $('#pf-city').value = parts.city;
+      toast(parts.house_no ? 'Standort übernommen ✓' : 'Standort übernommen ✓ – bitte Hausnummer ergänzen.', 'ok');
+    } catch (e) { toast('Standort nicht verfügbar: ' + e.message, 'err'); }
+    finally { geoBtn.disabled = false; geoBtn.textContent = orig; }
   };
   $('#pf-save').onclick = async () => {
     try {
@@ -361,6 +379,36 @@ function openTour() {
 }
 window.__openTour = openTour;
 
+// ---------- Was ist neu? (Changelog) ----------
+const CHANGELOG_VER = '3.32';
+const CHANGELOG = [
+  { v: '3.32', d: '25.07.2026', title: 'Standort & Neuigkeiten', items: [
+    '📍 Adresse per aktuellem Standort automatisch ausfüllen – du ergänzt nur die Hausnummer.',
+    '✨ Dieses „Was ist neu?“-Fenster – hier siehst du künftig alle Verbesserungen.'] },
+  { v: '3.31', d: '25.07.2026', title: 'Schneller & sauberer', items: [
+    '⚡ ginoco startet schneller (App lädt aus dem Cache).',
+    '🪟 Fenster schließen jetzt sauber ab – kein Überlappen mehr.',
+    '🛰️ Live-Karte mit Straßennamen und „Dein Fahrlehrer ist auf dem Weg zu dir“.'] },
+  { v: '3.30', d: '25.07.2026', title: 'Angebote & Bedienung', items: [
+    '🎁 Fahrstunden einfacher „Ins Angebot geben“ (früher „Feed“).',
+    '🧑‍🎓 Fahrschüler-Liste und Einstellungen komplett aufgeräumt.',
+    '🎨 Neue Metallic-Schriftfarben: Gold, Bronze, Carbon, Metallic Schwarz.'] },
+];
+function markWhatsNewSeen() { try { localStorage.setItem('ginoco-cl-seen', CHANGELOG_VER); } catch {} }
+function hasUnseenNews() { try { return localStorage.getItem('ginoco-cl-seen') !== CHANGELOG_VER; } catch { return false; } }
+function openWhatsNew() {
+  markWhatsNewSeen();
+  document.querySelectorAll('.edge-handle.right').forEach((h) => h.classList.remove('hasnew'));
+  modal(`<h3>✨ Was ist neu?</h3>
+    <p class="hint">Die letzten Verbesserungen in ginoco:</p>
+    ${CHANGELOG.map((c) => `<div class="wn-block">
+      <div class="wn-h"><span class="wn-v">v${c.v}</span> <strong>${esc(c.title)}</strong> <span class="muted">· ${c.d}</span></div>
+      <ul class="wn-list">${c.items.map((i) => `<li>${i}</li>`).join('')}</ul>
+    </div>`).join('')}
+    <div class="actions"><button onclick="window.__closeModal()">Alles klar 🚗</button></div>`, 'wide');
+}
+window.__openWhatsNew = openWhatsNew;
+
 // ---------- API ----------
 async function api(path, opts = {}) {
   const res = await fetch(path, {
@@ -417,6 +465,21 @@ async function reverseGeocode(lat, lng) {
     const city = a.city || a.town || a.village || a.suburb || '';
     const out = [street, [a.postcode, city].filter(Boolean).join(' ')].filter(Boolean).join(', ');
     return out || null;
+  } catch { return null; }
+}
+// Adresse aus Koordinaten in Einzelfeldern (für das Profil-Auto-Ausfüllen).
+async function geocodeAddressParts(lat, lng) {
+  try {
+    const u = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`;
+    const r = await fetch(u, { headers: { 'Accept-Language': 'de' } });
+    if (!r.ok) return null;
+    const a = (await r.json()).address || {};
+    return {
+      street: a.road || a.pedestrian || a.footway || a.residential || '',
+      house_no: a.house_number || '',
+      zip: a.postcode || '',
+      city: a.city || a.town || a.village || a.suburb || a.municipality || '',
+    };
   } catch { return null; }
 }
 // Live-Standort teilen (Fahrlehrer)
@@ -555,9 +618,9 @@ function mountEdgeMenus(role) {
     : edgeTilesHTML(STUDENT_NAV, 'data-scroll');
   const live = state.liveSharing ? [['live', '🛰️', 'Live beenden']] : [];
   const rightGroups = role === 'student'
-    ? [['__group', 'Anpassen'], ['theme', '🎨', 'Aussehen'], ['phone', '👤', 'Mein Profil'], ['tour', '❓', 'Einführung'],
+    ? [['__group', 'Anpassen'], ['theme', '🎨', 'Aussehen'], ['phone', '👤', 'Mein Profil'], ['tour', '❓', 'Einführung'], ['whatsnew', '✨', 'Was ist neu?'],
        ['__group', 'Konto'], ...live, ['reload', '🔄', 'Aktualisieren'], ['logout', '🚪', 'Abmelden']]
-    : [['__group', 'Anpassen'], ['theme', '🎨', 'Aussehen'],
+    : [['__group', 'Anpassen'], ['theme', '🎨', 'Aussehen'], ['whatsnew', '✨', 'Was ist neu?'],
        ['__group', 'Konto'], ...live, ['reload', '🔄', 'Aktualisieren'], ['logout', '🚪', 'Abmelden']];
   const rightItems = edgeTilesHTML(rightGroups, 'data-act');
   const root = document.createElement('div');
@@ -600,10 +663,13 @@ function mountEdgeMenus(role) {
     if (a === 'theme') window.__openThemePicker?.();
     else if (a === 'phone') window.__openPhone?.();
     else if (a === 'tour') window.__openTour?.();
+    else if (a === 'whatsnew') window.__openWhatsNew?.();
     else if (a === 'live') window.__stopLive?.();
     else if (a === 'reload') location.reload();
     else if (a === 'logout') { await api('/api/auth/logout', { method: 'POST' }); state.user = null; render(); }
   });
+  // Kleiner „Neu“-Punkt am ⋯-Griff, solange es ungesehene Updates gibt
+  if (hasUnseenNews()) root.querySelector('.edge-handle.right')?.classList.add('hasnew');
 }
 
 // ====================== LOGIN ======================

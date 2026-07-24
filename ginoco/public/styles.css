@@ -382,6 +382,16 @@ th{color:var(--muted);font-weight:600;font-size:.78rem;text-transform:uppercase;
   letter-spacing:.03em;margin:0 0 .5rem}
 .pf-sec .field{margin-bottom:.55rem}
 .pf-sec .row{gap:.55rem}
+.geo-btn{display:flex;align-items:center;justify-content:center;gap:.4rem;width:100%;padding:.65rem;
+  border-radius:10px;background:var(--card);border:1px dashed var(--brand);color:var(--brand);font-weight:700;cursor:pointer}
+.geo-btn:hover{background:var(--card2)}
+.geo-btn:disabled{opacity:.6;cursor:default}
+/* Was ist neu? */
+.wn-block{background:var(--card2);border:1px solid var(--line);border-radius:11px;padding:.7rem .8rem;margin-bottom:.6rem}
+.wn-h{font-size:.95rem;margin-bottom:.35rem}
+.wn-v{display:inline-block;background:var(--brand);color:#fff;font-size:.72rem;font-weight:800;border-radius:6px;padding:.1rem .4rem;margin-right:.2rem}
+.wn-list{margin:0;padding-left:1.1rem;line-height:1.7;font-size:.9rem}
+.edge-handle.hasnew::after{content:'';position:absolute;top:8px;right:6px;width:9px;height:9px;border-radius:50%;background:var(--bad);border:2px solid var(--card)}
 #pf-age{text-align:center;font-weight:700;color:var(--ink);background:var(--card)}
 .mini-avatar{display:inline-flex;width:30px;height:30px;border-radius:50%;overflow:hidden;
   vertical-align:middle;margin-right:.45rem;background:var(--card2);border:1px solid var(--line);
