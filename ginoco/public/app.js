@@ -1098,7 +1098,7 @@ async function refreshStudentLive() {
     const soon = etaShown != null && etaShown <= 2;
     const hero = soon
       ? `<div class="live-hero go"><span class="lh-ic">🚶</span><div><div class="lh-big">Jetzt rausgehen!</div><div class="lh-sub">Dein Fahrlehrer ist gleich da</div></div></div>`
-      : `<div class="live-hero"><span class="lh-ic">🚗</span><div><div class="lh-big">${etaShown != null ? `in ~${etaShown} Min da` : 'ist unterwegs'}</div><div class="lh-sub">Noch entspannt warten – wir sagen Bescheid</div></div></div>`;
+      : `<div class="live-hero"><span class="lh-ic">🚗</span><div><div class="lh-big">${etaShown != null ? `Fahrlehrer in ~${etaShown} Min da` : 'Fahrlehrer unterwegs'}</div><div class="lh-sub">Dein Fahrlehrer ist auf dem Weg zu dir – wir sagen Bescheid, wann du raus musst.</div></div></div>`;
     card.innerHTML = `<h2>🛰️ Dein Fahrlehrer ist unterwegs</h2>
       ${hero}
       <div class="inline" style="margin-bottom:.6rem">
