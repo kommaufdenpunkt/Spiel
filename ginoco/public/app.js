@@ -2871,78 +2871,66 @@ function tabEinstellungen() {
   const s = state.settings;
   const days = (s.workdays || '1,2,3,4,5,6').split(',').map(Number);
   const box = $('#itab');
+  const sec = (icon, title, sub, body, open) => `<details class="sset"${open ? ' open' : ''}>
+    <summary><span class="sset-ic">${icon}</span><span class="sset-tx"><span class="sset-tt">${title}</span><span class="sset-sub">${sub}</span></span><span class="sset-chev">▾</span></summary>
+    <div class="sset-body">${body}</div></details>`;
   box.innerHTML = `<div class="card">
-    <h2>Einstellungen</h2>
-    <div class="grid2">
-      <div>
-        <h2 style="font-size:.95rem">Slots & Zeiten</h2>
-        <div class="row"><div class="field"><label>Arbeitsbeginn (erster Slot)</label><input id="e-start" value="${s.start_time}"></div>
-          <div class="field"><label>Letzter buchbarer Slot</label><input id="e-last" value="${s.last_start}"></div></div>
-        <div class="row"><div class="field"><label>Dauer Fahrstunde (Min)</label><input id="e-lesson" type="number" value="${s.lesson_min}" step="5"></div>
-          <div class="field"><label>Pause dazwischen (Min)</label><input id="e-break" type="number" value="${s.break_min}" step="5"></div></div>
-        <div class="field"><label>Arbeitstage</label>
-          <div class="inline" id="e-days">${WD.map((d, i) => `<label style="margin:0;font-weight:600"><input type="checkbox" data-day="${i + 1}" ${days.includes(i + 1) ? 'checked' : ''} style="width:auto"> ${d}</label>`).join('')}</div>
-        </div>
-        <div class="row">
-          <div class="field"><label>Max. Fahrstunden pro Schüler & Woche</label><input id="e-max" type="number" value="${s.max_per_week}" min="1"></div>
-          <div class="field"><label>Vorausbuchung (Tage)</label><input id="e-horizon" type="number" value="${s.booking_horizon_days}" min="1"></div>
-        </div>
-        <div class="row">
-          <div class="field"><label>Tägliche Freigabe-Uhrzeit</label><input id="e-release" value="${s.release_time || '10:00'}"></div>
-          <div class="field"><label>Letzter Slot an kurzen Tagen</label><input id="e-shortlast" value="${s.short_day_last_start || '13:35'}"></div>
-        </div>
-        <div class="row">
-          <div class="field"><label>Urlaubstag zählt (Min)</label><input id="e-vaccredit" type="number" value="${s.vacation_credit_min}" step="10"></div>
-          <div class="field"><label>Resturlaub (Tage)</label><input id="e-vacdays" type="number" value="${s.vacation_days_left}" step="1"></div>
-          <div class="field"><label>Toleranz Verspätung (Min)</label><input id="e-grace" type="number" value="${s.late_grace_min}" step="5"></div>
-        </div>
-        <div class="field"><label>Aufklärungstext (wird beim Buchen gezeigt)</label><textarea id="e-policy" rows="4" style="resize:vertical">${esc(s.policy_text || '')}</textarea></div>
-        <div class="row">
-          <div class="field"><label>Kostenlos stornieren bis (Std. vorher)</label><input id="e-cancel" type="number" value="${s.cancel_hours}" min="0"></div>
-          <div class="field"><label>Sperrfrist – fest ab (Std. vorher)</label><input id="e-lock" type="number" value="${s.lock_hours}" min="0"></div>
-        </div>
-      </div>
-      <div>
-        <h2 style="font-size:.95rem">Ziele (Tacho)</h2>
-        <div class="field"><label>Wochenziel (Stunden)</label><input id="e-wt" type="number" value="${s.weekly_target_h}" step="0.5"></div>
-        <div class="field"><label>Untere Zielspanne (Stunden)</label><input id="e-wlo" type="number" value="${s.weekly_lo_h}" step="0.5"></div>
-        <div class="field"><label>Tagesziel (Stunden)</label><input id="e-dt" type="number" value="${s.daily_target_h}" step="0.5"></div>
-        <div class="row">
-          <div class="field"><label>Monatsziel (Std, mind. 80)</label><input id="e-mt" type="number" value="${s.monthly_target_h}" min="80" step="1"></div>
-          <div class="field"><label>Monat Skala-Ende (höchstens)</label><input id="e-mmax" type="number" value="${s.monthly_max_h}" min="80" step="1"></div>
-        </div>
-        <div class="hint" id="e-preview"></div>
-        <h2 style="font-size:.95rem;margin-top:1.4rem">Zugang</h2>
-        <div class="field"><label>Angezeigter Name</label><input id="e-name" value="${esc(s.instructor_name)}"></div>
-        <div class="field"><label>Deine Handynummer (Schüler können anrufen/schreiben)</label><input id="e-phone" value="${esc(s.instructor_phone || '')}" placeholder="z.B. 0151 23456789"></div>
-        <div class="field"><label>Neues Fahrlehrer-Passwort (leer lassen = unverändert)</label><input id="e-pin" type="password" placeholder="mind. 8 Zeichen, mit Zahl & Sonderzeichen"></div>
+    <h2>Einstellungen <span class="sub">alles an einem Ort</span></h2>
+    <p class="hint">Tippe einen Bereich an, um ihn zu öffnen. Änderungen unten mit „Speichern“ sichern – das gilt für alle Bereiche zusammen.</p>
 
-        <h2 style="font-size:.95rem;margin-top:1.4rem">Live-Standort</h2>
-        <div class="row">
-          <div class="field"><label>Standort teilen ab (Min vorher)</label><input id="e-lead" type="number" value="${s.live_lead_min}" min="1"></div>
-          <div class="field"><label>Ø Tempo für ETA (km/h)</label><input id="e-speed" type="number" value="${s.avg_speed_kmh}" min="5"></div>
-        </div>
-        <div class="field"><label>Standard-Treffpunkt (nur Rückfall)</label>
-          <div class="inline"><input id="e-meet" value="${esc(s.meet_default_label || '')}" placeholder="z.B. Fahrschule / Bahnhof" style="flex:1">
-            <button class="sec sm" id="e-meet-here" type="button">📍 Standort</button></div>
-          <div class="hint" id="e-meet-info" style="margin:.3rem 0 0">${s.meet_default_lat ? '✓ Koordinaten hinterlegt' : 'Ohne Koordinaten nur als Text.'}</div>
-          <div class="hint" style="margin:.3rem 0 0">Wird nur genutzt, wenn weder beim Schüler noch bei der Fahrstunde ein Treffpunkt gesetzt ist. Pro Schüler: Reiter „Fahrschüler" → „Treffpunkt festlegen". Pro Termin: Fahrstunde öffnen → Feld „Treffpunkt".</div>
-        </div>
+    ${sec('🕒', 'Zeiten & Slots', 'Arbeitszeiten, Dauer, Pausen, Arbeitstage', `
+      <div class="row"><div class="field"><label>Arbeitsbeginn (erster Slot)</label><input id="e-start" value="${s.start_time}"></div>
+        <div class="field"><label>Letzter buchbarer Slot</label><input id="e-last" value="${s.last_start}"></div></div>
+      <div class="row"><div class="field"><label>Dauer Fahrstunde (Min)</label><input id="e-lesson" type="number" value="${s.lesson_min}" step="5"></div>
+        <div class="field"><label>Pause dazwischen (Min)</label><input id="e-break" type="number" value="${s.break_min}" step="5"></div></div>
+      <div class="field"><label>Arbeitstage</label>
+        <div class="daypick" id="e-days">${WD.map((d, i) => `<label class="dur-chip ${days.includes(i + 1) ? 'on' : ''}"><input type="checkbox" data-day="${i + 1}" ${days.includes(i + 1) ? 'checked' : ''}> ${d}</label>`).join('')}</div></div>
+      <div class="row"><div class="field"><label>Tägliche Freigabe-Uhrzeit</label><input id="e-release" value="${s.release_time || '10:00'}"></div>
+        <div class="field"><label>Letzter Slot an kurzen Tagen</label><input id="e-shortlast" value="${s.short_day_last_start || '13:35'}"></div></div>
+      <div class="hint" id="e-preview" style="margin-top:.3rem"></div>`, true)}
 
-        <h2 style="font-size:.95rem;margin-top:1.4rem">Datenschutz, Sonderfahrten & Rang</h2>
-        <div class="field"><label style="font-weight:600;color:var(--ink)"><input type="checkbox" id="e-anon" ${s.anonymous_swaps === '1' ? 'checked' : ''} style="width:auto"> Tausch anonym (Schüler sehen nicht, von wem ein Termin kommt)</label></div>
-        <div class="row">
-          <div class="field"><label>Soll Überland</label><input id="e-req-u" type="number" value="${s.req_ueberland}" min="0"></div>
-          <div class="field"><label>Soll Autobahn</label><input id="e-req-a" type="number" value="${s.req_autobahn}" min="0"></div>
-          <div class="field"><label>Soll Nachtfahrt</label><input id="e-req-n" type="number" value="${s.req_nacht}" min="0"></div>
-        </div>
-        <div class="row">
-          <div class="field"><label>Rang 2 ab (gefahrene Stunden)</label><input id="e-rank2" type="number" value="${s.rank2_min_lessons}" min="1"></div>
-          <div class="field"><label>Rang 2: Vorausbuchung (Tage)</label><input id="e-horizon2" type="number" value="${s.booking_horizon_days_rank2}" min="1"></div>
-        </div>
-      </div>
-    </div>
-    <div class="inline" style="margin-top:.6rem"><button id="e-save">Speichern</button><span id="e-msg" class="muted"></span></div>
+    ${sec('📅', 'Buchung & Stornierung', 'Vorausbuchung, Limits, Fristen, Aufklärungstext', `
+      <div class="row"><div class="field"><label>Max. Fahrstunden pro Schüler & Woche</label><input id="e-max" type="number" value="${s.max_per_week}" min="1"></div>
+        <div class="field"><label>Vorausbuchung (Tage)</label><input id="e-horizon" type="number" value="${s.booking_horizon_days}" min="1"></div></div>
+      <div class="row"><div class="field"><label>Kostenlos stornieren bis (Std. vorher)</label><input id="e-cancel" type="number" value="${s.cancel_hours}" min="0"></div>
+        <div class="field"><label>Sperrfrist – fest ab (Std. vorher)</label><input id="e-lock" type="number" value="${s.lock_hours}" min="0"></div></div>
+      <div class="field"><label>Toleranz Verspätung (Min)</label><input id="e-grace" type="number" value="${s.late_grace_min}" step="5"></div>
+      <div class="field"><label>Aufklärungstext (wird beim Buchen gezeigt)</label><textarea id="e-policy" rows="4" style="resize:vertical">${esc(s.policy_text || '')}</textarea></div>`)}
+
+    ${sec('🎯', 'Ziele (Tacho)', 'Wochen-, Tages- und Monatsziel', `
+      <div class="row"><div class="field"><label>Wochenziel (Stunden)</label><input id="e-wt" type="number" value="${s.weekly_target_h}" step="0.5"></div>
+        <div class="field"><label>Untere Zielspanne (Stunden)</label><input id="e-wlo" type="number" value="${s.weekly_lo_h}" step="0.5"></div></div>
+      <div class="field"><label>Tagesziel (Stunden)</label><input id="e-dt" type="number" value="${s.daily_target_h}" step="0.5"></div>
+      <div class="row"><div class="field"><label>Monatsziel (Std, mind. 80)</label><input id="e-mt" type="number" value="${s.monthly_target_h}" min="80" step="1"></div>
+        <div class="field"><label>Monat Skala-Ende (höchstens)</label><input id="e-mmax" type="number" value="${s.monthly_max_h}" min="80" step="1"></div></div>`)}
+
+    ${sec('🏆', 'Sonderfahrten & Rang', 'Soll-Fahrten, Rang-Aufstieg, anonymer Tausch', `
+      <div class="row"><div class="field"><label>Soll Überland</label><input id="e-req-u" type="number" value="${s.req_ueberland}" min="0"></div>
+        <div class="field"><label>Soll Autobahn</label><input id="e-req-a" type="number" value="${s.req_autobahn}" min="0"></div>
+        <div class="field"><label>Soll Nachtfahrt</label><input id="e-req-n" type="number" value="${s.req_nacht}" min="0"></div></div>
+      <div class="row"><div class="field"><label>Rang 2 ab (gefahrene Stunden)</label><input id="e-rank2" type="number" value="${s.rank2_min_lessons}" min="1"></div>
+        <div class="field"><label>Rang 2: Vorausbuchung (Tage)</label><input id="e-horizon2" type="number" value="${s.booking_horizon_days_rank2}" min="1"></div></div>
+      <label class="ck-line"><input type="checkbox" id="e-anon" ${s.anonymous_swaps === '1' ? 'checked' : ''}> Tausch anonym (Schüler sehen nicht, von wem ein Termin kommt)</label>`)}
+
+    ${sec('🌴', 'Urlaub', 'Urlaubskonto & Gutschrift', `
+      <div class="row"><div class="field"><label>Urlaubstag zählt (Min)</label><input id="e-vaccredit" type="number" value="${s.vacation_credit_min}" step="10"></div>
+        <div class="field"><label>Resturlaub (Tage)</label><input id="e-vacdays" type="number" value="${s.vacation_days_left}" step="1"></div></div>`)}
+
+    ${sec('🛰️', 'Live-Standort & Treffpunkt', 'Abholung, ETA-Tempo, Standard-Treffpunkt', `
+      <div class="row"><div class="field"><label>Standort teilen ab (Min vorher)</label><input id="e-lead" type="number" value="${s.live_lead_min}" min="1"></div>
+        <div class="field"><label>Ø Tempo für ETA (km/h)</label><input id="e-speed" type="number" value="${s.avg_speed_kmh}" min="5"></div></div>
+      <div class="field"><label>Standard-Treffpunkt (nur Rückfall)</label>
+        <div class="inline"><input id="e-meet" value="${esc(s.meet_default_label || '')}" placeholder="z.B. Fahrschule / Bahnhof" style="flex:1">
+          <button class="sec sm" id="e-meet-here" type="button">📍 Standort</button></div>
+        <div class="hint" id="e-meet-info" style="margin:.3rem 0 0">${s.meet_default_lat ? '✓ Koordinaten hinterlegt' : 'Ohne Koordinaten nur als Text.'}</div>
+        <div class="hint" style="margin:.3rem 0 0">Wird nur genutzt, wenn weder beim Schüler noch beim Termin ein Treffpunkt gesetzt ist.</div></div>`)}
+
+    ${sec('👤', 'Zugang & Kontakt', 'Name, Handynummer, Passwort', `
+      <div class="field"><label>Angezeigter Name</label><input id="e-name" value="${esc(s.instructor_name)}"></div>
+      <div class="field"><label>Deine Handynummer (Schüler können anrufen/schreiben)</label><input id="e-phone" value="${esc(s.instructor_phone || '')}" placeholder="z.B. 0151 23456789"></div>
+      <div class="field" style="margin-bottom:0"><label>Neues Fahrlehrer-Passwort (leer = unverändert)</label><input id="e-pin" type="password" placeholder="mind. 8 Zeichen, mit Zahl & Sonderzeichen"></div>`)}
+
+    <div class="actions" style="justify-content:flex-start"><button id="e-save">💾 Alles speichern</button><span id="e-msg" class="muted"></span></div>
   </div>`;
   const updatePreview = () => {
     const start = $('#e-start').value, last = $('#e-last').value;
@@ -2956,6 +2944,9 @@ function tabEinstellungen() {
   };
   ['e-start', 'e-last', 'e-lesson', 'e-break'].forEach((id) => $('#' + id).oninput = updatePreview);
   updatePreview();
+  // Arbeitstage-Chips optisch mitschalten
+  box.querySelectorAll('#e-days [data-day]').forEach((cb) => cb.onchange = () =>
+    cb.closest('.dur-chip')?.classList.toggle('on', cb.checked));
   let meetLat = s.meet_default_lat || '', meetLng = s.meet_default_lng || '';
   $('#e-meet-here').onclick = async () => {
     try { const c = await getPosOnce(); meetLat = c.latitude; meetLng = c.longitude;

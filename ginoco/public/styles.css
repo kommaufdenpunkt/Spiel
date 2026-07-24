@@ -118,6 +118,23 @@ main{max-width:1080px;margin:0 auto;padding:1.4rem 1.2rem 4rem}
 .linklike:hover{text-decoration:underline;background:none}
 .stu-actions{display:flex;flex-wrap:wrap;gap:.35rem;border-top:1px solid var(--line);padding-top:.6rem}
 .stu-actions .stu-del{margin-left:auto}
+/* ---- Einstellungen: aufklappbare Abschnitte ---- */
+.sset{background:var(--card2);border:1px solid var(--line);border-radius:12px;margin-bottom:.6rem;overflow:hidden}
+.sset>summary{display:flex;align-items:center;gap:.7rem;padding:.8rem .85rem;cursor:pointer;list-style:none;user-select:none}
+.sset>summary::-webkit-details-marker{display:none}
+.sset-ic{font-size:1.3rem;flex:0 0 auto;width:2rem;text-align:center}
+.sset-tx{flex:1;min-width:0;display:flex;flex-direction:column}
+.sset-tt{font-weight:800;color:var(--ink);font-size:.98rem}
+.sset-sub{font-size:.78rem;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sset-chev{flex:0 0 auto;color:var(--muted);transition:transform .2s}
+.sset[open]>summary .sset-chev{transform:rotate(180deg)}
+.sset[open]>summary{border-bottom:1px solid var(--line)}
+.sset>summary:hover{background:var(--card)}
+.sset-body{padding:.85rem}
+.sset-body .field:last-child{margin-bottom:0}
+.daypick{display:flex;flex-wrap:wrap;gap:.35rem}
+.ck-line{display:flex;align-items:flex-start;gap:.5rem;font-size:.9rem;font-weight:600;color:var(--ink);margin:0;cursor:pointer}
+.ck-line input{width:auto;flex:0 0 auto;margin-top:.15rem}
 
 /* ---- Slots ---- */
 .dateline{display:flex;align-items:center;gap:.6rem;margin-bottom:1rem;flex-wrap:wrap}
