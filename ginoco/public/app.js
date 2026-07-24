@@ -2153,39 +2153,54 @@ async function tabSchueler(scope) {
         <span class="pill" id="s-count">${students.length}</span>
       </div>
       <p class="muted hidden" id="s-noresult">Keine Treffer.</p>
-      <table>
-      <tr><th>Name</th><th>Login-Name</th><th>Kontakt</th><th>Treffpunkt</th><th>Gefahren / Rang</th><th>Sonderfahrten</th><th>Erlaubte Längen (Min)</th></tr>
+      <div class="stu-grid">
       ${students.map((s) => {
         const searchStr = [s.name, s.username, s.email, s.phone].filter(Boolean).join(' ').toLowerCase();
         const durs = String(s.allowed_durations || '80').split(',').map(Number);
-        const boxes = [40, 80, 120].map((d) => `<label style="margin:0;font-weight:600"><input type="checkbox" data-sdur="${s.id}" value="${d}" ${durs.includes(d) ? 'checked' : ''} style="width:auto"> ${d}</label>`).join(' ');
+        const boxes = [40, 80, 120].map((d) => `<label class="dur-chip ${durs.includes(d) ? 'on' : ''}"><input type="checkbox" data-sdur="${s.id}" value="${d}" ${durs.includes(d) ? 'checked' : ''}> ${d}</label>`).join('');
         const hasHome = s.home_label || s.home_lat != null;
         const homeCell = hasHome
           ? `<span class="pill" style="background:var(--good-bg);color:var(--good)">📍 ${esc(s.home_label || 'gesetzt')}</span>`
           : `<span class="muted">– nicht vereinbart –</span>`;
         const isArch = !!s.archived_at;
         const av = s.has_photo ? `<img src="/api/students/${s.id}/photo" alt="">` : `<span>${esc(initials(s.name))}</span>`;
-        return `<tr data-search="${esc(searchStr)}">
-          <td class="s-name-cell"><span class="mini-avatar">${av}</span><strong>${esc(s.name)}</strong>${s.birth_year ? ` <span class="muted">(${s.birth_year})</span>` : ''}
-            ${isArch ? '<br><span class="pill" style="background:var(--good-bg);color:var(--good)">✅ bestanden</span>' : ''}
-            ${s.notes ? `<br><span class="muted" title="${esc(s.notes)}" style="font-size:.78rem">📝 ${esc(s.notes.length > 40 ? s.notes.slice(0, 40) + '…' : s.notes)}</span>` : ''}
-            <div class="inline" style="margin-top:.3rem;gap:.3rem;flex-wrap:wrap">
-              <button class="ghost sm" data-edit="${s.id}">✏️ Bearbeiten</button>
-              <button class="ghost sm" data-card="${s.id}" data-cname="${esc(s.name)}">📋 Ausbildungskarte</button>
-              ${isArch
-                ? `<button class="ghost sm" data-react="${s.id}" style="color:var(--brand)">↩︎ Reaktivieren</button>`
-                : `<button class="ghost sm" data-arch="${s.id}" data-aname="${esc(s.name)}" style="color:var(--good)">✅ Bestanden</button>`}
-              <button class="ghost sm" data-del="${s.id}" data-dname="${esc(s.name)}" style="color:var(--bad)">🗑️</button>
-            </div></td>
-          <td data-label="Login-Name"><span class="codechip">${esc(s.username || '–')}</span><br><button class="ghost sm" data-reset="${s.id}" data-uname="${esc(s.username || '')}" data-sname="${esc(s.name)}" style="margin-top:.3rem">🔑 Zugangsdaten</button></td>
-          <td data-label="Kontakt">${esc(s.email || '')}<br><span class="muted">${esc(s.phone || '–')}</span>${s.phone ? '<br>' + contactButtons(s.phone, `Hallo ${s.name.split(' ')[0]}, hier ${state.settings?.instructor_name || 'deine Fahrschule'}:`) : ''}</td>
-          <td data-label="Treffpunkt">${homeCell}<br><button class="ghost sm" data-home="${s.id}" data-sname="${esc(s.name)}" data-hlabel="${esc(s.home_label || '')}" data-hlat="${s.home_lat != null ? s.home_lat : ''}" data-hlng="${s.home_lng != null ? s.home_lng : ''}" style="margin-top:.3rem">Treffpunkt festlegen</button></td>
-          <td data-label="Gefahren / Rang">${s.done_count} Std.<br><span class="pill" style="background:${s.rank >= 2 ? 'var(--good-bg);color:var(--good)' : ''}">Rang ${s.rank} · ${s.horizon} Tage</span></td>
-          <td data-label="Sonderfahrten">${sonderCell(s)}</td>
-          <td data-label="Erlaubte Längen (Min)"><div class="inline">${boxes} <button class="sec sm" data-savedur="${s.id}">Speichern</button></div></td>
-        </tr>`;
+        const contact = s.phone
+          ? `<span class="muted">${esc(s.phone)}</span> ${contactButtons(s.phone, `Hallo ${s.name.split(' ')[0]}, hier ${state.settings?.instructor_name || 'deine Fahrschule'}:`)}`
+          : (s.email ? `<span class="muted">${esc(s.email)}</span>` : '<span class="muted">– kein Kontakt –</span>');
+        return `<div class="stu-card" data-search="${esc(searchStr)}">
+          <div class="stu-head">
+            <span class="stu-av">${av}</span>
+            <div class="stu-name">${esc(s.name)}${s.birth_year ? ` <span class="muted">(${s.birth_year})</span>` : ''}</div>
+            <div class="stu-hours"><b>${s.done_count}</b><span>Std.</span></div>
+          </div>
+          <div class="stu-chips">
+            <span class="codechip">${esc(s.username || '–')}</span>
+            <span class="pill" style="${s.rank >= 2 ? 'background:var(--good-bg);color:var(--good)' : ''}">🏆 Rang ${s.rank} · ${s.horizon} T</span>
+            ${isArch ? '<span class="pill" style="background:var(--good-bg);color:var(--good)">✅ bestanden</span>' : ''}
+          </div>
+          ${s.notes ? `<div class="stu-note" title="${esc(s.notes)}">📝 ${esc(s.notes.length > 80 ? s.notes.slice(0, 80) + '…' : s.notes)}</div>` : ''}
+          <div class="stu-info">
+            <div class="sir"><span class="sil">📞</span><span class="siv">${contact}</span></div>
+            <div class="sir"><span class="sil">📍</span><span class="siv">${homeCell}
+              <button class="linklike" data-home="${s.id}" data-sname="${esc(s.name)}" data-hlabel="${esc(s.home_label || '')}" data-hlat="${s.home_lat != null ? s.home_lat : ''}" data-hlng="${s.home_lng != null ? s.home_lng : ''}">${hasHome ? 'ändern' : 'festlegen'}</button></span></div>
+            <div class="sir"><span class="sil">🎯</span><span class="siv stu-sonder">${sonderCell(s)}</span></div>
+            <div class="sir"><span class="sil">⏱️</span><span class="siv stu-lengths">${boxes}<button class="linklike" data-savedur="${s.id}">speichern</button></span></div>
+          </div>
+          <div class="stu-actions">
+            <button class="ghost sm" data-edit="${s.id}">✏️ Bearbeiten</button>
+            <button class="ghost sm" data-card="${s.id}" data-cname="${esc(s.name)}">📋 Ausbildungskarte</button>
+            <button class="ghost sm" data-reset="${s.id}" data-uname="${esc(s.username || '')}" data-sname="${esc(s.name)}">🔑 Zugangsdaten</button>
+            ${isArch
+              ? `<button class="ghost sm" data-react="${s.id}" style="color:var(--brand)">↩︎ Reaktivieren</button>`
+              : `<button class="ghost sm" data-arch="${s.id}" data-aname="${esc(s.name)}" style="color:var(--good)">✅ Bestanden</button>`}
+            <button class="ghost sm stu-del" data-del="${s.id}" data-dname="${esc(s.name)}" style="color:var(--bad)">🗑️</button>
+          </div>
+        </div>`;
       }).join('')}
-    </table>`;
+      </div>`;
+    // Längen-Chips: optisch mitschalten
+    $('#s-list').querySelectorAll('[data-sdur]').forEach((cb) => cb.onchange = () =>
+      cb.closest('.dur-chip')?.classList.toggle('on', cb.checked));
     $('#s-list').querySelectorAll('[data-savedur]').forEach((btn) => btn.onclick = async () => {
       const id = btn.dataset.savedur;
       const vals = [...$('#s-list').querySelectorAll(`[data-sdur="${id}"]`)].filter((c) => c.checked).map((c) => Number(c.value));
@@ -2217,7 +2232,7 @@ async function tabSchueler(scope) {
     if (search) search.oninput = () => {
       const q = search.value.trim().toLowerCase();
       let shown = 0;
-      $('#s-list').querySelectorAll('tr[data-search]').forEach((tr) => {
+      $('#s-list').querySelectorAll('.stu-card[data-search]').forEach((tr) => {
         const match = !q || tr.dataset.search.includes(q);
         tr.style.display = match ? '' : 'none';
         if (match) shown++;
