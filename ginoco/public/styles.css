@@ -85,6 +85,11 @@ main{max-width:1080px;margin:0 auto;padding:1.4rem 1.2rem 4rem}
   border:1px solid rgba(229,96,95,.3)}
 .form-actions{margin-top:.4rem}
 .form-actions button{width:100%;padding:.7rem}
+/* Ganzen Tag sperren: Banner + Knopf */
+.day-blocked{background:var(--bad-bg);color:var(--bad);border:1px solid rgba(229,96,95,.35);
+  border-radius:10px;padding:.6rem .8rem;font-size:.9rem;margin-bottom:.7rem;text-align:center}
+#k-block.danger{background:transparent;color:var(--bad);border:1px solid rgba(229,96,95,.5)}
+#k-block.danger:hover{background:var(--bad-bg)}
 
 /* ---- Slots ---- */
 .dateline{display:flex;align-items:center;gap:.6rem;margin-bottom:1rem;flex-wrap:wrap}

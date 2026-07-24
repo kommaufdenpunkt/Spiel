@@ -1683,7 +1683,8 @@ async function tabKalender() {
       <span class="day" id="k-label"></span>
       <button class="sec sm" id="k-next">›</button>
       <input type="date" id="k-date" style="max-width:160px">
-      <button class="ghost sm" id="k-late" style="margin-left:auto">⏱️ Ich komme später</button>
+      ${mode === 'tag' ? '<button class="ghost sm" id="k-block" style="margin-left:auto"></button>' : ''}
+      <button class="ghost sm" id="k-late"${mode === 'tag' ? '' : ' style="margin-left:auto"'}>⏱️ Ich komme später</button>
       <button class="ghost sm" id="k-gap">🧩 Lücken schließen</button>
       <button class="ghost sm" id="k-bulk">📋 Sammel-Eintragen</button>
       <button class="sm" id="k-add">+ Eigener Termin</button>
@@ -1805,7 +1806,35 @@ async function loadK() {
     const ov = await api('/api/instructor/overview?from=' + state.date + '&to=' + state.date);
     window.__instrBookings = ov.bookings;
     renderInstrDay($('#k-list'), state.date, ov.bookings, ov.blocks);
+    const blocked = (ov.overrides || []).some((o) => o.date === state.date && o.closed);
+    if (blocked) $('#k-list').insertAdjacentHTML('afterbegin',
+      '<div class="day-blocked">🚫 <strong>Tag komplett gesperrt</strong> – Fahrschüler können an diesem Tag nichts buchen.</div>');
+    setDayBlockBtn(blocked);
   } catch (e) { toast(e.message, 'err'); }
+}
+// Ein-Tipp-Knopf: ganzen Tag sperren / wieder freigeben
+function setDayBlockBtn(blocked) {
+  const btn = $('#k-block');
+  if (!btn) return;
+  btn.textContent = blocked ? '🔓 Tag freigeben' : '🚫 Tag sperren';
+  btn.classList.toggle('danger', !blocked);
+  btn.onclick = async () => {
+    try {
+      if (blocked) {
+        await api('/api/day-overrides/' + state.date, { method: 'DELETE' });
+        toast('Tag wieder freigegeben ✓', 'ok');
+      } else {
+        const send = (force) => api('/api/day-overrides', { method: 'POST', body: force ? { type: 'free', date: state.date, force: true } : { type: 'free', date: state.date } });
+        try { await send(false); }
+        catch (e) {
+          if (/schon .* Termin/.test(e.message) && confirm(e.message + '\n\nTrotzdem sperren? Denk daran, die Schüler an dem Tag zu informieren.')) await send(true);
+          else throw e;
+        }
+        toast('Tag komplett gesperrt 🚫', 'ok');
+      }
+      loadK();
+    } catch (e) { toast(e.message, 'err'); }
+  };
 }
 
 // Farbe je Fahrschüler (stabil über die id)
