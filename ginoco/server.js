@@ -15,7 +15,7 @@ const PUBLIC = join(__dirname, 'public');
 const PORT = Number(process.env.PORT || 3000);
 const HOST = process.env.HOST || '0.0.0.0'; // hinter Caddy: HOST=127.0.0.1 (nur Proxy erreicht Node)
 const SESSION_DAYS = 30;
-const APP_VERSION = "3.13.1";
+const APP_VERSION = "3.13.2";
 // Einstellungen, die Schueler/Oeffentlichkeit sehen duerfen (Rest bleibt beim Fahrlehrer)
 const PUBLIC_SETTINGS = ['instructor_name', 'instructor_phone', 'policy_text',
   'cancel_hours', 'lock_hours', 'booking_horizon_days', 'booking_horizon_days_rank2',
@@ -783,10 +783,13 @@ async function handleApi(req, res, url) {
   if (p === '/api/my/live' && method === 'GET') {
     if (!requireStudent()) return bad(res, 'Bitte anmelden', 401);
     const lead = Number(getSettingRaw('live_lead_min'));
+    // Abhol-Fenster: bis 45 Min vorher (damit man den Abholort früh setzen kann),
+    // bis kurz nach Beginn. Der Fahrlehrer-Standort wird separat nur bei aktivem Teilen gezeigt.
+    const winMin = Math.max(lead, 45);
     const upcoming = db.prepare(
       "SELECT * FROM bookings WHERE student_id=? AND date=? AND status='booked' ORDER BY start_time").all(sess.student_id, todayStr())
       .map((b) => ({ b, h: hoursUntil(b.date, b.start_time) }))
-      .filter((x) => x.h > -0.25 && x.h * 60 <= lead)
+      .filter((x) => x.h > -0.25 && x.h * 60 <= winMin)
       .sort((a, z) => a.h - z.h)[0];
     if (!upcoming) return ok(res, { window: false });
     const bk = upcoming.b;
