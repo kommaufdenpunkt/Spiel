@@ -331,7 +331,7 @@ const TOUR = [
   { icon: '👋', title: 'Willkommen bei ginoco', text: 'Hier buchst du deine Fahrstunden selbst – schnell und von überall. In ein paar kurzen Schritten zeige ich dir, wie es geht. Du kannst jederzeit auf „Überspringen“ tippen.' },
   { icon: '📅', title: '1. Fahrstunde buchen', text: 'Am schnellsten geht’s mit <strong>🔎 Nächster freier Termin</strong> – ein Tipp und du landest direkt beim nächsten freien Tag. Oder blättere mit ‹ › durch die Tage. Freie Zeiten sind <strong>grün</strong> und mit „FREI“ markiert. Tippe auf <strong>Buchen</strong>, wähle die Dauer (z. B. 80 Min) und bestätige mit „Ja, verbindlich buchen“. Fertig! ✅' },
   { icon: '📋', title: '2. Deine Termine', text: 'Oben unter <strong>„Meine Termine“</strong> siehst du alle gebuchten Stunden mit Datum, Uhrzeit und Treffpunkt. Über <strong>„Zum Kalender hinzufügen“</strong> landen sie in deinem Handy-Kalender.' },
-  { icon: '🔄', title: '3. Doch keine Zeit?', text: 'Kannst du an dem Tag nicht: Tippe bei der Stunde auf <strong>„Zur Übernahme anbieten“</strong> – ein anderer Fahrschüler kann sie dann übernehmen (anonym, keiner sieht deinen Namen). Ist es noch früh genug, kannst du auch einfach <strong>„Stornieren“</strong>.' },
+  { icon: '🎁', title: '3. Doch keine Zeit?', text: 'Kannst du an dem Tag nicht: Tippe bei der Stunde auf <strong>„🎁 Ins Angebot geben“</strong> – deine Stunde landet dann in den <strong>Angeboten</strong>, und ein anderer Fahrschüler kann sie übernehmen (auf Wunsch anonym – keiner muss deinen Namen sehen). Übernimmt niemand, bleibt sie einfach bei dir. Ist es noch früh genug, kannst du auch <strong>„Stornieren“</strong>.' },
   { icon: '👤', title: '4. Dein Profil', text: 'Tippe oben auf <strong>👤</strong> und vervollständige deine Daten (Name, Handynummer, Jahrgang). Die sieht <strong>nur dein Fahrlehrer</strong> – kein anderer Fahrschüler.' },
   { icon: '🎉', title: 'Los geht’s!', text: 'Das war’s schon. Viel Erfolg beim Üben! 🚗 Diese Einführung findest du jederzeit wieder über das <strong>❓</strong> oben rechts.' },
 ];
@@ -455,7 +455,17 @@ function modal(html, extra) {
   closeModal();
   const bg = document.createElement('div');
   bg.className = 'modal-bg';
-  bg.innerHTML = `<div class="modal${extra === 'wide' ? ' wide' : ''}">${html}</div>`;
+  const m = document.createElement('div');
+  m.className = 'modal' + (extra === 'wide' ? ' wide' : '');
+  m.innerHTML = html;
+  // Inhalt in einen eigenen Scroll-Bereich packen; die Aktionsleiste (falls vorhanden)
+  // bleibt als fester Footer außen – so überlappt nichts und nichts scheint durch.
+  const actions = m.querySelector(':scope > .actions');
+  const body = document.createElement('div');
+  body.className = 'modal-body';
+  while (m.firstChild && m.firstChild !== actions) body.appendChild(m.firstChild);
+  m.insertBefore(body, m.firstChild);
+  bg.appendChild(m);
   bg.addEventListener('click', (e) => { if (e.target === bg) closeModal(); });
   document.body.appendChild(bg);
   const pwa = document.getElementById('pwa-install'); if (pwa) pwa.style.display = 'none';  // überlappt sonst das Fenster
@@ -519,7 +529,7 @@ const STUDENT_NAV = [
   ['__group', 'Übersicht'],
   ['week-card', '📅', 'Meine Woche'], ['slots', '🚗', 'Termin buchen'],
   ['__group', 'Mehr'],
-  ['notif-card', '🔔', 'Mitteilungen'], ['offers-card', '🎁', 'Feed'],
+  ['notif-card', '🔔', 'Mitteilungen'], ['offers-card', '🎁', 'Angebote'],
 ];
 // Flache Liste (mit '__group'-Markern) -> gruppierte Kacheln
 function edgeTilesHTML(items, attr) {
@@ -574,7 +584,7 @@ function mountEdgeMenus(role) {
   // freundlich mit Leer-Zustand zeigen. Beim nächsten Sync werden sie – falls
   // weiterhin leer – wieder ausgeblendet.
   const EMPTY_SECTION = {
-    'offers-card': '<h2>🎁 Feed</h2><p class="muted">Gerade gibt niemand eine Fahrstunde ab. Schau später wieder rein – hier erscheinen freie Stunden, die du übernehmen kannst.</p>',
+    'offers-card': '<h2>🎁 Angebote</h2><p class="muted">Gerade gibt niemand eine Fahrstunde ab. Schau später wieder rein – hier erscheinen freie Stunden, die du übernehmen kannst.</p>',
     'notif-card': '<h2>🔔 Mitteilungen</h2><p class="muted">Keine neuen Mitteilungen. Hier landen z.B. neue Termine, Verschiebungen oder Angebote.</p>',
     'lesson-card': '<h2>🚗 Deine Fahrstunde</h2><p class="muted">Rund um deine nächste Fahrstunde erscheint hier der Start-Knopf und der Fahrzeit-Timer.</p>',
     'live-card': '<h2>📍 Treffpunkt</h2><p class="muted">Kurz vor deiner Fahrstunde siehst du hier den Treffpunkt und wo dein Fahrlehrer gerade ist.</p>',
@@ -954,8 +964,8 @@ function studentBookingItem(b) {
   if (b.status === 'done') {
     st = '<span class="badge done">gefahren</span>';
   } else if (b.status === 'offered') {
-    st = '<span class="badge offer">🔄 zur Übernahme angeboten</span>';
-    actions = `<button class="ghost sm" data-withdraw="${b.id}">Angebot zurücknehmen</button>`;
+    st = '<span class="badge offer">🎁 im Angebot</span>';
+    actions = `<button class="ghost sm" data-withdraw="${b.id}">Zurücknehmen</button>`;
   } else if (b.confirmed === 0) {
     // Vom Fahrlehrer reservierter Termin – der Schüler bestätigt ihn zuerst.
     st = '<span class="badge reserved">🔶 reserviert</span>';
@@ -968,11 +978,11 @@ function studentBookingItem(b) {
       // gesperrt: Termin steht fest
       actions = `<span class="pill">🔒 fest gebucht</span>`;
     } else if (soon) {
-      // zwischen Sperr- und Storno-Frist: nur anbieten
-      actions = `<button class="sm" data-offer="${b.id}" title="Kostenfreies Storno nur bis ${cancelH} h vorher – biete die Stunde anderen an">Zur Übernahme anbieten</button>`;
+      // zwischen Sperr- und Storno-Frist: nur noch ins Angebot geben
+      actions = `<button class="sm" data-offer="${b.id}" title="Kostenfreies Storno nur bis ${cancelH} h vorher – gib die Stunde stattdessen ins Angebot">🎁 Ins Angebot geben</button>`;
     } else {
-      actions = `<button class="ghost sm" data-cancel="${b.id}">Stornieren</button>
-        <button class="ghost sm" data-offer="${b.id}">Anbieten</button>`;
+      actions = `<button class="sm" data-offer="${b.id}">🎁 Ins Angebot geben</button>
+        <button class="ghost sm" data-cancel="${b.id}">Stornieren</button>`;
     }
   }
   const fb = (b.status === 'done' && b.feedback) ? `<div class="lesson-fb">📝 ${esc(b.feedback)}</div>` : '';
@@ -1208,7 +1218,7 @@ function renderOffers(offers, wi) {
   if (!offers.length) { card.classList.add('hidden'); return; }
   card.classList.remove('hidden');
   const canTake = wi.remaining > 0;
-  card.innerHTML = `<h2>🎁 Feed <span class="sub">Fahrstunden, die andere abgeben</span></h2>
+  card.innerHTML = `<h2>🎁 Angebote <span class="sub">Fahrstunden, die andere abgeben</span></h2>
     ${!canTake ? '<p class="hint">Du hast diese Woche schon dein Limit erreicht – Übernahme aus dieser Woche ist gesperrt.</p>' : ''}
     <div class="blist">${offers.map((o) => `<div class="bitem warm">
       <div><div class="when">${WD[isoDow(o.date) - 1]} ${fmtShort(o.date)} · ${o.start_time} <span class="muted" style="font-weight:400">(${o.duration_min} Min)</span></div>
@@ -1223,8 +1233,8 @@ function renderOffers(offers, wi) {
 
 function offerBooking(id) {
   const vorname = firstName(state.user?.name);
-  modal(`<h3>Fahrstunde abgeben</h3>
-    <p class="hint">Deine Stunde erscheint im <strong>Feed</strong> – andere Fahrschüler können sie übernehmen. Kann niemand, bleibt sie bei dir.</p>
+  modal(`<h3>🎁 Ins Angebot geben</h3>
+    <p class="hint">Deine Stunde kommt in die <strong>Angebote</strong> – andere Fahrschüler können sie übernehmen. Übernimmt niemand, bleibt sie ganz normal bei dir.</p>
     <p style="margin:.5rem 0 .3rem">Möchtest du dabei erkennbar sein?</p>
     <div class="offer-choice">
       <button class="sec" id="of-anon">🕶️ Anonym abgeben<span class="oc-sub">Niemand sieht, dass die Stunde von dir ist</span></button>
@@ -1232,7 +1242,7 @@ function offerBooking(id) {
     </div>
     <div class="actions"><button class="sec" onclick="window.__closeModal()">Abbrechen</button></div>`);
   const go = async (named) => {
-    try { await api('/api/bookings/' + id + '/offer', { method: 'POST', body: { named } }); closeModal(); toast('Im Feed abgegeben ✓', 'ok'); syncStudent(); }
+    try { await api('/api/bookings/' + id + '/offer', { method: 'POST', body: { named } }); closeModal(); toast('Ins Angebot gestellt ✓', 'ok'); syncStudent(); }
     catch (e) { toast(e.message, 'err'); }
   };
   $('#of-anon').onclick = () => go(false);
