@@ -446,9 +446,10 @@ th{color:var(--muted);font-weight:600;font-size:.78rem;text-transform:uppercase;
 .reserve-note strong{color:#ffd9a0}
 
 /* ---- Aussehen-Panel (Farbe, Schrift, Größe) ---- */
-.ap-sec{margin:.2rem 0 .9rem}
-.ap-label{font-size:.85rem;font-weight:700;color:var(--ink);margin-bottom:.45rem}
-.ap-label .muted{font-weight:400}
+.ap-sec{padding:.9rem 0;margin:0;border-top:1px solid var(--line)}
+.ap-sec:first-of-type{border-top:none;padding-top:.2rem}
+.ap-label{font-size:.78rem;font-weight:800;color:var(--brand);margin-bottom:.5rem;text-transform:uppercase;letter-spacing:.03em}
+.ap-label .muted{font-weight:500;text-transform:none;letter-spacing:0;color:var(--muted)}
 .ap-grid2{display:grid;grid-template-columns:1fr 1fr;gap:.5rem}
 .ap-fonts{display:grid;grid-template-columns:1fr 1fr;gap:.5rem}
 .ap-swatches{display:flex;gap:.55rem;flex-wrap:wrap;align-items:center}
@@ -550,3 +551,5 @@ th{color:var(--muted);font-weight:600;font-size:.78rem;text-transform:uppercase;
   padding:.7rem 1.2rem;font-weight:600;font-size:.95rem;width:auto;
   box-shadow:0 8px 24px rgba(0,0,0,.4);cursor:pointer}
 .pwa-install:hover{background:var(--brand-dark)}
+/* Install-Knopf ausblenden, solange ein Fenster (Modal) offen ist – sonst überlappt er */
+body:has(.modal-bg) .pwa-install{display:none}

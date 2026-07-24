@@ -458,9 +458,13 @@ function modal(html, extra) {
   bg.innerHTML = `<div class="modal${extra === 'wide' ? ' wide' : ''}">${html}</div>`;
   bg.addEventListener('click', (e) => { if (e.target === bg) closeModal(); });
   document.body.appendChild(bg);
+  const pwa = document.getElementById('pwa-install'); if (pwa) pwa.style.display = 'none';  // überlappt sonst das Fenster
   return bg;
 }
-function closeModal() { const m = $('.modal-bg'); if (m) m.remove(); }
+function closeModal() {
+  const m = $('.modal-bg'); if (m) m.remove();
+  if (!$('.modal-bg')) { const pwa = document.getElementById('pwa-install'); if (pwa) pwa.style.display = ''; }
+}
 
 // ====================== Boot ======================
 (async function boot() {
