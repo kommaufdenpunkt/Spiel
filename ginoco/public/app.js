@@ -201,17 +201,17 @@ async function openProfileModal() {
   const avatar = (hasPhoto) => hasPhoto
     ? `<img src="/api/my/photo?t=${Date.now()}" alt="Profilfoto">`
     : `<span>${esc(initials(pr.name))}</span>`;
-  modal(`<h3>Mein Profil</h3>
-    <div class="err hidden" id="pf-err"></div>
-    <p class="hint">Vervollständige deine Daten. Sie sind <strong>nur für deinen Fahrlehrer</strong> sichtbar – kein anderer Fahrschüler sieht sie.</p>
-    <div class="pf-photo">
-      <div class="pf-avatar" id="pf-avatar">${avatar(!!pr.has_photo)}</div>
-      <div class="pf-photo-actions">
-        <label class="sec sm pf-filebtn">📷 Foto wählen<input type="file" id="pf-file" accept="image/*" hidden></label>
-        <button class="ghost sm ${pr.has_photo ? '' : 'hidden'}" id="pf-photo-del">Entfernen</button>
-        <div class="hint" style="margin:.35rem 0 0">Nur dein Fahrlehrer sieht dein Foto.</div>
+  modal(`<div class="pf-hero">
+      <div class="pf-avatar-lg">
+        <span class="pf-av-inner" id="pf-av-inner">${avatar(!!pr.has_photo)}</span>
+        <label class="pf-cam" title="Foto ändern">📷<input type="file" id="pf-file" accept="image/*" hidden></label>
       </div>
+      <div class="pf-name-big" id="pf-name-big">${esc(pr.name || 'Dein Name')}</div>
+      ${pr.username ? `<span class="pill pf-user">${esc(pr.username)}</span>` : ''}
+      <button class="ghost sm ${pr.has_photo ? '' : 'hidden'}" id="pf-photo-del" style="margin-top:.4rem">Foto entfernen</button>
     </div>
+    <div class="pf-privacy">🔒 Nur dein Fahrlehrer sieht dein Profil – kein anderer Fahrschüler.</div>
+    <div class="err hidden" id="pf-err"></div>
     <div class="field"><label>Name</label><input id="pf-name" value="${esc(pr.name || '')}" placeholder="Vor- und Nachname"></div>
     <div class="row">
       <div class="field"><label>Handynummer</label><input id="pf-phone" value="${esc(pr.phone || '')}" placeholder="z.B. 0151 23456789"></div>
@@ -221,7 +221,7 @@ async function openProfileModal() {
     <div class="field"><label>Login-Name (fest, ändert sich nicht)</label><input value="${esc(pr.username || '')}" readonly></div>
     ${ip ? `<div class="field"><label>Fahrschule erreichen</label><div class="inline">${contactButtons(ip)}</div></div>` : ''}
     <div class="actions"><button class="sec" onclick="window.__closeModal()">Schließen</button><button id="pf-save">Speichern</button></div>`);
-  const avEl = $('#pf-avatar'), delBtn = $('#pf-photo-del');
+  const avEl = $('#pf-av-inner'), delBtn = $('#pf-photo-del');
   $('#pf-file').onchange = async (e) => {
     const file = e.target.files && e.target.files[0];
     if (!file) return;
@@ -244,6 +244,8 @@ async function openProfileModal() {
       toast('Foto entfernt', 'ok');
     } catch (err) { toast(err.message, 'err'); }
   };
+  // Name-Vorschau oben live mitführen
+  $('#pf-name').oninput = () => { const nb = $('#pf-name-big'); if (nb) nb.textContent = $('#pf-name').value.trim() || 'Dein Name'; };
   $('#pf-save').onclick = async () => {
     try {
       await api('/api/my/profile', { method: 'PATCH', body: {

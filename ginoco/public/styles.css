@@ -272,6 +272,20 @@ th{color:var(--muted);font-weight:600;font-size:.78rem;text-transform:uppercase;
 .pf-avatar img{width:100%;height:100%;object-fit:cover;display:block}
 .pf-photo-actions{display:flex;flex-direction:column;gap:.35rem;align-items:flex-start}
 .pf-filebtn{display:inline-flex;align-items:center;cursor:pointer;margin:0}
+/* Profil-Kopf: großes Avatar mit Kamera-Badge, Name groß */
+.pf-hero{display:flex;flex-direction:column;align-items:center;text-align:center;margin:.2rem 0 1rem}
+.pf-avatar-lg{position:relative;width:104px;height:104px;margin-bottom:.6rem}
+.pf-av-inner{display:flex;width:100%;height:100%;border-radius:50%;overflow:hidden;
+  background:var(--card2);border:2px solid var(--line);align-items:center;justify-content:center;
+  font-size:2.2rem;font-weight:800;color:var(--muted)}
+.pf-av-inner img{width:100%;height:100%;object-fit:cover;display:block}
+.pf-cam{position:absolute;right:-2px;bottom:-2px;width:34px;height:34px;border-radius:50%;
+  background:linear-gradient(var(--brand),var(--brand-dark));color:#fff;display:flex;align-items:center;
+  justify-content:center;cursor:pointer;border:2px solid var(--card);font-size:1rem}
+.pf-name-big{font-size:1.25rem;font-weight:800;color:var(--ink);line-height:1.2}
+.pf-user{margin-top:.4rem}
+.pf-privacy{background:var(--card2);border:1px solid var(--line);border-radius:10px;
+  padding:.55rem .8rem;font-size:.83rem;color:var(--muted);margin:0 0 1rem;text-align:center}
 .mini-avatar{display:inline-flex;width:30px;height:30px;border-radius:50%;overflow:hidden;
   vertical-align:middle;margin-right:.45rem;background:var(--card2);border:1px solid var(--line);
   align-items:center;justify-content:center;font-size:.72rem;font-weight:800;color:var(--muted)}
