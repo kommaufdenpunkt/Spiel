@@ -380,8 +380,11 @@ function openTour() {
 window.__openTour = openTour;
 
 // ---------- Was ist neu? (Changelog) ----------
-const CHANGELOG_VER = '3.35';
+const CHANGELOG_VER = '3.36';
 const CHANGELOG = [
+  { v: '3.36', d: '25.07.2026', title: 'Ausbildungskarte griffbereit', items: [
+    '📋 Deine Ausbildungskarte jetzt direkt auf der Startseite (Knopf in der Fortschritts-Karte).',
+    '🎯 „Als Nächstes dran“ zeigt dir die nächsten offenen Übungspunkte.'] },
   { v: '3.35', d: '25.07.2026', title: 'Ausbildungskarte: PDF & Einsicht', items: [
     '📄 Fahrlehrer kann die Ausbildungskarte als PDF drucken/speichern (mit Unterschriftsfeldern).',
     '👀 Fahrschüler sehen ihre eigene Ausbildungskarte jetzt selbst (nur lesen) – im Menü „Ausbildungskarte“.'] },
@@ -1015,6 +1018,7 @@ function studentProgress(p) {
       }).join('')}
       </div>
     </div>
+    <button class="pc-adk" onclick="window.__openMyTraining()">📋 Meine Ausbildungskarte ansehen</button>
   </div>`;
 }
 
@@ -2619,6 +2623,9 @@ async function openMyTraining() {
   try { const r = await api('/api/my/training'); training = r.training || {}; } catch (e) { toast(e.message, 'err'); return; }
   const done = Object.values(training).filter(Boolean).length;
   const pct = CURR_TOTAL ? Math.round((done / CURR_TOTAL) * 100) : 0;
+  // Die nächsten offenen Punkte – motiviert und macht klar, was als Nächstes drankommt
+  const nextUp = [];
+  for (const s of CURRICULUM) { for (let i = 0; i < s.items.length; i++) { if (!training[currKey(s.key, i)]) { nextUp.push(s.items[i]); if (nextUp.length >= 3) break; } } if (nextUp.length >= 3) break; }
   const sections = CURRICULUM.map((s) => {
     const dn = s.items.filter((_, i) => training[currKey(s.key, i)]).length;
     const items = s.items.map((it, i) => {
@@ -2634,7 +2641,10 @@ async function openMyTraining() {
       <div style="display:flex;justify-content:space-between;font-size:.82rem;color:var(--muted)"><span>Ausbildungsfortschritt</span><span>${done}/${CURR_TOTAL} · ${pct}%</span></div>
       <div style="height:9px;background:#0f151d;border-radius:6px;overflow:hidden;margin-top:.25rem"><div style="height:100%;width:${pct}%;background:var(--brand)"></div></div>
     </div>
-    <div style="max-height:56vh;overflow:auto;margin:.2rem -.2rem 0;padding:0 .2rem">${sections}</div>
+    ${nextUp.length
+      ? `<div class="adk-next"><span class="adk-next-t">🎯 Als Nächstes dran</span><ul>${nextUp.map((it) => `<li>${esc(it)}</li>`).join('')}</ul></div>`
+      : '<div class="adk-next done">🎉 Alles abgehakt – stark gemacht!</div>'}
+    <div style="max-height:52vh;overflow:auto;margin:.2rem -.2rem 0;padding:0 .2rem">${sections}</div>
     <div class="actions"><button onclick="window.__closeModal()">Schließen</button></div>`, 'wide');
 }
 window.__openMyTraining = openMyTraining;

@@ -189,6 +189,10 @@ main{max-width:1080px;margin:0 auto;padding:1.4rem 1.2rem 4rem}
 .tc-item input{width:auto;margin-top:.15rem;flex:none}
 .tc-item.ro{cursor:default;color:var(--muted)}
 .tc-item.ro.on{color:var(--ink)}
+.adk-next{background:var(--good-bg);border:1px solid rgba(53,192,125,.35);border-radius:11px;padding:.6rem .8rem;margin:0 0 .7rem}
+.adk-next.done{text-align:center;font-weight:700;color:var(--good)}
+.adk-next-t{font-weight:800;font-size:.85rem;color:var(--good)}
+.adk-next ul{margin:.35rem 0 0;padding-left:1.2rem;line-height:1.7;font-size:.9rem;color:var(--ink)}
 /* Fahrschüler-Liste: am Handy Karten statt breiter Tabelle */
 @media(max-width:760px){
   #s-list table,#s-list tbody,#s-list tr,#s-list td{display:block;width:auto}
@@ -414,6 +418,9 @@ th{color:var(--muted);font-weight:600;font-size:.78rem;text-transform:uppercase;
 .pc-drives{font-size:.9rem;color:var(--muted)}
 .pc-drives strong{color:var(--ink);font-size:1.05rem}
 .pc-block{margin-bottom:.8rem}
+.pc-adk{display:flex;align-items:center;justify-content:center;gap:.4rem;width:100%;margin-top:.9rem;
+  padding:.65rem;border-radius:10px;background:var(--card);border:1px solid var(--line);color:var(--ink);font-weight:700}
+.pc-adk:hover{background:var(--card2);border-color:var(--brand)}
 .pc-line{display:flex;justify-content:space-between;font-size:.85rem;font-weight:600;margin-bottom:.35rem}
 .pbar{height:9px;background:var(--bg2);border:1px solid var(--line);border-radius:6px;overflow:hidden}
 .pbar>div{height:100%;border-radius:6px;transition:width .4s ease;min-width:2px}
