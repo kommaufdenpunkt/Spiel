@@ -380,11 +380,11 @@ function openTour() {
 window.__openTour = openTour;
 
 // ---------- Was ist neu? (Changelog) ----------
-const CHANGELOG_VER = '3.36';
+const CHANGELOG_VER = '3.37';
 const CHANGELOG = [
-  { v: '3.36', d: '25.07.2026', title: 'Ausbildungskarte griffbereit', items: [
+  { v: '3.37', d: '25.07.2026', title: 'Ausbildungskarte griffbereit', items: [
     '📋 Deine Ausbildungskarte jetzt direkt auf der Startseite (Knopf in der Fortschritts-Karte).',
-    '🎯 „Als Nächstes dran“ zeigt dir die nächsten offenen Übungspunkte.'] },
+    '🆕 Oben siehst du, was dein Fahrlehrer zuletzt abgehakt hat.'] },
   { v: '3.35', d: '25.07.2026', title: 'Ausbildungskarte: PDF & Einsicht', items: [
     '📄 Fahrlehrer kann die Ausbildungskarte als PDF drucken/speichern (mit Unterschriftsfeldern).',
     '👀 Fahrschüler sehen ihre eigene Ausbildungskarte jetzt selbst (nur lesen) – im Menü „Ausbildungskarte“.'] },
@@ -2532,6 +2532,7 @@ const CURRICULUM = [
 ];
 const CURR_TOTAL = CURRICULUM.reduce((n, s) => n + s.items.length, 0);
 const currKey = (sk, i) => `${sk}:${i}`;
+function currLabel(key) { const [sk, i] = String(key).split(':'); const s = CURRICULUM.find((x) => x.key === sk); return s ? s.items[Number(i)] : null; }
 
 async function openTrainingCard(id, name) {
   let training = {};
@@ -2566,8 +2567,8 @@ async function openTrainingCard(id, name) {
     try { await api('/api/students/' + id + '/training', { method: 'PUT', body: { training } }); } catch (e) { toast(e.message, 'err'); }
   }, 500); };
   document.querySelectorAll('[data-tc]').forEach((cb) => cb.onchange = () => {
-    training[cb.dataset.tc] = cb.checked ? 1 : 0;
-    if (!cb.checked) delete training[cb.dataset.tc];
+    if (cb.checked) training[cb.dataset.tc] = Date.now();   // Zeitstempel = „zuletzt abgehakt“
+    else delete training[cb.dataset.tc];
     const sec = CURRICULUM.find((s) => s.key === cb.dataset.sk);
     const done = sec.items.filter((_, i) => training[currKey(sec.key, i)]).length;
     const pill = document.querySelector(`[data-secpill="${cb.dataset.sk}"]`); if (pill) pill.textContent = `${done}/${sec.items.length}`;
@@ -2623,9 +2624,11 @@ async function openMyTraining() {
   try { const r = await api('/api/my/training'); training = r.training || {}; } catch (e) { toast(e.message, 'err'); return; }
   const done = Object.values(training).filter(Boolean).length;
   const pct = CURR_TOTAL ? Math.round((done / CURR_TOTAL) * 100) : 0;
-  // Die nächsten offenen Punkte – motiviert und macht klar, was als Nächstes drankommt
-  const nextUp = [];
-  for (const s of CURRICULUM) { for (let i = 0; i < s.items.length; i++) { if (!training[currKey(s.key, i)]) { nextUp.push(s.items[i]); if (nextUp.length >= 3) break; } } if (nextUp.length >= 3) break; }
+  // Zuletzt abgehakte Punkte (nach Zeitstempel), neueste zuerst
+  const recent = Object.entries(training)
+    .filter(([, v]) => typeof v === 'number' && v > 1e12)
+    .sort((a, b) => b[1] - a[1]).slice(0, 3)
+    .map(([k]) => currLabel(k)).filter(Boolean);
   const sections = CURRICULUM.map((s) => {
     const dn = s.items.filter((_, i) => training[currKey(s.key, i)]).length;
     const items = s.items.map((it, i) => {
@@ -2641,10 +2644,8 @@ async function openMyTraining() {
       <div style="display:flex;justify-content:space-between;font-size:.82rem;color:var(--muted)"><span>Ausbildungsfortschritt</span><span>${done}/${CURR_TOTAL} · ${pct}%</span></div>
       <div style="height:9px;background:#0f151d;border-radius:6px;overflow:hidden;margin-top:.25rem"><div style="height:100%;width:${pct}%;background:var(--brand)"></div></div>
     </div>
-    ${nextUp.length
-      ? `<div class="adk-next"><span class="adk-next-t">🎯 Als Nächstes dran</span><ul>${nextUp.map((it) => `<li>${esc(it)}</li>`).join('')}</ul></div>`
-      : '<div class="adk-next done">🎉 Alles abgehakt – stark gemacht!</div>'}
-    <div style="max-height:52vh;overflow:auto;margin:.2rem -.2rem 0;padding:0 .2rem">${sections}</div>
+    ${recent.length ? `<div class="adk-next"><span class="adk-next-t">🆕 Zuletzt abgehakt</span><ul>${recent.map((it) => `<li>${esc(it)}</li>`).join('')}</ul></div>` : ''}
+    <div style="max-height:${recent.length ? '52vh' : '56vh'};overflow:auto;margin:.2rem -.2rem 0;padding:0 .2rem">${sections}</div>
     <div class="actions"><button onclick="window.__closeModal()">Schließen</button></div>`, 'wide');
 }
 window.__openMyTraining = openMyTraining;

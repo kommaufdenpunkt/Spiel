@@ -15,7 +15,7 @@ const PUBLIC = join(__dirname, 'public');
 const PORT = Number(process.env.PORT || 3000);
 const HOST = process.env.HOST || '0.0.0.0'; // hinter Caddy: HOST=127.0.0.1 (nur Proxy erreicht Node)
 const SESSION_DAYS = 30;
-const APP_VERSION = "3.36.0";
+const APP_VERSION = "3.37.0";
 // Einstellungen, die Schueler/Oeffentlichkeit sehen duerfen (Rest bleibt beim Fahrlehrer)
 const PUBLIC_SETTINGS = ['instructor_name', 'instructor_phone', 'policy_text',
   'cancel_hours', 'lock_hours', 'booking_horizon_days', 'booking_horizon_days_rank2',
@@ -1169,9 +1169,13 @@ async function handleApi(req, res, url) {
     if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
     const b = await readBody(req);
     const t = (b && typeof b.training === 'object' && b.training) ? b.training : {};
-    // nur boolesche true-Werte speichern, kompakt halten
+    // nur gesetzte Punkte speichern; Zahl = Zeitstempel „zuletzt abgehakt“ (sonst 1)
     const clean = {};
-    for (const k of Object.keys(t)) if (t[k]) clean[String(k).slice(0, 80)] = 1;
+    for (const k of Object.keys(t)) {
+      if (!t[k]) continue;
+      const v = t[k];
+      clean[String(k).slice(0, 80)] = (typeof v === 'number' && v > 1e12) ? v : 1;
+    }
     db.prepare('UPDATE students SET training=? WHERE id=?').run(JSON.stringify(clean), Number(trm[1]));
     logEvent('info', { actor: 'instructor', studentId: Number(trm[1]), detail: `Ausbildungskarte aktualisiert (${Object.keys(clean).length} Punkte)` });
     return ok(res, { saved: true, count: Object.keys(clean).length });
