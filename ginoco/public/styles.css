@@ -599,3 +599,26 @@ button:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
 @media(prefers-reduced-motion:reduce){
   *{animation-duration:.001ms!important;transition-duration:.001ms!important}
 }
+
+/* ============================================================
+   Kontext-Hilfe: „?“-Punkt + Erklär-Blase
+   ============================================================ */
+.help-dot{display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;
+  border-radius:50%;background:var(--card2);border:1px solid var(--line);color:var(--muted);
+  font-size:.7rem;font-weight:800;padding:0;vertical-align:middle;margin-left:.15rem;line-height:1;transition:.14s}
+.help-dot:hover{background:var(--brand);color:#fff;border-color:var(--brand)}
+.help-pop{position:fixed;left:50%;bottom:calc(1.4rem + env(safe-area-inset-bottom));transform:translateX(-50%);
+  z-index:95;max-width:min(92vw,420px);background:var(--card);border:1px solid var(--brand);border-radius:12px;
+  padding:.75rem .9rem;box-shadow:0 14px 44px rgba(0,0,0,.5);display:flex;gap:.6rem;align-items:flex-start;
+  font-size:.9rem;color:var(--ink);line-height:1.5;animation:gc-toast-in .2s ease}
+.help-pop .help-x{flex:0 0 auto;background:none;border:none;color:var(--muted);font-size:.9rem;padding:.05rem .2rem;width:auto;cursor:pointer}
+.help-pop .help-x:hover{color:var(--ink);background:none}
+
+/* ============================================================
+   Einheitliches Karten-Design: gleiche Rundungen & ruhige Abstände
+   ============================================================ */
+.pf-sec,.stu-card,.sset,.wn-block,.pickup-box,.live-hero,.bcal,.minical,.progress-card,.stu-hours{border-radius:12px}
+.pf-sec,.sset{border-color:var(--line)}
+.card>h2:first-child{margin-top:.1rem}
+/* gleichmäßiger Abstand zwischen gestapelten Unterkarten */
+.pf-sec+.pf-sec,.sset+.sset,.wn-block+.wn-block{margin-top:.7rem}

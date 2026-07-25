@@ -380,8 +380,11 @@ function openTour() {
 window.__openTour = openTour;
 
 // ---------- Was ist neu? (Changelog) ----------
-const CHANGELOG_VER = '3.33';
+const CHANGELOG_VER = '3.34';
 const CHANGELOG = [
+  { v: '3.34', d: '25.07.2026', title: 'Einheitlicher Look & Hilfe', items: [
+    '💬 Kleine „?“-Erklärungen direkt an kniffligen Feldern (z. B. Sperrfrist, Rang 2, Sonderfahrten).',
+    '🎴 Einheitliches Karten-Design: überall gleiche Rundungen und ruhige Abstände.'] },
   { v: '3.33', d: '25.07.2026', title: 'Neuer, edlerer Look', items: [
     '✨ Feiner Schliff überall: weiche Übergänge, sanftes Ein-/Ausklappen.',
     '👆 Knöpfe und Kacheln geben jetzt spürbares Tipp-Feedback.',
@@ -510,12 +513,31 @@ window.__stopLive = stopLiveShare;
 
 // ---------- UI-Helfer ----------
 let toastTimer;
-function toast(msg, kind = '') {
+function toast(msg, kind = '', ms = 3200) {
   const t = $('#toast');
   t.textContent = msg; t.className = 'toast ' + kind; t.hidden = false;
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => { t.hidden = true; }, 3200);
+  toastTimer = setTimeout(() => { t.hidden = true; }, ms);
 }
+// ---------- Kontext-Hilfe: kleiner „?“ neben Feldern -> Erklär-Blase ----------
+function helpDot(text) { return `<button type="button" class="help-dot" data-help="${esc(text)}" aria-label="Erklärung">?</button>`; }
+let helpTimer = null;
+function showHelp(text) {
+  document.getElementById('help-pop')?.remove();
+  const el = document.createElement('div');
+  el.id = 'help-pop'; el.className = 'help-pop';
+  el.innerHTML = `<span>${esc(text)}</span><button class="help-x" aria-label="schließen">✕</button>`;
+  document.body.appendChild(el);
+  const close = () => { el.remove(); document.removeEventListener('click', onDoc, true); };
+  el.querySelector('.help-x').onclick = close;
+  const onDoc = (e) => { if (!el.contains(e.target) && !e.target.closest('.help-dot')) close(); };
+  setTimeout(() => document.addEventListener('click', onDoc, true), 60);
+  clearTimeout(helpTimer); helpTimer = setTimeout(close, 10000);
+}
+document.addEventListener('click', (e) => {
+  const d = e.target.closest('.help-dot');
+  if (d) { e.preventDefault(); e.stopPropagation(); showHelp(d.dataset.help); }
+});
 function esc(s) { return String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
 
 function modal(html, extra) {
@@ -976,7 +998,7 @@ function studentProgress(p) {
         </div>`
       : `<div class="pc-block"><span class="pill" style="background:var(--good-bg);color:var(--good)">✅ Rang 2 – du siehst ${p.horizon} Tage im Voraus</span></div>`}
     <div class="pc-sonder">
-      <div class="pc-sonder-title">Sonderfahrten</div>
+      <div class="pc-sonder-title">Sonderfahrten ${helpDot('Pflichtfahrten für die Führerscheinprüfung: Überlandfahrten, Autobahn und Nachtfahrt. Die Zahlen zeigen, wie viele du schon hast.')}</div>
       <div class="pc-tiles">
       ${sonder.map(([k, have, need]) => {
         const done = have >= need;
@@ -2976,16 +2998,16 @@ function tabEinstellungen() {
         <div class="field"><label>Pause dazwischen (Min)</label><input id="e-break" type="number" value="${s.break_min}" step="5"></div></div>
       <div class="field"><label>Arbeitstage</label>
         <div class="daypick" id="e-days">${WD.map((d, i) => `<label class="dur-chip ${days.includes(i + 1) ? 'on' : ''}"><input type="checkbox" data-day="${i + 1}" ${days.includes(i + 1) ? 'checked' : ''}> ${d}</label>`).join('')}</div></div>
-      <div class="row"><div class="field"><label>Tägliche Freigabe-Uhrzeit</label><input id="e-release" value="${s.release_time || '10:00'}"></div>
-        <div class="field"><label>Letzter Slot an kurzen Tagen</label><input id="e-shortlast" value="${s.short_day_last_start || '13:35'}"></div></div>
+      <div class="row"><div class="field"><label>Tägliche Freigabe-Uhrzeit ${helpDot('Ab dieser Uhrzeit wird der jeweils nächste Tag zum Buchen freigeschaltet.')}</label><input id="e-release" value="${s.release_time || '10:00'}"></div>
+        <div class="field"><label>Letzter Slot an kurzen Tagen ${helpDot('An „Kürzer“-Tagen ist das die späteste buchbare Startzeit.')}</label><input id="e-shortlast" value="${s.short_day_last_start || '13:35'}"></div></div>
       <div class="hint" id="e-preview" style="margin-top:.3rem"></div>`, true)}
 
     ${sec('📅', 'Buchung & Stornierung', 'Vorausbuchung, Limits, Fristen, Aufklärungstext', `
       <div class="row"><div class="field"><label>Max. Fahrstunden pro Schüler & Woche</label><input id="e-max" type="number" value="${s.max_per_week}" min="1"></div>
         <div class="field"><label>Vorausbuchung (Tage)</label><input id="e-horizon" type="number" value="${s.booking_horizon_days}" min="1"></div></div>
-      <div class="row"><div class="field"><label>Kostenlos stornieren bis (Std. vorher)</label><input id="e-cancel" type="number" value="${s.cancel_hours}" min="0"></div>
-        <div class="field"><label>Sperrfrist – fest ab (Std. vorher)</label><input id="e-lock" type="number" value="${s.lock_hours}" min="0"></div></div>
-      <div class="field"><label>Toleranz Verspätung (Min)</label><input id="e-grace" type="number" value="${s.late_grace_min}" step="5"></div>
+      <div class="row"><div class="field"><label>Kostenlos stornieren bis (Std. vorher) ${helpDot('Bis so viele Stunden vor Beginn darf der Fahrschüler kostenlos absagen.')}</label><input id="e-cancel" type="number" value="${s.cancel_hours}" min="0"></div>
+        <div class="field"><label>Sperrfrist – fest ab (Std. vorher) ${helpDot('Ab so vielen Stunden vor Beginn steht der Termin fest – kein Absagen oder Ins-Angebot-Geben mehr.')}</label><input id="e-lock" type="number" value="${s.lock_hours}" min="0"></div></div>
+      <div class="field"><label>Toleranz Verspätung (Min) ${helpDot('So viele Minuten Verspätung gelten noch nicht als „nicht erschienen“.')}</label><input id="e-grace" type="number" value="${s.late_grace_min}" step="5"></div>
       <div class="field"><label>Aufklärungstext (wird beim Buchen gezeigt)</label><textarea id="e-policy" rows="4" style="resize:vertical">${esc(s.policy_text || '')}</textarea></div>`)}
 
     ${sec('🎯', 'Ziele (Tacho)', 'Wochen-, Tages- und Monatsziel', `
@@ -2999,17 +3021,17 @@ function tabEinstellungen() {
       <div class="row"><div class="field"><label>Soll Überland</label><input id="e-req-u" type="number" value="${s.req_ueberland}" min="0"></div>
         <div class="field"><label>Soll Autobahn</label><input id="e-req-a" type="number" value="${s.req_autobahn}" min="0"></div>
         <div class="field"><label>Soll Nachtfahrt</label><input id="e-req-n" type="number" value="${s.req_nacht}" min="0"></div></div>
-      <div class="row"><div class="field"><label>Rang 2 ab (gefahrene Stunden)</label><input id="e-rank2" type="number" value="${s.rank2_min_lessons}" min="1"></div>
-        <div class="field"><label>Rang 2: Vorausbuchung (Tage)</label><input id="e-horizon2" type="number" value="${s.booking_horizon_days_rank2}" min="1"></div></div>
+      <div class="row"><div class="field"><label>Rang 2 ab (gefahrene Stunden) ${helpDot('Ab so vielen gefahrenen Stunden steigt ein Fahrschüler in Rang 2 auf und darf weiter im Voraus buchen.')}</label><input id="e-rank2" type="number" value="${s.rank2_min_lessons}" min="1"></div>
+        <div class="field"><label>Rang 2: Vorausbuchung (Tage) ${helpDot('So viele Tage im Voraus darf ein Rang-2-Fahrschüler buchen.')}</label><input id="e-horizon2" type="number" value="${s.booking_horizon_days_rank2}" min="1"></div></div>
       <label class="ck-line"><input type="checkbox" id="e-anon" ${s.anonymous_swaps === '1' ? 'checked' : ''}> Tausch anonym (Schüler sehen nicht, von wem ein Termin kommt)</label>`)}
 
     ${sec('🌴', 'Urlaub', 'Urlaubskonto & Gutschrift', `
-      <div class="row"><div class="field"><label>Urlaubstag zählt (Min)</label><input id="e-vaccredit" type="number" value="${s.vacation_credit_min}" step="10"></div>
+      <div class="row"><div class="field"><label>Urlaubstag zählt (Min) ${helpDot('So viele Minuten werden pro Urlaubstag deinem Arbeitszeit-/Stundenkonto gutgeschrieben.')}</label><input id="e-vaccredit" type="number" value="${s.vacation_credit_min}" step="10"></div>
         <div class="field"><label>Resturlaub (Tage)</label><input id="e-vacdays" type="number" value="${s.vacation_days_left}" step="1"></div></div>`)}
 
     ${sec('🛰️', 'Live-Standort & Treffpunkt', 'Abholung, ETA-Tempo, Standard-Treffpunkt', `
-      <div class="row"><div class="field"><label>Standort teilen ab (Min vorher)</label><input id="e-lead" type="number" value="${s.live_lead_min}" min="1"></div>
-        <div class="field"><label>Ø Tempo für ETA (km/h)</label><input id="e-speed" type="number" value="${s.avg_speed_kmh}" min="5"></div></div>
+      <div class="row"><div class="field"><label>Standort teilen ab (Min vorher) ${helpDot('So viele Minuten vor Beginn kann der Live-Standort mit dem Fahrschüler geteilt werden.')}</label><input id="e-lead" type="number" value="${s.live_lead_min}" min="1"></div>
+        <div class="field"><label>Ø Tempo für ETA (km/h) ${helpDot('Durchschnittstempo zur groben Schätzung der Ankunftszeit auf der Live-Karte.')}</label><input id="e-speed" type="number" value="${s.avg_speed_kmh}" min="5"></div></div>
       <div class="field"><label>Standard-Treffpunkt (nur Rückfall)</label>
         <div class="inline"><input id="e-meet" value="${esc(s.meet_default_label || '')}" placeholder="z.B. Fahrschule / Bahnhof" style="flex:1">
           <button class="sec sm" id="e-meet-here" type="button">📍 Standort</button></div>
