@@ -380,8 +380,12 @@ function openTour() {
 window.__openTour = openTour;
 
 // ---------- Was ist neu? (Changelog) ----------
-const CHANGELOG_VER = '3.32';
+const CHANGELOG_VER = '3.33';
 const CHANGELOG = [
+  { v: '3.33', d: '25.07.2026', title: 'Neuer, edlerer Look', items: [
+    '✨ Feiner Schliff überall: weiche Übergänge, sanftes Ein-/Ausklappen.',
+    '👆 Knöpfe und Kacheln geben jetzt spürbares Tipp-Feedback.',
+    '🪟 Fenster blenden elegant ein statt hart aufzupoppen.'] },
   { v: '3.32', d: '25.07.2026', title: 'Standort & Neuigkeiten', items: [
     '📍 Adresse per aktuellem Standort automatisch ausfüllen – du ergänzt nur die Hausnummer.',
     '✨ Dieses „Was ist neu?“-Fenster – hier siehst du künftig alle Verbesserungen.'] },

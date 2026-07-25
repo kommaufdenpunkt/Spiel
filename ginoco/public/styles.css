@@ -564,3 +564,38 @@ th{color:var(--muted);font-weight:600;font-size:.78rem;text-transform:uppercase;
 .pwa-install:hover{background:var(--brand-dark)}
 /* Install-Knopf ausblenden, solange ein Fenster (Modal) offen ist – sonst überlappt er */
 body:has(.modal-bg) .pwa-install{display:none}
+
+/* ============================================================
+   Mega-Optik: feiner Schliff – Übergänge, Tipp-Feedback, Einblenden
+   (dezent gehalten; respektiert „reduzierte Bewegung")
+   ============================================================ */
+@keyframes gc-modal-in{from{opacity:0;transform:translateY(10px) scale(.985)}to{opacity:1;transform:none}}
+@keyframes gc-bg-in{from{opacity:0}to{opacity:1}}
+@keyframes gc-card-in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.modal-bg{animation:gc-bg-in .16s ease}
+.modal{animation:gc-modal-in .22s cubic-bezier(.2,.7,.3,1)}
+main>.card{animation:gc-card-in .28s ease both}
+/* Tipp-Feedback: Knöpfe & Kacheln „drücken" sich leicht ein */
+button:active{transform:translateY(1px) scale(.985)}
+.edge-tile,.pc-tile,.bcal-day,.dur-chip,.stu-card,.bitem,.seg button,.ap-swatches button,.geo-btn,.live-traffic-btn{
+  transition:transform .14s ease,box-shadow .18s ease,background .18s ease,border-color .18s ease}
+.edge-tile:active,.pc-tile:active,.bcal-day:not([disabled]):active,.dur-chip:active{transform:scale(.96)}
+/* Sanftes Anheben bei Hover (nur wo es sich anfühlt wie „anfassbar") */
+@media(hover:hover){
+  .stu-card:hover,.bitem:hover{border-color:#34414f;box-shadow:0 6px 18px rgba(0,0,0,.28)}
+  .bcal-day.free:not([disabled]):hover,.mc-day:not([disabled]):hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(0,0,0,.3)}
+  .ap-swatches button:hover{transform:scale(1.12)}
+  .edge-tile:hover{border-color:#3a4757;transform:translateY(-1px)}
+}
+/* Aufklapp-Abschnitte (Einstellungen/Profil) weicher */
+.sset[open]>.sset-body{animation:gc-card-in .2s ease both}
+.pfc-body:not(.hidden){animation:gc-card-in .2s ease both}
+/* Toast: sanft hereinfahren */
+@keyframes gc-toast-in{from{opacity:0;transform:translate(-50%,12px)}to{opacity:1;transform:translate(-50%,0)}}
+.toast{animation:gc-toast-in .2s ease}
+/* Fokus-Ringe etwas edler */
+button:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+
+@media(prefers-reduced-motion:reduce){
+  *{animation-duration:.001ms!important;transition-duration:.001ms!important}
+}
