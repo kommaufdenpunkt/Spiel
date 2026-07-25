@@ -380,8 +380,12 @@ function openTour() {
 window.__openTour = openTour;
 
 // ---------- Was ist neu? (Changelog) ----------
-const CHANGELOG_VER = '3.37';
+const CHANGELOG_VER = '3.38';
 const CHANGELOG = [
+  { v: '3.38', d: '25.07.2026', title: 'Feinschliff rundum', items: [
+    '🏠 Einladendere Startseite: große Begrüßung + prominente „nächste Fahrstunde“.',
+    '🔔 Mitteilungen schöner dargestellt (Karten mit Icon).',
+    '📊 Protokoll mit Statistik-Überblick; 🗓️ Kalender hübscher.'] },
   { v: '3.37', d: '25.07.2026', title: 'Ausbildungskarte griffbereit', items: [
     '📋 Deine Ausbildungskarte jetzt direkt auf der Startseite (Knopf in der Fortschritts-Karte).',
     '🆕 Oben siehst du, was dein Fahrlehrer zuletzt abgehakt hat.'] },
@@ -951,14 +955,18 @@ function renderWeekCard(wi, bookings, progress) {
   const gname = firstName(state.user?.name);
   const reservedCount = upcoming.filter((b) => b.status === 'booked' && b.confirmed === 0).length;
   $('#week-card').innerHTML = `
-    <div class="greet">${greetWord()}${gname ? ', <strong>' + esc(gname) + '</strong>' : ''} 👋</div>
+    <div class="greet-big">${greetWord()}${gname ? ', <strong>' + esc(gname) + '</strong>' : ''} 👋</div>
+    ${next ? `<div class="next-hero">
+      <div class="nh-ic">🚗</div>
+      <div class="nh-body">
+        <div class="nh-label">Deine nächste Fahrstunde</div>
+        <div class="nh-when">${WD_LONG[isoDow(next.date) - 1]}, ${fmtShort(next.date)}</div>
+        <div class="nh-time">🕐 ${next.start_time} Uhr · ${next.duration_min} Min${next.meet_label ? ` · 📍 ${esc(next.meet_label)}` : ''}</div>
+      </div>
+      <div class="nh-count">${countdownLabel(next.date, next.start_time)}</div>
+    </div>` : ''}
     <h2>Meine Fahrstunden <span class="sub">diese Woche (${fmtShort(wi.from)}–${fmtShort(wi.to)})</span></h2>
     ${reservedCount ? `<div class="reserve-note">🔶 <strong>${reservedCount} Termin${reservedCount === 1 ? '' : 'e'}</strong> von deinem Fahrlehrer eingetragen – bitte unten mit <strong>✅ Bestätigen</strong> zusagen.</div>` : ''}
-    ${next ? `<div class="bitem" style="background:var(--booked);border-color:var(--booked-b);margin-bottom:.8rem">
-      <div><div class="meta" style="color:var(--muted)">Deine nächste Fahrstunde</div>
-      <div class="when" style="font-size:1.05rem">${WD_LONG[isoDow(next.date) - 1]}, ${fmtShort(next.date)} · ${next.start_time} Uhr</div></div>
-      <div class="pill" style="background:var(--brand);color:#fff">${countdownLabel(next.date, next.start_time)}</div>
-    </div>` : ''}
     <div class="inline" style="margin-bottom:1rem">
       <span class="pill" style="background:${wi.remaining > 0 ? 'var(--good-bg)' : 'var(--bad-bg)'};color:var(--${remainColor})">
         ${wi.count} von ${wi.max} gebucht · noch ${wi.remaining} frei
@@ -1302,13 +1310,15 @@ function renderNotifications(notifs, unread) {
   const card = $('#notif-card');
   if (!notifs || !notifs.length) { card.classList.add('hidden'); return; }
   card.classList.remove('hidden');
-  const icon = (k) => k === 'offer' ? '🔄' : k === 'shift' ? '🕐' : 'ℹ️';
-  card.innerHTML = `<h2>🔔 Benachrichtigungen ${unread ? `<span class="badge offer">${unread} neu</span>` : ''}</h2>
-    <div class="blist">${notifs.map((n) => `<div class="bitem ${n.read ? '' : 'warm'}">
-      <div><div class="meta" style="font-size:.9rem;color:var(--ink)">${icon(n.kind)} ${esc(n.message)}</div>
-      <div class="meta">${new Date(n.created_at).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</div></div>
+  const icon = (k) => k === 'offer' ? '🎁' : k === 'shift' ? '🕐' : k === 'reminder' ? '⏰' : 'ℹ️';
+  card.innerHTML = `<h2>🔔 Mitteilungen ${unread ? `<span class="badge offer">${unread} neu</span>` : ''}</h2>
+    <div class="notif-list">${notifs.map((n) => `<div class="notif ${n.read ? '' : 'unread'}">
+      <span class="notif-ic">${icon(n.kind)}</span>
+      <div class="notif-body"><div class="notif-msg">${esc(n.message)}</div>
+        <div class="notif-time">${new Date(n.created_at).toLocaleString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</div></div>
+      ${n.read ? '' : '<span class="notif-dot"></span>'}
     </div>`).join('')}</div>
-    ${unread ? '<div style="margin-top:.8rem"><button class="sec sm" id="notif-read">Als gelesen markieren</button></div>' : ''}`;
+    ${unread ? '<div style="margin-top:.8rem"><button class="sec sm" id="notif-read">Alle als gelesen markieren</button></div>' : ''}`;
   const b = $('#notif-read');
   if (b) b.onclick = async () => { try { await api('/api/my/notifications/read', { method: 'POST' }); syncStudent(); } catch (e) { toast(e.message, 'err'); } };
 }
@@ -3012,7 +3022,13 @@ async function loadProtokoll() {
   try {
     const { events } = await api('/api/instructor/events?' + q.toString());
     if (!events.length) { $('#pr-list').innerHTML = '<p class="muted">Keine Einträge.</p>'; return; }
-    $('#pr-list').innerHTML = `<table>
+    const counts = {}; for (const e of events) counts[e.type] = (counts[e.type] || 0) + 1;
+    const order = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
+    const stats = `<div class="pr-stats">
+      <div class="pr-stat total"><b>${events.length}</b><span>Vorgänge gesamt</span></div>
+      ${order.map((t) => { const [ic, lbl] = EV_META[t] || ['•', t]; return `<div class="pr-stat"><b>${counts[t]}</b><span>${ic} ${esc(lbl)}</span></div>`; }).join('')}
+    </div>`;
+    $('#pr-list').innerHTML = stats + `<table>
       <tr><th>Wann</th><th>Vorgang</th><th>Fahrschüler</th><th>Details</th></tr>
       ${events.map((e) => {
         const [ic, lbl] = EV_META[e.type] || ['•', e.type];
