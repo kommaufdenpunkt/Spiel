@@ -380,8 +380,11 @@ function openTour() {
 window.__openTour = openTour;
 
 // ---------- Was ist neu? (Changelog) ----------
-const CHANGELOG_VER = '3.34';
+const CHANGELOG_VER = '3.35';
 const CHANGELOG = [
+  { v: '3.35', d: '25.07.2026', title: 'Ausbildungskarte: PDF & Einsicht', items: [
+    '📄 Fahrlehrer kann die Ausbildungskarte als PDF drucken/speichern (mit Unterschriftsfeldern).',
+    '👀 Fahrschüler sehen ihre eigene Ausbildungskarte jetzt selbst (nur lesen) – im Menü „Ausbildungskarte“.'] },
   { v: '3.34', d: '25.07.2026', title: 'Einheitlicher Look & Hilfe', items: [
     '💬 Kleine „?“-Erklärungen direkt an kniffligen Feldern (z. B. Sperrfrist, Rang 2, Sonderfahrten).',
     '🎴 Einheitliches Karten-Design: überall gleiche Rundungen und ruhige Abstände.'] },
@@ -644,7 +647,7 @@ function mountEdgeMenus(role) {
     : edgeTilesHTML(STUDENT_NAV, 'data-scroll');
   const live = state.liveSharing ? [['live', '🛰️', 'Live beenden']] : [];
   const rightGroups = role === 'student'
-    ? [['__group', 'Anpassen'], ['theme', '🎨', 'Aussehen'], ['phone', '👤', 'Mein Profil'], ['tour', '❓', 'Einführung'], ['whatsnew', '✨', 'Was ist neu?'],
+    ? [['__group', 'Anpassen'], ['theme', '🎨', 'Aussehen'], ['phone', '👤', 'Mein Profil'], ['training', '📋', 'Ausbildungskarte'], ['tour', '❓', 'Einführung'], ['whatsnew', '✨', 'Was ist neu?'],
        ['__group', 'Konto'], ...live, ['reload', '🔄', 'Aktualisieren'], ['logout', '🚪', 'Abmelden']]
     : [['__group', 'Anpassen'], ['theme', '🎨', 'Aussehen'], ['whatsnew', '✨', 'Was ist neu?'],
        ['__group', 'Konto'], ...live, ['reload', '🔄', 'Aktualisieren'], ['logout', '🚪', 'Abmelden']];
@@ -688,6 +691,7 @@ function mountEdgeMenus(role) {
     close(); const a = b.dataset.act;
     if (a === 'theme') window.__openThemePicker?.();
     else if (a === 'phone') window.__openPhone?.();
+    else if (a === 'training') window.__openMyTraining?.();
     else if (a === 'tour') window.__openTour?.();
     else if (a === 'whatsnew') window.__openWhatsNew?.();
     else if (a === 'live') window.__stopLive?.();
@@ -2550,7 +2554,8 @@ async function openTrainingCard(id, name) {
     <p class="hint">Hake ab, was ${esc((name || '').split(' ')[0])} schon geübt/beherrscht hat. Wird automatisch gespeichert. Nur für dich sichtbar.</p>
     <div id="tc-bar">${bar()}</div>
     <div style="max-height:52vh;overflow:auto;margin:.2rem -.2rem 0;padding:0 .2rem">${sections}</div>
-    <div class="actions"><button onclick="window.__closeModal()">Schließen</button></div>`, 'wide');
+    <div class="actions" style="justify-content:space-between"><button class="sec" id="tc-pdf">📄 PDF / Drucken</button><button onclick="window.__closeModal()">Schließen</button></div>`, 'wide');
+  const pdfBtn = $('#tc-pdf'); if (pdfBtn) pdfBtn.onclick = () => printTrainingCard(name, training);
   const refreshBar = () => { const t = $('#tc-bar'); if (t) t.innerHTML = bar(); };
   let saveTimer = null;
   const save = () => { clearTimeout(saveTimer); saveTimer = setTimeout(async () => {
@@ -2565,6 +2570,74 @@ async function openTrainingCard(id, name) {
     refreshBar(); save();
   });
 }
+
+// Ausbildungskarte als sauberes, weißes PDF (über den Drucken-Dialog des Browsers -> „Als PDF sichern")
+function printTrainingCard(name, training) {
+  const done = Object.values(training).filter(Boolean).length;
+  const pct = CURR_TOTAL ? Math.round((done / CURR_TOTAL) * 100) : 0;
+  const today = new Date().toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  const school = esc(state.settings?.instructor_name || 'Fahrschule');
+  const secs = CURRICULUM.map((s) => {
+    const dn = s.items.filter((_, i) => training[currKey(s.key, i)]).length;
+    const items = s.items.map((it, i) => {
+      const on = !!training[currKey(s.key, i)];
+      return `<div class="it"><span class="bx">${on ? '☑' : '☐'}</span> <span class="${on ? 'dn' : ''}">${esc(it)}</span></div>`;
+    }).join('');
+    return `<section><h2>${esc(s.title)} <em>${dn}/${s.items.length}</em></h2><div class="items">${items}</div></section>`;
+  }).join('');
+  const doc = `<!doctype html><html lang="de"><head><meta charset="utf-8">
+    <title>Ausbildungskarte – ${esc(name)}</title>
+    <style>
+      *{box-sizing:border-box} body{font-family:Arial,Helvetica,sans-serif;color:#111;margin:0;padding:28px 30px;max-width:820px}
+      .head{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #111;padding-bottom:10px;margin-bottom:14px}
+      .head h1{font-size:20px;margin:0} .head .meta{font-size:12px;color:#444;text-align:right;line-height:1.5}
+      .prog{margin:10px 0 16px;font-size:13px} .bar{height:10px;background:#e6e6e6;border-radius:5px;overflow:hidden;margin-top:4px}
+      .bar>i{display:block;height:100%;width:${pct}%;background:#111}
+      section{break-inside:avoid;margin:0 0 12px} h2{font-size:14px;margin:0 0 6px;border-bottom:1px solid #ccc;padding-bottom:3px}
+      h2 em{font-style:normal;color:#666;font-weight:normal;font-size:12px;float:right}
+      .items{columns:2;column-gap:26px} .it{font-size:12px;line-height:1.7;break-inside:avoid} .bx{font-size:13px}
+      .dn{text-decoration:none} .foot{margin-top:20px;font-size:11px;color:#666;border-top:1px solid #ccc;padding-top:8px}
+      .sign{margin-top:34px;display:flex;gap:40px} .sign div{flex:1;border-top:1px solid #111;padding-top:4px;font-size:11px;color:#444}
+      @media print{body{padding:0}}
+    </style></head><body>
+    <div class="head"><div><h1>Ausbildungskarte</h1><div style="font-size:13px;margin-top:2px">${esc(name)}</div></div>
+      <div class="meta">${school}<br>Stand: ${today}</div></div>
+    <div class="prog"><strong>Ausbildungsfortschritt: ${done}/${CURR_TOTAL} (${pct}%)</strong><div class="bar"><i></i></div></div>
+    ${secs}
+    <div class="sign"><div>Unterschrift Fahrlehrer</div><div>Unterschrift Fahrschüler</div></div>
+    <div class="foot">Erstellt mit ginoco · ${today}</div>
+    <script>window.onload=function(){setTimeout(function(){window.print()},200)}<\/script>
+  </body></html>`;
+  const w = window.open('', '_blank');
+  if (!w) { toast('Bitte Pop-ups erlauben, um das PDF zu erzeugen.', 'err'); return; }
+  w.document.open(); w.document.write(doc); w.document.close();
+}
+
+// Schüler sieht seine eigene Ausbildungskarte (nur Lesen)
+async function openMyTraining() {
+  let training = {};
+  try { const r = await api('/api/my/training'); training = r.training || {}; } catch (e) { toast(e.message, 'err'); return; }
+  const done = Object.values(training).filter(Boolean).length;
+  const pct = CURR_TOTAL ? Math.round((done / CURR_TOTAL) * 100) : 0;
+  const sections = CURRICULUM.map((s) => {
+    const dn = s.items.filter((_, i) => training[currKey(s.key, i)]).length;
+    const items = s.items.map((it, i) => {
+      const on = !!training[currKey(s.key, i)];
+      return `<div class="tc-item ro${on ? ' on' : ''}">${on ? '✅' : '⬜'} ${esc(it)}</div>`;
+    }).join('');
+    return `<details class="tc-sec"${dn ? ' open' : ''}><summary>${esc(s.title)} <span class="pill">${dn}/${s.items.length}</span></summary>
+      <div class="tc-items">${items}</div></details>`;
+  }).join('');
+  modal(`<h3>📋 Deine Ausbildungskarte</h3>
+    <p class="hint">Das hat dein Fahrlehrer schon abgehakt. Nur zum Ansehen – die Häkchen setzt dein Fahrlehrer.</p>
+    <div style="margin:.2rem 0 .6rem">
+      <div style="display:flex;justify-content:space-between;font-size:.82rem;color:var(--muted)"><span>Ausbildungsfortschritt</span><span>${done}/${CURR_TOTAL} · ${pct}%</span></div>
+      <div style="height:9px;background:#0f151d;border-radius:6px;overflow:hidden;margin-top:.25rem"><div style="height:100%;width:${pct}%;background:var(--brand)"></div></div>
+    </div>
+    <div style="max-height:56vh;overflow:auto;margin:.2rem -.2rem 0;padding:0 .2rem">${sections}</div>
+    <div class="actions"><button onclick="window.__closeModal()">Schließen</button></div>`, 'wide');
+}
+window.__openMyTraining = openMyTraining;
 
 // Zugangsdaten-Anzeige mit Kopier-Funktion (nach Anlegen)
 function showCredentials(r, title) {

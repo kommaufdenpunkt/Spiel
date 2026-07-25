@@ -15,7 +15,7 @@ const PUBLIC = join(__dirname, 'public');
 const PORT = Number(process.env.PORT || 3000);
 const HOST = process.env.HOST || '0.0.0.0'; // hinter Caddy: HOST=127.0.0.1 (nur Proxy erreicht Node)
 const SESSION_DAYS = 30;
-const APP_VERSION = "3.34.0";
+const APP_VERSION = "3.35.0";
 // Einstellungen, die Schueler/Oeffentlichkeit sehen duerfen (Rest bleibt beim Fahrlehrer)
 const PUBLIC_SETTINGS = ['instructor_name', 'instructor_phone', 'policy_text',
   'cancel_hours', 'lock_hours', 'booking_horizon_days', 'booking_horizon_days_rank2',
@@ -1147,6 +1147,14 @@ async function handleApi(req, res, url) {
     return ok(res, { created, errors });
   }
 
+  // Eigene Ausbildungskarte ansehen (nur Lesen, Fahrschüler)
+  if (p === '/api/my/training' && method === 'GET') {
+    if (!requireStudent()) return bad(res, 'Bitte anmelden', 401);
+    const st = db.prepare('SELECT training FROM students WHERE id=?').get(sess.student_id);
+    let training = {};
+    try { training = st && st.training ? JSON.parse(st.training) : {}; } catch {}
+    return ok(res, { training });
+  }
   // Ausbildungskarte lesen/speichern (Fahrlehrer)
   const trm = p.match(/^\/api\/students\/(\d+)\/training$/);
   if (trm && method === 'GET') {

@@ -187,6 +187,8 @@ main{max-width:1080px;margin:0 auto;padding:1.4rem 1.2rem 4rem}
 @media(max-width:560px){.tc-items{grid-template-columns:1fr}}
 .tc-item{display:flex;align-items:flex-start;gap:.5rem;font-size:.86rem;font-weight:500;color:var(--ink);margin:0;padding:.25rem 0;cursor:pointer}
 .tc-item input{width:auto;margin-top:.15rem;flex:none}
+.tc-item.ro{cursor:default;color:var(--muted)}
+.tc-item.ro.on{color:var(--ink)}
 /* Fahrschüler-Liste: am Handy Karten statt breiter Tabelle */
 @media(max-width:760px){
   #s-list table,#s-list tbody,#s-list tr,#s-list td{display:block;width:auto}
