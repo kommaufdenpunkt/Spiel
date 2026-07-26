@@ -380,8 +380,10 @@ function openTour() {
 window.__openTour = openTour;
 
 // ---------- Was ist neu? (Changelog) ----------
-const CHANGELOG_VER = '3.39';
+const CHANGELOG_VER = '3.40';
 const CHANGELOG = [
+  { v: '3.40', d: '26.07.2026', title: 'Theorie sammeln eintragen', items: [
+    '📋 Mehrere Theorie-Termine auf einmal eintragen (Datum, Von, Bis, Titel – mit Vorschau).'] },
   { v: '3.39', d: '26.07.2026', title: 'Ausbildungskarte im Vollbild', items: [
     '📋 Ausbildungskarte öffnet jetzt als große Vollbild-Seite (statt engem Fenster).',
     '🚗 Direkt aus der Fahrstunde abhakbar: Knopf „Ausbildungskarte abhaken“.'] },
@@ -2924,6 +2926,93 @@ async function loadOverrides() {
 
 // ---- Tab: Theorie & Ausnahmen ----
 const BLOCK_META = { theorie: ['📚', 'Theorie'], block: ['⛔', 'Blockiert'], frei: ['🌴', 'Frei / Urlaub'] };
+// --- Sammel-Theorie: mehrere Termine auf einmal ---
+function parseImportDateClient(s) {
+  s = String(s || '').trim(); let m;
+  if (m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/)) return `${m[1]}-${m[2]}-${m[3]}`;
+  if (m = s.match(/^(\d{1,2})\.(\d{1,2})\.?(\d{2,4})?$/)) {
+    const d = +m[1], mo = +m[2]; let y = m[3] ? (+m[3] < 100 ? 2000 + +m[3] : +m[3]) : null;
+    const pad = (n) => String(n).padStart(2, '0');
+    if (!y) { y = parseD(todayStr()).getFullYear(); if (`${y}-${pad(mo)}-${pad(d)}` < todayStr()) y++; }
+    if (mo < 1 || mo > 12 || d < 1 || d > 31) return null;
+    return `${y}-${pad(mo)}-${pad(d)}`;
+  }
+  return null;
+}
+function parseTimeClient(s) {
+  const m = String(s || '').trim().match(/^(\d{1,2})[:.]?(\d{2})?$/); if (!m) return null;
+  const h = +m[1], mi = m[2] ? +m[2] : 0; if (h > 23 || mi > 59) return null;
+  return `${String(h).padStart(2, '0')}:${String(mi).padStart(2, '0')}`;
+}
+function parseTheoryLine(line) {
+  const raw = String(line).trim(); if (!raw) return null;
+  const c = raw.split(',').map((x) => x.trim());
+  if (c.length < 3) return { ok: false, input: raw, msg: 'Format: Datum, Von, Bis, Titel' };
+  const date = parseImportDateClient(c[0]), from = parseTimeClient(c[1]), to = parseTimeClient(c[2]);
+  const title = c.slice(3).join(', ');
+  const hm = (t) => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
+  if (!date) return { ok: false, input: raw, msg: 'Datum unklar' };
+  if (!from || !to) return { ok: false, input: raw, msg: 'Uhrzeit unklar' };
+  if (hm(to) <= hm(from)) return { ok: false, input: raw, msg: '„Bis“ muss nach „Von“ liegen' };
+  return { ok: true, date, from, to, title };
+}
+function openBulkTheory() {
+  modal(`<h3>📋 Theorie sammeln eintragen</h3>
+    <p class="hint" style="margin-bottom:.5rem">Trag deine Theorie-Termine hier untereinander ein – <strong>eine pro Zeile</strong>: <code>Datum, Von, Bis, Titel</code>. Ich prüfe alles und zeige dir eine Vorschau, bevor etwas gespeichert wird.</p>
+    <div class="bulk-help">
+      <div class="bh-row"><span class="bh-k">Beispiel</span><code>6.8., 17:00, 20:00, Theorie 1</code></div>
+      <div class="bh-row"><span class="bh-k">Geht auch</span><span class="muted">06.08.2026 · 17 (= 17:00) · Jahr weglassen nimmt das nächste Vorkommen</span></div>
+    </div>
+    <div class="row">
+      <div class="field" style="max-width:200px"><label>Art</label>
+        <select id="bt-type"><option value="theorie">📚 Theorie</option><option value="block">⛔ Blockiert</option><option value="frei">🌴 Frei / Urlaub</option></select></div>
+      <div class="field"><label style="opacity:0">.</label><label class="inline" style="margin:0;font-weight:600"><input type="checkbox" id="bt-count" checked style="width:auto"> zählt als Arbeitszeit</label></div>
+    </div>
+    <div class="field"><label>Termine (eine pro Zeile)</label>
+      <textarea id="bt-text" rows="7" placeholder="6.8., 17:00, 20:00, Theorie 1&#10;13.8., 17:00, 20:00, Theorie 2&#10;20.8., 18:00, 21:00, Theorie 3"></textarea></div>
+    <div id="bt-preview"></div>
+    <div class="actions" style="justify-content:space-between">
+      <button class="sec" onclick="window.__closeModal()">Abbrechen</button>
+      <div class="inline" style="gap:.5rem">
+        <button class="sec" id="bt-check">Vorschau prüfen</button>
+        <button id="bt-commit" disabled>Eintragen</button>
+      </div>
+    </div>`, 'wide');
+  const preview = $('#bt-preview'), commitBtn = $('#bt-commit');
+  let parsed = [];
+  const check = () => {
+    parsed = $('#bt-text').value.split('\n').map(parseTheoryLine).filter(Boolean);
+    const ok = parsed.filter((r) => r.ok), err = parsed.filter((r) => !r.ok);
+    preview.innerHTML = `<div class="bulk-summary">
+        ${ok.length ? `<span class="pill" style="background:var(--good-bg);color:var(--good)">✅ ${ok.length} bereit</span>` : '<span class="pill">0 bereit</span>'}
+        ${err.length ? `<span class="pill" style="background:var(--bad-bg);color:var(--bad)">⚠️ ${err.length} zu prüfen</span>` : ''}
+      </div>
+      <div class="bulk-list">${parsed.map((r) => r.ok
+        ? `<div class="bulk-row ok"><span class="br-ic">✅</span><div><b>${WD[isoDow(r.date) - 1]} ${fmtShort(r.date)}</b> · ${r.from}–${r.to}${r.title ? ' · ' + esc(r.title) : ''}</div></div>`
+        : `<div class="bulk-row error"><span class="br-ic">⚠️</span><div><span class="muted">${esc(r.input)}</span><div class="br-msg error">${esc(r.msg)}</div></div></div>`).join('')}</div>`;
+    commitBtn.disabled = ok.length === 0;
+    commitBtn.textContent = ok.length ? `${ok.length} eintragen` : 'Eintragen';
+  };
+  $('#bt-check').onclick = check;
+  commitBtn.onclick = async () => {
+    const ok = parsed.filter((r) => r.ok);
+    if (!ok.length) { check(); return; }
+    const type = $('#bt-type').value, count = $('#bt-count').checked;
+    let done = 0;
+    for (const r of ok) {
+      try {
+        await api('/api/blocks', { method: 'POST', body: {
+          date: r.date, start_time: r.from, end_time: r.to,
+          title: r.title || (type === 'theorie' ? 'Theorieunterricht' : type === 'frei' ? 'Frei' : 'Blockiert'),
+          type, count_hours: count, repeat_weekly: 1 } });
+        done++;
+      } catch (e) { /* eine Zeile fehlgeschlagen – weiter */ }
+    }
+    closeModal();
+    toast(`${done} Termin${done === 1 ? '' : 'e'} eingetragen ✓`, 'ok');
+    if (state.instrTab === 'theorie') loadBlocks();
+  };
+}
 async function tabTheorie() {
   const box = $('#itab');
   box.innerHTML = `<div class="card">
@@ -2957,10 +3046,12 @@ async function tabTheorie() {
     </div>
     <div class="inline" style="margin:.2rem 0 1rem">
       <button id="t-add">Eintragen</button>
+      <button class="sec" id="t-bulk">📋 Mehrere auf einmal</button>
       <span class="hint" style="margin:0" id="t-preview"></span>
     </div>
     <div id="t-list"></div>
   </div>`;
+  $('#t-bulk').onclick = () => openBulkTheory();
   const updatePreview = () => {
     const n = Number($('#t-repeat').value);
     if (n <= 1) { $('#t-preview').textContent = ''; return; }
