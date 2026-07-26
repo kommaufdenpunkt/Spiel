@@ -457,6 +457,16 @@ th{color:var(--muted);font-weight:600;font-size:.78rem;text-transform:uppercase;
   padding:.75rem .85rem;margin:.7rem 0}
 .pickup-box .pb-line{font-size:.95rem}
 .pickup-box .pb-line strong{color:var(--ink)}
+/* Beruhigender Status (planmäßig / etwas später) */
+.run-status{display:flex;align-items:flex-start;gap:.6rem;border-radius:12px;padding:.7rem .85rem;
+  margin:0 0 .7rem;font-size:1.4rem;line-height:1.3}
+.run-status div{font-size:.95rem;color:var(--ink)}
+.run-status div span{color:var(--muted);font-size:.9rem}
+.run-status.ok{background:var(--good-bg);border:1px solid var(--good-b,#2c6b46)}
+.run-status.late{background:rgba(230,147,77,.14);border:1px solid rgba(230,147,77,.5)}
+/* Freundliche Abhol-Frage (~1 h vorher) */
+.pickup-ask{margin:.2rem 0 .1rem}
+.pickup-ask .pa-q{font-size:1.05rem;font-weight:700;color:var(--ink)}
 
 /* ---- Ankunfts-Ansage & Fahrstunden-Timer ---- */
 .eta-row{display:flex;gap:.4rem;align-items:center;flex-wrap:wrap;margin:.6rem 0}

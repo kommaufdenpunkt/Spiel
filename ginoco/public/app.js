@@ -405,8 +405,12 @@ function openTour() {
 window.__openTour = openTour;
 
 // ---------- Was ist neu? (Changelog) ----------
-const CHANGELOG_VER = '3.44';
+const CHANGELOG_VER = '3.45';
 const CHANGELOG = [
+  { v: '3.45', d: '26.07.2026', title: 'Läuft alles? – Live-Status vor der Fahrstunde', items: [
+    '✅ Schon ~1 Std vorher siehst du: „Alles läuft planmäßig" – oder „wir starten etwas später".',
+    '🍦 Freundliche Frage vorab: „Wo sollen wir dich einsammeln?" – noch beim Eisessen? Kein Problem, kurz Bescheid geben.',
+    '⏱️ Fahrlehrer kann mit einem Tipp „+10/+15/+30 Min später" ansagen – die Fahrschüler werden automatisch informiert.'] },
   { v: '3.44', d: '26.07.2026', title: 'Menü beidseitig & frei einfärbbar', items: [
     '↔️ Das Menü öffnet links und rechts gleichzeitig – mit dem ✕ in der Mitte schließt du beide zusammen.',
     '🎨 Menü-Farbe frei wählbar: färbe die beiden Menüseiten, wie es dir gefällt (Aussehen → Menü-Farbe).',
@@ -1228,11 +1232,28 @@ async function refreshStudentLive() {
     </div>
     <div class="hint" style="margin:.4rem 0 0">${sharing ? '📍 Dein Standort wird geteilt – dein Fahrlehrer sieht jetzt genau, wo du bist.' : 'Teile deinen Standort, damit dich dein Fahrlehrer genau findet. Läuft nur jetzt und stoppt nach Beginn.'}</div>
   </div>`;
-  if (!d.active) {
+  // Beruhigender Status ganz oben (planmäßig / etwas später) – gilt in jeder Phase
+  const delayMin = d.booking.delayMin || 0;
+  const statusBanner = delayMin > 0
+    ? `<div class="run-status late">⏱️ <div><strong>Wir starten heute etwas später.</strong><br><span>Deine Fahrstunde verschiebt sich um ~${delayMin} Min auf <strong>${d.booking.start_time} Uhr</strong>. Kein Stress – nimm dir die Zeit.</span></div></div>`
+    : `<div class="run-status ok">✅ <div><strong>Alles läuft planmäßig.</strong><br><span>Beginn um <strong>${d.booking.start_time} Uhr</strong> (in ${d.booking.minutesToStart} Min).</span></div></div>`;
+  if (d.phase === 'soon') {
+    // ~1 Stunde vorher: freundlich nach dem Abholort fragen (in Gino's Ton)
+    card.innerHTML = `<h2>🚗 Deine nächste Fahrstunde</h2>
+      ${statusBanner}
+      ${announce}
+      <div class="pickup-ask">
+        <div class="pa-q">Wo sollen wir dich einsammeln?</div>
+        <p class="hint" style="margin:.3rem 0 0">Noch beim Eisessen oder mit Kumpels unterwegs? Kein Problem – sag einfach kurz Bescheid, wo genau du bist, dann findet dich dein Fahrlehrer sofort.</p>
+      </div>
+      ${pickupControls}
+      <p class="hint">Sobald dein Fahrlehrer losfährt (ca. ${d.lead} Min vorher), siehst du hier live auf der Karte, wo er ist und wann du rausgehen musst.</p>${contact}`;
+  } else if (!d.active) {
     const note = d.busy
       ? 'Dein Fahrlehrer ist gerade noch in einer Fahrstunde. Sein Standort wird geteilt, sobald er unterwegs zu dir ist.'
       : `Sobald dein Fahrlehrer seinen Standort teilt (ca. ${d.lead} Min vorher), kannst du hier live sehen, wo er ist und wann er da ist.`;
     card.innerHTML = `<h2>📍 Treffpunkt</h2>
+      ${statusBanner}
       ${announce}
       <p>Deine Fahrstunde beginnt in <strong>${d.booking.minutesToStart} Min</strong> (${d.booking.start_time} Uhr).</p>
       ${pickupControls}
@@ -1643,6 +1664,13 @@ async function renderLiveInstr() {
       <button class="sec sm" data-eta="15">in 15 Min</button>
       ${etaSaid}${st.eta ? '<button class="ghost sm" data-eta="0">zurücknehmen</button>' : ''}
     </div>
+    ${soon ? `<div class="eta-row">
+      <span class="muted" style="font-size:.85rem">Später anfangen:</span>
+      <button class="sec sm" data-delay="10">+10 Min</button>
+      <button class="sec sm" data-delay="15">+15 Min</button>
+      <button class="sec sm" data-delay="30">+30 Min</button>
+      <span class="hint" style="width:100%;margin:.1rem 0 0">Verschiebt die heutigen Termine & sagt den Fahrschülern automatisch Bescheid.</span>
+    </div>` : ''}
     ${sharing
       ? `<div class="inline"><span class="pill" style="background:var(--good-bg);color:var(--good)" id="live-instr" data-ts="">📍 Standort wird geteilt …</span>
          <button class="danger sm" id="live-stop">Teilen beenden</button></div>`
@@ -1655,6 +1683,15 @@ async function renderLiveInstr() {
     try {
       await api('/api/instructor/eta', { method: 'POST', body: { minutes: m } });
       toast(m ? `Dem Schüler gesagt: in ${m} Min da ✓` : 'Ansage zurückgenommen', 'ok');
+      renderLiveInstr();
+    } catch (e) { toast(e.message, 'err'); }
+  });
+  card.querySelectorAll('[data-delay]').forEach((b) => b.onclick = async () => {
+    const m = Number(b.dataset.delay);
+    if (!confirm(`Heutige Termine um ${m} Min nach hinten schieben? Die Fahrschüler werden benachrichtigt.`)) return;
+    try {
+      const r = await api('/api/instructor/delay-today', { method: 'POST', body: { minutes: m } });
+      toast(`${r.moved} Termin(e) um ${r.minutes} Min verschoben ✓`, 'ok');
       renderLiveInstr();
     } catch (e) { toast(e.message, 'err'); }
   });

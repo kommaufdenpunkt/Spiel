@@ -188,6 +188,7 @@ ensureColumn('bookings', 'started_at', 'started_at TEXT');   // Fahrstunden-Time
 // Buchungen als bestaetigt gelten – nur NEUE vom Fahrlehrer eingetragene Termine
 // starten als "reserviert" (0) und muessen vom Schueler bestaetigt werden.
 ensureColumn('bookings', 'confirmed', 'confirmed INTEGER NOT NULL DEFAULT 1');
+ensureColumn('bookings', 'delay_min', 'delay_min INTEGER NOT NULL DEFAULT 0'); // heutige Verspätung (Min), die der Fahrlehrer angesagt hat – nur für den beruhigenden Live-Status
 ensureColumn('bookings', 'ended_at', 'ended_at TEXT');       // Fahrstunde beendet (fürs Protokoll: von–bis)
 ensureColumn('bookings', 'feedback', 'feedback TEXT');       // Rückmeldung an den Schüler ("das haben wir gemacht")
 

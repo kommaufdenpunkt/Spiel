@@ -15,7 +15,7 @@ const PUBLIC = join(__dirname, 'public');
 const PORT = Number(process.env.PORT || 3000);
 const HOST = process.env.HOST || '0.0.0.0'; // hinter Caddy: HOST=127.0.0.1 (nur Proxy erreicht Node)
 const SESSION_DAYS = 30;
-const APP_VERSION = "3.44.0";
+const APP_VERSION = "3.45.0";
 // Einstellungen, die Schueler/Oeffentlichkeit sehen duerfen (Rest bleibt beim Fahrlehrer)
 const PUBLIC_SETTINGS = ['instructor_name', 'instructor_phone', 'policy_text',
   'cancel_hours', 'lock_hours', 'booking_horizon_days', 'booking_horizon_days_rank2',
@@ -733,7 +733,7 @@ async function handleApi(req, res, url) {
     let moved = 0;
     for (const r of rows) {
       const nt = toHHMM(toMin(r.start_time) + mins);
-      db.prepare('UPDATE bookings SET start_time = ? WHERE id = ?').run(nt, r.id);
+      db.prepare('UPDATE bookings SET start_time = ?, delay_min = delay_min + ? WHERE id = ?').run(nt, mins, r.id);
       moved++;
       if (r.student_id) {
         notify(r.student_id, 'shift', `Der Fahrlehrer verspätet sich um ${mins} Min. Dein Termin verschiebt sich auf ${nt} Uhr.`, date, r.id);
@@ -812,10 +812,11 @@ async function handleApi(req, res, url) {
     // Abhol-Fenster: bis 45 Min vorher (damit man den Abholort früh setzen kann),
     // bis kurz nach Beginn. Der Fahrlehrer-Standort wird separat nur bei aktivem Teilen gezeigt.
     const winMin = Math.max(lead, 45);
+    const statusWin = Math.max(winMin, 90); // schon ~1,5 h vorher den beruhigenden Status zeigen
     const upcoming = db.prepare(
       "SELECT * FROM bookings WHERE student_id=? AND date=? AND status='booked' ORDER BY start_time").all(sess.student_id, todayStr())
       .map((b) => ({ b, h: hoursUntil(b.date, b.start_time) }))
-      .filter((x) => x.h > -0.25 && x.h * 60 <= winMin)
+      .filter((x) => x.h > -0.25 && x.h * 60 <= statusWin)
       .sort((a, z) => a.h - z.h)[0];
     if (!upcoming) return ok(res, { window: false });
     const bk = upcoming.b;
@@ -848,9 +849,15 @@ async function handleApi(req, res, url) {
       if (ageMin < 30) announce = { minutes: live.eta_min, remaining: Math.max(0, Math.round(live.eta_min - ageMin)), at: live.eta_at };
     }
     const meLive = db.prepare('SELECT live_active FROM students WHERE id=?').get(bk.student_id);
+    const minutesToStart = Math.round(upcoming.h * 60);
+    // Phase steuert die Anzeige beim Schüler:
+    //  soon   = noch früh dran (≈45–90 Min): beruhigender Status + freundliche Standort-Frage
+    //  pickup = im Abhol-Fenster, Fahrlehrer teilt aber noch nicht: Abholort setzen/Standort teilen
+    //  live   = Fahrlehrer ist unterwegs (Karte)
+    const phase = active ? 'live' : (minutesToStart > winMin ? 'soon' : 'pickup');
     return ok(res, {
-      window: true, active, busy: otherInProgress,
-      booking: { date: bk.date, start_time: bk.start_time, minutesToStart: Math.round(upcoming.h * 60) },
+      window: true, active, busy: otherInProgress, phase,
+      booking: { date: bk.date, start_time: bk.start_time, minutesToStart, delayMin: bk.delay_min || 0 },
       location: active ? { lat: live.lat, lng: live.lng, updated_at: live.updated_at } : null,
       meet, distanceKm, etaMin, lead, announce,
       sharing: !!(meLive && meLive.live_active),
