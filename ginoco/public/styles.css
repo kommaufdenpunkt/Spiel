@@ -701,3 +701,8 @@ button:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
   padding:.7rem;border-radius:11px;background:var(--card2);border:1px dashed var(--brand);color:var(--brand);font-weight:700}
 .adk-open:hover{background:var(--card)}
 body:has(.fp-overlay) .pwa-install{display:none}
+
+/* Suchleiste in der Vollbild-Ausbildungskarte */
+.fp-search{margin-top:.55rem;width:100%;background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:.55rem .8rem}
+.fp-search:focus{border-color:var(--brand)}
+.fp-noresult{color:var(--muted);text-align:center;padding:1.4rem;font-size:.95rem}

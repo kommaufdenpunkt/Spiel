@@ -380,8 +380,10 @@ function openTour() {
 window.__openTour = openTour;
 
 // ---------- Was ist neu? (Changelog) ----------
-const CHANGELOG_VER = '3.40';
+const CHANGELOG_VER = '3.41';
 const CHANGELOG = [
+  { v: '3.41', d: '26.07.2026', title: 'Suche in der Ausbildungskarte', items: [
+    '🔍 Suchleiste in der Ausbildungskarte – tippe z.B. „Kreisverkehr“ und hake direkt ab, ohne Scrollen.'] },
   { v: '3.40', d: '26.07.2026', title: 'Theorie sammeln eintragen', items: [
     '📋 Mehrere Theorie-Termine auf einmal eintragen (Datum, Von, Bis, Titel – mit Vorschau).'] },
   { v: '3.39', d: '26.07.2026', title: 'Ausbildungskarte im Vollbild', items: [
@@ -2581,10 +2583,30 @@ async function openTrainingCard(id, name) {
       <button class="sec sm" id="tc-pdf">📄 PDF</button>
     </div>
     <div class="fp-sub">Hake ab, was ${esc((name || '').split(' ')[0])} schon geübt/beherrscht hat. Speichert automatisch – nur für dich sichtbar.</div>
-    <div class="fp-progwrap" id="tc-bar">${barInner()}</div>
+    <div class="fp-progwrap"><div id="tc-bar">${barInner()}</div>
+      <input id="tc-search" class="fp-search" placeholder="🔍 Punkt suchen … (z.B. Kreisverkehr, Einparken)" autocomplete="off"></div>
     <div class="fp-body">${sections}</div>
+    <div class="fp-noresult hidden" id="tc-noresult">Kein Punkt gefunden.</div>
   </div>`;
   document.body.appendChild(ov);
+  // Live-Suche: filtert die Punkte, blendet leere Abschnitte aus
+  const search = ov.querySelector('#tc-search');
+  search.oninput = () => {
+    const q = search.value.trim().toLowerCase();
+    let anyShown = false;
+    ov.querySelectorAll('.tc-sec').forEach((sec) => {
+      let secShown = 0;
+      sec.querySelectorAll('.tc-item').forEach((it) => {
+        const match = !q || it.textContent.toLowerCase().includes(q);
+        it.style.display = match ? '' : 'none';
+        if (match) secShown++;
+      });
+      sec.style.display = secShown ? '' : 'none';
+      if (q && secShown) sec.open = true;
+      if (secShown) anyShown = true;
+    });
+    ov.querySelector('#tc-noresult').classList.toggle('hidden', anyShown);
+  };
   const pwa = document.getElementById('pwa-install'); if (pwa) pwa.style.display = 'none';
   const close = () => { ov.remove(); const p = document.getElementById('pwa-install'); if (p) p.style.display = ''; };
   ov.querySelector('#tc-back').onclick = close;
