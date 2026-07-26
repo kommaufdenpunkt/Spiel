@@ -579,9 +579,9 @@ th{color:var(--muted);font-weight:600;font-size:.78rem;text-transform:uppercase;
 .edge-tiles{display:grid;grid-template-columns:1fr 1fr;gap:.55rem}
 .edge-panel .edge-tile{position:relative;display:flex;flex-direction:column;align-items:center;
   justify-content:center;gap:.4rem;background:var(--edge-tile,var(--card2));color:var(--ink);border:1px solid var(--edge-line,var(--line));
-  border-radius:15px;padding:.95rem .45rem;min-height:82px;text-align:center;font-weight:600}
+  border-radius:15px;padding:.95rem .45rem;min-height:82px;text-align:center;font-weight:600;min-width:0}
 .edge-panel .edge-tile .et-ic{font-size:1.55rem;line-height:1}
-.edge-panel .edge-tile .et-lb{font-size:.8rem;line-height:1.2}
+.edge-panel .edge-tile .et-lb{font-size:.8rem;line-height:1.2;overflow-wrap:anywhere;hyphens:auto;max-width:100%}
 .edge-panel .edge-tile:hover{border-color:var(--brand)}
 .edge-panel .edge-tile:active{transform:scale(.97)}
 .edge-panel .edge-tile.active{background:linear-gradient(var(--brand),var(--brand-dark));border-color:var(--brand)}
