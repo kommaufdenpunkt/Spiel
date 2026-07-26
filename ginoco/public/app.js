@@ -41,6 +41,8 @@ const FONTS = {
 };
 // Freie Akzentfarben (Buttons, Reiter, Hervorhebungen)
 const ACCENTS = ['#4d8dff', '#35c07d', '#a877f0', '#ec6ba6', '#e6934d', '#3fb6c4', '#e5605f', '#c9a13b'];
+// Menü-Hintergründe (die beiden aufklappenden Menüseiten) – dunkle, ruhige Töne
+const EDGES = ['#111319', '#141a24', '#161421', '#101a17', '#1c1620', '#1a1712', '#0f1720', '#201a1a'];
 // Textfarben – bewusst nur helle, gut lesbare Töne (alle Themes sind dunkel)
 const INKS = {
   standard: { label: 'Standard', dot: '#e7edf5', val: '' },
@@ -72,6 +74,14 @@ function applyAppearance() {
   const p = state.prefs || {}, root = document.documentElement;
   if (p.accent) { root.style.setProperty('--brand', p.accent); root.style.setProperty('--brand-dark', shade(p.accent, -16)); }
   if (p.ink) root.style.setProperty('--ink', p.ink);
+  // Menü-Farbe: färbt die Menü-Panels + Kacheln (frei wählbar)
+  if (p.edge) {
+    root.style.setProperty('--edge-bg', p.edge);
+    root.style.setProperty('--edge-tile', shade(p.edge, 16));
+    root.style.setProperty('--edge-line', shade(p.edge, 40));
+  } else {
+    root.style.removeProperty('--edge-bg'); root.style.removeProperty('--edge-tile'); root.style.removeProperty('--edge-line');
+  }
   root.style.setProperty('--font', (FONTS[p.font] || FONTS.system).stack);
   root.style.fontSize = SIZES[p.size] || '100%';
 }
@@ -82,6 +92,7 @@ function loadAppearance() {
     p.accent = localStorage.getItem('fsp-accent') || '';
     p.font = localStorage.getItem('fsp-font') || 'system';
     p.ink = localStorage.getItem('fsp-ink') || '';
+    p.edge = localStorage.getItem('fsp-edge') || '';
     p.size = localStorage.getItem('fsp-size') || 'normal';
   } catch {}
   state.prefs = p;
@@ -97,8 +108,8 @@ function savePref(k, v) {
   applyAppearance();
 }
 function resetAppearance() {
-  state.theme = 'nachtblau'; state.prefs = { font: 'system', size: 'normal', accent: '', ink: '' };
-  try { ['fsp-theme', 'fsp-accent', 'fsp-font', 'fsp-ink', 'fsp-size'].forEach((k) => localStorage.removeItem(k)); } catch {}
+  state.theme = 'nachtblau'; state.prefs = { font: 'system', size: 'normal', accent: '', ink: '', edge: '' };
+  try { ['fsp-theme', 'fsp-accent', 'fsp-font', 'fsp-ink', 'fsp-edge', 'fsp-size'].forEach((k) => localStorage.removeItem(k)); } catch {}
   applyAppearance();
 }
 
@@ -136,6 +147,14 @@ function openThemePicker() {
       </div>
     </div>
 
+    <div class="ap-sec"><div class="ap-label">Menü-Farbe <span class="muted">(die zwei Menüseiten)</span></div>
+      <div class="ap-swatches">
+        ${EDGES.map((c) => `<button data-edge="${c}" title="${c}" style="${swatch(c, (p.edge || '').toLowerCase() === c.toLowerCase())}"></button>`).join('')}
+        <label class="ap-free" title="Eigene Farbe">🎨<input type="color" id="ap-edge-free" value="${p.edge || '#111319'}"></label>
+        <button class="ghost sm" data-edge="" style="margin-left:.4rem">Standard</button>
+      </div>
+    </div>
+
     <div class="ap-sec"><div class="ap-label">Schriftgröße</div>
       <div class="ap-grid2">
         ${Object.keys(SIZES).map((k) => `<button class="sec" data-size="${k}" style="${(p.size || 'normal') === k ? 'outline:2px solid var(--brand)' : ''}">${SIZE_LABEL[k]}${(p.size || 'normal') === k ? ' ✓' : ''}</button>`).join('')}
@@ -152,11 +171,17 @@ function openThemePicker() {
   document.querySelectorAll('[data-accent]').forEach((b) => b.onclick = () => { savePref('accent', b.dataset.accent); reopen(); });
   document.querySelectorAll('[data-font]').forEach((b) => b.onclick = () => { savePref('font', b.dataset.font); reopen(); });
   document.querySelectorAll('[data-ink]').forEach((b) => b.onclick = () => { savePref('ink', b.dataset.ink); reopen(); });
+  document.querySelectorAll('[data-edge]').forEach((b) => b.onclick = () => { savePref('edge', b.dataset.edge); reopen(); });
   document.querySelectorAll('[data-size]').forEach((b) => b.onclick = () => { savePref('size', b.dataset.size); reopen(); });
   const free = $('#ap-accent-free');
   if (free) {
     free.oninput = () => { state.prefs.accent = free.value; applyAppearance(); };           // live-Vorschau
     free.onchange = () => { savePref('accent', free.value); reopen(); };                     // festhalten
+  }
+  const efree = $('#ap-edge-free');
+  if (efree) {
+    efree.oninput = () => { state.prefs.edge = efree.value; applyAppearance(); };            // live-Vorschau
+    efree.onchange = () => { savePref('edge', efree.value); reopen(); };                     // festhalten
   }
   const rst = $('#ap-reset');
   if (rst) rst.onclick = () => { resetAppearance(); toast('Auf Standard zurückgesetzt', 'ok'); reopen(); };
@@ -380,8 +405,12 @@ function openTour() {
 window.__openTour = openTour;
 
 // ---------- Was ist neu? (Changelog) ----------
-const CHANGELOG_VER = '3.42';
+const CHANGELOG_VER = '3.44';
 const CHANGELOG = [
+  { v: '3.44', d: '26.07.2026', title: 'Menü beidseitig & frei einfärbbar', items: [
+    '↔️ Das Menü öffnet links und rechts gleichzeitig – mit dem ✕ in der Mitte schließt du beide zusammen.',
+    '🎨 Menü-Farbe frei wählbar: färbe die beiden Menüseiten, wie es dir gefällt (Aussehen → Menü-Farbe).',
+    '🔲 Auch bei geöffnetem Menü immer zwei Kacheln nebeneinander.'] },
   { v: '3.42', d: '26.07.2026', title: 'Schönere Anmeldung & Tages-Überblick', items: [
     '🎨 Aufgehübschte Login-/Registrierungsseite (buntes Logo, Feature-Chips).',
     '📱 Fahrlehrer-„Heute": Begrüßung + Kurzüberblick (Stunden heute, nächste Stunde).'] },
@@ -673,15 +702,19 @@ function mountEdgeMenus(role) {
   root.className = 'edge-root';
   root.innerHTML = `
     <button class="edge-handle left" aria-label="Menü öffnen">☰</button>
-    <button class="edge-handle right" aria-label="Aktionen öffnen">⋯</button>
+    <button class="edge-handle right" aria-label="Menü öffnen">⋯</button>
     <div class="edge-overlay"></div>
+    <button class="edge-x" aria-label="Menü schließen">✕</button>
     <aside class="edge-panel left"><div class="edge-title">Menü</div>${leftItems}</aside>
     <aside class="edge-panel right"><div class="edge-title">Aktionen</div>${rightItems}</aside>`;
   document.body.appendChild(root);
-  const close = () => root.classList.remove('open-left', 'open-right');
-  root.querySelector('.edge-handle.left').onclick = () => { close(); root.classList.add('open-left'); };
-  root.querySelector('.edge-handle.right').onclick = () => { close(); root.classList.add('open-right'); };
+  // Beide Seiten öffnen sich zeitgleich; das ✕ in der Mitte schließt beide.
+  const open = () => root.classList.add('open-both');
+  const close = () => root.classList.remove('open-both', 'open-left', 'open-right');
+  root.querySelector('.edge-handle.left').onclick = open;
+  root.querySelector('.edge-handle.right').onclick = open;
   root.querySelector('.edge-overlay').onclick = close;
+  root.querySelector('.edge-x').onclick = close;
   // aktive Kachel markieren (Fahrlehrer)
   if (role === 'instructor') root.querySelectorAll('[data-nav]').forEach((b) =>
     b.classList.toggle('active', b.dataset.nav === state.instrTab));

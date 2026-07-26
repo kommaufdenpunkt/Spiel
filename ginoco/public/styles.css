@@ -551,9 +551,15 @@ th{color:var(--muted);font-weight:600;font-size:.78rem;text-transform:uppercase;
 .edge-handle.right{right:0;border-right:none;border-radius:16px 0 0 16px}
 .edge-overlay{position:fixed;inset:0;z-index:39;background:rgba(4,7,11,.5);backdrop-filter:blur(2px);
   opacity:0;pointer-events:none;transition:opacity .2s}
-.edge-root.open-left .edge-overlay,.edge-root.open-right .edge-overlay{opacity:1;pointer-events:auto}
-.edge-panel{position:fixed;top:0;height:100%;width:min(86vw,320px);z-index:41;background:var(--card);
-  border:1px solid var(--line);box-shadow:0 0 40px rgba(0,0,0,.5);padding:1rem .8rem 1.4rem;
+.edge-root.open-left .edge-overlay,.edge-root.open-right .edge-overlay,.edge-root.open-both .edge-overlay{opacity:1;pointer-events:auto}
+/* Zentrales Schließen-X (nur sichtbar, wenn beide Menüs offen sind) */
+.edge-x{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) scale(.6);z-index:44;
+  width:54px;height:54px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  font-size:1.4rem;color:#fff;background:linear-gradient(var(--brand),var(--brand-dark));
+  border:2px solid var(--card);box-shadow:0 6px 22px rgba(0,0,0,.5);opacity:0;pointer-events:none;transition:.2s}
+.edge-root.open-both .edge-x{opacity:1;pointer-events:auto;transform:translate(-50%,-50%) scale(1)}
+.edge-panel{position:fixed;top:0;height:100%;width:min(86vw,320px);z-index:41;background:var(--edge-bg,var(--card));
+  border:1px solid var(--edge-line,var(--line));box-shadow:0 0 40px rgba(0,0,0,.5);padding:1rem .8rem 1.4rem;
   display:flex;flex-direction:column;overflow-y:auto;-webkit-overflow-scrolling:touch;transition:transform .22s ease}
 .edge-panel .edge-title{font-size:.72rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
   color:var(--muted);margin:.2rem .2rem .6rem}
@@ -562,7 +568,7 @@ th{color:var(--muted);font-weight:600;font-size:.78rem;text-transform:uppercase;
   color:var(--muted);margin:.3rem .3rem .45rem;opacity:.8}
 .edge-tiles{display:grid;grid-template-columns:1fr 1fr;gap:.55rem}
 .edge-panel .edge-tile{position:relative;display:flex;flex-direction:column;align-items:center;
-  justify-content:center;gap:.4rem;background:var(--card2);color:var(--ink);border:1px solid var(--line);
+  justify-content:center;gap:.4rem;background:var(--edge-tile,var(--card2));color:var(--ink);border:1px solid var(--edge-line,var(--line));
   border-radius:15px;padding:.95rem .45rem;min-height:82px;text-align:center;font-weight:600}
 .edge-panel .edge-tile .et-ic{font-size:1.55rem;line-height:1}
 .edge-panel .edge-tile .et-lb{font-size:.8rem;line-height:1.2}
@@ -575,7 +581,18 @@ th{color:var(--muted);font-weight:600;font-size:.78rem;text-transform:uppercase;
 .edge-panel.right{right:0;transform:translateX(102%);border-radius:16px 0 0 16px}
 .edge-root.open-left .edge-panel.left{transform:translateX(0)}
 .edge-root.open-right .edge-panel.right{transform:translateX(0)}
-.edge-root.open-left .edge-handle,.edge-root.open-right .edge-handle{opacity:0;pointer-events:none}
+.edge-root.open-both .edge-panel.left,.edge-root.open-both .edge-panel.right{transform:translateX(0)}
+.edge-root.open-left .edge-handle,.edge-root.open-right .edge-handle,.edge-root.open-both .edge-handle{opacity:0;pointer-events:none}
+/* Beide gleichzeitig offen: Panels schmaler, damit sie nebeneinander passen (Platz fürs ✕) */
+.edge-root.open-both .edge-panel{width:min(46vw,300px)}
+@media(max-width:560px){
+  /* Beide Menüs offen: schmaler, aber immer zwei Kacheln nebeneinander */
+  .edge-root.open-both .edge-panel{width:48vw;padding:.85rem .4rem 1.4rem}
+  .edge-root.open-both .edge-panel .edge-tiles{gap:.4rem}
+  .edge-root.open-both .edge-panel .edge-tile{min-height:64px;padding:.55rem .3rem}
+  .edge-root.open-both .edge-panel .edge-tile .et-ic{font-size:1.35rem}
+  .edge-root.open-both .edge-panel .edge-tile .et-lb{font-size:.72rem}
+}
 
 /* PWA: schwebender "App installieren"-Button */
 .pwa-install{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(1rem + env(safe-area-inset-bottom));
