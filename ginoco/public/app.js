@@ -380,8 +380,11 @@ function openTour() {
 window.__openTour = openTour;
 
 // ---------- Was ist neu? (Changelog) ----------
-const CHANGELOG_VER = '3.38';
+const CHANGELOG_VER = '3.39';
 const CHANGELOG = [
+  { v: '3.39', d: '26.07.2026', title: 'Ausbildungskarte im Vollbild', items: [
+    '📋 Ausbildungskarte öffnet jetzt als große Vollbild-Seite (statt engem Fenster).',
+    '🚗 Direkt aus der Fahrstunde abhakbar: Knopf „Ausbildungskarte abhaken“.'] },
   { v: '3.38', d: '25.07.2026', title: 'Feinschliff rundum', items: [
     '🏠 Einladendere Startseite: große Begrüßung + prominente „nächste Fahrstunde“.',
     '🔔 Mitteilungen schöner dargestellt (Karten mit Icon).',
@@ -1774,6 +1777,7 @@ function openMarkModal(id) {
     </div>
     <div class="field"><label>📝 Rückmeldung an den Schüler <span class="muted">(sieht der Schüler – „das haben wir gemacht")</span></label>
       <textarea id="m-feedback" rows="3" placeholder="z.B. Heute Kreisverkehr & Vorfahrt geübt – nächstes Mal Einparken." style="resize:vertical">${esc(b.feedback || '')}</textarea></div>
+    ${b.student_id ? `<button class="adk-open" id="m-adk" type="button">📋 Ausbildungskarte abhaken (Vollbild)</button>` : ''}
     <div class="field"><label>Grund (bei Absage/Nichterscheinen, optional)</label><input id="m-reason" value="${esc(b.reason || '')}"></div>
     <div class="field"><label>Interne Notiz (nur für dich)</label><input id="m-note" value="${esc(b.note || '')}"></div>
     <div class="field"><label>Treffpunkt (für Live-Standort & Navigation)</label>
@@ -1787,6 +1791,8 @@ function openMarkModal(id) {
       <button id="m-save">Speichern</button>
     </div>`);
   let meetLat = b.meet_lat, meetLng = b.meet_lng;
+  const adkBtn = $('#m-adk');
+  if (adkBtn) adkBtn.onclick = () => { closeModal(); openTrainingCard(b.student_id, b.student_name || ''); };
   $('#m-meet-here').onclick = async () => {
     try { const c = await getPosOnce(); meetLat = c.latitude; meetLng = c.longitude;
       $('#m-meet-info').innerHTML = `✓ Koordinaten übernommen (${meetLat.toFixed(4)}, ${meetLng.toFixed(4)})`; toast('Treffpunkt gesetzt', 'ok'); }
@@ -2548,12 +2554,10 @@ async function openTrainingCard(id, name) {
   let training = {};
   try { const r = await api('/api/students/' + id + '/training'); training = r.training || {}; } catch (e) { toast(e.message, 'err'); return; }
   const doneCount = () => Object.values(training).filter(Boolean).length;
-  const bar = () => {
+  const barInner = () => {
     const d = doneCount(), pct = Math.round((d / CURR_TOTAL) * 100);
-    return `<div style="margin:.2rem 0 .6rem">
-      <div style="display:flex;justify-content:space-between;font-size:.82rem;color:var(--muted)"><span>Ausbildungsfortschritt</span><span id="tc-pct">${d}/${CURR_TOTAL} · ${pct}%</span></div>
-      <div style="height:9px;background:#0f151d;border-radius:6px;overflow:hidden;margin-top:.25rem"><div id="tc-fill" style="height:100%;width:${pct}%;background:var(--brand);transition:.2s"></div></div>
-    </div>`;
+    return `<div class="fp-prog-row"><span>Ausbildungsfortschritt</span><span id="tc-pct">${d}/${CURR_TOTAL} · ${pct}%</span></div>
+      <div class="fp-prog-bar"><div id="tc-fill" style="width:${pct}%"></div></div>`;
   };
   const sections = CURRICULUM.map((s) => {
     const done = s.items.filter((_, i) => training[currKey(s.key, i)]).length;
@@ -2565,23 +2569,35 @@ async function openTrainingCard(id, name) {
       }).join('')}</div>
     </details>`;
   }).join('');
-  modal(`<h3>📋 Ausbildungskarte – ${esc(name)}</h3>
-    <p class="hint">Hake ab, was ${esc((name || '').split(' ')[0])} schon geübt/beherrscht hat. Wird automatisch gespeichert. Nur für dich sichtbar.</p>
-    <div id="tc-bar">${bar()}</div>
-    <div style="max-height:52vh;overflow:auto;margin:.2rem -.2rem 0;padding:0 .2rem">${sections}</div>
-    <div class="actions" style="justify-content:space-between"><button class="sec" id="tc-pdf">📄 PDF / Drucken</button><button onclick="window.__closeModal()">Schließen</button></div>`, 'wide');
-  const pdfBtn = $('#tc-pdf'); if (pdfBtn) pdfBtn.onclick = () => printTrainingCard(name, training);
-  const refreshBar = () => { const t = $('#tc-bar'); if (t) t.innerHTML = bar(); };
+  // Vollbild-Seite (nicht als enges Fenster) – viel Platz zum Abhaken
+  const ov = document.createElement('div');
+  ov.className = 'fp-overlay';
+  ov.innerHTML = `<div class="fp">
+    <div class="fp-head">
+      <button class="fp-back" id="tc-back">‹ Zurück</button>
+      <div class="fp-title">📋 Ausbildungskarte <span>${esc(name)}</span></div>
+      <button class="sec sm" id="tc-pdf">📄 PDF</button>
+    </div>
+    <div class="fp-sub">Hake ab, was ${esc((name || '').split(' ')[0])} schon geübt/beherrscht hat. Speichert automatisch – nur für dich sichtbar.</div>
+    <div class="fp-progwrap" id="tc-bar">${barInner()}</div>
+    <div class="fp-body">${sections}</div>
+  </div>`;
+  document.body.appendChild(ov);
+  const pwa = document.getElementById('pwa-install'); if (pwa) pwa.style.display = 'none';
+  const close = () => { ov.remove(); const p = document.getElementById('pwa-install'); if (p) p.style.display = ''; };
+  ov.querySelector('#tc-back').onclick = close;
+  ov.querySelector('#tc-pdf').onclick = () => printTrainingCard(name, training);
+  const refreshBar = () => { const t = ov.querySelector('#tc-bar'); if (t) t.innerHTML = barInner(); };
   let saveTimer = null;
   const save = () => { clearTimeout(saveTimer); saveTimer = setTimeout(async () => {
     try { await api('/api/students/' + id + '/training', { method: 'PUT', body: { training } }); } catch (e) { toast(e.message, 'err'); }
   }, 500); };
-  document.querySelectorAll('[data-tc]').forEach((cb) => cb.onchange = () => {
+  ov.querySelectorAll('[data-tc]').forEach((cb) => cb.onchange = () => {
     if (cb.checked) training[cb.dataset.tc] = Date.now();   // Zeitstempel = „zuletzt abgehakt“
     else delete training[cb.dataset.tc];
     const sec = CURRICULUM.find((s) => s.key === cb.dataset.sk);
     const done = sec.items.filter((_, i) => training[currKey(sec.key, i)]).length;
-    const pill = document.querySelector(`[data-secpill="${cb.dataset.sk}"]`); if (pill) pill.textContent = `${done}/${sec.items.length}`;
+    const pill = ov.querySelector(`[data-secpill="${cb.dataset.sk}"]`); if (pill) pill.textContent = `${done}/${sec.items.length}`;
     refreshBar(); save();
   });
 }
