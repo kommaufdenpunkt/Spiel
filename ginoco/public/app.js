@@ -380,8 +380,11 @@ function openTour() {
 window.__openTour = openTour;
 
 // ---------- Was ist neu? (Changelog) ----------
-const CHANGELOG_VER = '3.41';
+const CHANGELOG_VER = '3.42';
 const CHANGELOG = [
+  { v: '3.42', d: '26.07.2026', title: 'Schönere Anmeldung & Tages-Überblick', items: [
+    '🎨 Aufgehübschte Login-/Registrierungsseite (buntes Logo, Feature-Chips).',
+    '📱 Fahrlehrer-„Heute": Begrüßung + Kurzüberblick (Stunden heute, nächste Stunde).'] },
   { v: '3.41', d: '26.07.2026', title: 'Suche in der Ausbildungskarte', items: [
     '🔍 Suchleiste in der Ausbildungskarte – tippe z.B. „Kreisverkehr“ und hake direkt ab, ohne Scrollen.'] },
   { v: '3.40', d: '26.07.2026', title: 'Theorie sammeln eintragen', items: [
@@ -738,9 +741,14 @@ function renderAuth() {
   const tagline = mode === 'admin' ? 'Fahrlehrer-Bereich' : 'Fahrstunden einfach online buchen';
   const draw = () => {
     app.innerHTML = `<div class="auth-wrap"><div class="auth">
-      <div class="logo-big">🚗</div>
-      <h1>ginoco</h1>
-      <div class="tag">${tagline}</div>
+      <div class="auth-hero">
+        <div class="auth-logo"><span>🚗</span></div>
+        <h1 class="auth-name">ginoco</h1>
+        <div class="tag">${tagline}</div>
+      </div>
+      ${mode !== 'admin' ? `<div class="auth-feats">
+        <span>📅 Selbst buchen</span><span>🎁 Tauschen</span><span>📍 Live-Abholung</span>
+      </div>` : ''}
       <div class="card">
         ${TABS.length > 1 ? `<div class="tabs">
           ${TABS.map(([t, l]) => `<button data-t="${t}" class="${tab === t ? 'active' : ''}">${l}</button>`).join('')}
@@ -1532,8 +1540,13 @@ function drawInstrTab() {
 // ---- Tab: Heute & Ziele (Tacho) ----
 async function tabHeute() {
   const box = $('#itab');
+  const gname = firstName(state.settings?.instructor_name || state.user?.name || '');
   box.innerHTML = `<div class="card hidden" id="live-card"></div>
-    <div class="card"><h2>Wochenziel</h2><div id="gauge"></div><div id="tiles"></div></div>
+    <div class="card">
+      <div class="greet-big">${greetWord()}${gname ? ', <strong>' + esc(gname) + '</strong>' : ''} 👋</div>
+      <div id="today-strip"></div>
+      <h2 style="margin-top:.3rem">Wochenziel</h2><div id="gauge"></div><div id="tiles"></div>
+    </div>
     <div class="card"><h2>Heute <span class="sub" id="today-sub"></span></h2><div id="today-list"></div></div>`;
   try {
     renderLiveInstr();
@@ -1543,6 +1556,17 @@ async function tabHeute() {
     const ov = await api('/api/instructor/overview?from=' + todayStr() + '&to=' + todayStr());
     $('#today-sub').textContent = fmtDay(todayStr());
     renderInstrDay($('#today-list'), todayStr(), ov.bookings, ov.blocks);
+    // Kurzüberblick für heute: wie viele Stunden, nächste offen
+    const hm = (t) => { const [h, m] = String(t).split(':').map(Number); return h * 60 + m; };
+    const nowD = new Date(), nowM = nowD.getHours() * 60 + nowD.getMinutes();
+    const todays = (ov.bookings || []).filter((b) => b.status !== 'cancelled').sort((a, b) => a.start_time.localeCompare(b.start_time));
+    const next = todays.find((b) => b.status === 'booked' && hm(b.start_time) + (b.duration_min || 0) > nowM);
+    const strip = `<div class="today-strip">
+      <div class="ts-item"><b>${todays.length}</b><span>Fahrstunden heute</span></div>
+      ${next ? `<div class="ts-item accent"><b>${next.start_time}</b><span>nächste: ${esc((next.student_name || next.title || '').split(' ')[0] || 'Termin')}</span></div>`
+        : `<div class="ts-item"><b>✓</b><span>keine offene Stunde mehr</span></div>`}
+    </div>`;
+    const strEl = $('#today-strip'); if (strEl) strEl.innerHTML = strip;
   } catch (e) { toast(e.message, 'err'); }
 }
 
