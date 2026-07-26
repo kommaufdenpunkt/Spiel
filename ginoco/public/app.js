@@ -405,8 +405,12 @@ function openTour() {
 window.__openTour = openTour;
 
 // ---------- Was ist neu? (Changelog) ----------
-const CHANGELOG_VER = '3.45';
+const CHANGELOG_VER = '3.46';
 const CHANGELOG = [
+  { v: '3.46', d: '26.07.2026', title: 'Neue Live-Karte direkt in der App', items: [
+    '🗺️ Echte Live-Karte in Ginoco: der Fahrlehrer-Punkt bewegt sich live, die Route wird eingezeichnet – kein Wechsel zu Google Maps mehr nötig.',
+    '📍 Entfernung & Ankunftszeit direkt dabei; die Karte aktualisiert sich automatisch.',
+    '🔒 Datenschutzfreundlich über OpenStreetMap, ohne fremde Tracker.'] },
   { v: '3.45', d: '26.07.2026', title: 'Läuft alles? – Live-Status vor der Fahrstunde', items: [
     '✅ Schon ~1 Std vorher siehst du: „Alles läuft planmäßig" – oder „wir starten etwas später".',
     '🍦 Freundliche Frage vorab: „Wo sollen wir dich einsammeln?" – noch beim Eisessen? Kein Problem, kurz Bescheid geben.',
@@ -1204,12 +1208,99 @@ window.__openPickup = openPickupModal;
 
 // ---------- Live-Verfolgung (Schüler) ----------
 let studentLivePoll = null;
+// ---------- Live-Karte (Leaflet + OpenStreetMap, lokal gehostet) ----------
+let _leafletPromise = null;
+function ensureLeaflet() {
+  if (window.L) return Promise.resolve();
+  if (_leafletPromise) return _leafletPromise;
+  _leafletPromise = new Promise((resolve, reject) => {
+    const css = document.createElement('link');
+    css.rel = 'stylesheet'; css.href = '/vendor/leaflet/leaflet.css';
+    document.head.appendChild(css);
+    const s = document.createElement('script');
+    s.src = '/vendor/leaflet/leaflet.js';
+    s.onload = () => resolve();
+    s.onerror = () => { _leafletPromise = null; reject(new Error('Karte konnte nicht geladen werden')); };
+    document.head.appendChild(s);
+  });
+  return _leafletPromise;
+}
+const _liveMaps = {}; // id -> { map, car, meet, route, routeKey, fitted }
+function _carIcon() { return L.divIcon({ className: 'lm-car', html: '🚗', iconSize: [36, 36], iconAnchor: [18, 18] }); }
+function _meetIcon() { return L.divIcon({ className: 'lm-pin', html: '📍', iconSize: [30, 34], iconAnchor: [15, 30] }); }
+function _youIcon() { return L.divIcon({ className: 'lm-you', html: '🧍', iconSize: [30, 34], iconAnchor: [15, 30] }); }
+async function initLiveMap(id) {
+  await ensureLeaflet();
+  const el = document.getElementById(id);
+  if (!el || !window.L) return null;
+  destroyLiveMap(id);
+  const map = L.map(el, { zoomControl: true, attributionControl: true, scrollWheelZoom: false });
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(map);
+  _liveMaps[id] = { map, car: null, meet: null, route: null, routeKey: '', fitted: false };
+  setTimeout(() => { try { map.invalidateSize(); } catch {} }, 60);
+  return _liveMaps[id];
+}
+function destroyLiveMap(id) {
+  const m = _liveMaps[id];
+  if (m) { try { m.map.remove(); } catch {} delete _liveMaps[id]; }
+}
+// aPos/bPos = [lat,lng]. aIcon = Icon für den beweglichen Punkt (Auto oder Schüler).
+async function updateLiveMap(id, aPos, aIcon, bPos, bLabel, bIcon) {
+  const m = _liveMaps[id];
+  if (!m || !window.L) return;
+  if (!m.car) m.car = L.marker(aPos, { icon: aIcon }).addTo(m.map);
+  else m.car.setLatLng(aPos);
+  const pts = [aPos];
+  if (bPos) {
+    if (!m.meet) { m.meet = L.marker(bPos, { icon: bIcon || _meetIcon() }).addTo(m.map); if (bLabel) m.meet.bindPopup(bLabel); }
+    else m.meet.setLatLng(bPos);
+    pts.push(bPos);
+    const key = aPos.map((x) => x.toFixed(3)).join(',') + '|' + bPos.map((x) => x.toFixed(4)).join(',');
+    if (key !== m.routeKey) { m.routeKey = key; _drawRoute(id, aPos, bPos); }
+  }
+  if (pts.length > 1) m.map.fitBounds(pts, { padding: [42, 42], maxZoom: 16, animate: m.fitted });
+  else if (!m.fitted) m.map.setView(aPos, 15);
+  else m.map.panTo(aPos, { animate: true });
+  m.fitted = true;
+}
+async function _drawRoute(id, a, b) {
+  const m = _liveMaps[id]; if (!m) return;
+  const straight = () => {
+    if (!_liveMaps[id]) return;
+    if (m.route) m.map.removeLayer(m.route);
+    m.route = L.polyline([a, b], { color: '#4d8dff', weight: 4, dashArray: '6,8', opacity: .7 }).addTo(m.map);
+  };
+  try {
+    const url = `https://router.project-osrm.org/route/v1/driving/${a[1]},${a[0]};${b[1]},${b[0]}?overview=full&geometries=geojson`;
+    const r = await fetch(url); const j = await r.json();
+    const co = j.routes && j.routes[0] && j.routes[0].geometry && j.routes[0].geometry.coordinates;
+    if (co && _liveMaps[id]) {
+      const ll = co.map((c) => [c[1], c[0]]);
+      if (m.route) m.map.removeLayer(m.route);
+      m.route = L.polyline(ll, { color: '#4d8dff', weight: 5, opacity: .85 }).addTo(m.map);
+    } else straight();
+  } catch { straight(); }
+}
+
+// Karte für den Fahrlehrer-Standort: stellt sicher, dass Leaflet + Karte bereit sind,
+// bevor Icons (die L brauchen) erzeugt werden – dann Position aktualisieren.
+async function renderCarMap(id, carPos, meetPos, label) {
+  try {
+    await ensureLeaflet();
+    if (!_liveMaps[id]) { if (!(await initLiveMap(id))) return; }
+    await updateLiveMap(id, carPos, _carIcon(), meetPos, label, _meetIcon());
+  } catch {}
+}
+
 async function refreshStudentLive() {
   const card = $('#live-card'); if (!card) return;
   let d;
   try { d = await api('/api/my/live'); } catch { return; }
   if (!d.window) {
     card.classList.add('hidden');
+    card.dataset.mode = '';
+    destroyLiveMap('live-map');
     if (studentLivePoll) { clearInterval(studentLivePoll); studentLivePoll = null; }
     return;
   }
@@ -1239,6 +1330,7 @@ async function refreshStudentLive() {
     : `<div class="run-status ok">✅ <div><strong>Alles läuft planmäßig.</strong><br><span>Beginn um <strong>${d.booking.start_time} Uhr</strong> (in ${d.booking.minutesToStart} Min).</span></div></div>`;
   if (d.phase === 'soon') {
     // ~1 Stunde vorher: freundlich nach dem Abholort fragen (in Gino's Ton)
+    card.dataset.mode = 'soon'; destroyLiveMap('live-map');
     card.innerHTML = `<h2>🚗 Deine nächste Fahrstunde</h2>
       ${statusBanner}
       ${announce}
@@ -1249,6 +1341,7 @@ async function refreshStudentLive() {
       ${pickupControls}
       <p class="hint">Sobald dein Fahrlehrer losfährt (ca. ${d.lead} Min vorher), siehst du hier live auf der Karte, wo er ist und wann du rausgehen musst.</p>${contact}`;
   } else if (!d.active) {
+    card.dataset.mode = 'pickup'; destroyLiveMap('live-map');
     const note = d.busy
       ? 'Dein Fahrlehrer ist gerade noch in einer Fahrstunde. Sein Standort wird geteilt, sobald er unterwegs zu dir ist.'
       : `Sobald dein Fahrlehrer seinen Standort teilt (ca. ${d.lead} Min vorher), kannst du hier live sehen, wo er ist und wann er da ist.`;
@@ -1260,33 +1353,37 @@ async function refreshStudentLive() {
       <p class="hint">${note}</p>${contact}`;
   } else {
     const loc = d.location;
-    // Google-Maps-Einbettung (ohne API-Key): volle Straßennamen. Mit Treffpunkt = Route,
-    // sonst nur die Live-Position des Fahrlehrers.
-    const mapSrc = d.meet?.lat != null
-      ? `https://maps.google.com/maps?saddr=${loc.lat},${loc.lng}&daddr=${d.meet.lat},${d.meet.lng}&hl=de&output=embed`
-      : `https://maps.google.com/maps?q=${loc.lat},${loc.lng}&z=15&hl=de&output=embed`;
-    // Google Maps-Route zeigt echten Live-Verkehr + genaue Ankunftszeit
-    const traffic = d.meet?.lat != null
-      ? `https://www.google.com/maps/dir/?api=1&origin=${loc.lat},${loc.lng}&destination=${d.meet.lat},${d.meet.lng}&travelmode=driving`
-      : `https://www.google.com/maps/search/?api=1&query=${loc.lat},${loc.lng}`;
     const upd = new Date(loc.updated_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
     // "Wann rausgehen?" – Ansage des Fahrlehrers hat Vorrang, sonst GPS-Schätzung
     const etaShown = d.announce ? d.announce.remaining : d.etaMin;
-    const soon = etaShown != null && etaShown <= 2;
-    const hero = soon
+    const goNow = etaShown != null && etaShown <= 2;
+    const hero = goNow
       ? `<div class="live-hero go"><span class="lh-ic">🚶</span><div><div class="lh-big">Jetzt rausgehen!</div><div class="lh-sub">Dein Fahrlehrer ist gleich da</div></div></div>`
       : `<div class="live-hero"><span class="lh-ic">🚗</span><div><div class="lh-big">${etaShown != null ? `Fahrlehrer in ~${etaShown} Min da` : 'Fahrlehrer unterwegs'}</div><div class="lh-sub">Dein Fahrlehrer ist auf dem Weg zu dir – wir sagen Bescheid, wann du raus musst.</div></div></div>`;
-    card.innerHTML = `<h2>🛰️ Dein Fahrlehrer ist unterwegs</h2>
-      ${hero}
-      <div class="inline" style="margin-bottom:.6rem">
-        ${d.distanceKm != null ? `<span class="pill">${d.distanceKm < 1 ? Math.round(d.distanceKm * 1000) + ' m' : d.distanceKm.toFixed(1) + ' km'} Luftlinie</span>` : ''}
-        <span class="pill">aktualisiert ${upd}</span>
-      </div>
-      <iframe title="Karte" src="${mapSrc}" style="width:100%;height:280px;border:1px solid var(--line);border-radius:10px" loading="lazy"></iframe>
-      <a class="live-traffic-btn" href="${traffic}" target="_blank" rel="noopener">🚦 Live-Verkehr & genaue Ankunft in Google Maps</a>
-      ${d.meet?.label ? `<div class="inline" style="margin-top:.5rem"><span class="pill">📍 Treffpunkt: ${esc(d.meet.label)}</span></div>` : ''}
-      ${pickupControls}
-      <p class="hint" style="margin-top:.4rem">Karte zeigt die aktuelle Position (Luftlinie). Für Verkehr & präzise Ankunftszeit den grünen Knopf tippen.</p>${contact}`;
+    const distPill = d.distanceKm != null ? `<span class="pill">${d.distanceKm < 1 ? Math.round(d.distanceKm * 1000) + ' m' : d.distanceKm.toFixed(1) + ' km'} entfernt</span>` : '';
+    const meetPill = d.meet?.label ? `<div class="inline" style="margin-top:.5rem"><span class="pill">📍 Treffpunkt: ${esc(d.meet.label)}</span></div>` : '';
+    // Karte NUR EINMAL aufbauen und danach live aktualisieren (sonst würde der Punkt „springen")
+    if (card.dataset.mode !== 'live' || !$('#live-map')) {
+      card.dataset.mode = 'live';
+      card.innerHTML = `<h2>🛰️ Dein Fahrlehrer ist unterwegs</h2>
+        <div id="live-hero"></div>
+        <div class="inline" id="live-pills" style="margin-bottom:.6rem"></div>
+        <div id="live-map" class="live-map"></div>
+        <div id="live-meet"></div>
+        <div id="live-pickup"></div>
+        <p class="hint" style="margin-top:.4rem">🛰️ Die Karte aktualisiert sich automatisch – du siehst live, wo dein Fahrlehrer ist und wann du rausgehen musst.</p>
+        <div id="live-contact"></div>`;
+    }
+    // dynamische Teile bei jedem Durchlauf frisch setzen
+    const setEl = (id, html) => { const e = document.getElementById(id); if (e) e.innerHTML = html; };
+    setEl('live-hero', hero);
+    setEl('live-pills', `${distPill}<span class="pill">aktualisiert ${upd}</span>`);
+    setEl('live-meet', meetPill);
+    setEl('live-pickup', pickupControls);
+    setEl('live-contact', contact);
+    const carPos = [loc.lat, loc.lng];
+    const meetPos = d.meet?.lat != null ? [d.meet.lat, d.meet.lng] : null;
+    renderCarMap('live-map', carPos, meetPos, d.meet?.label ? esc(d.meet.label) : null);
   }
   const pe = $('#pk-edit'); if (pe) pe.onclick = () => openPickupModal(d.meet?.label);
   const ms = $('#my-share'); if (ms) ms.onclick = () => startMyShare();
@@ -1641,13 +1738,18 @@ async function renderLiveInstr() {
     studentBox = `<div class="pickup-box">
       <div class="pb-line"><span class="muted">Abholort ${vn}:</span> <strong>${m.label ? esc(m.label) : '– noch nicht gesetzt –'}</strong></div>`;
     if (sl) {
-      const dd = 0.006, bbox = [sl.lng - dd, sl.lat - dd, sl.lng + dd, sl.lat + dd].join(',');
-      const mapSrc = `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${sl.lat},${sl.lng}`;
       const route = `https://www.google.com/maps/dir/?api=1&destination=${sl.lat},${sl.lng}`;
       const upd = new Date(sl.updated_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
       studentBox += `<div class="inline" style="margin:.45rem 0"><span class="pill" style="background:var(--good-bg);color:var(--good)">📍 ${vn} teilt Standort · ${upd}</span></div>
-        <iframe title="Schüler-Standort" src="${mapSrc}" style="width:100%;height:220px;border:1px solid var(--line);border-radius:10px" loading="lazy"></iframe>
-        <a class="pill" href="${route}" target="_blank" rel="noopener" style="text-decoration:none;background:var(--brand);color:#fff;margin-top:.5rem;display:inline-block">🧭 Route zu ${vn}</a>`;
+        <div id="instr-live-map" class="live-map" style="height:220px"></div>
+        <a class="pill" href="${route}" target="_blank" rel="noopener" style="text-decoration:none;background:var(--brand);color:#fff;margin-top:.5rem;display:inline-block">🧭 Route zu ${vn} (Navi öffnen)</a>`;
+      // Karte nach dem Rendern initialisieren (Schüler-Punkt + Treffpunkt)
+      setTimeout(() => {
+        initLiveMap('instr-live-map').then(() => {
+          const meetPos = (m.lat != null && m.lng != null) ? [m.lat, m.lng] : null;
+          updateLiveMap('instr-live-map', [sl.lat, sl.lng], _youIcon(), meetPos, m.label ? esc(m.label) : null, _meetIcon());
+        });
+      }, 30);
     } else {
       studentBox += `<div class="hint" style="margin:.35rem 0 0">Sobald ${vn} den Standort teilt, siehst du hier genau, wo er/sie steht.</div>`;
     }

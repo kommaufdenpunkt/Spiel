@@ -148,6 +148,19 @@ main{max-width:1080px;margin:0 auto;padding:1.4rem 1.2rem 4rem}
   padding:.7rem;border-radius:11px;background:linear-gradient(135deg,#35c07d,#2aa568);color:#fff;
   font-weight:700;text-decoration:none;font-size:.95rem}
 .live-traffic-btn:hover{filter:brightness(1.06)}
+/* Live-Karte (Leaflet + OpenStreetMap) */
+.live-map{width:100%;height:300px;border:1px solid var(--line);border-radius:12px;overflow:hidden;
+  background:var(--card2);position:relative;isolation:isolate}
+.lm-car,.lm-pin,.lm-you{display:flex;align-items:center;justify-content:center;line-height:1;
+  background:none;border:none;filter:drop-shadow(0 2px 3px rgba(0,0,0,.55))}
+.lm-car{font-size:30px}
+.lm-pin,.lm-you{font-size:26px}
+.leaflet-container{background:var(--card2);font-family:inherit}
+.leaflet-control-attribution{font-size:9px;background:rgba(0,0,0,.45);color:var(--muted)}
+.leaflet-control-attribution a{color:var(--muted)}
+.leaflet-bar a{background:var(--card);color:var(--ink);border-color:var(--line)}
+.leaflet-bar a:hover{background:var(--card2)}
+.leaflet-popup-content-wrapper,.leaflet-popup-tip{background:var(--card);color:var(--ink)}
 
 /* ---- Slots ---- */
 .dateline{display:flex;align-items:center;gap:.6rem;margin-bottom:1rem;flex-wrap:wrap}
