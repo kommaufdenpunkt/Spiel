@@ -127,6 +127,11 @@
   if ($('obPlayBtn')) $('obPlayBtn').addEventListener('click', () => { setupObPlayer(); if (obPlayer) obPlayer.start(); });
   if ($('obStopBtn')) $('obStopBtn').addEventListener('click', () => { if (obPlayer) obPlayer.stop(); });
   if ($('readyBtn')) $('readyBtn').addEventListener('click', async () => {
+    if ($('consentRec') && !$('consentRec').checked) {
+      if ($('consentRecBox')) { $('consentRecBox').style.borderColor = 'var(--bad, #e14b6a)'; $('consentRecBox').scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+      toast('Bitte bestätige die Einwilligung zur Aufnahme und Speicherung, um fortzufahren.');
+      return;
+    }
     if (obPlayer) obPlayer.stop();
     const b = $('readyBtn'); b.disabled = true; b.textContent = 'Kamera wird gestartet …';
     if (!(await startCamera())) { b.disabled = false; b.textContent = 'Bereit – in den Warteraum'; toast('Kein Zugriff auf Kamera/Mikrofon. Bitte erlauben.'); return; }
@@ -289,20 +294,39 @@
   if ($('setupPasskeyBtn')) $('setupPasskeyBtn').addEventListener('click', registerPasskey);
 
   // ================= TELEPROMPTER (Bewerber liest den Audition-Text ab) =================
-  let prompterTimer = null;
+  // Bewerber bestimmt das Tempo selbst – flüssiges Scrollen per requestAnimationFrame.
+  let promptRAF = null, promptPos = 0, promptLast = 0;
   async function loadScript() { try { const r = await api('GET', '/api/script'); if (r.status === 200 && $('prompterText')) $('prompterText').textContent = r.body.script || ''; } catch {} }
-  function prompterStop() { if (prompterTimer) clearInterval(prompterTimer); prompterTimer = null; if ($('prompterToggle')) $('prompterToggle').textContent = '▶ Start'; }
+  function prompterStop() { if (promptRAF) cancelAnimationFrame(promptRAF); promptRAF = null; if ($('prompterToggle')) $('prompterToggle').textContent = '▶ Start'; }
   function prompterStart() {
-    if (prompterTimer || !$('prompterBox')) return;
+    const box = $('prompterBox'); if (promptRAF || !box) return;
     $('prompterToggle').textContent = '⏸ Pause';
-    prompterTimer = setInterval(() => {
-      const box = $('prompterBox'); const speed = parseInt($('prompterSpeed').value, 10) || 4;
-      box.scrollTop += Math.max(1, speed * 0.6);
-      if (box.scrollTop + box.clientHeight >= box.scrollHeight - 1) prompterStop();
-    }, 40);
+    promptPos = box.scrollTop; promptLast = 0;
+    const step = (ts) => {
+      if (!promptLast) promptLast = ts;
+      const dt = Math.min(80, ts - promptLast); promptLast = ts;
+      const speed = parseInt($('prompterSpeed').value, 10) || 4;
+      promptPos += speed * 0.02 * dt; // px pro ms, vom Tempo skaliert
+      box.scrollTop = promptPos;
+      if (box.scrollTop + box.clientHeight >= box.scrollHeight - 1) { prompterStop(); return; }
+      promptRAF = requestAnimationFrame(step);
+    };
+    promptRAF = requestAnimationFrame(step);
   }
-  if ($('prompterToggle')) $('prompterToggle').addEventListener('click', () => (prompterTimer ? prompterStop() : prompterStart()));
-  if ($('prompterReset')) $('prompterReset').addEventListener('click', () => { prompterStop(); $('prompterBox').scrollTop = 0; });
+  if ($('prompterToggle')) $('prompterToggle').addEventListener('click', () => (promptRAF ? prompterStop() : prompterStart()));
+  if ($('prompterReset')) $('prompterReset').addEventListener('click', () => { prompterStop(); promptPos = 0; $('prompterBox').scrollTop = 0; });
+  if ($('prompterSpeed')) {
+    try { const sv = localStorage.getItem('ident.prompterSpeed'); if (sv) $('prompterSpeed').value = sv; } catch {}
+    const showSpeed = () => { if ($('prompterSpeedVal')) $('prompterSpeedVal').textContent = $('prompterSpeed').value; };
+    showSpeed();
+    $('prompterSpeed').addEventListener('input', () => { showSpeed(); try { localStorage.setItem('ident.prompterSpeed', $('prompterSpeed').value); } catch {} });
+  }
+  // Manuelles Scrollen mit dem Auto-Scroll synchronisieren (Bewerber darf jederzeit
+  // selbst scrollen; Auto-Scroll macht dann von dort weiter).
+  if ($('prompterBox')) $('prompterBox').addEventListener('scroll', () => {
+    const box = $('prompterBox');
+    if (Math.abs(box.scrollTop - promptPos) > 3) promptPos = box.scrollTop; // vom Nutzer bewegt
+  }, { passive: true });
   loadScript();
 
   // ================= RAUM / WebRTC =================

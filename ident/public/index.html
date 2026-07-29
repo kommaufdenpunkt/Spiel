@@ -157,7 +157,7 @@
   .shot{position:relative;width:calc(50% - .25rem)}
   .shot img{width:100%;border:1px solid var(--line);border-radius:8px;display:block;cursor:zoom-in}
   .shot .cap{font-size:.66rem;color:var(--dim);text-align:center;margin-top:.15rem}
-  .prompter{height:190px;overflow:hidden;border:1px solid var(--line);border-radius:12px;background:#0b1220;padding:1rem 1.1rem;position:relative;scroll-behavior:auto}
+  .prompter{height:190px;overflow-y:auto;-webkit-overflow-scrolling:touch;touch-action:pan-y;overscroll-behavior:contain;border:1px solid var(--line);border-radius:12px;background:#0b1220;padding:1rem 1.1rem;position:relative;scroll-behavior:auto}
   .prompter #prompterText{font-size:1.25rem;line-height:1.9;color:#eef3ff;white-space:pre-wrap;font-weight:500}
   .prompter::after{content:"";position:absolute;left:0;right:0;bottom:0;height:40px;background:linear-gradient(transparent,#0b1220);pointer-events:none}
   .prompter-ctrl{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;margin-top:.5rem;font-size:.82rem;color:var(--dim)}
@@ -260,6 +260,8 @@
     <div class="obsub" id="obSubtitle">Tippe auf „Erklären lassen" – dein Team führt dich durch den Ablauf. Ton bitte anlassen. 🔊</div>
     <div class="obrow"><button id="obPlayBtn" class="primary">▶ Erklären lassen</button><button id="obStopBtn">⏹ Stopp</button></div>
     <details style="margin-bottom:1rem"><summary style="cursor:pointer;color:var(--dim);font-size:.9rem">Text lieber lesen</summary><div class="introtext" id="introText" style="margin-top:.7rem"></div></details>
+    <label class="consent" id="consentRecBox" style="margin:.2rem 0 1rem;background:#101a2e;border:1px solid #2a3a60;border-radius:10px;padding:.7rem .8rem"><input type="checkbox" id="consentRec">
+      <span>Ich willige <b>ausdrücklich</b> ein, dass ab jetzt <b>Bild und Ton aufgezeichnet</b> werden und meine <b>Ausweis- und Gesichtsbilder</b> zusammen mit der Aufnahme <b>verschlüsselt gespeichert und aufbewahrt</b> werden dürfen – zum Zweck meiner Bewerbung. Freiwillig und jederzeit für die Zukunft widerrufbar.</span></label>
     <div class="actions"><button id="readyBtn" class="primary">Bereit – in den Warteraum</button></div>
     <button id="backToStart" class="linklike">← Zurück</button>
   </div>
@@ -299,7 +301,8 @@
       <div class="prompter-ctrl">
         <button id="prompterToggle" class="primary">▶ Start</button>
         <button id="prompterReset" title="Von vorn">↺</button>
-        <label>Tempo <input type="range" id="prompterSpeed" min="1" max="10" value="4"></label>
+        <label>🏃 Ablese-Tempo <input type="range" id="prompterSpeed" min="1" max="12" value="4"><b id="prompterSpeedVal" style="min-width:1.6em;text-align:center;color:var(--ink)">4</b></label>
+        <span style="opacity:.7">– du bestimmst selbst, auch während du liest.</span>
       </div>
 
       <div class="gstep" id="gs1"><span class="gn">1</span><div class="gt">Ausweis-Vorderseite<small>gut lesbar, alle Ecken sichtbar</small></div></div>
