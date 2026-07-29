@@ -231,7 +231,7 @@
   // Bewerber-Link: IMMER auf die Bewerber-Seite zeigen – nie auf die Prüfer-
   // Subdomain/den Prüfer-Pfad (sonst landet der Bewerber im Mitarbeiter-Login).
   function applicantLink(code) {
-    const host = location.host.replace(/^pruefer\./i, 'ident.');
+    const host = location.host.replace(/^(pruefer|admin)\./i, 'ident.');
     return `${location.protocol}//${host}/?code=${encodeURIComponent(code)}`;
   }
   $('newCodeBtn').addEventListener('click', async () => {
