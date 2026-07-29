@@ -29,7 +29,7 @@ let settings = {};
 
 const DEFAULT_SCRIPT = [
   'Hallo, mein Name ist [dein Name].',
-  'Mein BIGO-Name ist [dein BIGO-Name] und ich bin [dein Alter] Jahre alt.',
+  'Meine BIGO-ID ist [deine BIGO-ID] und ich bin [dein Alter] Jahre alt.',
   'Mit diesem Video bewerbe ich mich bei der Agentur 4EVER1 als Streamerin bzw. Streamer auf BIGO Live.',
   'Ich möchte dem V-System der Agentur 4EVER1 beitreten und kenne die dazugehörigen Regeln.',
   'Mir ist bewusst, dass ich mich in meinen Streams zeigen muss und die allgemeinen BIGO-Regeln einhalte:',

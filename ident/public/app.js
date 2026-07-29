@@ -222,6 +222,10 @@
     if (!(await startCamera())) { if (!alreadyRunning) api('POST', '/api/waiting/release', { code }); openWaiting(); toast('Kein Zugriff auf Kamera/Mikrofon.'); return; }
     state.role = 'host'; state.code = code; localTag.textContent = state.name + ' (Du)';
     $('waitingView').style.display = 'none';
+    // Wer zu einem laufenden Gespräch dazukommt, startet stumm – so wird der
+    // Bewerber nicht unterbrochen. Freischalten jederzeit über „Mikro an".
+    if (alreadyRunning) { setMic(false); toast('Du bist stumm beigetreten – tippe auf „Mikro an", wenn du sprechen willst.'); }
+    else setMic(true);
     startRoom();
   }
   // Bewerber-Link: IMMER auf die Bewerber-Seite zeigen – nie auf die Prüfer-
@@ -580,7 +584,14 @@
   }));
 
   // ================= MIKRO/KAMERA =================
-  $('micBtn').addEventListener('click', () => { const t = state.localStream && state.localStream.getAudioTracks()[0]; if (!t) return; t.enabled = !t.enabled; $('micBtn').textContent = t.enabled ? '🎤 Mikro an' : '🔇 Mikro aus'; });
+  // Mikro an/aus – zentral, damit auch „stumm beitreten" denselben Weg nutzt.
+  function setMic(on) {
+    const t = state.localStream && state.localStream.getAudioTracks()[0];
+    if (t) t.enabled = !!on;
+    const b = $('micBtn');
+    if (b) { b.textContent = on ? '🎤 Mikro an' : '🔇 Mikro aus (stumm)'; b.classList.toggle('danger', !on); }
+  }
+  $('micBtn').addEventListener('click', () => { const t = state.localStream && state.localStream.getAudioTracks()[0]; if (!t) return; setMic(!t.enabled); });
   $('camBtn').addEventListener('click', () => { const t = state.localStream && state.localStream.getVideoTracks()[0]; if (!t) return; t.enabled = !t.enabled; $('camBtn').textContent = t.enabled ? '📷 Kamera an' : '🚫 Kamera aus'; });
 
   // ================= AUFNAHME (Prüfer) =================
