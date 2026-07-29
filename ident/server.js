@@ -42,7 +42,7 @@ const RETENTION_DAYS = parseInt(process.env.RETENTION_DAYS || '90', 10); // Stan
 // rpID = registrierbare Domain, damit Passkeys auf ident. UND pruefer. gelten.
 const RP_ID = process.env.RP_ID || '4ever1.tv';
 const RP_NAME = process.env.RP_NAME || '4EVER1';
-const RP_ORIGINS = (process.env.RP_ORIGINS || 'https://ident.4ever1.tv,https://pruefer.4ever1.tv')
+const RP_ORIGINS = (process.env.RP_ORIGINS || 'https://ident.4ever1.tv,https://pruefer.4ever1.tv,https://admin.4ever1.tv')
   .split(',').map((s) => s.trim()).filter(Boolean);
 const waChallenges = new Map(); // schlüssel -> { challenge, exp }
 function waSetChallenge(key, challenge) { waChallenges.set(key, { challenge, exp: Date.now() + 5 * 60 * 1000 }); }
@@ -489,8 +489,13 @@ const server = http.createServer(async (req, res) => {
 
   if (urlPath.startsWith('/api/')) { try { if (await handleApi(req, res, urlPath, ip)) return; } catch { if (!res.headersSent) sendJson(res, 500, { reason: 'server-error' }); return; } }
 
-  // Statische Dateien
-  if (urlPath === '/') urlPath = '/index.html';
+  // Statische Dateien – je nach Subdomain der passende Einstieg:
+  //   ident.*   -> Bewerber-Startseite      (index.html)
+  //   pruefer.* -> Mitarbeiter-Login        (index.html, Modus per JS)
+  //   admin.*   -> Admin-Bereich            (admin.html)
+  const hostName = String(req.headers.host || '').split(':')[0].toLowerCase();
+  const adminHost = hostName.startsWith('admin.');
+  if (urlPath === '/') urlPath = adminHost ? '/admin.html' : '/index.html';
   // Eigener Direkt-Link für Prüfer -> Startseite öffnet gleich den Mitarbeiter-Login
   if (['/pruefer', '/login', '/team', '/mitarbeiter'].includes(urlPath)) urlPath = '/index.html';
   if (urlPath === '/panel' || urlPath === '/admin') urlPath = '/admin.html';

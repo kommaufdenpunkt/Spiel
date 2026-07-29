@@ -160,7 +160,7 @@
           </ol>
           ${r.body.qr ? `<img src="${r.body.qr}" alt="2FA-QR-Code" style="width:200px;height:200px;background:#fff;padding:8px;border-radius:12px;border:1px solid var(--line)">` : ''}
           <ol start="3" style="margin:.6rem 0 .2rem 1.1rem;padding:0;line-height:1.5">
-            <li>Der Prüfer öffnet <b>ident.4ever1.tv/pruefer</b>.</li>
+            <li>Der Prüfer öffnet <b>pruefer.4ever1.tv</b>.</li>
             <li>Eingeben: <b>Benutzername</b> + <b>Startpasswort</b> + den <b>6-stelligen Code</b> aus der App.</li>
             <li>Beim <b>ersten Login</b> setzt der Prüfer sein <b>eigenes Passwort</b>.</li>
           </ol>
@@ -169,7 +169,7 @@
       } else {
         $('agentResult').innerHTML = `
           <div><b>${esc(r.body.username)}</b> wurde angelegt – <b>ohne 2FA</b> (nur Benutzername + Passwort).</div>
-          <div class="muted" style="margin-top:.4rem">Login des Prüfers auf <b>ident.4ever1.tv/pruefer</b>: Benutzername + Startpasswort (2FA-Feld bleibt leer). Beim ersten Login wird ein eigenes Passwort gesetzt.</div>`;
+          <div class="muted" style="margin-top:.4rem">Login des Prüfers auf <b>pruefer.4ever1.tv</b>: Benutzername + Startpasswort (2FA-Feld bleibt leer). Beim ersten Login wird ein eigenes Passwort gesetzt.</div>`;
       }
       loadAgents();
     } else toast(r.body && r.body.reason === 'exists-or-invalid' ? 'Benutzername existiert bereits.' : 'Anlegen fehlgeschlagen.');
