@@ -131,6 +131,47 @@ const MAX_IP_FAILS = 10, IP_BLOCK_MS = 10 * 60 * 1000;
 const MAX_ACCOUNT_FAILS = 5;
 const RATE_MAX = 60, RATE_WINDOW = 60 * 1000; // 60 Anfragen / Minute (nur unangemeldet)
 
+// ---- Erhöhte Sicherheitsstufe für den Admin-Login ------------------------
+// Deutlich strenger als der normale Login: schon nach wenigen Fehlversuchen
+// wird gesperrt, und bei erneuten Versuchen wächst die Sperre stark an.
+const adminFails = new Map();   // ip -> { n, last, strikes, until }
+const ADMIN_MAX_FAILS = parseInt(process.env.ADMIN_MAX_FAILS || '3', 10);
+// Sperrdauer in Minuten je Runde (letzter Wert gilt für alle weiteren Runden)
+const ADMIN_BLOCK_MIN = [15, 60, 240, 1440];
+const ADMIN_FAIL_WINDOW = 30 * 60 * 1000; // Fehlversuche verfallen nach 30 Min Ruhe
+
+/** Wie lange ist der Admin-Login für diese IP noch gesperrt? (ms, 0 = frei) */
+function adminLockRemaining(ip) {
+  const f = adminFails.get(ip);
+  if (!f || !f.until) return 0;
+  const left = f.until - Date.now();
+  if (left <= 0) { f.until = 0; f.n = 0; return 0; }
+  return left;
+}
+/** Fehlversuch am Admin-Login zählen. Gibt die verbleibenden Versuche zurück. */
+function recordAdminFail(ip) {
+  const now = Date.now();
+  const f = adminFails.get(ip) || { n: 0, last: 0, strikes: 0, until: 0 };
+  if (f.last && now - f.last > ADMIN_FAIL_WINDOW) f.n = 0; // lange Ruhe -> Zähler zurück
+  f.n += 1; f.last = now;
+  let lockedMs = 0;
+  if (f.n >= ADMIN_MAX_FAILS) {
+    const step = ADMIN_BLOCK_MIN[Math.min(f.strikes, ADMIN_BLOCK_MIN.length - 1)];
+    lockedMs = step * 60 * 1000;
+    f.until = now + lockedMs; f.strikes += 1; f.n = 0;
+    recordEvent('blocked', ip, 'Admin-Login gesperrt für ' + step + ' Min (Runde ' + f.strikes + ')');
+  }
+  adminFails.set(ip, f);
+  return { remaining: Math.max(0, ADMIN_MAX_FAILS - f.n), lockedMs };
+}
+function resetAdminFails(ip) { adminFails.delete(ip); }
+/** Wartezeit nach einem Fehlversuch – bremst automatisiertes Durchprobieren. */
+function adminFailDelay(ip) {
+  const f = adminFails.get(ip);
+  const n = f ? f.n : 0;
+  return Math.min(2000, 400 + n * 600);
+}
+
 function clientIp(req) {
   const xf = req.headers['x-forwarded-for'];
   if (xf) return String(xf).split(',')[0].trim();
@@ -208,6 +249,7 @@ module.exports = {
   verifyTotp, verifyAdminTotp, adminTotpActive, generateTotpSecret,
   issueToken, tokenInfo, validToken, isAdmin, revokeToken,
   clientIp, recordEvent, recordFail, recordAccountFail, resetFails, resetAccountFails,
+  adminLockRemaining, recordAdminFail, resetAdminFails, adminFailDelay,
   isBlocked, block, unblock, rateLimit, loginAllowed, loginIpRestricted, getMonitoring,
   setSecurityHeaders,
 };

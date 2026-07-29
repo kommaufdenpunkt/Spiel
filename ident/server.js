@@ -149,16 +149,30 @@ async function handleApi(req, res, urlPath, ip) {
     }
     // Admin-Login (leerer Benutzername + Admin-Passwort + Admin-2FA)
     if (!ADMIN_PASSWORD) { sendJson(res, 503, { reason: 'admin-not-configured' }); return true; }
+    // Erhöhte Sicherheitsstufe: bereits gesperrt? -> gar nicht erst prüfen.
+    const lock = sec.adminLockRemaining(ip);
+    if (lock > 0) {
+      sec.recordEvent('blocked', ip, 'Admin-Login abgewiesen (gesperrt)');
+      sendJson(res, 429, { reason: 'locked', retryAfterSec: Math.ceil(lock / 1000) }); return true;
+    }
     if (sec.safeEqual(body.password || '', ADMIN_PASSWORD) && sec.verifyTotp(adminTotpSecret(), body.totp)) {
-      sec.resetFails(ip); sec.recordEvent('login-ok', ip, 'Admin');
+      sec.resetFails(ip); sec.resetAdminFails(ip); sec.recordEvent('login-ok', ip, 'Admin');
       sendJson(res, 200, { token: sec.issueToken(ip, { name: 'Admin', role: 'admin' }), name: 'Admin', role: 'admin' });
     } else {
-      sec.recordFail(ip, 'Admin-Login fehlgeschlagen');
       // Stimmt das Passwort und fehlt nur der 2FA-Code, sagen wir das ausdrücklich –
       // sonst könnte man sich mit ausgeblendetem 2FA-Feld aussperren (wie beim
       // Mitarbeiter-Login). Ohne gültiges Passwort bleibt es bei 'bad-login'.
       const pwOk = sec.safeEqual(body.password || '', ADMIN_PASSWORD);
-      sendJson(res, 401, { reason: pwOk && adminTotpSecret() ? 'bad-totp' : 'bad-login' });
+      sec.recordFail(ip, 'Admin-Login fehlgeschlagen');
+      // Bremse gegen automatisiertes Durchprobieren (vor dem Zählen ermittelt).
+      const wait = sec.adminFailDelay(ip);
+      const st = sec.recordAdminFail(ip);
+      await new Promise((r) => setTimeout(r, wait));
+      if (st.lockedMs) { sendJson(res, 429, { reason: 'locked', retryAfterSec: Math.ceil(st.lockedMs / 1000) }); return true; }
+      sendJson(res, 401, {
+        reason: pwOk && adminTotpSecret() ? 'bad-totp' : 'bad-login',
+        triesLeft: st.remaining,
+      });
     }
     return true;
   }
@@ -350,6 +364,16 @@ async function handleApi(req, res, urlPath, ip) {
     store.setIntro(body.intro || ''); sec.recordEvent('audit', ip, 'Begrüßungstext geändert');
     sendJson(res, 200, { ok: true, intro: store.getIntro() }); return true;
   }
+  // ---- Admin-Oberfläche: Markup erst nach erfolgreichem Login ausliefern ----
+  // So steht im Quelltext der Anmeldeseite nichts über Akten, Aufnahmen usw.
+  if (urlPath === '/api/admin-shell' && req.method === 'GET') {
+    if (!adminOnly()) return true;
+    let html; try { html = fs.readFileSync(path.join(__dirname, 'views', 'admin-dash.html'), 'utf8'); }
+    catch { sendJson(res, 500, { reason: 'shell-missing' }); return true; }
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
+    res.end(html); return true;
+  }
+
   // ---- Figuren (Team-Avatare) speichern – nur Admin (GET ist oben öffentlich) --
   if (urlPath === '/api/figures' && req.method === 'POST') {
     if (!adminOnly()) return true;

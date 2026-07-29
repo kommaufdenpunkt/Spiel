@@ -18,21 +18,61 @@
   $('loginBtn').addEventListener('click', login);
   $('pw').addEventListener('keydown', (e) => { if (e.key === 'Enter') login(); });
   $('totp').addEventListener('keydown', (e) => { if (e.key === 'Enter') login(); });
+  let lockTimer = 0;
+  function setLocked(sec) {
+    clearInterval(lockTimer);
+    $('loginBtn').disabled = true; $('pw').disabled = true;
+    const tick = () => {
+      if (sec <= 0) { clearInterval(lockTimer); $('loginBtn').disabled = false; $('pw').disabled = false; $('loginErr').textContent = 'Du kannst es wieder versuchen.'; return; }
+      const m = Math.floor(sec / 60), s = sec % 60;
+      $('loginErr').textContent = 'Zu viele Fehlversuche. Gesperrt für ' + (m ? m + ' Min ' : '') + (s < 10 ? '0' : '') + s + ' Sek.';
+      sec--;
+    };
+    tick(); lockTimer = setInterval(tick, 1000);
+  }
   async function login() {
-    $('loginErr').textContent = '';
+    $('loginErr').textContent = 'Prüfe …';
     const r = await api('POST', '/api/login', { username: '', password: $('pw').value, totp: $('totp').value.trim() });
     if (r.status === 200 && r.body.token && r.body.role === 'admin') {
-      token = r.body.token; $('login').style.display = 'none'; $('dash').classList.add('on');
-      $('whoami').textContent = 'Angemeldet als Admin'; show('overview');
+      token = r.body.token; $('loginErr').textContent = ''; await openDash();
+    } else if (r.status === 429 || (r.body && r.body.reason === 'locked')) {
+      setLocked(parseInt((r.body && r.body.retryAfterSec) || 900, 10));
     } else if (r.body && r.body.reason === 'bad-totp') {
       // 2FA ist aktiv -> Feld einblenden, damit der Code eingegeben werden kann.
       $('totpField').style.display = ''; $('totp').focus();
       $('loginErr').textContent = 'Ein 2FA-Code ist nötig – bitte unten eingeben.';
-    } else $('loginErr').textContent = r.status === 503 ? 'Admin ist auf dem Server nicht konfiguriert.' : 'Anmeldung fehlgeschlagen.';
+    } else if (r.status === 503) {
+      $('loginErr').textContent = 'Auf dem Server nicht konfiguriert.';
+    } else {
+      const left = r.body && typeof r.body.triesLeft === 'number' ? r.body.triesLeft : null;
+      $('loginErr').textContent = 'Anmeldung fehlgeschlagen.' + (left !== null ? ' Noch ' + left + ' Versuch' + (left === 1 ? '' : 'e') + ' bis zur Sperre.' : '');
+      $('pw').value = ''; $('pw').focus();
+    }
   }
-  $('logout').addEventListener('click', () => { token = ''; $('dash').classList.remove('on'); $('login').style.display = ''; $('pw').value = ''; $('totp').value = ''; });
+  // Die Oberfläche wird erst nach dem Login vom Server geholt – erst danach
+  // können ihre Schaltflächen verknüpft werden.
+  async function openDash() {
+    if (!$('dash').dataset.ready) {
+      const r = await fetch('/api/admin-shell', { headers: { Authorization: 'Bearer ' + token } });
+      if (!r.ok) { $('loginErr').textContent = 'Oberfläche konnte nicht geladen werden.'; return false; }
+      $('dash').innerHTML = await r.text();
+      $('dash').dataset.ready = '1';
+      bindDash();
+    }
+    $('login').style.display = 'none'; $('dash').classList.add('on');
+    $('whoami').textContent = 'Angemeldet als Admin';
+    show('overview');
+    return true;
+  }
 
-  document.querySelector('.nav').addEventListener('click', (e) => { const b = e.target.closest('button[data-sec]'); if (b) show(b.dataset.sec); });
+  function bindDash() {
+    $('logout').addEventListener('click', () => { token = ''; $('dash').classList.remove('on'); $('login').style.display = ''; $('pw').value = ''; $('totp').value = ''; });
+    document.querySelector('.nav').addEventListener('click', (e) => { const b = e.target.closest('button[data-sec]'); if (b) show(b.dataset.sec); });
+    if ($('scriptSave')) $('scriptSave').addEventListener('click', saveScript);
+    if ($('introSave')) $('introSave').addEventListener('click', saveIntro);
+    if ($('caseSearch')) $('caseSearch').addEventListener('input', (e) => renderCases(e.target.value));
+    if ($('addAgent')) $('addAgent').addEventListener('click', addAgent);
+  }
   function show(sec) {
     document.querySelectorAll('.nav button[data-sec]').forEach((b) => b.classList.toggle('sel', b.dataset.sec === sec));
     document.querySelectorAll('.section').forEach((s) => s.classList.toggle('on', s.dataset.pane === sec));
@@ -71,16 +111,16 @@
     const s = await api('GET', '/api/script'); if (s.status === 200) $('scriptText').value = s.body.script || '';
     const i = await api('GET', '/api/intro'); if (i.status === 200) $('introTextEdit').value = i.body.intro || '';
   }
-  if ($('scriptSave')) $('scriptSave').addEventListener('click', async () => {
+  async function saveScript() {
     const r = await api('POST', '/api/script', { script: $('scriptText').value });
     $('scriptMsg').textContent = r.status === 200 ? 'Gespeichert ✓' : 'Fehler beim Speichern';
     setTimeout(() => { $('scriptMsg').textContent = ''; }, 2500);
-  });
-  if ($('introSave')) $('introSave').addEventListener('click', async () => {
+  }
+  async function saveIntro() {
     const r = await api('POST', '/api/intro', { intro: $('introTextEdit').value });
     $('introMsg').textContent = r.status === 200 ? 'Gespeichert ✓' : 'Fehler beim Speichern';
     setTimeout(() => { $('introMsg').textContent = ''; }, 2500);
-  });
+  }
 
   // ---- Übersicht ----
   async function loadOverview() {
@@ -119,7 +159,6 @@
       div.appendChild(acts); el.appendChild(div);
     });
   }
-  if ($('caseSearch')) $('caseSearch').addEventListener('input', (e) => renderCases(e.target.value));
 
   // ---- Aufnahmen ----
   async function loadRec() {
@@ -148,13 +187,13 @@
   }
 
   // ---- Mitarbeiter ----
-  $('addAgent').addEventListener('click', async () => {
+  async function addAgent() {
     const username = $('newUser').value.trim(), password = $('newPass').value, role = $('newRole').value;
-    const require2fa = $('new2fa').checked;
+    const require2fa = $('new2fa') ? $('new2fa').checked : false;
     if (!username || password.length < 8) { toast('Benutzername + Passwort (mind. 8 Zeichen) nötig.'); return; }
     const r = await api('POST', '/api/agents', { username, password, role, require2fa });
     if (r.status === 200) {
-      $('newUser').value = ''; $('newPass').value = ''; $('new2fa').checked = false;
+      $('newUser').value = ''; $('newPass').value = ''; if ($('new2fa')) $('new2fa').checked = false;
       if (r.body.has2fa) {
         $('agentResult').innerHTML = `
           <div><b>${esc(r.body.username)}</b> wurde angelegt. Jetzt die 2FA einrichten:</div>
@@ -177,7 +216,7 @@
       }
       loadAgents();
     } else toast(r.body && r.body.reason === 'exists-or-invalid' ? 'Benutzername existiert bereits.' : 'Anlegen fehlgeschlagen.');
-  });
+  }
   async function loadAgents() {
     const r = await api('GET', '/api/agents'); const list = r.body.agents || [];
     const el = $('agentList'); if (!list.length) { el.innerHTML = '<div class="empty">Noch keine Mitarbeiter.</div>'; return; }
