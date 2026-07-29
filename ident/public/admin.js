@@ -14,31 +14,159 @@
     return { status: res.status, body: json };
   }
 
+  // ---- Geräte-Kennung ----
+  // Bleibt dauerhaft in diesem Browser. Nur freigegebene Geräte dürfen sich
+  // anmelden; der Server kennt davon nur einen Hash.
+  const DEV_KEY = 'ident.deviceId';
+  function deviceId() {
+    let d = '';
+    try { d = localStorage.getItem(DEV_KEY) || ''; } catch {}
+    if (!d || d.length < 20) {
+      const a = new Uint8Array(32); crypto.getRandomValues(a);
+      d = Array.from(a, (x) => x.toString(16).padStart(2, '0')).join('');
+      try { localStorage.setItem(DEV_KEY, d); } catch {}
+    }
+    return d;
+  }
+
   // ---- Login ----
   $('loginBtn').addEventListener('click', login);
   $('pw').addEventListener('keydown', (e) => { if (e.key === 'Enter') login(); });
   $('totp').addEventListener('keydown', (e) => { if (e.key === 'Enter') login(); });
+  let lockTimer = 0;
+  function setLocked(sec) {
+    clearInterval(lockTimer);
+    $('loginBtn').disabled = true; $('pw').disabled = true;
+    const tick = () => {
+      if (sec <= 0) { clearInterval(lockTimer); $('loginBtn').disabled = false; $('pw').disabled = false; $('loginErr').textContent = 'Du kannst es wieder versuchen.'; return; }
+      const m = Math.floor(sec / 60), s = sec % 60;
+      $('loginErr').textContent = 'Zu viele Fehlversuche. Gesperrt für ' + (m ? m + ' Min ' : '') + (s < 10 ? '0' : '') + s + ' Sek.';
+      sec--;
+    };
+    tick(); lockTimer = setInterval(tick, 1000);
+  }
   async function login() {
-    $('loginErr').textContent = '';
-    const r = await api('POST', '/api/login', { username: '', password: $('pw').value, totp: $('totp').value.trim() });
+    $('loginErr').textContent = 'Prüfe …';
+    const r = await api('POST', '/api/login', { username: '', password: $('pw').value, totp: $('totp').value.trim(), device: deviceId() });
     if (r.status === 200 && r.body.token && r.body.role === 'admin') {
-      token = r.body.token; $('login').style.display = 'none'; $('dash').classList.add('on');
-      $('whoami').textContent = 'Angemeldet als Admin'; show('overview');
+      token = r.body.token; $('loginErr').textContent = ''; await openDash();
+    } else if (r.status === 429 || (r.body && r.body.reason === 'locked')) {
+      setLocked(parseInt((r.body && r.body.retryAfterSec) || 900, 10));
+    } else if (r.body && r.body.reason === 'device-not-approved') {
+      showClaim();
     } else if (r.body && r.body.reason === 'bad-totp') {
       // 2FA ist aktiv -> Feld einblenden, damit der Code eingegeben werden kann.
       $('totpField').style.display = ''; $('totp').focus();
       $('loginErr').textContent = 'Ein 2FA-Code ist nötig – bitte unten eingeben.';
-    } else $('loginErr').textContent = r.status === 503 ? 'Admin ist auf dem Server nicht konfiguriert.' : 'Anmeldung fehlgeschlagen.';
+    } else if (r.status === 503) {
+      $('loginErr').textContent = 'Auf dem Server nicht konfiguriert.';
+    } else {
+      const left = r.body && typeof r.body.triesLeft === 'number' ? r.body.triesLeft : null;
+      $('loginErr').textContent = 'Anmeldung fehlgeschlagen.' + (left !== null ? ' Noch ' + left + ' Versuch' + (left === 1 ? '' : 'e') + ' bis zur Sperre.' : '');
+      $('pw').value = ''; $('pw').focus();
+    }
   }
-  $('logout').addEventListener('click', () => { token = ''; $('dash').classList.remove('on'); $('login').style.display = ''; $('pw').value = ''; $('totp').value = ''; });
+  // Dieses Gerät ist noch nicht freigegeben -> Freischaltung anbieten.
+  function showClaim() {
+    if ($('claimBox')) { $('claimBox').style.display = ''; $('claimCode').focus(); return; }
+    const box = document.createElement('div');
+    box.id = 'claimBox';
+    box.style.cssText = 'margin-top:1rem;padding:.9rem;border:1px solid var(--line);border-radius:12px;background:var(--panel2)';
+    box.innerHTML = '<div style="font-size:.88rem;line-height:1.5">Dieses Gerät ist nicht freigegeben.<br>'
+      + 'Erzeuge auf einem <b>bereits freigegebenen Gerät</b> einen Freischalt-Code (Sicherheit → Geräte) und gib ihn hier ein.</div>'
+      + '<div style="display:flex;gap:.5rem;margin-top:.7rem;flex-wrap:wrap">'
+      + '<input id="claimCode" inputmode="numeric" placeholder="6-stelliger Code" style="max-width:150px">'
+      + '<button id="claimBtn" class="primary">Freischalten</button></div>'
+      + '<div id="claimMsg" class="muted" style="margin-top:.5rem"></div>';
+    $('loginErr').after(box);
+    $('claimBtn').addEventListener('click', async () => {
+      const r = await api('POST', '/api/admin-devices/claim', {
+        password: $('pw').value, code: $('claimCode').value.trim(), device: deviceId(),
+      });
+      if (r.status === 200) {
+        $('claimMsg').textContent = 'Gerät freigeschaltet ✓ – melde dich jetzt an.';
+        setTimeout(() => { box.style.display = 'none'; login(); }, 900);
+      } else if (r.status === 429) {
+        box.style.display = 'none'; setLocked(parseInt((r.body && r.body.retryAfterSec) || 900, 10));
+      } else {
+        const left = r.body && typeof r.body.triesLeft === 'number' ? ' Noch ' + r.body.triesLeft + ' Versuche.' : '';
+        $('claimMsg').textContent = 'Code oder Passwort falsch.' + left;
+      }
+    });
+    $('claimCode').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('claimBtn').click(); });
+    $('loginErr').textContent = '';
+    $('claimCode').focus();
+  }
 
-  document.querySelector('.nav').addEventListener('click', (e) => { const b = e.target.closest('button[data-sec]'); if (b) show(b.dataset.sec); });
+  // Die Oberfläche wird erst nach dem Login vom Server geholt – erst danach
+  // können ihre Schaltflächen verknüpft werden.
+  async function openDash() {
+    if (!$('dash').dataset.ready) {
+      const r = await fetch('/api/admin-shell', { headers: { Authorization: 'Bearer ' + token } });
+      if (!r.ok) { $('loginErr').textContent = 'Oberfläche konnte nicht geladen werden.'; return false; }
+      $('dash').innerHTML = await r.text();
+      $('dash').dataset.ready = '1';
+      bindDash();
+    }
+    $('login').style.display = 'none'; $('dash').classList.add('on');
+    $('whoami').textContent = 'Angemeldet als Admin';
+    show('overview');
+    return true;
+  }
+
+  function bindDash() {
+    $('logout').addEventListener('click', () => { token = ''; $('dash').classList.remove('on'); $('login').style.display = ''; $('pw').value = ''; $('totp').value = ''; });
+    document.querySelector('.nav').addEventListener('click', (e) => { const b = e.target.closest('button[data-sec]'); if (b) show(b.dataset.sec); });
+    if ($('scriptSave')) $('scriptSave').addEventListener('click', saveScript);
+    if ($('introSave')) $('introSave').addEventListener('click', saveIntro);
+    if ($('caseSearch')) $('caseSearch').addEventListener('input', (e) => renderCases(e.target.value));
+    if ($('addAgent')) $('addAgent').addEventListener('click', addAgent);
+    if ($('devInvite')) $('devInvite').addEventListener('click', async () => {
+      const r = await api('POST', '/api/admin-devices/invite', {});
+      if (r.status !== 200) { toast('Konnte keinen Code erzeugen.'); return; }
+      $('devInviteOut').innerHTML = 'Freischalt-Code: <b style="font-size:1.4rem;letter-spacing:.18em">' + esc(r.body.code) + '</b>'
+        + '<div class="muted" style="margin-top:.4rem">Gültig für ' + r.body.validMin + ' Minuten und nur einmal verwendbar.<br>'
+        + 'Auf dem neuen Gerät <b>admin.4ever1.tv</b> öffnen, Passwort eingeben – dann erscheint das Code-Feld.</div>';
+    });
+  }
   function show(sec) {
     document.querySelectorAll('.nav button[data-sec]').forEach((b) => b.classList.toggle('sel', b.dataset.sec === sec));
     document.querySelectorAll('.section').forEach((s) => s.classList.toggle('on', s.dataset.pane === sec));
     ({ overview: loadOverview, cases: loadCases, rec: loadRec, agents: loadAgents, script: loadScriptEditor, adminsec: loadA2fa, security: loadSecurity }[sec] || (() => {}))();
   }
+  // ---- Freigegebene Geräte ----
+  async function loadDevices() {
+    const r = await api('GET', '/api/admin-devices');
+    const list = (r.body && r.body.devices) || [];
+    const el = $('devList'); if (!el) return;
+    if (r.body && r.body.lockOff) {
+      el.innerHTML = '<div class="note" style="color:var(--warn)">⚠️ Die Geräte-Prüfung ist per Notausgang (ADMIN_DEVICE_LOCK=off) abgeschaltet – derzeit kann sich jedes Gerät mit dem Passwort anmelden.</div>';
+      return;
+    }
+    if (!list.length) { el.innerHTML = '<div class="empty">Noch keine Geräte – das erste Gerät wird beim Anmelden automatisch freigegeben.</div>'; return; }
+    el.innerHTML = '';
+    list.forEach((d) => {
+      const div = document.createElement('div'); div.className = 'row';
+      const seen = d.lastSeen ? new Date(d.lastSeen).toLocaleString('de-DE') : '–';
+      const info = document.createElement('div');
+      info.innerHTML = '<b>' + esc(d.name) + '</b><div class="muted">Zuletzt benutzt: ' + esc(seen) + '</div>';
+      const acts = document.createElement('div'); acts.className = 'acts';
+      acts.appendChild(btn('✏️ Umbenennen', '', async () => {
+        const name = prompt('Name für dieses Gerät:', d.name); if (name === null) return;
+        await api('POST', '/api/admin-devices/rename', { id: d.id, name }); loadDevices();
+      }));
+      acts.appendChild(btn('🗑 Entfernen', 'danger', async () => {
+        if (!confirm('„' + d.name + '" wirklich entfernen? Dieses Gerät kann sich dann nicht mehr anmelden.')) return;
+        const rr = await api('POST', '/api/admin-devices/remove', { id: d.id });
+        if (rr.status === 400) toast('Das letzte Gerät kann nicht entfernt werden.');
+        loadDevices();
+      }));
+      div.appendChild(info); div.appendChild(acts); el.appendChild(div);
+    });
+  }
+
   async function loadA2fa() {
+    loadDevices();
     const s = (await api('GET', '/api/admin-2fa/status')).body || {};
     const st = $('a2faStatus'), setup = $('a2faSetup'); setup.innerHTML = '';
     if (s.envForced) { st.innerHTML = '🔐 Admin-2FA ist über eine Server-Variable (ADMIN_TOTP_SECRET) fest aktiv.'; return; }
@@ -71,16 +199,16 @@
     const s = await api('GET', '/api/script'); if (s.status === 200) $('scriptText').value = s.body.script || '';
     const i = await api('GET', '/api/intro'); if (i.status === 200) $('introTextEdit').value = i.body.intro || '';
   }
-  if ($('scriptSave')) $('scriptSave').addEventListener('click', async () => {
+  async function saveScript() {
     const r = await api('POST', '/api/script', { script: $('scriptText').value });
     $('scriptMsg').textContent = r.status === 200 ? 'Gespeichert ✓' : 'Fehler beim Speichern';
     setTimeout(() => { $('scriptMsg').textContent = ''; }, 2500);
-  });
-  if ($('introSave')) $('introSave').addEventListener('click', async () => {
+  }
+  async function saveIntro() {
     const r = await api('POST', '/api/intro', { intro: $('introTextEdit').value });
     $('introMsg').textContent = r.status === 200 ? 'Gespeichert ✓' : 'Fehler beim Speichern';
     setTimeout(() => { $('introMsg').textContent = ''; }, 2500);
-  });
+  }
 
   // ---- Übersicht ----
   async function loadOverview() {
@@ -119,7 +247,6 @@
       div.appendChild(acts); el.appendChild(div);
     });
   }
-  if ($('caseSearch')) $('caseSearch').addEventListener('input', (e) => renderCases(e.target.value));
 
   // ---- Aufnahmen ----
   async function loadRec() {
@@ -148,13 +275,13 @@
   }
 
   // ---- Mitarbeiter ----
-  $('addAgent').addEventListener('click', async () => {
+  async function addAgent() {
     const username = $('newUser').value.trim(), password = $('newPass').value, role = $('newRole').value;
-    const require2fa = $('new2fa').checked;
+    const require2fa = $('new2fa') ? $('new2fa').checked : false;
     if (!username || password.length < 8) { toast('Benutzername + Passwort (mind. 8 Zeichen) nötig.'); return; }
     const r = await api('POST', '/api/agents', { username, password, role, require2fa });
     if (r.status === 200) {
-      $('newUser').value = ''; $('newPass').value = ''; $('new2fa').checked = false;
+      $('newUser').value = ''; $('newPass').value = ''; if ($('new2fa')) $('new2fa').checked = false;
       if (r.body.has2fa) {
         $('agentResult').innerHTML = `
           <div><b>${esc(r.body.username)}</b> wurde angelegt. Jetzt die 2FA einrichten:</div>
@@ -177,7 +304,7 @@
       }
       loadAgents();
     } else toast(r.body && r.body.reason === 'exists-or-invalid' ? 'Benutzername existiert bereits.' : 'Anlegen fehlgeschlagen.');
-  });
+  }
   async function loadAgents() {
     const r = await api('GET', '/api/agents'); const list = r.body.agents || [];
     const el = $('agentList'); if (!list.length) { el.innerHTML = '<div class="empty">Noch keine Mitarbeiter.</div>'; return; }

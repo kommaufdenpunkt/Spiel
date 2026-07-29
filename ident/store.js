@@ -308,6 +308,40 @@ function getIntro() { return typeof settings.intro === 'string' ? settings.intro
 function setIntro(text) { settings.intro = String(text || '').slice(0, 8000); save('settings.json', settings); return true; }
 function getAdminTotp() { return typeof settings.adminTotp === 'string' ? settings.adminTotp : ''; }
 function setAdminTotp(secret) { settings.adminTotp = String(secret || ''); save('settings.json', settings); return true; }
+
+// ---- Geräte-Freigabe für den Admin-Bereich ---------------------------------
+// Nur freigegebene Geräte dürfen sich anmelden. Jedes Gerät hat eine eigene,
+// zufällige Kennung; gespeichert wird nur deren Hash (das Klartext-Geheimnis
+// liegt allein im Browser des Geräts).
+function adminDevices() { if (!Array.isArray(settings.adminDevices)) settings.adminDevices = []; return settings.adminDevices; }
+function listAdminDevices() {
+  return adminDevices().map((d) => ({ id: d.id, name: d.name, addedAt: d.addedAt, lastSeen: d.lastSeen || '' }));
+}
+function adminDeviceCount() { return adminDevices().length; }
+function findAdminDevice(hash) {
+  if (!hash) return null;
+  return adminDevices().find((d) => d.hash === hash) || null;
+}
+function addAdminDevice({ hash, name }) {
+  if (!hash) return null;
+  const list = adminDevices();
+  if (list.some((d) => d.hash === hash)) return null;
+  const rec = { id: crypto.randomUUID(), hash, name: String(name || 'Gerät').slice(0, 40), addedAt: new Date().toISOString(), lastSeen: '' };
+  list.push(rec); save('settings.json', settings); return rec;
+}
+function touchAdminDevice(hash) {
+  const d = findAdminDevice(hash); if (!d) return false;
+  d.lastSeen = new Date().toISOString(); save('settings.json', settings); return true;
+}
+function renameAdminDevice(id, name) {
+  const d = adminDevices().find((x) => x.id === id); if (!d) return false;
+  d.name = String(name || '').slice(0, 40) || d.name; save('settings.json', settings); return true;
+}
+function removeAdminDevice(id) {
+  const list = adminDevices(); const i = list.findIndex((d) => d.id === id);
+  if (i < 0) return false;
+  list.splice(i, 1); save('settings.json', settings); return true;
+}
 // Figuren (Team-Avatare) + zugehöriger Erklär-Text – null = Standard im Client verwenden
 function getFigures() { return Array.isArray(settings.figures) ? settings.figures : null; }
 function setFigures(arr) { settings.figures = Array.isArray(arr) ? arr.slice(0, 3) : null; save('settings.json', settings); return true; }
@@ -316,6 +350,8 @@ function setFigureScript(text) { settings.figureScript = (typeof text === 'strin
 
 module.exports = {
   init, getScript, setScript, getIntro, setIntro, getAdminTotp, setAdminTotp,
+  listAdminDevices, adminDeviceCount, findAdminDevice, addAdminDevice,
+  touchAdminDevice, renameAdminDevice, removeAdminDevice,
   getFigures, setFigures, getFigureScript, setFigureScript,
   listAgents, getAgentByUsername, getAgentById, addAgent, verifyAgent,
   setAgentPassword, changeOwnPassword, lockAgent, unlockAgent, deleteAgent, agentCount,

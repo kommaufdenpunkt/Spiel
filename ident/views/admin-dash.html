@@ -1,0 +1,59 @@
+
+  <nav class="nav">
+    <button data-sec="overview" class="sel">📊 Übersicht</button>
+    <button data-sec="cases">🗂 Fälle / Akten</button>
+    <button data-sec="rec">🎬 Aufnahmen</button>
+    <button data-sec="agents">👥 Mitarbeiter</button>
+    <button data-sec="script">📖 Audition-Text</button>
+    <button data-sec="adminsec">🔐 Sicherheit</button>
+    <button data-sec="security">🛡 Überwachung</button>
+    <button id="logout" style="margin-top:auto;color:var(--bad)">Abmelden</button>
+  </nav>
+  <div class="content">
+    <div class="section on" data-pane="overview"><h2>Übersicht</h2><div class="stats" id="stats"></div></div>
+    <div class="section" data-pane="cases"><h2>Fälle / Akten</h2><p class="sub">Abgeschlossene Auditions inkl. Ausweis-/Gesichtsbilder – verschlüsselt.</p><input id="caseSearch" placeholder="🔎 Suchen: BIGO-ID, Name, Nummer, Prüfer, Status …" style="margin-bottom:1rem"><div id="caseList"></div></div>
+    <div class="section" data-pane="rec"><h2>Aufnahmen</h2><p class="sub">Aufgezeichnete Video-Gespräche – verschlüsselt gespeichert.</p><div id="recList"></div></div>
+    <div class="section" data-pane="agents"><h2>Mitarbeiter</h2>
+      <div class="note" style="margin-bottom:.7rem">Prüfer melden sich über ihren eigenen Link <b>pruefer.4ever1.tv</b> an. Benutzername + Startpasswort eingeben, Rolle wählen, anlegen – das reicht. Beim ersten Login setzt der Prüfer ein eigenes Passwort.</div>
+      <div class="addbar"><input id="newUser" placeholder="Benutzername"><input id="newPass" placeholder="Startpasswort"><select id="newRole" style="padding:.6rem;border-radius:10px;border:1px solid var(--line)"><option value="agent">Prüfer</option><option value="admin">Admin</option></select><button id="addAgent" class="primary">+ Anlegen</button></div>
+      <details style="margin-bottom:.9rem"><summary class="muted" style="cursor:pointer;user-select:none">🔐 Zusätzliche Sicherheit (optional)</summary>
+        <label style="display:flex;align-items:center;gap:.45rem;font-size:.85rem;color:var(--dim);margin:.6rem 0 .2rem"><input type="checkbox" id="new2fa" style="width:auto"> 2FA verlangen – nach dem Anlegen erscheint ein QR-Code für Google Authenticator</label>
+      </details>
+      <div id="agentResult" class="note"></div><div id="agentList"></div>
+    </div>
+    <div class="section" data-pane="script"><h2>Texte für die Audition</h2>
+      <h3 style="font-size:1rem;margin:.2rem 0 .3rem">Begrüßung / Ablauf (Warteraum)</h3>
+      <p class="sub">Sieht der Bewerber beim Reinkommen: Willkommen, Ablauf, PK-Board-Hinweis und die Einwilligung „ab jetzt wird aufgezeichnet". Zeilenumbrüche bleiben erhalten.</p>
+      <textarea id="introTextEdit" style="width:100%;min-height:220px;font-family:inherit;font-size:.95rem;line-height:1.6;padding:.8rem;border-radius:12px;border:1px solid var(--line);background:#0f1728;color:var(--ink)"></textarea>
+      <div style="margin-top:.7rem;display:flex;gap:.5rem;align-items:center"><button id="introSave" class="primary">Begrüßung speichern</button><span id="introMsg" class="muted"></span></div>
+      <div class="note" style="margin-top:1rem;display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap">
+        <span>🎭 <b>Figuren &amp; Erklär-Video:</b> Baue eure Teamleitung als Comic-Figuren nach – sie tragen den Text oben als kleines Erklär-Video vor.</span>
+        <a href="/figur" target="_blank" style="text-decoration:none"><button class="primary" type="button">Figuren-Baukasten öffnen →</button></a>
+      </div>
+      <hr style="border:0;border-top:1px solid var(--line);margin:1.5rem 0">
+      <h3 style="font-size:1rem;margin:.2rem 0 .3rem">Vorlese-Text (Teleprompter)</h3>
+      <p class="sub">Diesen Text liest der Bewerber in die Kamera; das Tempo bestimmt er selbst. Platzhalter wie <b>[dein Name]</b> ruhig stehen lassen.</p>
+      <textarea id="scriptText" style="width:100%;min-height:280px;font-family:inherit;font-size:.95rem;line-height:1.6;padding:.8rem;border-radius:12px;border:1px solid var(--line);background:#0f1728;color:var(--ink)"></textarea>
+      <div style="margin-top:.7rem;display:flex;gap:.5rem;align-items:center"><button id="scriptSave" class="primary">Vorlese-Text speichern</button><span id="scriptMsg" class="muted"></span></div>
+    </div>
+    <div class="section" data-pane="adminsec"><h2>Sicherheit</h2>
+      <h3 style="font-size:1rem;margin:.2rem 0 .3rem">📱 Freigegebene Geräte</h3>
+      <p class="sub">Nur diese Geräte dürfen sich im Admin-Bereich anmelden – alle anderen werden abgewiesen, selbst mit richtigem Passwort. Ein neues Gerät (z. B. Tablet) schaltest du mit einem <b>Freischalt-Code</b> frei.</p>
+      <div class="row" style="margin-bottom:.8rem"><span>Neues Gerät hinzufügen</span><button id="devInvite" class="primary">Freischalt-Code erzeugen</button></div>
+      <div id="devInviteOut" class="note" style="margin-bottom:.8rem"></div>
+      <div id="devList"></div>
+      <p class="muted" style="margin-top:.6rem">Notausgang, falls kein Gerät mehr geht: in Coolify <b>ADMIN_DEVICE_LOCK=off</b> setzen und Redeploy – dann zählt nur noch das Passwort.</p>
+      <hr style="border:0;border-top:1px solid var(--line);margin:1.5rem 0">
+      <h3 style="font-size:1rem;margin:.2rem 0 .3rem">🔐 Zusätzlicher Code beim Login <span class="pill">optional</span></h3>
+      <p class="sub"><b>Du musst hier nichts einrichten</b> – der Login mit Passwort und freigegebenem Gerät funktioniert auch ohne. Wer mag, kann zusätzlich einen 6-stelligen Code verlangen (Google Authenticator). <b>Notausgang:</b> in Coolify <b>ADMIN_2FA_OFF=1</b> setzen und Redeploy.</p>
+      <div id="a2faStatus" class="note"></div>
+      <div id="a2faSetup" style="margin-top:1rem"></div>
+    </div>
+    <div class="section" data-pane="security"><h2>Überwachung</h2>
+      <h3 style="font-size:.95rem">Gesperrte IPs</h3><div id="blockedList"></div>
+      <h3 style="font-size:.95rem;margin-top:1rem">Letzte Ereignisse</h3><div id="eventList" class="evlog"></div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast">
