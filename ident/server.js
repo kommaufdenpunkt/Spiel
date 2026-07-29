@@ -154,7 +154,11 @@ async function handleApi(req, res, urlPath, ip) {
       sendJson(res, 200, { token: sec.issueToken(ip, { name: 'Admin', role: 'admin' }), name: 'Admin', role: 'admin' });
     } else {
       sec.recordFail(ip, 'Admin-Login fehlgeschlagen');
-      sendJson(res, 401, { reason: 'bad-login' });
+      // Stimmt das Passwort und fehlt nur der 2FA-Code, sagen wir das ausdrücklich –
+      // sonst könnte man sich mit ausgeblendetem 2FA-Feld aussperren (wie beim
+      // Mitarbeiter-Login). Ohne gültiges Passwort bleibt es bei 'bad-login'.
+      const pwOk = sec.safeEqual(body.password || '', ADMIN_PASSWORD);
+      sendJson(res, 401, { reason: pwOk && adminTotpSecret() ? 'bad-totp' : 'bad-login' });
     }
     return true;
   }

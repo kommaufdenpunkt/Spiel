@@ -240,7 +240,8 @@
     <div id="staffFields" style="display:none">
       <div class="field"><label for="userInput">Benutzername</label><input id="userInput" placeholder="dein persönlicher Login" autocomplete="username"></div>
       <div class="field"><label for="passInput">Passwort</label><input id="passInput" type="password" placeholder="dein Passwort" autocomplete="current-password"></div>
-      <div class="field"><label for="totpInput">2FA-Code</label><input id="totpInput" inputmode="numeric" placeholder="6-stelliger Code (falls aktiv)" autocomplete="one-time-code"></div>
+      <!-- 2FA ist optional: Feld erscheint nur, wenn der Server einen Code verlangt. -->
+      <div class="field" id="totpField" style="display:none"><label for="totpInput">2FA-Code</label><input id="totpInput" inputmode="numeric" placeholder="6-stelliger Code" autocomplete="one-time-code"></div>
       <button id="passkeyLoginBtn" type="button" style="width:100%;display:none">🔐 Mit Face ID / Fingerabdruck anmelden</button>
     </div>
 
