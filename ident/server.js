@@ -33,6 +33,7 @@ const ADMIN_2FA_OFF = /^(1|true|yes|on)$/i.test(process.env.ADMIN_2FA_OFF || '')
 // Wirksames Admin-2FA-Secret: Env hat Vorrang, sonst das im Panel gesetzte.
 function adminTotpSecret() { return ADMIN_2FA_OFF ? '' : (ADMIN_TOTP || store.getAdminTotp()); }
 let pendingAdminTotp = '';
+let pendingDeviceInvite = null; // { code, exp } – Freischalt-Code für ein neues Admin-Gerät
 const TURN_HOST = process.env.TURN_HOST || '';
 const TURN_SECRET = process.env.TURN_SECRET || '';
 const TURN_TTL = parseInt(process.env.TURN_TTL || '3600', 10);
@@ -59,6 +60,27 @@ const MIME = {
   '.jpg': 'image/jpeg', '.ico': 'image/x-icon', '.json': 'application/json; charset=utf-8',
   '.webmanifest': 'application/manifest+json; charset=utf-8',
 };
+
+// ---- Geräte-Freigabe für den Admin-Bereich ---------------------------------
+// Nur freigegebene Geräte dürfen sich anmelden. Das Gerät schickt bei jedem
+// Login seine Kennung mit; gespeichert ist nur deren Hash.
+// Notausgang: ADMIN_DEVICE_LOCK=off (Env) + Redeploy schaltet die Prüfung ab.
+const ADMIN_DEVICE_LOCK_OFF = /^(off|0|false|no)$/i.test(process.env.ADMIN_DEVICE_LOCK || '');
+function deviceHash(secret) {
+  const s = String(secret || '');
+  if (s.length < 20) return '';
+  return crypto.createHash('sha256').update('ident-device:' + s).digest('hex');
+}
+function deviceLabel(req) {
+  const ua = String(req.headers['user-agent'] || '');
+  if (/iPad/i.test(ua)) return 'iPad';
+  if (/iPhone/i.test(ua)) return 'iPhone';
+  if (/Android/i.test(ua)) return /Mobile/i.test(ua) ? 'Android-Handy' : 'Android-Tablet';
+  if (/Macintosh/i.test(ua)) return 'Mac';
+  if (/Windows/i.test(ua)) return 'Windows-PC';
+  if (/Linux/i.test(ua)) return 'Linux-Rechner';
+  return 'Gerät';
+}
 
 // ---- Figuren-Konfiguration serverseitig absichern --------------------------
 function sanitizeFigures(arr) {
@@ -156,6 +178,20 @@ async function handleApi(req, res, urlPath, ip) {
       sendJson(res, 429, { reason: 'locked', retryAfterSec: Math.ceil(lock / 1000) }); return true;
     }
     if (sec.safeEqual(body.password || '', ADMIN_PASSWORD) && sec.verifyTotp(adminTotpSecret(), body.totp)) {
+      // Passwort stimmt – jetzt zusätzlich das Gerät prüfen.
+      const dh = deviceHash(body.device);
+      const known = dh ? store.findAdminDevice(dh) : null;
+      if (!ADMIN_DEVICE_LOCK_OFF && !known) {
+        // Erstes Gerät überhaupt? Dann automatisch freigeben (Einrichtung).
+        if (store.adminDeviceCount() === 0 && dh) {
+          store.addAdminDevice({ hash: dh, name: deviceLabel(req) + ' (erstes Gerät)' });
+          sec.recordEvent('audit', ip, 'Erstes Admin-Gerät freigegeben: ' + deviceLabel(req));
+        } else {
+          sec.recordEvent('blocked', ip, 'Admin-Login von nicht freigegebenem Gerät (' + deviceLabel(req) + ')');
+          sendJson(res, 403, { reason: 'device-not-approved', device: deviceLabel(req) }); return true;
+        }
+      }
+      if (dh) store.touchAdminDevice(dh);
       sec.resetFails(ip); sec.resetAdminFails(ip); sec.recordEvent('login-ok', ip, 'Admin');
       sendJson(res, 200, { token: sec.issueToken(ip, { name: 'Admin', role: 'admin' }), name: 'Admin', role: 'admin' });
     } else {
@@ -175,6 +211,32 @@ async function handleApi(req, res, urlPath, ip) {
       });
     }
     return true;
+  }
+
+  // ---- Neues Gerät mit Freischalt-Code anmelden -----------------------------
+  // Verlangt Admin-Passwort UND den Code, der auf einem freigegebenen Gerät
+  // erzeugt wurde. Unterliegt derselben Sperre wie der Login.
+  if (urlPath === '/api/admin-devices/claim' && req.method === 'POST') {
+    if (!ADMIN_PASSWORD) { sendJson(res, 503, { reason: 'admin-not-configured' }); return true; }
+    const lockC = sec.adminLockRemaining(ip);
+    if (lockC > 0) { sendJson(res, 429, { reason: 'locked', retryAfterSec: Math.ceil(lockC / 1000) }); return true; }
+    let body; try { body = await readJson(req, 8 * 1024); } catch { body = {}; }
+    const pwOk = sec.safeEqual(body.password || '', ADMIN_PASSWORD);
+    const inv = pendingDeviceInvite;
+    const codeOk = !!(inv && inv.exp > Date.now() && sec.safeEqual(String(body.code || '').trim(), inv.code));
+    const dh = deviceHash(body.device);
+    if (!pwOk || !codeOk || !dh) {
+      sec.recordFail(ip, 'Geräte-Freischaltung fehlgeschlagen');
+      const w = sec.adminFailDelay(ip); const st2 = sec.recordAdminFail(ip);
+      await new Promise((r) => setTimeout(r, w));
+      if (st2.lockedMs) { sendJson(res, 429, { reason: 'locked', retryAfterSec: Math.ceil(st2.lockedMs / 1000) }); return true; }
+      sendJson(res, 401, { reason: 'bad-claim', triesLeft: st2.remaining }); return true;
+    }
+    pendingDeviceInvite = null; // Code ist verbraucht
+    store.addAdminDevice({ hash: dh, name: String(body.name || deviceLabel(req)).slice(0, 40) });
+    sec.resetAdminFails(ip);
+    sec.recordEvent('audit', ip, 'Neues Admin-Gerät freigeschaltet: ' + deviceLabel(req));
+    sendJson(res, 200, { ok: true }); return true;
   }
 
   // ---- Passkey-Login (Face ID / Fingerabdruck) – öffentlich ----
@@ -364,6 +426,35 @@ async function handleApi(req, res, urlPath, ip) {
     store.setIntro(body.intro || ''); sec.recordEvent('audit', ip, 'Begrüßungstext geändert');
     sendJson(res, 200, { ok: true, intro: store.getIntro() }); return true;
   }
+  // ---- Geräte-Freigabe verwalten (nur Admin) -------------------------------
+  if (urlPath === '/api/admin-devices' && req.method === 'GET') {
+    if (!adminOnly()) return true;
+    sendJson(res, 200, { devices: store.listAdminDevices(), lockOff: ADMIN_DEVICE_LOCK_OFF }); return true;
+  }
+  // Freischalt-Code erzeugen: damit gibt ein bereits freigegebenes Gerät ein
+  // neues frei (Code ist kurz gültig und nur einmal verwendbar).
+  if (urlPath === '/api/admin-devices/invite' && req.method === 'POST') {
+    if (!adminOnly()) return true;
+    const code = String(crypto.randomInt(0, 1e6)).padStart(6, '0');
+    pendingDeviceInvite = { code, exp: Date.now() + 10 * 60 * 1000 };
+    sec.recordEvent('audit', ip, 'Freischalt-Code für neues Admin-Gerät erzeugt');
+    sendJson(res, 200, { code, validMin: 10 }); return true;
+  }
+  if (urlPath === '/api/admin-devices/rename' && req.method === 'POST') {
+    if (!adminOnly()) return true;
+    let body; try { body = await readJson(req, 8 * 1024); } catch { body = {}; }
+    sendJson(res, 200, { ok: store.renameAdminDevice(body.id, body.name) }); return true;
+  }
+  if (urlPath === '/api/admin-devices/remove' && req.method === 'POST') {
+    if (!adminOnly()) return true;
+    let body; try { body = await readJson(req, 8 * 1024); } catch { body = {}; }
+    // Das letzte Gerät darf nicht entfernt werden – sonst sperrt man sich aus.
+    if (store.adminDeviceCount() <= 1) { sendJson(res, 400, { reason: 'last-device' }); return true; }
+    const ok = store.removeAdminDevice(body.id);
+    if (ok) sec.recordEvent('audit', ip, 'Admin-Gerät entfernt');
+    sendJson(res, 200, { ok }); return true;
+  }
+
   // ---- Admin-Oberfläche: Markup erst nach erfolgreichem Login ausliefern ----
   // So steht im Quelltext der Anmeldeseite nichts über Akten, Aufnahmen usw.
   if (urlPath === '/api/admin-shell' && req.method === 'GET') {

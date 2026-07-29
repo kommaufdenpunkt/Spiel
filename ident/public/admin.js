@@ -14,6 +14,21 @@
     return { status: res.status, body: json };
   }
 
+  // ---- Geräte-Kennung ----
+  // Bleibt dauerhaft in diesem Browser. Nur freigegebene Geräte dürfen sich
+  // anmelden; der Server kennt davon nur einen Hash.
+  const DEV_KEY = 'ident.deviceId';
+  function deviceId() {
+    let d = '';
+    try { d = localStorage.getItem(DEV_KEY) || ''; } catch {}
+    if (!d || d.length < 20) {
+      const a = new Uint8Array(32); crypto.getRandomValues(a);
+      d = Array.from(a, (x) => x.toString(16).padStart(2, '0')).join('');
+      try { localStorage.setItem(DEV_KEY, d); } catch {}
+    }
+    return d;
+  }
+
   // ---- Login ----
   $('loginBtn').addEventListener('click', login);
   $('pw').addEventListener('keydown', (e) => { if (e.key === 'Enter') login(); });
@@ -32,11 +47,13 @@
   }
   async function login() {
     $('loginErr').textContent = 'Prüfe …';
-    const r = await api('POST', '/api/login', { username: '', password: $('pw').value, totp: $('totp').value.trim() });
+    const r = await api('POST', '/api/login', { username: '', password: $('pw').value, totp: $('totp').value.trim(), device: deviceId() });
     if (r.status === 200 && r.body.token && r.body.role === 'admin') {
       token = r.body.token; $('loginErr').textContent = ''; await openDash();
     } else if (r.status === 429 || (r.body && r.body.reason === 'locked')) {
       setLocked(parseInt((r.body && r.body.retryAfterSec) || 900, 10));
+    } else if (r.body && r.body.reason === 'device-not-approved') {
+      showClaim();
     } else if (r.body && r.body.reason === 'bad-totp') {
       // 2FA ist aktiv -> Feld einblenden, damit der Code eingegeben werden kann.
       $('totpField').style.display = ''; $('totp').focus();
@@ -49,6 +66,38 @@
       $('pw').value = ''; $('pw').focus();
     }
   }
+  // Dieses Gerät ist noch nicht freigegeben -> Freischaltung anbieten.
+  function showClaim() {
+    if ($('claimBox')) { $('claimBox').style.display = ''; $('claimCode').focus(); return; }
+    const box = document.createElement('div');
+    box.id = 'claimBox';
+    box.style.cssText = 'margin-top:1rem;padding:.9rem;border:1px solid var(--line);border-radius:12px;background:var(--panel2)';
+    box.innerHTML = '<div style="font-size:.88rem;line-height:1.5">Dieses Gerät ist nicht freigegeben.<br>'
+      + 'Erzeuge auf einem <b>bereits freigegebenen Gerät</b> einen Freischalt-Code (Sicherheit → Geräte) und gib ihn hier ein.</div>'
+      + '<div style="display:flex;gap:.5rem;margin-top:.7rem;flex-wrap:wrap">'
+      + '<input id="claimCode" inputmode="numeric" placeholder="6-stelliger Code" style="max-width:150px">'
+      + '<button id="claimBtn" class="primary">Freischalten</button></div>'
+      + '<div id="claimMsg" class="muted" style="margin-top:.5rem"></div>';
+    $('loginErr').after(box);
+    $('claimBtn').addEventListener('click', async () => {
+      const r = await api('POST', '/api/admin-devices/claim', {
+        password: $('pw').value, code: $('claimCode').value.trim(), device: deviceId(),
+      });
+      if (r.status === 200) {
+        $('claimMsg').textContent = 'Gerät freigeschaltet ✓ – melde dich jetzt an.';
+        setTimeout(() => { box.style.display = 'none'; login(); }, 900);
+      } else if (r.status === 429) {
+        box.style.display = 'none'; setLocked(parseInt((r.body && r.body.retryAfterSec) || 900, 10));
+      } else {
+        const left = r.body && typeof r.body.triesLeft === 'number' ? ' Noch ' + r.body.triesLeft + ' Versuche.' : '';
+        $('claimMsg').textContent = 'Code oder Passwort falsch.' + left;
+      }
+    });
+    $('claimCode').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('claimBtn').click(); });
+    $('loginErr').textContent = '';
+    $('claimCode').focus();
+  }
+
   // Die Oberfläche wird erst nach dem Login vom Server geholt – erst danach
   // können ihre Schaltflächen verknüpft werden.
   async function openDash() {
@@ -72,13 +121,52 @@
     if ($('introSave')) $('introSave').addEventListener('click', saveIntro);
     if ($('caseSearch')) $('caseSearch').addEventListener('input', (e) => renderCases(e.target.value));
     if ($('addAgent')) $('addAgent').addEventListener('click', addAgent);
+    if ($('devInvite')) $('devInvite').addEventListener('click', async () => {
+      const r = await api('POST', '/api/admin-devices/invite', {});
+      if (r.status !== 200) { toast('Konnte keinen Code erzeugen.'); return; }
+      $('devInviteOut').innerHTML = 'Freischalt-Code: <b style="font-size:1.4rem;letter-spacing:.18em">' + esc(r.body.code) + '</b>'
+        + '<div class="muted" style="margin-top:.4rem">Gültig für ' + r.body.validMin + ' Minuten und nur einmal verwendbar.<br>'
+        + 'Auf dem neuen Gerät <b>admin.4ever1.tv</b> öffnen, Passwort eingeben – dann erscheint das Code-Feld.</div>';
+    });
   }
   function show(sec) {
     document.querySelectorAll('.nav button[data-sec]').forEach((b) => b.classList.toggle('sel', b.dataset.sec === sec));
     document.querySelectorAll('.section').forEach((s) => s.classList.toggle('on', s.dataset.pane === sec));
     ({ overview: loadOverview, cases: loadCases, rec: loadRec, agents: loadAgents, script: loadScriptEditor, adminsec: loadA2fa, security: loadSecurity }[sec] || (() => {}))();
   }
+  // ---- Freigegebene Geräte ----
+  async function loadDevices() {
+    const r = await api('GET', '/api/admin-devices');
+    const list = (r.body && r.body.devices) || [];
+    const el = $('devList'); if (!el) return;
+    if (r.body && r.body.lockOff) {
+      el.innerHTML = '<div class="note" style="color:var(--warn)">⚠️ Die Geräte-Prüfung ist per Notausgang (ADMIN_DEVICE_LOCK=off) abgeschaltet – derzeit kann sich jedes Gerät mit dem Passwort anmelden.</div>';
+      return;
+    }
+    if (!list.length) { el.innerHTML = '<div class="empty">Noch keine Geräte – das erste Gerät wird beim Anmelden automatisch freigegeben.</div>'; return; }
+    el.innerHTML = '';
+    list.forEach((d) => {
+      const div = document.createElement('div'); div.className = 'row';
+      const seen = d.lastSeen ? new Date(d.lastSeen).toLocaleString('de-DE') : '–';
+      const info = document.createElement('div');
+      info.innerHTML = '<b>' + esc(d.name) + '</b><div class="muted">Zuletzt benutzt: ' + esc(seen) + '</div>';
+      const acts = document.createElement('div'); acts.className = 'acts';
+      acts.appendChild(btn('✏️ Umbenennen', '', async () => {
+        const name = prompt('Name für dieses Gerät:', d.name); if (name === null) return;
+        await api('POST', '/api/admin-devices/rename', { id: d.id, name }); loadDevices();
+      }));
+      acts.appendChild(btn('🗑 Entfernen', 'danger', async () => {
+        if (!confirm('„' + d.name + '" wirklich entfernen? Dieses Gerät kann sich dann nicht mehr anmelden.')) return;
+        const rr = await api('POST', '/api/admin-devices/remove', { id: d.id });
+        if (rr.status === 400) toast('Das letzte Gerät kann nicht entfernt werden.');
+        loadDevices();
+      }));
+      div.appendChild(info); div.appendChild(acts); el.appendChild(div);
+    });
+  }
+
   async function loadA2fa() {
+    loadDevices();
     const s = (await api('GET', '/api/admin-2fa/status')).body || {};
     const st = $('a2faStatus'), setup = $('a2faSetup'); setup.innerHTML = '';
     if (s.envForced) { st.innerHTML = '🔐 Admin-2FA ist über eine Server-Variable (ADMIN_TOTP_SECRET) fest aktiv.'; return; }

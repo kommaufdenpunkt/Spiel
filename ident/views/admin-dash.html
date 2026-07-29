@@ -36,8 +36,16 @@
       <textarea id="scriptText" style="width:100%;min-height:280px;font-family:inherit;font-size:.95rem;line-height:1.6;padding:.8rem;border-radius:12px;border:1px solid var(--line);background:#0f1728;color:var(--ink)"></textarea>
       <div style="margin-top:.7rem;display:flex;gap:.5rem;align-items:center"><button id="scriptSave" class="primary">Vorlese-Text speichern</button><span id="scriptMsg" class="muted"></span></div>
     </div>
-    <div class="section" data-pane="adminsec"><h2>Sicherheit – Admin-2FA <span class="pill">optional</span></h2>
-      <p class="sub"><b>Du musst hier nichts einrichten</b> – der Login mit Passwort funktioniert auch ohne. Wer mag, kann zusätzlich einen 6-stelligen Code beim Admin-Login verlangen (Google Authenticator). <b>Notausgang:</b> falls dein Handy mal weg ist – in Coolify <b>ADMIN_2FA_OFF=1</b> setzen und Redeploy, dann ist die 2FA wieder aus und du kommst nur mit Passwort rein.</p>
+    <div class="section" data-pane="adminsec"><h2>Sicherheit</h2>
+      <h3 style="font-size:1rem;margin:.2rem 0 .3rem">📱 Freigegebene Geräte</h3>
+      <p class="sub">Nur diese Geräte dürfen sich im Admin-Bereich anmelden – alle anderen werden abgewiesen, selbst mit richtigem Passwort. Ein neues Gerät (z. B. Tablet) schaltest du mit einem <b>Freischalt-Code</b> frei.</p>
+      <div class="row" style="margin-bottom:.8rem"><span>Neues Gerät hinzufügen</span><button id="devInvite" class="primary">Freischalt-Code erzeugen</button></div>
+      <div id="devInviteOut" class="note" style="margin-bottom:.8rem"></div>
+      <div id="devList"></div>
+      <p class="muted" style="margin-top:.6rem">Notausgang, falls kein Gerät mehr geht: in Coolify <b>ADMIN_DEVICE_LOCK=off</b> setzen und Redeploy – dann zählt nur noch das Passwort.</p>
+      <hr style="border:0;border-top:1px solid var(--line);margin:1.5rem 0">
+      <h3 style="font-size:1rem;margin:.2rem 0 .3rem">🔐 Zusätzlicher Code beim Login <span class="pill">optional</span></h3>
+      <p class="sub"><b>Du musst hier nichts einrichten</b> – der Login mit Passwort und freigegebenem Gerät funktioniert auch ohne. Wer mag, kann zusätzlich einen 6-stelligen Code verlangen (Google Authenticator). <b>Notausgang:</b> in Coolify <b>ADMIN_2FA_OFF=1</b> setzen und Redeploy.</p>
       <div id="a2faStatus" class="note"></div>
       <div id="a2faSetup" style="margin-top:1rem"></div>
     </div>
