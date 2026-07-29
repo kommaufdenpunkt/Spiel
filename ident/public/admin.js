@@ -24,6 +24,10 @@
     if (r.status === 200 && r.body.token && r.body.role === 'admin') {
       token = r.body.token; $('login').style.display = 'none'; $('dash').classList.add('on');
       $('whoami').textContent = 'Angemeldet als Admin'; show('overview');
+    } else if (r.body && r.body.reason === 'bad-totp') {
+      // 2FA ist aktiv -> Feld einblenden, damit der Code eingegeben werden kann.
+      $('totpField').style.display = ''; $('totp').focus();
+      $('loginErr').textContent = 'Ein 2FA-Code ist nötig – bitte unten eingeben.';
     } else $('loginErr').textContent = r.status === 503 ? 'Admin ist auf dem Server nicht konfiguriert.' : 'Anmeldung fehlgeschlagen.';
   }
   $('logout').addEventListener('click', () => { token = ''; $('dash').classList.remove('on'); $('login').style.display = ''; $('pw').value = ''; $('totp').value = ''; });

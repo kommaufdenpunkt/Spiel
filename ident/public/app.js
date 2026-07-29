@@ -146,7 +146,11 @@
   function loginErr(r) {
     const x = r.body && r.body.reason;
     if (x === 'account-locked') return 'Konto gesperrt (zu viele Fehlversuche). Bitte an den Admin wenden.';
-    if (x === 'bad-totp') return 'Passwort ok, aber 2FA-Code falsch.';
+    if (x === 'bad-totp') {
+      // Für dieses Konto ist 2FA aktiv -> Feld einblenden, damit man den Code eingeben kann.
+      if ($('totpField')) { $('totpField').style.display = ''; if ($('totpInput')) $('totpInput').focus(); }
+      return 'Für dieses Konto ist ein 2FA-Code nötig – bitte unten eingeben.';
+    }
     if (x === 'ip-blocked') return 'Login von diesem Standort nicht erlaubt.';
     if (r.status === 503) return 'Admin/Login ist auf dem Server nicht konfiguriert.';
     return 'Anmeldung fehlgeschlagen.';
