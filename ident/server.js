@@ -415,7 +415,7 @@ async function handleApi(req, res, urlPath, ip) {
       <div class="print">Tipp: Mit <b>Strg/Cmd + P</b> → „Als PDF sichern" exportierst du diese Akte als PDF.</div>
       <p>Status: <span class="badge ${c.result === 'approved' ? 'ok' : (c.result === 'rejected' ? 'no' : 'open')}">${eh(status)}</span></p>
       <table>
-        ${row('BIGO-Name', c.bigoName)}${row('Alter', c.age)}${row('Name laut Ausweis', c.verifiedName)}
+        ${row('BIGO-ID', c.bigoName)}${row('Alter', c.age)}${row('Name laut Ausweis', c.verifiedName)}
         ${row('Ausweisart', c.docType)}${row('Ausweis-Nr.', c.docNumber)}${row('Zugangsnummer', c.code)}
         ${row('Prüfer', c.agentName)}${row('Datum', new Date(c.createdAt).toLocaleString('de-DE'))}
         ${row('Notiz', c.note)}${row('Ablehnungsgrund', c.rejectReason)}
