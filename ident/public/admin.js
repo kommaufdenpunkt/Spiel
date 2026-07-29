@@ -14,16 +14,6 @@
     return { status: res.status, body: json };
   }
 
-  // Prüfer-Link passend zur Umgebung: von admin.* auf pruefer.*, sonst /pruefer.
-  (function staffLink() {
-    const a = $('staffLink'); if (!a) return;
-    if (/^admin\./i.test(location.hostname)) {
-      const host = location.host.replace(/^admin\./i, 'pruefer.');
-      a.href = location.protocol + '//' + host + '/';
-      a.textContent = host;
-    } else { a.textContent = 'Mitarbeiter-Login'; }
-  })();
-
   // ---- Login ----
   $('loginBtn').addEventListener('click', login);
   $('pw').addEventListener('keydown', (e) => { if (e.key === 'Enter') login(); });
