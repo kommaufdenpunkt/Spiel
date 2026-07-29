@@ -36,7 +36,7 @@ let pendingAdminTotp = '';
 const TURN_HOST = process.env.TURN_HOST || '';
 const TURN_SECRET = process.env.TURN_SECRET || '';
 const TURN_TTL = parseInt(process.env.TURN_TTL || '3600', 10);
-const RETENTION_DAYS = parseInt(process.env.RETENTION_DAYS || '0', 10); // 0 = aus
+const RETENTION_DAYS = parseInt(process.env.RETENTION_DAYS || '90', 10); // Standard: Auto-Löschung nach 90 Tagen (0 = aus). Passend zur Datenschutzerklärung.
 
 // ---- Passkeys (Face ID / Fingerabdruck, WebAuthn) --------------------------
 // rpID = registrierbare Domain, damit Passkeys auf ident. UND pruefer. gelten.
