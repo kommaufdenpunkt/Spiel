@@ -97,6 +97,53 @@
   .cta h2{margin:0 0 .6rem;font-size:clamp(1.5rem,3.2vw,2rem)}
   .cta p{color:var(--dim);margin:0 auto 1.5rem;max-width:32rem}
 
+  /* Echtes Team-Foto oben */
+  .team-photo{position:relative;border-radius:20px;overflow:hidden;border:1px solid var(--line2);
+    box-shadow:0 30px 70px -30px rgba(0,0,0,.85),0 0 0 1px #ffffff0a inset;line-height:0}
+  .team-photo img{width:100%;height:auto;display:block}
+  .team-photo::after{content:"";position:absolute;inset:0;pointer-events:none;
+    background:linear-gradient(180deg,transparent 55%,#0d132099 100%)}
+  .hero-figs{align-items:center}
+  .hero-figs .team-photo{width:100%;max-width:480px}
+
+  /* Vertrauens-Band */
+  .trust{border-block:1px solid var(--line);background:#111827aa}
+  .trust-in{display:grid;grid-template-columns:repeat(4,1fr);gap:1.2rem;padding:1.6rem 0}
+  .trust-item{text-align:center}
+  .trust-item b{display:block;font-size:1.5rem;letter-spacing:-.01em;
+    background:linear-gradient(100deg,#8fb2ff,#e8975d);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .trust-item span{font-size:.82rem;color:var(--dim);display:block;margin-top:.2rem;line-height:1.35}
+  @media(max-width:760px){.trust-in{grid-template-columns:repeat(2,1fr);gap:1.4rem}}
+
+  /* Voraussetzungen */
+  .need{display:flex;gap:.8rem;align-items:flex-start;padding:.9rem 0;border-bottom:1px solid var(--line)}
+  .need:last-child{border-bottom:0}
+  .need .tick{width:26px;height:26px;flex:none;border-radius:50%;display:grid;place-items:center;font-size:.85rem;
+    background:#163024;color:#5fe0a0;border:1px solid #2f6b4a}
+  .need b{display:block;font-size:.97rem}
+  .need span{color:var(--dim);font-size:.9rem}
+
+  /* Fragen */
+  .faq{display:grid;gap:.7rem}
+  .faq details{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:0 1.2rem;transition:border-color .18s}
+  .faq details[open]{border-color:var(--line2)}
+  .faq summary{cursor:pointer;list-style:none;padding:1.05rem 0;font-weight:650;font-size:1rem;display:flex;justify-content:space-between;gap:1rem;align-items:center}
+  .faq summary::-webkit-details-marker{display:none}
+  .faq summary::after{content:"+";font-size:1.4rem;color:var(--accent);font-weight:400;line-height:1;flex:none}
+  .faq details[open] summary::after{content:"–"}
+  .faq p{margin:0 0 1.1rem;color:var(--dim);font-size:.95rem}
+
+  /* Kontakt */
+  .contact{display:flex;gap:1rem;flex-wrap:wrap;justify-content:center}
+  .contact a{display:inline-flex;align-items:center;gap:.55rem;background:var(--panel);border:1px solid var(--line);
+    border-radius:14px;padding:.9rem 1.3rem;color:var(--ink);font-weight:600;transition:border-color .18s,transform .18s}
+  .contact a:hover{border-color:var(--accent);transform:translateY(-2px)}
+
+  /* sanftes Einblenden beim Scrollen */
+  .reveal{opacity:0;transform:translateY(16px);transition:opacity .6s ease,transform .6s cubic-bezier(.2,.7,.3,1)}
+  .reveal.in{opacity:1;transform:none}
+  @media(prefers-reduced-motion:reduce){.reveal{opacity:1;transform:none;transition:none}}
+
   footer{border-top:1px solid var(--line);margin-top:2rem;padding:2rem 0 3rem;color:var(--dim);font-size:.9rem}
   .foot{display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap;align-items:center}
   .foot-links{display:flex;gap:1.2rem;flex-wrap:wrap}
@@ -114,6 +161,7 @@
       <a href="#team">Team</a>
       <a href="#ablauf">Ablauf</a>
       <a href="#pkboard">PK Board</a>
+      <a href="#fragen">Fragen</a>
       <a class="btn primary" href="https://ident.4ever1.tv">Jetzt bewerben</a>
     </nav>
   </div>
@@ -133,6 +181,16 @@
       </div>
     </div>
     <div class="hero-figs" id="heroFigs"></div>
+  </div>
+
+  <!-- Vertrauen: nur belegbare Angaben -->
+  <div class="trust">
+    <div class="wrap trust-in">
+      <div class="trust-item"><b>3</b><span>feste Ansprech&shy;partner statt anonymer Verteiler</span></div>
+      <div class="trust-item"><b>15 Min</b><span>dauert die Audition im Schnitt</span></div>
+      <div class="trust-item"><b>DSGVO</b><span>Server in Deutschland, alles verschlüsselt</span></div>
+      <div class="trust-item"><b>18+</b><span>Alter wird bei jeder Aufnahme geprüft</span></div>
+    </div>
   </div>
 
   <!-- Warum wir -->
@@ -222,6 +280,61 @@
           <p style="margin-bottom:.7rem">Ankündigungen gehen nicht mehr im Chat unter – du findest sie jederzeit wieder.</p>
           <p style="margin:0">Niemand ist verpflichtet, seine Handynummer herauszugeben. Bei uns ganz sicher nicht.</p>
         </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Voraussetzungen -->
+  <section id="voraussetzungen">
+    <div class="wrap">
+      <div class="grid g2" style="align-items:start;gap:2rem">
+        <div>
+          <span class="kicker">Kurz geprüft</span>
+          <h2 style="font-size:clamp(1.5rem,3.2vw,2rem);margin:.9rem 0 .6rem">Passt das für dich?</h2>
+          <p style="color:var(--dim);margin:0 0 1rem">Du brauchst keine Erfahrung und keine Ausrüstung.
+             Wichtig ist nur, dass du volljährig bist und Lust hast, regelmäßig live zu gehen.</p>
+          <a class="btn primary" href="https://ident.4ever1.tv">Audition starten →</a>
+        </div>
+        <div class="card">
+          <div class="need"><span class="tick">✓</span><div><b>Mindestens 18 Jahre alt</b><span>Wir prüfen das mit deinem Ausweis – Pflicht bei BIGO Live.</span></div></div>
+          <div class="need"><span class="tick">✓</span><div><b>Handy oder Rechner mit Kamera</b><span>Mehr braucht es für die Audition nicht.</span></div></div>
+          <div class="need"><span class="tick">✓</span><div><b>Gültiger Ausweis</b><span>Personalausweis oder Reisepass, Vorder- und Rückseite.</span></div></div>
+          <div class="need"><span class="tick">✓</span><div><b>Lust auf Live-Streaming</b><span>Alles Weitere zeigen wir dir – Schritt für Schritt.</span></div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Fragen -->
+  <section id="fragen">
+    <div class="wrap">
+      <div class="sec-head">
+        <h2>Häufige Fragen</h2>
+        <p>Was uns am häufigsten gefragt wird – ehrlich beantwortet.</p>
+      </div>
+      <div class="faq">
+        <details><summary>Kostet mich das etwas?</summary><p>Nein. Die Bewerbung und die Betreuung durch uns sind für dich kostenlos.</p></details>
+        <details><summary>Wie lange dauert die Audition?</summary><p>In der Regel unter 15 Minuten. Du kommst in den Warteraum, wir sagen kurz Hallo, prüfen deinen Ausweis und du liest einen kurzen Text in die Kamera. Den Text siehst du vorher und kannst ihn in Ruhe durchlesen.</p></details>
+        <details><summary>Was passiert mit meinen Daten?</summary><p>Deine Angaben, Ausweisbilder und die Aufnahme werden verschlüsselt auf Servern in Deutschland gespeichert und für deine Bewerbung an den BIGO-Support weitergeleitet. Spätestens nach 90 Tagen werden sie automatisch gelöscht. Du kannst deine Einwilligung jederzeit widerrufen – Einzelheiten stehen in unserer <a href="https://ident.4ever1.tv/datenschutz">Datenschutzerklärung</a>.</p></details>
+        <details><summary>Muss ich meine Handynummer herausgeben?</summary><p>Nein. Genau deshalb gibt es unser PK Board: Alle Ankündigungen und PK-Cards laufen dort – ohne dass jemand deine Nummer sehen muss.</p></details>
+        <details><summary>Brauche ich Erfahrung oder besondere Technik?</summary><p>Nein. Ein Handy mit Kamera reicht. Wie du startest, welche Zeiten sich lohnen und worauf du achten solltest, zeigen wir dir.</p></details>
+        <details><summary>Was erwartet ihr von mir?</summary><p>Dass du regelmäßig live gehst, dich an die BIGO-Regeln hältst (keine verbotenen Inhalte, kein Parallelstreaming) und fair mit uns und den anderen umgehst. Beleidigungen haben bei uns keinen Platz.</p></details>
+        <details><summary>Wie geht es nach der Audition weiter?</summary><p>Wir leiten deine Bewerbung an den BIGO-Support weiter und melden uns bei dir. Passt alles, richten wir dich im PK Board ein und du kannst loslegen.</p></details>
+        <details><summary>Kann ich die Agentur später wechseln?</summary><p>Ja. Über die Transferregeln – also Freigabe und Freikauf – informieren wir dich schon vor dem Start, damit du weißt, worauf du dich einlässt.</p></details>
+      </div>
+    </div>
+  </section>
+
+  <!-- Kontakt -->
+  <section id="kontakt">
+    <div class="wrap">
+      <div class="sec-head">
+        <h2>Noch Fragen?</h2>
+        <p>Schreib uns einfach – wir antworten persönlich, nicht automatisch.</p>
+      </div>
+      <div class="contact">
+        <a href="mailto:ginoheidrich@outlook.com">✉️ ginoheidrich@outlook.com</a>
+        <a href="https://ident.4ever1.tv">🎬 Direkt zur Audition</a>
       </div>
     </div>
   </section>
