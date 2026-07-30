@@ -82,17 +82,22 @@
   function drawPreview() { $('preview').innerHTML = F.renderFigure(team[cur], {}); }
   function drawVideoTeam() { if (player) player.render(); else F.renderTeamInto($('videoTeam'), team); }
 
-  // Bild laden, quadratisch zuschneiden, verkleinern -> data-URL (kompakt)
+  // Bild laden und verkleinern -> data-URL (kompakt).
+  // Es wird bewusst NICHT zugeschnitten: Das ganze Bild bleibt erhalten,
+  // den Ausschnitt wählt man danach in Ruhe mit Zoom und Verschieben.
   function resizeImage(file, size, q) {
     return new Promise(function (resolve, reject) {
       var img = new Image();
       img.onload = function () {
-        var c = document.createElement('canvas'); c.width = size; c.height = size;
+        var lang = Math.max(img.width, img.height) || 1;
+        var f = Math.min(1, size / lang);
+        var w = Math.max(1, Math.round(img.width * f)), h = Math.max(1, Math.round(img.height * f));
+        var c = document.createElement('canvas'); c.width = w; c.height = h;
         var ctx = c.getContext('2d');
-        var s = Math.min(img.width, img.height);
-        ctx.drawImage(img, (img.width - s) / 2, (img.height - s) / 2, s, s, 0, 0, size, size);
+        ctx.fillStyle = '#0f1728'; ctx.fillRect(0, 0, w, h);
+        ctx.drawImage(img, 0, 0, w, h);
         var out = c.toDataURL('image/jpeg', q), qq = q;
-        while (out.length > 640000 && qq > 0.4) { qq -= 0.12; out = c.toDataURL('image/jpeg', qq); }
+        while (out.length > 800000 && qq > 0.4) { qq -= 0.12; out = c.toDataURL('image/jpeg', qq); }
         resolve(out);
       };
       img.onerror = reject;
@@ -101,6 +106,54 @@
       fr.onerror = reject;
       fr.readAsDataURL(file);
     });
+  }
+
+  // ---- Zuschnitt: Zoom + Verschieben --------------------------------------
+  // Man kann das Bild in der Vorschau direkt mit der Maus bzw. dem Finger
+  // schieben; die drei Regler tun dasselbe für alle, die das lieber mögen.
+  function cropUI() {
+    var box = $('cropBox'); if (!box) return;
+    var f = team[cur];
+    if (!f.img) { box.style.display = 'none'; return; }
+    box.style.display = '';
+    if ($('cropZoom')) $('cropZoom').value = f.imgZoom == null ? 1 : f.imgZoom;
+    if ($('cropX')) $('cropX').value = f.imgX == null ? 0.5 : f.imgX;
+    if ($('cropY')) $('cropY').value = f.imgY == null ? 0.5 : f.imgY;
+  }
+  function cropSet(k, v) {
+    team[cur][k] = parseFloat(v);
+    drawPreview(); drawVideoTeam();
+  }
+  // Ziehen in der Vorschau
+  function cropDrag() {
+    var host = $('preview'); if (!host) return;
+    var akt = null;
+    function start(e) {
+      var f = team[cur]; if (!f.img) return;
+      var p = e.touches ? e.touches[0] : e;
+      akt = { x: p.clientX, y: p.clientY, ix: f.imgX == null ? 0.5 : f.imgX, iy: f.imgY == null ? 0.5 : f.imgY,
+              w: host.clientWidth || 200, h: host.clientHeight || 220 };
+      if (e.cancelable) e.preventDefault();
+    }
+    function move(e) {
+      if (!akt) return;
+      var f = team[cur], z = f.imgZoom || 1;
+      if (z <= 1) return;                                  // ohne Zoom gibt es nichts zu schieben
+      var p = e.touches ? e.touches[0] : e;
+      var dx = (p.clientX - akt.x) / (akt.w * (z - 1));
+      var dy = (p.clientY - akt.y) / (akt.h * (z - 1));
+      f.imgX = Math.max(0, Math.min(1, akt.ix - dx));
+      f.imgY = Math.max(0, Math.min(1, akt.iy - dy));
+      cropUI(); drawPreview(); drawVideoTeam();
+      if (e.cancelable) e.preventDefault();
+    }
+    function end() { akt = null; }
+    host.addEventListener('mousedown', start);
+    window.addEventListener('mousemove', move);
+    window.addEventListener('mouseup', end);
+    host.addEventListener('touchstart', start, { passive: false });
+    window.addEventListener('touchmove', move, { passive: false });
+    window.addEventListener('touchend', end);
   }
 
   function renderAll() {
@@ -113,6 +166,7 @@
     buildSwatches('swShirt', F.SHIRT, 'shirt');
     buildSwatches('swBg', F.BG, 'bg');
     if ($('imgHint')) $('imgHint').textContent = team[cur].img ? 'Bild aktiv – die Zeichnungs-Einstellungen unten werden dann ignoriert.' : '';
+    cropUI();
     drawPreview();
     drawVideoTeam();
   }
@@ -152,13 +206,27 @@
     if ($('figImg')) $('figImg').onchange = function (e) {
       var file = e.target.files && e.target.files[0]; if (!file) return;
       $('imgHint').textContent = 'Bild wird verarbeitet …';
-      resizeImage(file, 512, 0.82).then(function (url) {
-        team[cur].img = url; renderAll();
-        $('imgHint').textContent = 'Bild aktiv – „Team speichern" nicht vergessen (für alle: als Admin anmelden).';
+      resizeImage(file, 720, 0.82).then(function (url) {
+        team[cur].img = url;
+        team[cur].imgZoom = 1.35; team[cur].imgX = 0.5; team[cur].imgY = 0.32;  // Startwert: eher aufs Gesicht
+        renderAll();
+        $('imgHint').textContent = 'Bild aktiv – Ausschnitt unten einstellen, dann „Team speichern".';
       }).catch(function () { $('imgHint').textContent = 'Bild konnte nicht geladen werden.'; });
       e.target.value = '';
     };
-    if ($('clearImgBtn')) $('clearImgBtn').onclick = function () { team[cur].img = ''; renderAll(); };
+    if ($('clearImgBtn')) $('clearImgBtn').onclick = function () {
+      team[cur].img = ''; team[cur].imgZoom = 1; team[cur].imgX = 0.5; team[cur].imgY = 0.5; renderAll();
+    };
+
+    // Zuschnitt-Regler
+    ['cropZoom:imgZoom', 'cropX:imgX', 'cropY:imgY'].forEach(function (paar) {
+      var t = paar.split(':'), el = $(t[0]);
+      if (el) el.addEventListener('input', function () { cropSet(t[1], this.value); });
+    });
+    if ($('cropReset')) $('cropReset').onclick = function () {
+      team[cur].imgZoom = 1; team[cur].imgX = 0.5; team[cur].imgY = 0.5; renderAll();
+    };
+    cropDrag();
 
     $('scriptBox').value = loadLocalScript();
     $('scriptSaveBtn').onclick = function () {

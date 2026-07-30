@@ -137,7 +137,12 @@ function sanitizeFigures(arr) {
       numKeys.forEach((k) => { let n = parseInt(f[k], 10); if (!Number.isFinite(n) || n < 0) n = 0; o[k] = Math.min(n, 99); });
       o.name = String(f.name || '').slice(0, 16);
       o.role = String(f.role || '').slice(0, 48);
-      if (typeof f.img === 'string' && /^data:image\/(png|jpe?g|webp);base64,/.test(f.img) && f.img.length <= 700000) o.img = f.img;
+      if (typeof f.img === 'string' && /^data:image\/(png|jpe?g|webp);base64,/.test(f.img) && f.img.length <= 900000) o.img = f.img;
+      // Bildausschnitt (Zoom + Verschiebung), damit das Gesicht sauber sitzt
+      const zahl = (v, vor, min, max) => { const n = parseFloat(v); return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : vor; };
+      o.imgZoom = zahl(f.imgZoom, 1, 1, 4);
+      o.imgX = zahl(f.imgX, 0.5, 0, 1);
+      o.imgY = zahl(f.imgY, 0.5, 0, 1);
     }
     return o;
   });
@@ -383,6 +388,14 @@ async function handleApi(req, res, urlPath, ip) {
   // ---- Audition-Text (Teleprompter) – Abruf öffentlich (Bewerber liest ihn) ----
   if (urlPath === '/api/script' && req.method === 'GET') { sendJson(res, 200, { script: store.getScript() }); return true; }
   if (urlPath === '/api/intro' && req.method === 'GET') { sendJson(res, 200, { intro: store.getIntro() }); return true; }
+  // Startseite: liegt ein echtes Team-Foto im Ordner public? (öffentlich)
+  if (urlPath === '/api/site' && req.method === 'GET') {
+    let photo = '';
+    for (const n of ['team.jpg', 'team.jpeg', 'team.png', 'team.webp']) {
+      try { fs.accessSync(path.join(PUBLIC_DIR, n)); photo = '/' + n; break; } catch {}
+    }
+    sendJson(res, 200, { teamPhoto: photo }); return true;
+  }
   // Figuren (Team-Avatare) – Abruf öffentlich (Bewerber sieht sie im Warteraum)
   if (urlPath === '/api/figures' && req.method === 'GET') { sendJson(res, 200, { figures: store.getFigures(), script: store.getFigureScript() }); return true; }
 
