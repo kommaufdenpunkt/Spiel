@@ -84,7 +84,7 @@
 
     if (mode === 'host') {
       $('enterBtn').textContent = 'Anmeldung …';
-      const r = await api('POST', '/api/login', { username: $('userInput').value.trim(), password: $('passInput').value, totp: $('totpInput').value.trim() });
+      const r = await api('POST', '/api/login', { username: $('userInput').value.trim(), password: $('passInput').value, totp: $('totpInput').value.trim(), device: deviceId() });
       if (r.status !== 200 || !r.body.token) { resetEnter(); $('lobbyErr').textContent = loginErr(r); return; }
       state.token = r.body.token; state.name = r.body.name; state.isAdmin = r.body.role === 'admin'; state.mustChange = !!r.body.mustChange;
       if (state.mustChange) { const ok = await forcePwChange(); if (!ok) { resetEnter(); return; } }
@@ -143,6 +143,21 @@
   // Textfelder mit "grow" wachsen mit dem Inhalt (Zeilenumbrüche).
   function autoGrow(el) { el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 280) + 'px'; }
   document.querySelectorAll('textarea.grow').forEach((t) => { t.addEventListener('input', () => autoGrow(t)); });
+  // ---- Geräte-Kennung (bleibt in diesem Browser) ----
+  // Prüfer kommen nur von freigegebenen Geräten herein; der Server kennt davon
+  // nur einen Hash.
+  function deviceId() {
+    const K = 'ident.deviceId';
+    let d = '';
+    try { d = localStorage.getItem(K) || ''; } catch {}
+    if (!d || d.length < 20) {
+      const a = new Uint8Array(32); crypto.getRandomValues(a);
+      d = Array.from(a, (x) => x.toString(16).padStart(2, '0')).join('');
+      try { localStorage.setItem(K, d); } catch {}
+    }
+    return d;
+  }
+
   function loginErr(r) {
     const x = r.body && r.body.reason;
     if (x === 'account-locked') return 'Konto gesperrt (zu viele Fehlversuche). Bitte an den Admin wenden.';
@@ -151,6 +166,7 @@
       if ($('totpField')) { $('totpField').style.display = ''; if ($('totpInput')) $('totpInput').focus(); }
       return 'Für dieses Konto ist ein 2FA-Code nötig – bitte unten eingeben.';
     }
+    if (x === 'device-not-approved') return 'Dieses Gerät ist nicht freigegeben. Melde dich bei der Teamleitung – dein Gerät muss einmal freigeschaltet werden.';
     if (x === 'ip-blocked') return 'Login von diesem Standort nicht erlaubt.';
     if (r.status === 503) return 'Admin/Login ist auf dem Server nicht konfiguriert.';
     return 'Anmeldung fehlgeschlagen.';
