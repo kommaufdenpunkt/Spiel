@@ -855,7 +855,12 @@ const server = http.createServer(async (req, res) => {
   //   admin.*   -> Admin-Bereich            (admin.html)
   const hostName = String(req.headers.host || '').split(':')[0].toLowerCase();
   const adminHost = hostName.startsWith('admin.');
-  if (urlPath === '/') urlPath = adminHost ? '/admin.html' : '/index.html';
+  // Hauptdomain (4ever1.tv, www.4ever1.tv) -> öffentliche Startseite der Agentur.
+  // ident./pruefer. -> Audition bzw. Mitarbeiter-Login, admin. -> Verwaltung.
+  const knownSub = /^(ident|pruefer|admin)\./.test(hostName);
+  const homeHost = !knownSub && !/^(localhost|127\.|\[|\d+\.\d+\.\d+\.\d+$)/.test(hostName);
+  if (urlPath === '/') urlPath = adminHost ? '/admin.html' : (homeHost ? '/home.html' : '/index.html');
+  if (urlPath === '/start' || urlPath === '/home') urlPath = '/home.html';
   // Eigener Direkt-Link für Prüfer -> Startseite öffnet gleich den Mitarbeiter-Login
   if (['/pruefer', '/login', '/team', '/mitarbeiter'].includes(urlPath)) urlPath = '/index.html';
   // Der Admin-Bereich ist AUSSCHLIESSLICH über admin.<domain> erreichbar.
