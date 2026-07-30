@@ -214,26 +214,81 @@
   function openWaiting() {
     $('lobby').style.display = 'none';
     $('waitingView').style.display = '';
-    $('waitWho').textContent = 'Angemeldet als ' + state.name + (state.isAdmin ? ' (Admin)' : '');
+    $('waitWho').textContent = state.name || 'Prüfer';
+    $('waitRole').textContent = state.isAdmin ? 'Admin' : 'Prüfer';
+    $('waitAvatar').textContent = (state.name || 'P').charAt(0).toUpperCase();
     $('newCodeResult').textContent = '';
     refreshWaiting(); clearInterval(state.waitingTimer); state.waitingTimer = setInterval(refreshWaiting, 3000);
   }
-  async function refreshWaiting() { const r = await api('GET', '/api/waiting'); if (r.status === 200) renderWaiting(r.body.waiting || []); }
-  function renderWaiting(list) {
+  async function refreshWaiting() {
+    const r = await api('GET', '/api/waiting');
+    if (r.status === 200) renderWaiting(r.body.waiting || [], r.body);
+  }
+  // Wartezeit lesbar machen
+  function sinceText(sec) {
+    if (sec < 60) return sec + ' Sek.';
+    const m = Math.floor(sec / 60);
+    return m + (m === 1 ? ' Minute' : ' Minuten');
+  }
+  function renderWaiting(list, info) {
+    const queue = list.filter((w) => !w.busy);
+    const running = list.filter((w) => w.busy);
+    $('statWaiting').textContent = queue.length;
+    $('statRunning').textContent = running.length;
+    $('takeNextBtn').disabled = queue.length === 0;
+    $('takeNextBtn').textContent = queue.length ? '▶ Nächsten annehmen (' + queue.length + ')' : '▶ Niemand wartet';
+
+    // --- Warteschlange (Mitte) ---
     const el = $('waitingList'); el.innerHTML = '';
-    if (!list.length) { el.innerHTML = '<p style="color:var(--dim);font-size:.88rem">Niemand wartet gerade. Erzeuge oben eine Zugangsnummer und gib sie an einen Bewerber weiter.</p>'; return; }
-    list.forEach((w) => {
-      const div = document.createElement('div'); div.className = 'gstep'; div.style.marginBottom = '.5rem';
-      const secs = Math.max(0, Math.round((Date.now() - w.joinedAt) / 1000));
-      const since = secs < 60 ? secs + ' Sek.' : Math.floor(secs / 60) + ' Min.';
-      const st = w.busy ? (w.claimedBy ? 'wird von ' + esc(w.claimedBy) + ' geholt' : 'in Bearbeitung') : 'wartet seit ' + since;
-      div.innerHTML = `<span class="gn">👤</span><div class="gt">Bewerber-Nr. ${esc(w.code)}${w.note ? ' · ' + esc(w.note) : ''}<small>${st}</small></div>`;
+    if (!queue.length) {
+      el.innerHTML = '<div class="deck-empty">Niemand wartet gerade.<br>Erzeuge links eine <b>Zugangsnummer</b> und gib sie an einen Bewerber weiter.</div>';
+    } else {
+      queue.forEach((w, i) => {
+        const secs = typeof w.waitingSec === 'number' ? w.waitingSec : Math.max(0, Math.round((Date.now() - w.joinedAt) / 1000));
+        const div = document.createElement('div');
+        div.className = 'deck-card' + (i === 0 ? ' next' : '');
+        const pill = '<span class="wait-pill' + (secs > 180 ? ' long' : '') + '">⏱ ' + sinceText(secs) + '</span>';
+        div.innerHTML = '<div class="who"><b>' + esc(w.code) + '</b> ' + pill
+          + '<div class="meta">' + (i === 0 ? 'Als Nächster dran' : 'Platz ' + (i + 1) + ' in der Schlange')
+          + (w.note ? ' · ' + esc(w.note) : '') + '</div></div>';
+        const acts = document.createElement('div'); acts.className = 'acts';
+        const b = document.createElement('button');
+        b.className = 'primary'; b.textContent = '📞 Abholen';
+        b.addEventListener('click', () => joinRoom(w.code, false));
+        acts.appendChild(b); div.appendChild(acts); el.appendChild(div);
+      });
+    }
+
+    // --- Laufende Gespräche (rechts) ---
+    const rl = $('runningList'); if (!rl) return;
+    rl.innerHTML = '';
+    if (!running.length) {
+      rl.innerHTML = '<div class="deck-empty">Gerade läuft kein Gespräch.</div>';
+      return;
+    }
+    running.forEach((w) => {
+      const div = document.createElement('div'); div.className = 'deck-card busy';
+      const wer = (w.hosts && w.hosts.length) ? w.hosts.join(', ') : (w.claimedBy || 'wird geholt');
+      div.innerHTML = '<div class="who"><b>' + esc(w.code) + '</b> '
+        + (w.live ? '<span class="wait-pill live">● läuft</span>' : '<span class="wait-pill">wird geholt</span>')
+        + '<div class="meta">Prüfer: ' + esc(wer) + '</div></div>';
+      const acts = document.createElement('div'); acts.className = 'acts';
       const b = document.createElement('button');
-      if (w.busy) { b.className = 'good'; b.textContent = '➕ Beitreten'; b.addEventListener('click', () => joinRoom(w.code, true)); }
-      else { b.className = 'primary'; b.textContent = '📞 Abholen'; b.addEventListener('click', () => joinRoom(w.code, false)); }
-      div.appendChild(b); el.appendChild(div);
+      b.className = 'good'; b.textContent = '➕ Dazu';
+      b.title = 'Du kommst stumm dazu';
+      b.addEventListener('click', () => joinRoom(w.code, true));
+      acts.appendChild(b); div.appendChild(acts); rl.appendChild(div);
     });
   }
+  if ($('takeNextBtn')) $('takeNextBtn').addEventListener('click', async () => {
+    const b = $('takeNextBtn'); b.disabled = true;
+    const r = await api('POST', '/api/waiting/next', {});
+    if (r.status === 200 && r.body.code) { joinRoom(r.body.code, false); return; }
+    b.disabled = false;
+    toast(r.status === 404 ? 'Gerade wartet niemand.' : 'Konnte niemanden übernehmen.');
+    refreshWaiting();
+  });
+
   async function joinRoom(code, alreadyRunning) {
     if (!alreadyRunning) {
       const claim = await api('POST', '/api/waiting/claim', { code });
