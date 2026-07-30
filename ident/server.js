@@ -231,7 +231,12 @@ async function handleApi(req, res, urlPath, ip) {
             sendJson(res, 403, { reason: 'device-not-approved', device: deviceLabel(req) }); return true;
           }
         }
-        if (adh) store.touchAgentDevice(a.id, adh);
+        // Auch hier: erfolgreich genutzte Geräte immer merken, damit sie beim
+        // späteren Einschalten der Bindung schon freigegeben sind.
+        if (adh) {
+          if (!store.findAgentDevice(a, adh)) store.addAgentDevice(a.id, { hash: adh, name: deviceLabel(req) });
+          store.touchAgentDevice(a.id, adh);
+        }
         sec.resetFails(ip); sec.resetAccountFails(username);
         sec.recordEvent('login-ok', ip, 'Mitarbeiter: ' + a.username);
         store.addLoginEvent({ ok: true, kind: 'agent', who: a.username, ip });
@@ -282,7 +287,13 @@ async function handleApi(req, res, urlPath, ip) {
           sendJson(res, 403, { reason: 'device-not-approved', device: deviceLabel(req) }); return true;
         }
       }
-      if (dh) store.touchAdminDevice(dh);
+      // Jedes Gerät, von dem aus man sich erfolgreich anmeldet, wird gemerkt –
+      // auch bei ausgeschalteter Bindung. Dadurch sind beim späteren Einschalten
+      // alle bisher genutzten Geräte bereits freigegeben.
+      if (dh) {
+        if (!store.findAdminDevice(dh)) store.addAdminDevice({ hash: dh, name: deviceLabel(req) });
+        store.touchAdminDevice(dh);
+      }
       sec.resetFails(ip); sec.resetAdminFails(ip); sec.recordEvent('login-ok', ip, 'Admin');
       store.addLoginEvent({ ok: true, kind: 'admin', who: 'Admin', ip });
       sendJson(res, 200, { token: sec.issueToken(ip, { name: 'Admin', role: 'admin' }), name: 'Admin', role: 'admin' });
