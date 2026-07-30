@@ -326,13 +326,19 @@ function addAgentDevice(agentId, { hash, name }) {
   const a = getAgentById(agentId); if (!a || !hash) return null;
   const list = agentDeviceList(a);
   if (list.some((d) => d.hash === hash)) return null;
-  const rec = { id: crypto.randomUUID(), hash, name: String(name || 'Gerät').slice(0, 40), addedAt: new Date().toISOString(), lastSeen: '' };
+  const rec = { id: crypto.randomUUID(), hash, name: String(name || 'Gerät').slice(0, 60), addedAt: new Date().toISOString(), lastSeen: '' };
   list.push(rec); save('agents.json', agents); return rec;
 }
 function touchAgentDevice(agentId, hash) {
   const a = getAgentById(agentId); if (!a) return false;
   const d = findAgentDevice(a, hash); if (!d) return false;
   d.lastSeen = new Date().toISOString(); save('agents.json', agents); return true;
+}
+function renameAgentDevice(agentId, deviceId, name) {
+  const a = getAgentById(agentId); if (!a) return false;
+  const d = agentDeviceList(a).find((x) => x.id === deviceId); if (!d) return false;
+  d.name = String(name || '').slice(0, 60) || d.name;
+  save('agents.json', agents); return true;
 }
 function removeAgentDevice(agentId, deviceId) {
   const a = getAgentById(agentId); if (!a) return false;
@@ -420,7 +426,7 @@ function addAdminDevice({ hash, name }) {
   if (!hash) return null;
   const list = adminDevices();
   if (list.some((d) => d.hash === hash)) return null;
-  const rec = { id: crypto.randomUUID(), hash, name: String(name || 'Gerät').slice(0, 40), addedAt: new Date().toISOString(), lastSeen: '' };
+  const rec = { id: crypto.randomUUID(), hash, name: String(name || 'Gerät').slice(0, 60), addedAt: new Date().toISOString(), lastSeen: '' };
   list.push(rec); save('settings.json', settings); return rec;
 }
 function touchAdminDevice(hash) {
@@ -429,7 +435,7 @@ function touchAdminDevice(hash) {
 }
 function renameAdminDevice(id, name) {
   const d = adminDevices().find((x) => x.id === id); if (!d) return false;
-  d.name = String(name || '').slice(0, 40) || d.name; save('settings.json', settings); return true;
+  d.name = String(name || '').slice(0, 60) || d.name; save('settings.json', settings); return true;
 }
 function removeAdminDevice(id) {
   const list = adminDevices(); const i = list.findIndex((d) => d.id === id);
@@ -447,7 +453,7 @@ module.exports = {
   addCaseEntry, updateCaseEntry, deleteCaseEntry,
   addLoginEvent, listLoginEvents, loginFailCount, clearLoginLog,
   agentDevices, findAgentDevice, addAgentDevice, touchAgentDevice,
-  removeAgentDevice, resetAgentDevices,
+  removeAgentDevice, resetAgentDevices, renameAgentDevice,
   listAdminDevices, adminDeviceCount, findAdminDevice, addAdminDevice,
   touchAdminDevice, renameAdminDevice, removeAdminDevice,
   getFigures, setFigures, getFigureScript, setFigureScript,

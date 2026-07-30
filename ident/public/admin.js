@@ -404,8 +404,13 @@
         const info = document.createElement('div');
         info.innerHTML = '<b>' + esc(d.name) + '</b><div class="muted">Zuletzt benutzt: ' + esc(seen) + '</div>';
         const ac = document.createElement('div'); ac.className = 'acts';
+        ac.appendChild(btn('✏️ Umbenennen', '', async () => {
+          const nn = prompt('Name für dieses Gerät (z. B. „Dennis Samsung"):', d.name); if (nn === null) return;
+          await api('POST', '/api/agent-device-rename', { id: a.id, deviceId: d.id, name: nn });
+          box.remove(); showAgentDevices(a, row);
+        }));
         ac.appendChild(btn('🗑 Entfernen', 'danger', async () => {
-          if (!confirm('Gerät „' + d.name + '" entfernen? ' + a.username + ' kann sich damit nicht mehr anmelden.')) return;
+          if (!confirm('Gerät „' + d.name + '" entfernen?\n\n' + a.username + ' kann sich damit nicht mehr anmelden. Beim nächsten Login von einem Gerät wird dieses neu gebunden.')) return;
           await api('POST', '/api/agent-device-remove', { id: a.id, deviceId: d.id });
           box.remove(); showAgentDevices(a, row); loadAgents();
         }));
