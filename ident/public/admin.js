@@ -52,6 +52,9 @@
       token = r.body.token; $('loginErr').textContent = ''; await openDash();
     } else if (r.status === 429 || (r.body && r.body.reason === 'locked')) {
       setLocked(parseInt((r.body && r.body.retryAfterSec) || 900, 10));
+    } else if (r.body && r.body.reason === 'device-missing') {
+      $('loginErr').innerHTML = 'Diese Seite ist veraltet. Bitte einmal <b>vollständig neu laden</b>'
+        + ' (Windows: Strg + Umschalt + R · Mac: Cmd + Umschalt + R) und erneut anmelden.';
     } else if (r.body && r.body.reason === 'device-not-approved') {
       showClaim();
     } else if (r.body && r.body.reason === 'bad-totp') {

@@ -167,8 +167,18 @@ async function handleApi(req, res, urlPath, ip) {
         // Gerät prüfen: Prüfer kommen nur von freigegebenen Geräten herein.
         const adh = deviceHash(body.device);
         const knownDev = adh ? store.findAgentDevice(a, adh) : null;
+        const hasDev = (a.devices || []).length > 0;
         if (!AGENT_DEVICE_LOCK_OFF && !knownDev) {
-          if (!(a.devices || []).length && adh) {
+          if (!adh) {
+            // Keine Gerätekennung übermittelt (alte, zwischengespeicherte
+            // App-Version). Nur abweisen, wenn bereits ein Gerät gebunden ist –
+            // sonst käme der Prüfer nach einem Update nie wieder hinein.
+            if (hasDev) {
+              sec.recordEvent('blocked', ip, 'Login ohne Gerätekennung abgewiesen: ' + a.username);
+              store.addLoginEvent({ ok: false, kind: 'device', who: a.username, ip, detail: 'keine Gerätekennung übermittelt' });
+              sendJson(res, 403, { reason: 'device-missing' }); return true;
+            }
+          } else if (!hasDev) {
             // Erstes Gerät dieses Prüfers -> automatisch binden (Einrichtung).
             store.addAgentDevice(a.id, { hash: adh, name: deviceLabel(req) + ' (erstes Gerät)' });
             sec.recordEvent('audit', ip, 'Erstes Gerät für ' + a.username + ' gebunden: ' + deviceLabel(req));
@@ -206,9 +216,22 @@ async function handleApi(req, res, urlPath, ip) {
       // Passwort stimmt – jetzt zusätzlich das Gerät prüfen.
       const dh = deviceHash(body.device);
       const known = dh ? store.findAdminDevice(dh) : null;
+      const anyDevice = store.adminDeviceCount() > 0;
       if (!ADMIN_DEVICE_LOCK_OFF && !known) {
-        // Erstes Gerät überhaupt? Dann automatisch freigeben (Einrichtung).
-        if (store.adminDeviceCount() === 0 && dh) {
+        if (!dh) {
+          // Es kam gar keine Gerätekennung (alte, zwischengespeicherte App-Version
+          // oder Browser ohne lokalen Speicher). Solange noch kein Gerät gebunden
+          // ist, darf das nicht zum Aussperren führen – sonst käme man nach einem
+          // Update nie wieder hinein. Ist bereits ein Gerät gebunden, bleibt es
+          // beim Abweisen, mit einem verständlichen Hinweis.
+          if (anyDevice) {
+            sec.recordEvent('blocked', ip, 'Admin-Login ohne Gerätekennung abgewiesen');
+            store.addLoginEvent({ ok: false, kind: 'device', who: 'Admin', ip, detail: 'keine Gerätekennung übermittelt' });
+            sendJson(res, 403, { reason: 'device-missing' }); return true;
+          }
+          sec.recordEvent('audit', ip, 'Admin-Login ohne Gerätekennung zugelassen (noch kein Gerät gebunden)');
+        } else if (!anyDevice) {
+          // Erstes Gerät überhaupt -> automatisch freigeben (Einrichtung).
           store.addAdminDevice({ hash: dh, name: deviceLabel(req) + ' (erstes Gerät)' });
           sec.recordEvent('audit', ip, 'Erstes Admin-Gerät freigegeben: ' + deviceLabel(req));
         } else {
