@@ -72,8 +72,12 @@
     out.bg = clampIdx(out.bg, BG.length);
     out.name = String(out.name || '').slice(0, 16);
     out.role = String(out.role || '').slice(0, 48);
-    out.img = (f && typeof f.img === 'string' && /^data:image\/(png|jpe?g|webp);base64,/.test(f.img) && f.img.length <= 700000) ? f.img : '';
+    out.img = (f && typeof f.img === 'string' && /^data:image\/(png|jpe?g|webp);base64,/.test(f.img) && f.img.length <= 900000) ? f.img : '';
     out.eyeCol = (f && /^#[0-9a-fA-F]{6}$/.test(f.eyeCol || '')) ? f.eyeCol : '';
+    // Bildausschnitt: Zoom sowie Verschiebung nach links/rechts und oben/unten.
+    out.imgZoom = num(f && f.imgZoom, 1, 1, 4);
+    out.imgX = num(f && f.imgX, 0.5, 0, 1);
+    out.imgY = num(f && f.imgY, 0.5, 0, 1);
     return out;
   }
   function sanitizeTeam(arr) {
@@ -82,6 +86,13 @@
   }
 
   function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+
+  // Zahl mit Vorgabewert und Grenzen – für die Zuschnitt-Werte.
+  function num(v, vor, min, max) {
+    v = parseFloat(v);
+    if (!isFinite(v)) return vor;
+    return v < min ? min : (v > max ? max : v);
+  }
 
   function shade(hex, amt) {
     var c = hex.replace('#', '');
@@ -169,6 +180,19 @@
     return s;
   }
 
+  // Bildausschnitt: Das Foto füllt das Fenster (176 x 196) immer vollständig aus.
+  // Zoom vergrößert das Bild, imgX/imgY schieben den sichtbaren Ausschnitt –
+  // 0 = ganz links bzw. ganz oben, 1 = ganz rechts bzw. ganz unten.
+  function imgTag(f, id) {
+    var z = num(f.imgZoom, 1, 1, 4), px = num(f.imgX, 0.5, 0, 1), py = num(f.imgY, 0.5, 0, 1);
+    var w = 176 * z, h = 196 * z;
+    var x = 12 + (176 - w) * px, yy = 12 + (196 - h) * py;
+    return '<image class="avimg" href="' + esc(f.img) + '" x="' + r2(x) + '" y="' + r2(yy) +
+      '" width="' + r2(w) + '" height="' + r2(h) + '" preserveAspectRatio="xMidYMid slice" ' +
+      'clip-path="url(#cl' + id + ')"/>';
+  }
+  function r2(n) { return Math.round(n * 100) / 100; }
+
   // Foto-/KI-Bild-Modus: das hochgeladene Bild als Figur (mit sanfter Bewegung)
   function renderPhoto(f, id, seed) {
     var bg = BG[f.bg];
@@ -183,7 +207,7 @@
     s += anim('translate', '0 0;0 -2.4;0 0', 3.8, -seed * 0.9);
     s += anim('rotate', '-0.9 100 150;0.9 100 150;-0.9 100 150', 6.6, -seed * 1.7);
     s += '<g class="avtalk">';
-    s += '<image class="avimg" href="' + esc(f.img) + '" x="12" y="12" width="176" height="196" preserveAspectRatio="xMidYMid slice" clip-path="url(#cl' + id + ')"/>';
+    s += imgTag(f, id);
     s += '</g>';
     s += '<rect x="12" y="12" width="176" height="196" rx="20" fill="none" stroke="#ffffff22" stroke-width="2"/>';
     s += '</g>';

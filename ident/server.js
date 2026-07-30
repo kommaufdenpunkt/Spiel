@@ -137,7 +137,12 @@ function sanitizeFigures(arr) {
       numKeys.forEach((k) => { let n = parseInt(f[k], 10); if (!Number.isFinite(n) || n < 0) n = 0; o[k] = Math.min(n, 99); });
       o.name = String(f.name || '').slice(0, 16);
       o.role = String(f.role || '').slice(0, 48);
-      if (typeof f.img === 'string' && /^data:image\/(png|jpe?g|webp);base64,/.test(f.img) && f.img.length <= 700000) o.img = f.img;
+      if (typeof f.img === 'string' && /^data:image\/(png|jpe?g|webp);base64,/.test(f.img) && f.img.length <= 900000) o.img = f.img;
+      // Bildausschnitt (Zoom + Verschiebung), damit das Gesicht sauber sitzt
+      const zahl = (v, vor, min, max) => { const n = parseFloat(v); return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : vor; };
+      o.imgZoom = zahl(f.imgZoom, 1, 1, 4);
+      o.imgX = zahl(f.imgX, 0.5, 0, 1);
+      o.imgY = zahl(f.imgY, 0.5, 0, 1);
     }
     return o;
   });
