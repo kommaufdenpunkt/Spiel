@@ -74,15 +74,44 @@ function deviceHash(secret) {
   if (s.length < 20) return '';
   return crypto.createHash('sha256').update('ident-device:' + s).digest('hex');
 }
+/**
+ * Erkennt Gerät und Browser aus der Browser-Kennung, damit man in der Liste
+ * sofort sieht, welches Handy oder welcher Rechner gemeint ist – z. B.
+ * „Samsung SM-S918B · Chrome" statt nur „Android-Handy".
+ */
 function deviceLabel(req) {
   const ua = String(req.headers['user-agent'] || '');
-  if (/iPad/i.test(ua)) return 'iPad';
-  if (/iPhone/i.test(ua)) return 'iPhone';
-  if (/Android/i.test(ua)) return /Mobile/i.test(ua) ? 'Android-Handy' : 'Android-Tablet';
-  if (/Macintosh/i.test(ua)) return 'Mac';
-  if (/Windows/i.test(ua)) return 'Windows-PC';
-  if (/Linux/i.test(ua)) return 'Linux-Rechner';
-  return 'Gerät';
+  let dev = 'Gerät';
+
+  if (/iPad/i.test(ua)) dev = 'iPad';
+  else if (/iPhone/i.test(ua)) dev = 'iPhone';
+  else if (/Android/i.test(ua)) {
+    // Modell steht bei Android meist in Klammern vor „) AppleWebKit"
+    const m = ua.match(/Android[^;)]*;\s*([^;)]+?)\s*(?:Build|\))/i);
+    let model = m ? m[1].trim() : '';
+    model = model.replace(/\s*\/.*$/, '').slice(0, 28);
+    if (/^SM-/i.test(model)) dev = 'Samsung ' + model;
+    else if (/^Pixel/i.test(model)) dev = 'Google ' + model;
+    else if (/^(Mi|Redmi|POCO)\b/i.test(model)) dev = 'Xiaomi ' + model;
+    else if (/^(CPH|OnePlus)/i.test(model)) dev = 'OnePlus ' + model;
+    else if (/^(ELS|ANA|VOG|NOH|LIO)/i.test(model)) dev = 'Huawei ' + model;
+    else if (model && model.toLowerCase() !== 'k') dev = model;
+    else dev = /Mobile/i.test(ua) ? 'Android-Handy' : 'Android-Tablet';
+  } else if (/Macintosh/i.test(ua)) dev = 'Mac';
+  else if (/Windows/i.test(ua)) dev = 'Windows-PC';
+  else if (/CrOS/i.test(ua)) dev = 'Chromebook';
+  else if (/Linux/i.test(ua)) dev = 'Linux-Rechner';
+
+  // Browser dazu – so lassen sich zwei Browser auf demselben Rechner trennen.
+  let br = '';
+  if (/Edg\//i.test(ua)) br = 'Edge';
+  else if (/OPR\/|Opera/i.test(ua)) br = 'Opera';
+  else if (/SamsungBrowser/i.test(ua)) br = 'Samsung Internet';
+  else if (/Firefox\//i.test(ua)) br = 'Firefox';
+  else if (/Chrome\//i.test(ua)) br = 'Chrome';
+  else if (/Safari\//i.test(ua)) br = 'Safari';
+
+  return (br ? dev + ' · ' + br : dev).slice(0, 40);
 }
 
 // ---- Figuren-Konfiguration serverseitig absichern --------------------------
@@ -180,7 +209,7 @@ async function handleApi(req, res, urlPath, ip) {
             }
           } else if (!hasDev) {
             // Erstes Gerät dieses Prüfers -> automatisch binden (Einrichtung).
-            store.addAgentDevice(a.id, { hash: adh, name: deviceLabel(req) + ' (erstes Gerät)' });
+            store.addAgentDevice(a.id, { hash: adh, name: deviceLabel(req) });
             sec.recordEvent('audit', ip, 'Erstes Gerät für ' + a.username + ' gebunden: ' + deviceLabel(req));
             store.addLoginEvent({ ok: true, kind: 'device', who: a.username, ip, detail: 'erstes Gerät gebunden (' + deviceLabel(req) + ')' });
           } else {
@@ -232,7 +261,7 @@ async function handleApi(req, res, urlPath, ip) {
           sec.recordEvent('audit', ip, 'Admin-Login ohne Gerätekennung zugelassen (noch kein Gerät gebunden)');
         } else if (!anyDevice) {
           // Erstes Gerät überhaupt -> automatisch freigeben (Einrichtung).
-          store.addAdminDevice({ hash: dh, name: deviceLabel(req) + ' (erstes Gerät)' });
+          store.addAdminDevice({ hash: dh, name: deviceLabel(req) });
           sec.recordEvent('audit', ip, 'Erstes Admin-Gerät freigegeben: ' + deviceLabel(req));
         } else {
           sec.recordEvent('blocked', ip, 'Admin-Login von nicht freigegebenem Gerät (' + deviceLabel(req) + ')');
@@ -518,6 +547,11 @@ async function handleApi(req, res, urlPath, ip) {
     if (!adminOnly()) return true;
     const id = new URL(req.url, 'http://x').searchParams.get('id') || '';
     sendJson(res, 200, { devices: store.agentDevices(id), lockOff: AGENT_DEVICE_LOCK_OFF }); return true;
+  }
+  if (urlPath === '/api/agent-device-rename' && req.method === 'POST') {
+    if (!adminOnly()) return true;
+    let body; try { body = await readJson(req, 8 * 1024); } catch { body = {}; }
+    sendJson(res, 200, { ok: store.renameAgentDevice(body.id, body.deviceId, body.name) }); return true;
   }
   if (urlPath === '/api/agent-device-remove' && req.method === 'POST') {
     if (!adminOnly()) return true;
