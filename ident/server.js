@@ -158,16 +158,19 @@ async function handleApi(req, res, urlPath, ip) {
 
     if (username) { // Mitarbeiter-Login
       const existing = store.getAgentByUsername(username);
-      if (existing && existing.locked) { sec.recordEvent('auth-fail', ip, 'Gesperrtes Konto: ' + username); sendJson(res, 403, { reason: 'account-locked' }); return true; }
+      if (existing && existing.locked) { sec.recordEvent('auth-fail', ip, 'Gesperrtes Konto: ' + username); store.addLoginEvent({ ok: false, kind: 'agent', who: username, ip, detail: 'Konto ist gesperrt' }); sendJson(res, 403, { reason: 'account-locked' }); return true; }
       const a = store.verifyAgent(username, body.password || '');
       const okTotp = a ? sec.verifyTotp(a.totpSecret, body.totp) : false;
       if (a && okTotp) {
         sec.resetFails(ip); sec.resetAccountFails(username);
         sec.recordEvent('login-ok', ip, 'Mitarbeiter: ' + a.username);
+        store.addLoginEvent({ ok: true, kind: 'agent', who: a.username, ip });
         sendJson(res, 200, { token: sec.issueToken(ip, { name: a.username, role: a.role }), name: a.username, role: a.role, mustChange: !!a.mustChange });
       } else {
         sec.recordFail(ip, 'Mitarbeiter-Login fehlgeschlagen (' + username + ')');
-        if (existing && sec.recordAccountFail(username)) { store.lockAgent(username); sec.recordEvent('blocked', ip, 'Konto gesperrt: ' + username); }
+        store.addLoginEvent({ ok: false, kind: 'agent', who: username, ip,
+          detail: !existing ? 'Benutzername unbekannt' : (a ? '2FA-Code falsch' : 'Passwort falsch') });
+        if (existing && sec.recordAccountFail(username)) { store.lockAgent(username); sec.recordEvent('blocked', ip, 'Konto gesperrt: ' + username); store.addLoginEvent({ ok: false, kind: 'agent', who: username, ip, detail: 'Konto nach zu vielen Fehlversuchen gesperrt' }); }
         sendJson(res, 401, { reason: a ? 'bad-totp' : 'bad-login' });
       }
       return true;
@@ -178,6 +181,7 @@ async function handleApi(req, res, urlPath, ip) {
     const lock = sec.adminLockRemaining(ip);
     if (lock > 0) {
       sec.recordEvent('blocked', ip, 'Admin-Login abgewiesen (gesperrt)');
+      store.addLoginEvent({ ok: false, kind: 'admin', who: 'Admin', ip, detail: 'abgewiesen – gesperrt' });
       sendJson(res, 429, { reason: 'locked', retryAfterSec: Math.ceil(lock / 1000) }); return true;
     }
     if (sec.safeEqual(body.password || '', ADMIN_PASSWORD) && sec.verifyTotp(adminTotpSecret(), body.totp)) {
@@ -191,11 +195,13 @@ async function handleApi(req, res, urlPath, ip) {
           sec.recordEvent('audit', ip, 'Erstes Admin-Gerät freigegeben: ' + deviceLabel(req));
         } else {
           sec.recordEvent('blocked', ip, 'Admin-Login von nicht freigegebenem Gerät (' + deviceLabel(req) + ')');
+          store.addLoginEvent({ ok: false, kind: 'device', who: 'Admin', ip, detail: 'Gerät nicht freigegeben (' + deviceLabel(req) + ')' });
           sendJson(res, 403, { reason: 'device-not-approved', device: deviceLabel(req) }); return true;
         }
       }
       if (dh) store.touchAdminDevice(dh);
       sec.resetFails(ip); sec.resetAdminFails(ip); sec.recordEvent('login-ok', ip, 'Admin');
+      store.addLoginEvent({ ok: true, kind: 'admin', who: 'Admin', ip });
       sendJson(res, 200, { token: sec.issueToken(ip, { name: 'Admin', role: 'admin' }), name: 'Admin', role: 'admin' });
     } else {
       // Stimmt das Passwort und fehlt nur der 2FA-Code, sagen wir das ausdrücklich –
@@ -203,6 +209,8 @@ async function handleApi(req, res, urlPath, ip) {
       // Mitarbeiter-Login). Ohne gültiges Passwort bleibt es bei 'bad-login'.
       const pwOk = sec.safeEqual(body.password || '', ADMIN_PASSWORD);
       sec.recordFail(ip, 'Admin-Login fehlgeschlagen');
+      store.addLoginEvent({ ok: false, kind: 'admin', who: 'Admin', ip,
+        detail: pwOk ? '2FA-Code fehlt oder falsch' : 'Passwort falsch' });
       // Bremse gegen automatisiertes Durchprobieren (vor dem Zählen ermittelt).
       const wait = sec.adminFailDelay(ip);
       const st = sec.recordAdminFail(ip);
@@ -261,7 +269,7 @@ async function handleApi(req, res, urlPath, ip) {
     const agent = store.getAgentByUsername(body.username || '');
     const expectedChallenge = agent ? waTakeChallenge('auth:' + agent.username.toLowerCase()) : null;
     const pk = agent ? (agent.passkeys || []).find((p) => p.id === (body.response && body.response.id)) : null;
-    if (!agent || agent.locked || !expectedChallenge || !pk) { sec.recordFail(ip, 'Passkey-Login fehlgeschlagen'); sendJson(res, 401, { reason: 'bad-login' }); return true; }
+    if (!agent || agent.locked || !expectedChallenge || !pk) { sec.recordFail(ip, 'Passkey-Login fehlgeschlagen'); store.addLoginEvent({ ok: false, kind: 'passkey', who: body.username || '', ip, detail: agent && agent.locked ? 'Konto ist gesperrt' : 'Passkey unbekannt' }); sendJson(res, 401, { reason: 'bad-login' }); return true; }
     let verification;
     try {
       verification = await verifyAuthenticationResponse({
@@ -270,9 +278,10 @@ async function handleApi(req, res, urlPath, ip) {
         requireUserVerification: false,
       });
     } catch (e) { verification = { verified: false }; }
-    if (!verification.verified) { sec.recordFail(ip, 'Passkey-Login fehlgeschlagen (' + agent.username + ')'); sendJson(res, 401, { reason: 'bad-login' }); return true; }
+    if (!verification.verified) { sec.recordFail(ip, 'Passkey-Login fehlgeschlagen (' + agent.username + ')'); store.addLoginEvent({ ok: false, kind: 'passkey', who: agent.username, ip, detail: 'Passkey nicht bestätigt' }); sendJson(res, 401, { reason: 'bad-login' }); return true; }
     store.setPasskeyCounter(agent.id, pk.id, verification.authenticationInfo.newCounter);
     sec.resetFails(ip); sec.resetAccountFails(agent.username); sec.recordEvent('login-ok', ip, 'Passkey: ' + agent.username);
+    store.addLoginEvent({ ok: true, kind: 'passkey', who: agent.username, ip });
     sendJson(res, 200, { token: sec.issueToken(ip, { name: agent.username, role: agent.role }), name: agent.username, role: agent.role, mustChange: !!agent.mustChange });
     return true;
   }
@@ -463,6 +472,21 @@ async function handleApi(req, res, urlPath, ip) {
     store.setIntro(body.intro || ''); sec.recordEvent('audit', ip, 'Begrüßungstext geändert');
     sendJson(res, 200, { ok: true, intro: store.getIntro() }); return true;
   }
+  // ---- Anmelde-Protokoll (nur Admin) ---------------------------------------
+  if (urlPath === '/api/login-log' && req.method === 'GET') {
+    if (!adminOnly()) return true;
+    const q = new URL(req.url, 'http://x').searchParams;
+    sendJson(res, 200, {
+      events: store.listLoginEvents(q.get('limit') || 200),
+      fails24h: store.loginFailCount(24),
+    }); return true;
+  }
+  if (urlPath === '/api/login-log-clear' && req.method === 'POST') {
+    if (!adminOnly()) return true;
+    store.clearLoginLog(); sec.recordEvent('audit', ip, 'Anmelde-Protokoll geleert');
+    sendJson(res, 200, { ok: true }); return true;
+  }
+
   // ---- Geräte-Freigabe verwalten (nur Admin) -------------------------------
   if (urlPath === '/api/admin-devices' && req.method === 'GET') {
     if (!adminOnly()) return true;

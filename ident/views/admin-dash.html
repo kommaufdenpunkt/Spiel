@@ -50,8 +50,12 @@
       <div id="a2faSetup" style="margin-top:1rem"></div>
     </div>
     <div class="section" data-pane="security"><h2>Überwachung</h2>
-      <h3 style="font-size:.95rem">Gesperrte IPs</h3><div id="blockedList"></div>
-      <h3 style="font-size:.95rem;margin-top:1rem">Letzte Ereignisse</h3><div id="eventList" class="evlog"></div>
+      <h3 style="font-size:.95rem;margin-top:0">🔑 Anmeldeversuche</h3>
+      <p class="sub">Wer sich angemeldet hat – und wer es versucht hat. Bleibt auch nach einem Neustart erhalten.</p>
+      <div class="row" style="margin-bottom:.7rem"><span id="loginFailSum" class="muted">–</span><button id="loginLogClear" class="danger">Protokoll leeren</button></div>
+      <div id="loginLogList" class="evlog"></div>
+      <h3 style="font-size:.95rem;margin-top:1.4rem">Gesperrte IPs</h3><div id="blockedList"></div>
+      <h3 style="font-size:.95rem;margin-top:1rem">Letzte Ereignisse (seit dem Start)</h3><div id="eventList" class="evlog"></div>
     </div>
   </div>
 </div>
