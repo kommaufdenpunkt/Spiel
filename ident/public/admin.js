@@ -252,8 +252,73 @@
       const acts = document.createElement('div'); acts.style.marginTop = '.7rem'; acts.style.display = 'flex'; acts.style.gap = '.4rem'; acts.style.flexWrap = 'wrap';
       acts.appendChild(btn('📄 Export / PDF', '', () => window.open(`/api/case-export?id=${c.id}&token=${encodeURIComponent(token)}`, '_blank')));
       acts.appendChild(btn('🗑 Akte löschen', 'danger', async () => { if (!confirm('Diese Akte inkl. Bilder endgültig löschen?')) return; await api('POST', '/api/case-delete', { id: c.id }); loadCases(); loadOverview(); }));
-      div.appendChild(acts); el.appendChild(div);
+      div.appendChild(acts);
+      div.appendChild(entriesBlock(c));
+      el.appendChild(div);
     });
+  }
+
+  // ---- Protokoll-Einträge in der Akte ----
+  // Text wird vor dem Speichern aufgeräumt; der Nutzer entscheidet, ob er den
+  // verbesserten Vorschlag übernimmt.
+  function entriesBlock(c) {
+    const wrap = document.createElement('div');
+    wrap.style.cssText = 'margin-top:.9rem;padding-top:.8rem;border-top:1px solid var(--line)';
+    const head = document.createElement('div');
+    head.className = 'muted'; head.style.marginBottom = '.5rem';
+    head.textContent = '📝 Protokoll (' + ((c.entries || []).length) + ')';
+    wrap.appendChild(head);
+
+    (c.entries || []).forEach((e) => {
+      const row = document.createElement('div');
+      row.style.cssText = 'background:#0f1728;border:1px solid var(--line);border-radius:10px;padding:.6rem .7rem;margin-bottom:.45rem';
+      const when = new Date(e.createdAt).toLocaleString('de-DE');
+      const txt = document.createElement('div');
+      txt.style.cssText = 'white-space:pre-wrap;font-size:.9rem;line-height:1.5';
+      txt.textContent = e.text;
+      const meta = document.createElement('div');
+      meta.className = 'muted'; meta.style.marginTop = '.35rem';
+      meta.textContent = e.author + ' · ' + when + (e.editedAt ? ' · bearbeitet von ' + e.editedBy : '');
+      row.appendChild(txt); row.appendChild(meta);
+      const ea = document.createElement('div'); ea.style.cssText = 'display:flex;gap:.35rem;margin-top:.45rem;flex-wrap:wrap';
+      ea.appendChild(btn('✏️ Bearbeiten', '', async () => {
+        const neu = prompt('Eintrag bearbeiten:', e.text); if (neu === null) return;
+        const r = await api('POST', '/api/entry-update', { caseId: c.id, entryId: e.id, text: neu });
+        if (r.status !== 200) toast('Ändern nicht möglich.'); loadCases();
+      }));
+      ea.appendChild(btn('🗑', 'danger', async () => {
+        if (!confirm('Diesen Eintrag löschen?')) return;
+        await api('POST', '/api/entry-delete', { caseId: c.id, entryId: e.id }); loadCases();
+      }));
+      row.appendChild(ea);
+      wrap.appendChild(row);
+    });
+
+    // Neuer Eintrag
+    const ta = document.createElement('textarea');
+    ta.placeholder = 'Neuer Protokoll-Eintrag …';
+    ta.style.cssText = 'width:100%;min-height:70px;font-family:inherit;font-size:.9rem;padding:.55rem .7rem;border-radius:10px;border:1px solid var(--line);background:#0f1728;color:var(--ink);line-height:1.5';
+    wrap.appendChild(ta);
+    const bar = document.createElement('div'); bar.style.cssText = 'display:flex;gap:.4rem;margin-top:.45rem;flex-wrap:wrap;align-items:center';
+    const msg = document.createElement('span'); msg.className = 'muted';
+    bar.appendChild(btn('✨ Eintrag hinzufügen', 'primary', async () => {
+      const raw = ta.value.trim(); if (!raw) { toast('Bitte etwas schreiben.'); return; }
+      msg.textContent = 'Text wird aufbereitet …';
+      const p = await api('POST', '/api/entry-polish', { text: raw });
+      let final = raw;
+      if (p.status === 200 && p.body.changed) {
+        const liste = (p.body.changes || []).map((x) => '• ' + x).join('\n');
+        final = confirm('Aufbereiteter Text:\n\n' + p.body.text + '\n\nÄnderungen:\n' + liste + '\n\nSo einpflegen?  (Abbrechen = Originaltext)')
+          ? p.body.text : raw;
+      }
+      const r = await api('POST', '/api/entry', { caseId: c.id, text: final, original: raw });
+      msg.textContent = '';
+      if (r.status !== 200) { toast('Eintrag konnte nicht gespeichert werden.'); return; }
+      ta.value = ''; loadCases();
+    }));
+    bar.appendChild(msg);
+    wrap.appendChild(bar);
+    return wrap;
   }
 
   // ---- Aufnahmen ----
