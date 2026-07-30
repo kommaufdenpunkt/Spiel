@@ -157,7 +157,8 @@
       const txt = document.createElement('div');
       txt.innerHTML = on
         ? '🔒 <b style="color:var(--good)">Geräte-Bindung ist EIN</b><div class="muted">Nur die unten gelisteten Geräte kommen herein.</div>'
-        : '🔓 <b>Geräte-Bindung ist AUS</b><div class="muted">Derzeit reicht das Passwort – von jedem Gerät.</div>';
+        : '🔓 <b>Geräte-Bindung ist AUS</b><div class="muted">Derzeit reicht das Passwort – von jedem Gerät.<br>'
+          + 'Benutzte Geräte werden trotzdem gemerkt: beim Einschalten sind sie sofort freigegeben.</div>';
       zeile.appendChild(txt);
       if (forced) {
         const hint = document.createElement('span'); hint.className = 'muted';
@@ -165,7 +166,7 @@
         zeile.appendChild(hint);
       } else {
         zeile.appendChild(btn(on ? 'Ausschalten' : '🔒 Jetzt einschalten', on ? 'danger' : 'primary', async () => {
-          if (!on && !confirm('Geräte-Bindung einschalten?\n\nDanach kommen nur noch freigegebene Geräte herein.\nDieses Gerät wird sofort freigegeben, damit du weiter Zugriff hast.')) return;
+          if (!on && !confirm('Geräte-Bindung einschalten?\n\nDanach kommen nur noch die ' + list.length + ' unten gelisteten Geräte herein.\nBitte vorher prüfen, ob dort nur eure eigenen Geräte stehen – fremde vorher entfernen.')) return;
           const rr = await api('POST', '/api/device-lock', { kind: 'admin', on: !on, device: deviceId() });
           if (rr.status !== 200) { toast('Umschalten nicht möglich.'); return; }
           toast(!on ? 'Geräte-Bindung ist jetzt EIN.' : 'Geräte-Bindung ist jetzt AUS.');
@@ -176,7 +177,8 @@
     }
 
     const el = $('devList'); if (!el) return;
-    if (!list.length) { el.innerHTML = '<div class="empty">Noch kein Gerät freigegeben. Beim Einschalten wird dein aktuelles Gerät automatisch aufgenommen.</div>'; return; }
+    if (!list.length) { el.innerHTML = '<div class="empty">Noch kein Gerät gemerkt. Sobald sich jemand anmeldet, erscheint das Gerät hier.</div>'; return; }
+    el.insertAdjacentHTML('beforebegin', '');
     el.innerHTML = '';
     list.forEach((d) => {
       const div = document.createElement('div'); div.className = 'row';
