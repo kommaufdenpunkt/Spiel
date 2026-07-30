@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>4EVER1 · Agentur für BIGO Live</title>
+<meta name="description" content="4EVER1 – Agentur für BIGO Live. Wir begleiten Streamerinnen und Streamer: persönliche Betreuung, faire Regeln, eigenes PK Board.">
+<link rel="icon" href="/icon-192.png">
+<link rel="apple-touch-icon" href="/icon-180.png">
+<meta name="theme-color" content="#0d1320">
+<style>
+  :root{
+    --bg:#0d1320; --panel:#161d2c; --panel2:#1c2438; --line:#2b3651; --line2:#3a4a6b;
+    --ink:#e9eefb; --dim:#9aabc6; --accent:#5b8cff; --accent2:#3b6ef0; --warm:#e8975d; --good:#3ec77b;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased;line-height:1.6;
+    background:radial-gradient(1200px 620px at 80% -10%,#3a2a1555,transparent 60%),
+      radial-gradient(1000px 560px at -8% 105%,#16265055,transparent 55%),var(--bg)}
+  a{color:var(--accent);text-decoration:none}
+  .wrap{max-width:1080px;margin:0 auto;padding:0 1.3rem}
+
+  /* Kopf */
+  header{position:sticky;top:0;z-index:20;background:#0d1320d9;backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
+  .nav{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:.8rem 0}
+  .brand{display:flex;align-items:center;gap:.7rem;font-weight:700}
+  .brand .logo{width:36px;height:36px;border-radius:11px;display:grid;place-items:center;flex:none;
+    background:linear-gradient(135deg,#6f9bff,#3b6ef0);box-shadow:0 8px 20px -8px #3b6ef0cc}
+  .brand b{font-size:1.05rem;letter-spacing:.02em}
+  .brand small{display:block;font-size:.6rem;color:var(--dim);letter-spacing:.2em;text-transform:uppercase;font-weight:600}
+  .nav-links{display:flex;align-items:center;gap:1.3rem}
+  .nav-links a{color:var(--dim);font-size:.92rem;font-weight:500}
+  .nav-links a:hover{color:var(--ink)}
+  .btn{display:inline-block;border:1px solid var(--line);border-radius:12px;padding:.62rem 1.15rem;font-weight:650;font-size:.92rem;
+    background:linear-gradient(180deg,#232e46,#1a2336);color:var(--ink);transition:transform .15s,filter .15s,border-color .15s;cursor:pointer}
+  .btn:hover{transform:translateY(-1px);border-color:var(--accent)}
+  .btn.primary{background:linear-gradient(180deg,#6a97ff,#3b6ef0 52%,#2a55c8);border-color:#2a55c8;color:#fff;
+    box-shadow:0 1px 0 rgba(255,255,255,.28) inset,0 16px 32px -14px rgba(59,110,240,.8)}
+  .btn.primary:hover{filter:brightness(1.07)}
+  .btn.big{padding:.95rem 1.7rem;font-size:1.05rem;border-radius:14px}
+  @media(max-width:760px){.nav-links a:not(.btn){display:none}}
+
+  /* Bühne */
+  .hero{padding:4.5rem 0 3.5rem;display:grid;grid-template-columns:1.15fr .85fr;gap:2.5rem;align-items:center}
+  .kicker{display:inline-flex;align-items:center;gap:.5rem;font-size:.78rem;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--warm);background:#2a201666;border:1px solid #3a2c1c;border-radius:999px;padding:.35rem .85rem;font-weight:600}
+  .hero h1{font-size:clamp(2.1rem,5vw,3.3rem);line-height:1.12;margin:1rem 0 .8rem;letter-spacing:-.02em}
+  .hero h1 span{background:linear-gradient(100deg,#6f9bff,#e8975d);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .hero p{color:var(--dim);font-size:1.08rem;max-width:34rem;margin:0 0 1.6rem}
+  .hero-actions{display:flex;gap:.7rem;flex-wrap:wrap}
+  .hero-figs{display:flex;justify-content:center;gap:.5rem}
+  .hero-figs .fig{text-align:center}
+  .hero-figs .fig svg{width:135px;height:148px;max-width:100%;filter:drop-shadow(0 18px 30px rgba(0,0,0,.5))}
+  .hero-figs .nm{font-size:.8rem;color:var(--dim);margin-top:.3rem}
+  @media(max-width:880px){.hero{grid-template-columns:1fr;padding-top:3rem;text-align:center}
+    .hero p{margin-inline:auto}.hero-actions{justify-content:center}.hero-figs .fig svg{width:104px;height:114px}}
+
+  /* Abschnitte */
+  section{padding:3.4rem 0}
+  .sec-head{text-align:center;margin-bottom:2.2rem}
+  .sec-head h2{font-size:clamp(1.6rem,3.4vw,2.1rem);margin:0 0 .5rem;letter-spacing:-.01em}
+  .sec-head p{color:var(--dim);margin:0 auto;max-width:38rem}
+  .grid{display:grid;gap:1rem}
+  .g3{grid-template-columns:repeat(3,1fr)}
+  .g2{grid-template-columns:repeat(2,1fr)}
+  @media(max-width:860px){.g3,.g2{grid-template-columns:1fr}}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:1.5rem 1.4rem;transition:border-color .18s,transform .18s}
+  .card:hover{border-color:var(--line2);transform:translateY(-2px)}
+  .card .ico{width:44px;height:44px;border-radius:13px;display:grid;place-items:center;font-size:1.3rem;margin-bottom:.9rem;
+    background:linear-gradient(135deg,#2c2117,#241a10);box-shadow:inset 0 0 0 1px #3a2c1c}
+  .card h3{margin:0 0 .45rem;font-size:1.1rem}
+  .card p{margin:0;color:var(--dim);font-size:.94rem}
+
+  /* Team */
+  .team{display:grid;grid-template-columns:repeat(3,1fr);gap:1.1rem}
+  @media(max-width:860px){.team{grid-template-columns:1fr}}
+  .member{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:1.3rem;text-align:center}
+  .member svg{width:150px;height:165px;max-width:100%}
+  .member .nm{font-weight:700;font-size:1.05rem;margin-top:.6rem}
+  .member .role{color:var(--dim);font-size:.88rem;margin-top:.15rem}
+
+  /* Ablauf */
+  .steps{counter-reset:s;display:grid;gap:.9rem}
+  .stepline{display:flex;gap:1rem;align-items:flex-start;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:1.1rem 1.2rem}
+  .stepline .n{counter-increment:s;width:36px;height:36px;flex:none;border-radius:11px;display:grid;place-items:center;font-weight:700;
+    background:linear-gradient(135deg,#4a7bf5,#2a55c8);color:#fff}
+  .stepline .n::before{content:counter(s)}
+  .stepline b{display:block;margin-bottom:.15rem}
+  .stepline span{color:var(--dim);font-size:.93rem}
+
+  /* Aufruf */
+  .cta{background:linear-gradient(135deg,#1a2440,#141b2b);border:1px solid var(--line2);border-radius:22px;padding:2.6rem 2rem;text-align:center;
+    position:relative;overflow:hidden}
+  .cta::before{content:"";position:absolute;inset:0;background:radial-gradient(600px 200px at 50% 0%,#3b6ef033,transparent 70%);pointer-events:none}
+  .cta h2{margin:0 0 .6rem;font-size:clamp(1.5rem,3.2vw,2rem)}
+  .cta p{color:var(--dim);margin:0 auto 1.5rem;max-width:32rem}
+
+  footer{border-top:1px solid var(--line);margin-top:2rem;padding:2rem 0 3rem;color:var(--dim);font-size:.9rem}
+  .foot{display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap;align-items:center}
+  .foot-links{display:flex;gap:1.2rem;flex-wrap:wrap}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap nav">
+    <div class="brand">
+      <span class="logo"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" aria-hidden="true"><path d="M12 2.6l6.8 2.5v5.2c0 4.3-2.9 7.4-6.8 8.8-3.9-1.4-6.8-4.5-6.8-8.8V5.1L12 2.6z" fill="#fff"/><path d="M8.6 12.1l2.2 2.2 4.6-4.8" stroke="#2a55c8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+      <span><b>4EVER1</b><small>Agentur · BIGO Live</small></span>
+    </div>
+    <nav class="nav-links">
+      <a href="#team">Team</a>
+      <a href="#ablauf">Ablauf</a>
+      <a href="#pkboard">PK Board</a>
+      <a class="btn primary" href="https://ident.4ever1.tv">Jetzt bewerben</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <!-- Bühne -->
+  <div class="wrap hero">
+    <div>
+      <span class="kicker">● Wir nehmen Bewerbungen an</span>
+      <h1>Deine Agentur für <span>BIGO&nbsp;Live</span></h1>
+      <p>Wir begleiten dich beim Start und danach: persönliche Betreuung durch ein festes Team,
+         klare und faire Regeln – und alles Wichtige gebündelt in unserem eigenen PK&nbsp;Board.</p>
+      <div class="hero-actions">
+        <a class="btn primary big" href="https://ident.4ever1.tv">Zur Audition →</a>
+        <a class="btn big" href="#ablauf">So läuft es ab</a>
+      </div>
+    </div>
+    <div class="hero-figs" id="heroFigs"></div>
+  </div>
+
+  <!-- Warum wir -->
+  <section>
+    <div class="wrap">
+      <div class="sec-head">
+        <h2>Was du bei uns bekommst</h2>
+        <p>Kein anonymer Verteiler – bei uns weißt du, mit wem du sprichst.</p>
+      </div>
+      <div class="grid g3">
+        <div class="card">
+          <div class="ico">🤝</div>
+          <h3>Feste Ansprechpartner</h3>
+          <p>Drei Personen in der Teamleitung, die du direkt erreichst – für Fragen, Events und wenn es mal hakt.</p>
+        </div>
+        <div class="card">
+          <div class="ico">📱</div>
+          <h3>Eigenes PK Board</h3>
+          <p>Alle PK-Cards, Ankündigungen und Neuigkeiten an einem Ort. Ohne WhatsApp-Gruppen, ohne Nummerntausch.</p>
+        </div>
+        <div class="card">
+          <div class="ico">🔒</div>
+          <h3>Datenschutz ernst gemeint</h3>
+          <p>Deine Daten liegen verschlüsselt auf Servern in Deutschland. Niemand muss seine Handynummer herausgeben.</p>
+        </div>
+        <div class="card">
+          <div class="ico">🎯</div>
+          <h3>Klare, faire Regeln</h3>
+          <p>Du weißt von Anfang an, was gilt – zu Streams, Transfers und zum Umgang miteinander. Keine Überraschungen.</p>
+        </div>
+        <div class="card">
+          <div class="ico">🎉</div>
+          <h3>Events &amp; PKs</h3>
+          <p>Wir organisieren Events und PKs, bereiten sie mit dir vor und sind dabei, wenn es losgeht.</p>
+        </div>
+        <div class="card">
+          <div class="ico">🚀</div>
+          <h3>Begleitung von Tag&nbsp;1</h3>
+          <p>Von der Audition über die ersten Streams bis zum Wachstum – wir gehen den Weg mit dir zusammen.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Team -->
+  <section id="team">
+    <div class="wrap">
+      <div class="sec-head">
+        <h2>Das ist unsere Teamleitung</h2>
+        <p>Wir drei kümmern uns um euch – jeder mit einem eigenen Schwerpunkt.</p>
+      </div>
+      <div class="team" id="teamGrid"></div>
+    </div>
+  </section>
+
+  <!-- Ablauf -->
+  <section id="ablauf">
+    <div class="wrap">
+      <div class="sec-head">
+        <h2>So läuft deine Bewerbung ab</h2>
+        <p>Ein kurzes Video-Gespräch – meist in unter 15 Minuten erledigt.</p>
+      </div>
+      <div class="steps">
+        <div class="stepline"><span class="n"></span><div><b>Du bekommst deine Zugangsnummer</b><span>Schreib uns – wir schicken dir deine persönliche Nummer und den Link zur Audition.</span></div></div>
+        <div class="stepline"><span class="n"></span><div><b>Im Warteraum erklären wir dir alles</b><span>Bevor es losgeht, führt dich unser Team durch den Ablauf. Du kannst den Vorlese-Text schon vorher in Ruhe durchlesen.</span></div></div>
+        <div class="stepline"><span class="n"></span><div><b>Kurzes Video-Gespräch</b><span>Wir sagen Hallo, prüfen deinen Ausweis (18+) und du liest einen kurzen Text in die Kamera. Das war’s.</span></div></div>
+        <div class="stepline"><span class="n"></span><div><b>Wir melden uns</b><span>Deine Bewerbung geht an den BIGO-Support. Danach bekommst du von uns Bescheid und wir richten dich im PK Board ein.</span></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PK Board -->
+  <section id="pkboard">
+    <div class="wrap">
+      <div class="grid g2" style="align-items:center">
+        <div>
+          <span class="kicker">Unsere App</span>
+          <h2 style="font-size:clamp(1.5rem,3.2vw,2rem);margin:.9rem 0 .6rem">Das PK Board</h2>
+          <p style="color:var(--dim);margin:0 0 1.2rem">Hier läuft bei uns alles zusammen: PK-Cards, Ankündigungen und alle Neuigkeiten –
+             übersichtlich an einem Ort und immer aktuell. Das schützt dich außerdem: Du musst deine
+             Telefonnummer nicht mehr weitergeben.</p>
+          <a class="btn" href="https://ident.4ever1.tv">Mehr erfahren</a>
+        </div>
+        <div class="card" style="padding:1.7rem">
+          <h3 style="margin-bottom:.9rem">Warum keine WhatsApp-Gruppen mehr?</h3>
+          <p style="margin-bottom:.7rem">Weil dort jede Nummer für alle sichtbar ist. Im PK Board bleibt deine Nummer privat.</p>
+          <p style="margin-bottom:.7rem">Ankündigungen gehen nicht mehr im Chat unter – du findest sie jederzeit wieder.</p>
+          <p style="margin:0">Niemand ist verpflichtet, seine Handynummer herauszugeben. Bei uns ganz sicher nicht.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Aufruf -->
+  <section>
+    <div class="wrap">
+      <div class="cta">
+        <h2>Bereit für deine Audition?</h2>
+        <p>Du brauchst nur ein Handy oder einen Rechner mit Kamera, deinen Ausweis und ein paar Minuten Zeit.</p>
+        <a class="btn primary big" href="https://ident.4ever1.tv">Audition starten →</a>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap foot">
+    <div>© <span id="year">2026</span> 4EVER1 · Agentur für BIGO Live</div>
+    <div class="foot-links">
+      <a href="https://ident.4ever1.tv">Audition</a>
+      <a href="https://ident.4ever1.tv/impressum">Impressum</a>
+      <a href="https://ident.4ever1.tv/datenschutz">Datenschutz</a>
+    </div>
+  </div>
+</footer>
+
+<script src="/figur-core.js"></script>
+<script src="/home.js"></script>
+</body>
+</html>
