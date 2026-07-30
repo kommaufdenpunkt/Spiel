@@ -500,7 +500,19 @@ async function handleApi(req, res, urlPath, ip) {
   }
   if (urlPath === '/api/cases' && req.method === 'GET') {
     if (!adminOnly()) return true;
-    sendJson(res, 200, { cases: store.listCases().map((c) => ({ ...c, docs: c.docs.map((d) => ({ label: d.label, file: d.file })) })) }); return true;
+    // Die zur Akte gehörende Aufnahme (über die Zugangsnummer) gleich mitliefern,
+    // damit in der Akte wirklich alles zusammen steht.
+    const recs = store.listRecordings();
+    sendJson(res, 200, {
+      cases: store.listCases().map((c) => {
+        const r = c.code ? recs.find((x) => x.code === c.code) : null;
+        return {
+          ...c,
+          docs: c.docs.map((d) => ({ label: d.label, file: d.file })),
+          recording: r ? { id: r.id, bytes: r.bytes, durationSec: r.durationSec, ext: r.ext, createdAt: r.createdAt } : null,
+        };
+      }),
+    }); return true;
   }
   if (urlPath === '/api/doc' && req.method === 'GET') {
     if (!isAdmin(req, ip)) { res.writeHead(403); res.end('Forbidden'); return true; }
@@ -538,6 +550,10 @@ async function handleApi(req, res, urlPath, ip) {
         ${row('Ausweisart', c.docType)}${row('Ausweis-Nr.', c.docNumber)}${row('Zugangsnummer', c.code)}
         ${row('Prüfer', c.agentName)}${row('Datum', new Date(c.createdAt).toLocaleString('de-DE'))}
         ${row('Notiz', c.note)}${row('Ablehnungsgrund', c.rejectReason)}
+        ${(() => { const r = c.code ? store.listRecordings().find((x) => x.code === c.code) : null;
+          return row('Video-Aufnahme', r ? 'vorhanden (' + (r.bytes / (1024 * 1024)).toFixed(1) + ' MB'
+            + (r.durationSec ? ', ' + Math.floor(r.durationSec / 60) + ':' + String(r.durationSec % 60).padStart(2, '0') : '')
+            + ') – im Admin-Bereich abrufbar' : 'keine'); })()}
       </table>
       ${checks ? `<h3>Prüf-Checkliste</h3><ul>${checks}</ul>` : ''}
       ${imgs ? `<h3>Bilder</h3><div class="imgs">${imgs}</div>` : ''}
