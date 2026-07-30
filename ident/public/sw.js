@@ -2,7 +2,7 @@
  * Strategie: Netzwerk zuerst (immer aktueller Stand), Cache nur als Fallback,
  * damit ein neues Deploy sofort ankommt. API-/Live-Aufrufe werden NIE gecacht.
  */
-const CACHE = 'ident-v4';
+const CACHE = 'ident-v5';
 const SHELL = ['/', '/index.html', '/app.js', '/figur-core.js', '/manifest.webmanifest', '/icon-192.png', '/icon-512.png'];
 
 self.addEventListener('install', (e) => {

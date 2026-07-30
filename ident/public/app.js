@@ -166,6 +166,7 @@
       if ($('totpField')) { $('totpField').style.display = ''; if ($('totpInput')) $('totpInput').focus(); }
       return 'Für dieses Konto ist ein 2FA-Code nötig – bitte unten eingeben.';
     }
+    if (x === 'device-missing') return 'Diese Seite ist veraltet. Bitte einmal vollständig neu laden (Strg/Cmd + Umschalt + R) und erneut anmelden.';
     if (x === 'device-not-approved') return 'Dieses Gerät ist nicht freigegeben. Melde dich bei der Teamleitung – dein Gerät muss einmal freigeschaltet werden.';
     if (x === 'ip-blocked') return 'Login von diesem Standort nicht erlaubt.';
     if (r.status === 503) return 'Admin/Login ist auf dem Server nicht konfiguriert.';
