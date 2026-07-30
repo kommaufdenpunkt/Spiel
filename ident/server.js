@@ -390,11 +390,18 @@ async function handleApi(req, res, urlPath, ip) {
   if (urlPath === '/api/intro' && req.method === 'GET') { sendJson(res, 200, { intro: store.getIntro() }); return true; }
   // Startseite: liegt ein echtes Team-Foto im Ordner public? (öffentlich)
   if (urlPath === '/api/site' && req.method === 'GET') {
-    let photo = '';
-    for (const n of ['team.jpg', 'team.jpeg', 'team.png', 'team.webp']) {
-      try { fs.accessSync(path.join(PUBLIC_DIR, n)); photo = '/' + n; break; } catch {}
-    }
-    sendJson(res, 200, { teamPhoto: photo }); return true;
+    // Eigene Bilder, die einfach in den Ordner public gelegt werden können.
+    const suche = (namen) => {
+      for (const n of namen) {
+        try { fs.accessSync(path.join(PUBLIC_DIR, n)); return '/' + n; } catch { /* nicht vorhanden */ }
+      }
+      return '';
+    };
+    sendJson(res, 200, {
+      teamPhoto: suche(['team.jpg', 'team.jpeg', 'team.png', 'team.webp']),
+      logo: suche(['logo.png', 'logo.webp', 'logo.jpg', 'logo.jpeg', 'logo.svg'])
+    });
+    return true;
   }
   // Figuren (Team-Avatare) – Abruf öffentlich (Bewerber sieht sie im Warteraum)
   if (urlPath === '/api/figures' && req.method === 'GET') { sendJson(res, 200, { figures: store.getFigures(), script: store.getFigureScript() }); return true; }

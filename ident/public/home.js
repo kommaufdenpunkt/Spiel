@@ -1,7 +1,7 @@
-/* home.js – Startseite von 4EVER1.
- * Zeigt oben ein echtes Team-Foto, sofern eines hinterlegt ist (/team.jpg),
- * sonst die gezeichneten Figuren. Dazu: Menü fürs Handy, Fortschrittsbalken,
- * hochzählende Zahlen und sanftes Einblenden beim Scrollen.
+/* home.js – Startseite von 4EVER1.TV.
+ * Holt echtes Logo und Team-Foto vom Server (falls hinterlegt), zeichnet die
+ * Teamleitung, kümmert sich ums Handy-Menü, den Fortschrittsbalken, die
+ * hochzählenden Zahlen und das sanfte Einblenden beim Scrollen.
  */
 (function () {
   'use strict';
@@ -41,16 +41,14 @@
   function zaehlen(el) {
     var ziel = parseInt(el.getAttribute('data-count'), 10);
     if (!ziel || sanft) return;
-    var suffix = el.getAttribute('data-suffix') || '';
     var start = null, dauer = 900;
     function schritt(t) {
       if (start === null) start = t;
       var p = Math.min(1, (t - start) / dauer);
-      var e = 1 - Math.pow(1 - p, 3);
-      el.textContent = Math.round(ziel * e) + suffix;
+      el.textContent = Math.round(ziel * (1 - Math.pow(1 - p, 3)));
       if (p < 1) window.requestAnimationFrame(schritt);
     }
-    el.textContent = '0' + suffix;
+    el.textContent = '0';
     window.requestAnimationFrame(schritt);
   }
 
@@ -76,64 +74,71 @@
     });
   }
 
-  // ---- Echtes Team-Foto, falls vorhanden -----------------------------------
-  // Liegt eine Datei team.jpg (oder .png/.webp) im Ordner public, wird sie oben
-  // groß gezeigt. Fehlt sie, bleiben die gezeichneten Figuren stehen.
-  function tryPhoto() {
-    var hero = $('heroFigs'); if (!hero) return;
+  // ---- Echtes Logo und Team-Foto, falls hinterlegt --------------------------
+  // Liegt logo.png im Ordner public, ersetzt es das gezeichnete Zeichen oben.
+  // Liegt team.jpg dort, erscheint es groß über der Teamleitung.
+  function vomServer() {
     fetch('/api/site').then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
-      if (!j || !j.teamPhoto) return;               // kein Foto -> Figuren bleiben
-      var img = new Image();
-      img.onload = function () {
-        hero.innerHTML = '';
-        var box = document.createElement('div');
-        box.className = 'team-photo';
-        box.appendChild(img);
-        var cap = document.createElement('div');
-        cap.className = 'cap';
-        cap.innerHTML = '<b>Unsere Teamleitung</b><span>Drei feste Ansprechpartner für dich</span>';
-        box.appendChild(cap);
-        hero.appendChild(box);
-      };
-      img.alt = 'Die Teamleitung von 4EVER1';
-      img.src = j.teamPhoto;
+      if (!j) return;
+      if (j.logo) {
+        var art = $('brandArt');
+        if (art) {
+          var alt = art.querySelector('.mark-big');
+          if (alt) {
+            var i = new Image();
+            i.className = 'logo-img'; i.alt = '4EVER1.TV'; i.src = j.logo;
+            i.onload = function () { alt.replaceWith(i); };
+          }
+        }
+        var kopf = $('brandLink');
+        if (kopf) {
+          var k = new Image();
+          k.alt = '4EVER1.TV'; k.src = j.logo;
+          k.onload = function () { kopf.innerHTML = ''; kopf.appendChild(k); };
+        }
+      }
+      if (j.teamPhoto) {
+        var host = $('teamPhoto'); if (!host) return;
+        var img = new Image();
+        img.alt = 'Die Teamleitung von 4EVER1.TV';
+        img.onload = function () {
+          var box = document.createElement('div');
+          box.className = 'team-photo';
+          box.appendChild(img);
+          var cap = document.createElement('div');
+          cap.className = 'cap';
+          cap.innerHTML = '<b>Unsere Teamleitung</b><span>Drei feste Ansprechpartner für dich</span>';
+          box.appendChild(cap);
+          host.appendChild(box);
+          zeigen([box]);
+        };
+        img.src = j.teamPhoto;
+      }
     }).catch(function () {});
   }
 
-  // ---- Gezeichnete Figuren (Rückfallebene + Team-Bereich) ------------------
+  // ---- Teamleitung zeichnen ------------------------------------------------
   var F = window.Figuren;
   if (F) {
     var team = F.defaultTeam();
     var draw = function () {
-      var hero = $('heroFigs');
-      if (hero && !hero.querySelector('.team-photo')) {
-        hero.innerHTML = '';
-        team.forEach(function (f, i) {
-          var d = document.createElement('div'); d.className = 'fig';
-          d.innerHTML = F.renderFigure(f, { seed: i });
-          var n = document.createElement('div'); n.className = 'nm'; n.textContent = f.name || '';
-          d.appendChild(n); hero.appendChild(d);
-        });
-      }
-      var grid = $('teamGrid');
-      if (grid) {
-        grid.innerHTML = '';
-        team.forEach(function (f, i) {
-          var c = document.createElement('div'); c.className = 'member' + (f.img ? ' foto' : '');
-          c.innerHTML = '<div class="ring">' + F.renderFigure(f, { seed: i + 3 }) + '</div>'
-            + '<div class="nm">' + esc(f.name || '') + '</div>'
-            + '<div class="role">' + esc(f.role || '') + '</div>';
-          grid.appendChild(c);
-        });
-        zeigen(grid.querySelectorAll('.member'));
-      }
+      var grid = $('teamGrid'); if (!grid) return;
+      grid.innerHTML = '';
+      team.forEach(function (f, i) {
+        var c = document.createElement('div'); c.className = 'member' + (f.img ? ' foto' : '');
+        c.innerHTML = '<div class="ring">' + F.renderFigure(f, { seed: i + 3 }) + '</div>'
+          + '<div class="nm">' + esc(f.name || '') + '</div>'
+          + '<div class="role">' + esc(f.role || '') + '</div>';
+        grid.appendChild(c);
+      });
+      zeigen(grid.querySelectorAll('.member'));
     };
     draw();
     F.loadServerConfig().then(function (cfg) {
       if (cfg && cfg.figures) { team = cfg.figures; draw(); }
     }).catch(function () {});
   }
-  tryPhoto();
+  vomServer();
 
-  zeigen(document.querySelectorAll('.sec-head, .card, .stepline, .trust-item, .faq details, .contact a, .cta, .phone, #pkboard .wrap > .grid > div:first-child, #voraussetzungen .wrap > .grid > div, .foot > div'));
+  zeigen(document.querySelectorAll('.sec-head, .card, .stepline, .stat, .faq details, .contact a, .cta, .phone, #teammanagement .grid > div:first-child, #voraussetzungen .grid > div, .foot > div'));
 })();
