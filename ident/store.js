@@ -309,6 +309,34 @@ function setIntro(text) { settings.intro = String(text || '').slice(0, 8000); sa
 function getAdminTotp() { return typeof settings.adminTotp === 'string' ? settings.adminTotp : ''; }
 function setAdminTotp(secret) { settings.adminTotp = String(secret || ''); save('settings.json', settings); return true; }
 
+// ---- Protokoll-Einträge in der Akte ----------------------------------------
+// Fortlaufende Notizen zu einer Akte (Teamleitung schreibt, Admin darf ändern).
+function caseEntries(c) { if (!Array.isArray(c.entries)) c.entries = []; return c.entries; }
+function addCaseEntry(caseId, { text, author, original }) {
+  const c = getCase(caseId); if (!c) return null;
+  const t = String(text || '').trim().slice(0, 4000); if (!t) return null;
+  const rec = {
+    id: crypto.randomUUID(), text: t,
+    original: original && String(original).trim() !== t ? String(original).slice(0, 4000) : '',
+    author: String(author || '').slice(0, 60),
+    createdAt: new Date().toISOString(), editedAt: '', editedBy: '',
+  };
+  caseEntries(c).push(rec); save('cases.json', cases); return rec;
+}
+function updateCaseEntry(caseId, entryId, { text, editor }) {
+  const c = getCase(caseId); if (!c) return false;
+  const e = caseEntries(c).find((x) => x.id === entryId); if (!e) return false;
+  const t = String(text || '').trim().slice(0, 4000); if (!t) return false;
+  e.text = t; e.editedAt = new Date().toISOString(); e.editedBy = String(editor || '').slice(0, 60);
+  save('cases.json', cases); return true;
+}
+function deleteCaseEntry(caseId, entryId) {
+  const c = getCase(caseId); if (!c) return false;
+  const list = caseEntries(c); const i = list.findIndex((x) => x.id === entryId);
+  if (i < 0) return false;
+  list.splice(i, 1); save('cases.json', cases); return true;
+}
+
 // ---- Geräte-Freigabe für den Admin-Bereich ---------------------------------
 // Nur freigegebene Geräte dürfen sich anmelden. Jedes Gerät hat eine eigene,
 // zufällige Kennung; gespeichert wird nur deren Hash (das Klartext-Geheimnis
@@ -350,6 +378,7 @@ function setFigureScript(text) { settings.figureScript = (typeof text === 'strin
 
 module.exports = {
   init, getScript, setScript, getIntro, setIntro, getAdminTotp, setAdminTotp,
+  addCaseEntry, updateCaseEntry, deleteCaseEntry,
   listAdminDevices, adminDeviceCount, findAdminDevice, addAdminDevice,
   touchAdminDevice, renameAdminDevice, removeAdminDevice,
   getFigures, setFigures, getFigureScript, setFigureScript,

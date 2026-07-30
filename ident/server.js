@@ -21,6 +21,7 @@ const {
 } = require('@simplewebauthn/server');
 const sec = require('./security.js');
 const store = require('./store.js');
+const textpolish = require('./textpolish.js');
 
 const PORT = process.env.PORT || 8080;
 const PUBLIC_DIR = path.join(__dirname, 'public');
@@ -146,6 +147,8 @@ function reqName(req, ip) { const t = sec.tokenInfo(getToken(req), ip); return t
 // ---- API -------------------------------------------------------------------
 async function handleApi(req, res, urlPath, ip) {
   if (!urlPath.startsWith('/api/')) return false;
+  // Nur-Admin-Prüfung (früh definiert, damit sie überall im Handler nutzbar ist)
+  const adminOnly = () => { if (!isAdmin(req, ip)) { sendJson(res, 403, { reason: 'admin-only' }); return false; } return true; };
 
   // ---- Login (Admin ODER Mitarbeiter) ----
   if (urlPath === '/api/login' && req.method === 'POST') {
@@ -370,6 +373,41 @@ async function handleApi(req, res, urlPath, ip) {
     sendJson(res, 200, { id: rec.id }); return true;
   }
 
+  // ---- Protokoll-Einträge in der Akte --------------------------------------
+  // Vorschlag holen: Text aufräumen, damit der Nutzer entscheiden kann.
+  if (urlPath === '/api/entry-polish' && req.method === 'POST') {
+    if (!authed(req, ip)) { sendJson(res, 401, { reason: 'auth' }); return true; }
+    let body; try { body = await readJson(req, 64 * 1024); } catch { body = {}; }
+    const out = await textpolish.polishWithService(String(body.text || ''));
+    sendJson(res, 200, out); return true;
+  }
+  // Eintrag anlegen – Prüfer (Teamleitung) und Admin dürfen das.
+  if (urlPath === '/api/entry' && req.method === 'POST') {
+    if (!authed(req, ip)) { sendJson(res, 401, { reason: 'auth' }); return true; }
+    let body; try { body = await readJson(req, 64 * 1024); } catch { body = {}; }
+    const rec = store.addCaseEntry(body.caseId, {
+      text: body.text, original: body.original, author: reqName(req, ip) || 'Unbekannt',
+    });
+    if (!rec) { sendJson(res, 400, { reason: 'bad-entry' }); return true; }
+    sec.recordEvent('audit', ip, 'Akten-Eintrag hinzugefügt');
+    sendJson(res, 200, { entry: rec }); return true;
+  }
+  // Ändern und Löschen: nur Admin.
+  if (urlPath === '/api/entry-update' && req.method === 'POST') {
+    if (!adminOnly()) return true;
+    let body; try { body = await readJson(req, 64 * 1024); } catch { body = {}; }
+    const ok = store.updateCaseEntry(body.caseId, body.entryId, { text: body.text, editor: reqName(req, ip) || 'Admin' });
+    if (ok) sec.recordEvent('audit', ip, 'Akten-Eintrag geändert');
+    sendJson(res, ok ? 200 : 400, { ok }); return true;
+  }
+  if (urlPath === '/api/entry-delete' && req.method === 'POST') {
+    if (!adminOnly()) return true;
+    let body; try { body = await readJson(req, 16 * 1024); } catch { body = {}; }
+    const ok = store.deleteCaseEntry(body.caseId, body.entryId);
+    if (ok) sec.recordEvent('audit', ip, 'Akten-Eintrag gelöscht');
+    sendJson(res, ok ? 200 : 400, { ok }); return true;
+  }
+
   // ---- Aufnahme hochladen (Prüfer, roher Video-Body) ----
   if (urlPath === '/api/recording' && req.method === 'POST') {
     let buf; try { buf = await readRaw(req); } catch { sendJson(res, 413, { reason: 'too-large' }); return true; }
@@ -382,7 +420,6 @@ async function handleApi(req, res, urlPath, ip) {
   }
 
   // ---- ab hier: NUR Admin ----
-  const adminOnly = () => { if (!isAdmin(req, ip)) { sendJson(res, 403, { reason: 'admin-only' }); return false; } return true; };
 
   if (urlPath === '/api/agents' && req.method === 'GET') { if (!adminOnly()) return true; sendJson(res, 200, { agents: store.listAgents() }); return true; }
   if (urlPath === '/api/agents' && req.method === 'POST') {
