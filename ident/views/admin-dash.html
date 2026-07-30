@@ -37,8 +37,9 @@
       <div style="margin-top:.7rem;display:flex;gap:.5rem;align-items:center"><button id="scriptSave" class="primary">Vorlese-Text speichern</button><span id="scriptMsg" class="muted"></span></div>
     </div>
     <div class="section" data-pane="adminsec"><h2>Sicherheit</h2>
-      <h3 style="font-size:1rem;margin:.2rem 0 .3rem">📱 Freigegebene Geräte</h3>
-      <p class="sub">Nur diese Geräte dürfen sich im Admin-Bereich anmelden – alle anderen werden abgewiesen, selbst mit richtigem Passwort. Ein neues Gerät (z. B. Tablet) schaltest du mit einem <b>Freischalt-Code</b> frei.</p>
+      <h3 style="font-size:1rem;margin:.2rem 0 .3rem">📱 Geräte-Bindung</h3>
+      <p class="sub">Ist sie <b>eingeschaltet</b>, dürfen sich nur freigegebene Geräte im Admin-Bereich anmelden – alle anderen werden abgewiesen, selbst mit richtigem Passwort. <b>Standardmäßig ist sie aus</b>, damit man sich nicht versehentlich aussperrt. Du entscheidest, wann es losgeht.</p>
+      <div id="devLockBox" class="note" style="margin-bottom:.8rem"></div>
       <div class="row" style="margin-bottom:.8rem"><span>Neues Gerät hinzufügen</span><button id="devInvite" class="primary">Freischalt-Code erzeugen</button></div>
       <div id="devInviteOut" class="note" style="margin-bottom:.8rem"></div>
       <div id="devList"></div>

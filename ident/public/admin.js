@@ -145,12 +145,38 @@
   async function loadDevices() {
     const r = await api('GET', '/api/admin-devices');
     const list = (r.body && r.body.devices) || [];
-    const el = $('devList'); if (!el) return;
-    if (r.body && r.body.lockOff) {
-      el.innerHTML = '<div class="note" style="color:var(--warn)">⚠️ Die Geräte-Prüfung ist per Notausgang (ADMIN_DEVICE_LOCK=off) abgeschaltet – derzeit kann sich jedes Gerät mit dem Passwort anmelden.</div>';
-      return;
+    const on = !!(r.body && r.body.lockOn);
+    const forced = !!(r.body && r.body.lockEnvForced);
+
+    // Schalter mit Erklärung – hier entscheidest du, wann die Bindung greift.
+    const box = $('devLockBox');
+    if (box) {
+      box.innerHTML = '';
+      const zeile = document.createElement('div');
+      zeile.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:.8rem;flex-wrap:wrap';
+      const txt = document.createElement('div');
+      txt.innerHTML = on
+        ? '🔒 <b style="color:var(--good)">Geräte-Bindung ist EIN</b><div class="muted">Nur die unten gelisteten Geräte kommen herein.</div>'
+        : '🔓 <b>Geräte-Bindung ist AUS</b><div class="muted">Derzeit reicht das Passwort – von jedem Gerät.</div>';
+      zeile.appendChild(txt);
+      if (forced) {
+        const hint = document.createElement('span'); hint.className = 'muted';
+        hint.textContent = 'per Server-Variable festgelegt';
+        zeile.appendChild(hint);
+      } else {
+        zeile.appendChild(btn(on ? 'Ausschalten' : '🔒 Jetzt einschalten', on ? 'danger' : 'primary', async () => {
+          if (!on && !confirm('Geräte-Bindung einschalten?\n\nDanach kommen nur noch freigegebene Geräte herein.\nDieses Gerät wird sofort freigegeben, damit du weiter Zugriff hast.')) return;
+          const rr = await api('POST', '/api/device-lock', { kind: 'admin', on: !on, device: deviceId() });
+          if (rr.status !== 200) { toast('Umschalten nicht möglich.'); return; }
+          toast(!on ? 'Geräte-Bindung ist jetzt EIN.' : 'Geräte-Bindung ist jetzt AUS.');
+          loadDevices();
+        }));
+      }
+      box.appendChild(zeile);
     }
-    if (!list.length) { el.innerHTML = '<div class="empty">Noch keine Geräte – das erste Gerät wird beim Anmelden automatisch freigegeben.</div>'; return; }
+
+    const el = $('devList'); if (!el) return;
+    if (!list.length) { el.innerHTML = '<div class="empty">Noch kein Gerät freigegeben. Beim Einschalten wird dein aktuelles Gerät automatisch aufgenommen.</div>'; return; }
     el.innerHTML = '';
     list.forEach((d) => {
       const div = document.createElement('div'); div.className = 'row';

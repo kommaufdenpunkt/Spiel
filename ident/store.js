@@ -310,6 +310,18 @@ function setIntro(text) { settings.intro = String(text || '').slice(0, 8000); sa
 function getAdminTotp() { return typeof settings.adminTotp === 'string' ? settings.adminTotp : ''; }
 function setAdminTotp(secret) { settings.adminTotp = String(secret || ''); save('settings.json', settings); return true; }
 
+// ---- Geräte-Bindung an/aus (vom Betreiber selbst geschaltet) ---------------
+// Standardmäßig AUS: Erst wenn hier eingeschaltet wird, dürfen sich nur noch
+// freigegebene Geräte anmelden. So kann sich niemand versehentlich aussperren.
+function getDeviceLock(kind) {
+  const k = kind === 'agent' ? 'deviceLockAgent' : 'deviceLockAdmin';
+  return settings[k] === true;
+}
+function setDeviceLock(kind, on) {
+  const k = kind === 'agent' ? 'deviceLockAgent' : 'deviceLockAdmin';
+  settings[k] = !!on; save('settings.json', settings); return true;
+}
+
 // ---- Geräte-Bindung für Mitarbeiter (Prüfer) -------------------------------
 // Wie beim Admin: ein Prüfer kommt nur von freigegebenen Geräten hinein.
 // Gespeichert wird nur der Hash der Gerätekennung.
@@ -452,6 +464,7 @@ module.exports = {
   init, getScript, setScript, getIntro, setIntro, getAdminTotp, setAdminTotp,
   addCaseEntry, updateCaseEntry, deleteCaseEntry,
   addLoginEvent, listLoginEvents, loginFailCount, clearLoginLog,
+  getDeviceLock, setDeviceLock,
   agentDevices, findAgentDevice, addAgentDevice, touchAgentDevice,
   removeAgentDevice, resetAgentDevices, renameAgentDevice,
   listAdminDevices, adminDeviceCount, findAdminDevice, addAdminDevice,

@@ -66,9 +66,22 @@ const MIME = {
 // Nur freigegebene Geräte dürfen sich anmelden. Das Gerät schickt bei jedem
 // Login seine Kennung mit; gespeichert ist nur deren Hash.
 // Notausgang: ADMIN_DEVICE_LOCK=off (Env) + Redeploy schaltet die Prüfung ab.
-const ADMIN_DEVICE_LOCK_OFF = /^(off|0|false|no)$/i.test(process.env.ADMIN_DEVICE_LOCK || '');
-// Dasselbe für Prüfer/Mitarbeiter: AGENT_DEVICE_LOCK=off schaltet die Prüfung ab.
-const AGENT_DEVICE_LOCK_OFF = /^(off|0|false|no)$/i.test(process.env.AGENT_DEVICE_LOCK || '');
+// WICHTIG: Die Geräte-Bindung ist standardmäßig AUS. Sie wird erst wirksam,
+// wenn sie bewusst eingeschaltet wird – entweder über die Umgebungsvariable
+// ADMIN_DEVICE_LOCK=on oder im Sicherheits-Bereich per Schalter. So kann sich
+// niemand nach einem Update unbeabsichtigt selbst aussperren.
+const ADMIN_DEVICE_LOCK_ENV = String(process.env.ADMIN_DEVICE_LOCK || '').toLowerCase();
+const AGENT_DEVICE_LOCK_ENV = String(process.env.AGENT_DEVICE_LOCK || '').toLowerCase();
+function adminDeviceLockOn() {
+  if (/^(off|0|false|no)$/.test(ADMIN_DEVICE_LOCK_ENV)) return false; // Notausgang hat Vorrang
+  if (/^(on|1|true|yes)$/.test(ADMIN_DEVICE_LOCK_ENV)) return true;
+  return store.getDeviceLock('admin');       // sonst: Einstellung aus dem Panel
+}
+function agentDeviceLockOn() {
+  if (/^(off|0|false|no)$/.test(AGENT_DEVICE_LOCK_ENV)) return false;
+  if (/^(on|1|true|yes)$/.test(AGENT_DEVICE_LOCK_ENV)) return true;
+  return store.getDeviceLock('agent');
+}
 function deviceHash(secret) {
   const s = String(secret || '');
   if (s.length < 20) return '';
@@ -197,7 +210,7 @@ async function handleApi(req, res, urlPath, ip) {
         const adh = deviceHash(body.device);
         const knownDev = adh ? store.findAgentDevice(a, adh) : null;
         const hasDev = (a.devices || []).length > 0;
-        if (!AGENT_DEVICE_LOCK_OFF && !knownDev) {
+        if (agentDeviceLockOn() && !knownDev) {
           if (!adh) {
             // Keine Gerätekennung übermittelt (alte, zwischengespeicherte
             // App-Version). Nur abweisen, wenn bereits ein Gerät gebunden ist –
@@ -246,7 +259,7 @@ async function handleApi(req, res, urlPath, ip) {
       const dh = deviceHash(body.device);
       const known = dh ? store.findAdminDevice(dh) : null;
       const anyDevice = store.adminDeviceCount() > 0;
-      if (!ADMIN_DEVICE_LOCK_OFF && !known) {
+      if (adminDeviceLockOn() && !known) {
         if (!dh) {
           // Es kam gar keine Gerätekennung (alte, zwischengespeicherte App-Version
           // oder Browser ohne lokalen Speicher). Solange noch kein Gerät gebunden
@@ -570,7 +583,7 @@ async function handleApi(req, res, urlPath, ip) {
   if (urlPath === '/api/agent-devices' && req.method === 'GET') {
     if (!adminOnly()) return true;
     const id = new URL(req.url, 'http://x').searchParams.get('id') || '';
-    sendJson(res, 200, { devices: store.agentDevices(id), lockOff: AGENT_DEVICE_LOCK_OFF }); return true;
+    sendJson(res, 200, { devices: store.agentDevices(id), lockOn: agentDeviceLockOn(), lockEnvForced: /^(on|1|true|yes|off|0|false|no)$/.test(AGENT_DEVICE_LOCK_ENV) }); return true;
   }
   if (urlPath === '/api/agent-device-rename' && req.method === 'POST') {
     if (!adminOnly()) return true;
@@ -609,10 +622,28 @@ async function handleApi(req, res, urlPath, ip) {
     sendJson(res, 200, { ok: true }); return true;
   }
 
+  // ---- Geräte-Bindung ein-/ausschalten (nur Admin) -------------------------
+  // Beim Einschalten wird das gerade benutzte Gerät sofort mit freigegeben –
+  // sonst würde man sich mit dem eigenen Klick aussperren.
+  if (urlPath === '/api/device-lock' && req.method === 'POST') {
+    if (!adminOnly()) return true;
+    let body; try { body = await readJson(req, 8 * 1024); } catch { body = {}; }
+    const kind = body.kind === 'agent' ? 'agent' : 'admin';
+    const on = !!body.on;
+    if (on && kind === 'admin') {
+      const dh = deviceHash(body.device);
+      if (!dh) { sendJson(res, 400, { reason: 'device-missing' }); return true; }
+      if (!store.findAdminDevice(dh)) store.addAdminDevice({ hash: dh, name: deviceLabel(req) });
+    }
+    store.setDeviceLock(kind, on);
+    sec.recordEvent('audit', ip, 'Geräte-Bindung (' + kind + ') ' + (on ? 'eingeschaltet' : 'ausgeschaltet'));
+    sendJson(res, 200, { ok: true, on: kind === 'admin' ? adminDeviceLockOn() : agentDeviceLockOn() }); return true;
+  }
+
   // ---- Geräte-Freigabe verwalten (nur Admin) -------------------------------
   if (urlPath === '/api/admin-devices' && req.method === 'GET') {
     if (!adminOnly()) return true;
-    sendJson(res, 200, { devices: store.listAdminDevices(), lockOff: ADMIN_DEVICE_LOCK_OFF }); return true;
+    sendJson(res, 200, { devices: store.listAdminDevices(), lockOn: adminDeviceLockOn(), lockEnvForced: /^(on|1|true|yes|off|0|false|no)$/.test(ADMIN_DEVICE_LOCK_ENV) }); return true;
   }
   // Freischalt-Code erzeugen: damit gibt ein bereits freigegebenes Gerät ein
   // neues frei (Code ist kurz gültig und nur einmal verwendbar).
