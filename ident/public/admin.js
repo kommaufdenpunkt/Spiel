@@ -382,16 +382,55 @@
       loadAgents();
     } else toast(r.body && r.body.reason === 'exists-or-invalid' ? 'Benutzername existiert bereits.' : 'Anlegen fehlgeschlagen.');
   }
+  // Geräte eines Prüfers anzeigen und verwalten
+  async function showAgentDevices(a, row) {
+    const old = row.querySelector('.devbox'); if (old) { old.remove(); return; }
+    const box = document.createElement('div'); box.className = 'devbox';
+    box.style.cssText = 'width:100%;margin-top:.6rem;padding-top:.6rem;border-top:1px solid var(--line)';
+    const r = await api('GET', '/api/agent-devices?id=' + encodeURIComponent(a.id));
+    const list = (r.body && r.body.devices) || [];
+    if (r.body && r.body.lockOff) {
+      box.innerHTML = '<div class="note" style="color:var(--warn)">⚠️ Die Geräte-Bindung für Prüfer ist per Notausgang (AGENT_DEVICE_LOCK=off) abgeschaltet.</div>';
+    } else if (!list.length) {
+      box.innerHTML = '<div class="muted">Noch kein Gerät gebunden. Das erste Gerät, mit dem sich <b>' + esc(a.username) + '</b> anmeldet, wird automatisch gebunden – danach kommt nur dieses Gerät herein.</div>';
+    } else {
+      box.innerHTML = '<div class="muted" style="margin-bottom:.4rem">Nur diese Geräte dürfen sich als <b>' + esc(a.username) + '</b> anmelden:</div>';
+      list.forEach((d) => {
+        const line = document.createElement('div'); line.className = 'row';
+        const seen = d.lastSeen ? new Date(d.lastSeen).toLocaleString('de-DE') : '–';
+        const info = document.createElement('div');
+        info.innerHTML = '<b>' + esc(d.name) + '</b><div class="muted">Zuletzt benutzt: ' + esc(seen) + '</div>';
+        const ac = document.createElement('div'); ac.className = 'acts';
+        ac.appendChild(btn('🗑 Entfernen', 'danger', async () => {
+          if (!confirm('Gerät „' + d.name + '" entfernen? ' + a.username + ' kann sich damit nicht mehr anmelden.')) return;
+          await api('POST', '/api/agent-device-remove', { id: a.id, deviceId: d.id });
+          box.remove(); showAgentDevices(a, row); loadAgents();
+        }));
+        line.appendChild(info); line.appendChild(ac); box.appendChild(line);
+      });
+    }
+    const bar = document.createElement('div'); bar.style.cssText = 'margin-top:.5rem;display:flex;gap:.4rem;flex-wrap:wrap';
+    bar.appendChild(btn('↺ Neues Gerät zulassen', 'primary', async () => {
+      if (!confirm('Alle Geräte von ' + a.username + ' lösen?\n\nDas nächste Gerät, mit dem er/sie sich anmeldet, wird automatisch gebunden.')) return;
+      await api('POST', '/api/agent-devices-reset', { id: a.id });
+      toast('Geräte gelöst – nächster Login bindet das neue Gerät.');
+      box.remove(); loadAgents();
+    }));
+    box.appendChild(bar);
+    row.appendChild(box);
+  }
+
   async function loadAgents() {
     const r = await api('GET', '/api/agents'); const list = r.body.agents || [];
     const el = $('agentList'); if (!list.length) { el.innerHTML = '<div class="empty">Noch keine Mitarbeiter.</div>'; return; }
     el.innerHTML = '';
     list.forEach((a) => {
       const div = document.createElement('div'); div.className = 'row';
-      div.innerHTML = `<div><b>${esc(a.username)}</b> <span class="pill ${a.role === 'admin' ? 'warn' : 'ok'}">${a.role === 'admin' ? 'Admin' : 'Prüfer'}</span> ${a.locked ? '<span class="pill no">gesperrt</span>' : ''} ${a.mustChange ? '<span class="pill warn">PW-Wechsel offen</span>' : ''}<div class="muted">2FA: ${a.has2fa ? 'aktiv' : 'aus'} · Face ID/Fingerabdruck: ${a.hasPasskey ? 'ja' : 'nein'} · seit ${new Date(a.createdAt).toLocaleDateString('de-DE')}</div></div>`;
+      div.innerHTML = `<div><b>${esc(a.username)}</b> <span class="pill ${a.role === 'admin' ? 'warn' : 'ok'}">${a.role === 'admin' ? 'Admin' : 'Prüfer'}</span> ${a.locked ? '<span class="pill no">gesperrt</span>' : ''} ${a.mustChange ? '<span class="pill warn">PW-Wechsel offen</span>' : ''}<div class="muted">2FA: ${a.has2fa ? 'aktiv' : 'aus'} · Geräte: ${a.deviceCount || 0} · Face ID/Fingerabdruck: ${a.hasPasskey ? 'ja' : 'nein'} · seit ${new Date(a.createdAt).toLocaleDateString('de-DE')}</div></div>`;
       const acts = document.createElement('div'); acts.className = 'acts';
       if (a.locked) acts.appendChild(btn('🔓 Entsperren', '', async () => { await api('POST', '/api/agent-unlock', { id: a.id }); loadAgents(); }));
       acts.appendChild(btn('🔑 PW zurücksetzen', '', async () => { const np = prompt('Neues Startpasswort (mind. 8 Zeichen):'); if (!np || np.length < 8) { toast('Zu kurz.'); return; } const x = await api('POST', '/api/agent-reset', { id: a.id, newPassword: np }); toast(x.body.ok ? 'Zurückgesetzt.' : 'Fehlgeschlagen.'); }));
+      acts.appendChild(btn('📱 Geräte', '', () => showAgentDevices(a, div)));
       acts.appendChild(btn('🗑', 'danger', async () => { if (!confirm('Mitarbeiter löschen?')) return; await api('POST', '/api/agent-delete', { id: a.id }); loadAgents(); loadOverview(); }));
       div.appendChild(acts); el.appendChild(div);
     });

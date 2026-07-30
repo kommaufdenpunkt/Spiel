@@ -97,6 +97,7 @@ function listAgents() {
     id: a.id, username: a.username, role: a.role, createdAt: a.createdAt,
     createdBy: a.createdBy || '', has2fa: !!a.totpSecret, mustChange: !!a.mustChange, locked: !!a.locked,
     hasPasskey: (a.passkeys || []).length > 0,
+    deviceCount: (a.devices || []).length,
   }));
 }
 
@@ -309,6 +310,42 @@ function setIntro(text) { settings.intro = String(text || '').slice(0, 8000); sa
 function getAdminTotp() { return typeof settings.adminTotp === 'string' ? settings.adminTotp : ''; }
 function setAdminTotp(secret) { settings.adminTotp = String(secret || ''); save('settings.json', settings); return true; }
 
+// ---- Geräte-Bindung für Mitarbeiter (Prüfer) -------------------------------
+// Wie beim Admin: ein Prüfer kommt nur von freigegebenen Geräten hinein.
+// Gespeichert wird nur der Hash der Gerätekennung.
+function agentDeviceList(a) { if (!Array.isArray(a.devices)) a.devices = []; return a.devices; }
+function agentDevices(agentId) {
+  const a = getAgentById(agentId); if (!a) return [];
+  return agentDeviceList(a).map((d) => ({ id: d.id, name: d.name, addedAt: d.addedAt, lastSeen: d.lastSeen || '' }));
+}
+function findAgentDevice(agent, hash) {
+  if (!agent || !hash) return null;
+  return agentDeviceList(agent).find((d) => d.hash === hash) || null;
+}
+function addAgentDevice(agentId, { hash, name }) {
+  const a = getAgentById(agentId); if (!a || !hash) return null;
+  const list = agentDeviceList(a);
+  if (list.some((d) => d.hash === hash)) return null;
+  const rec = { id: crypto.randomUUID(), hash, name: String(name || 'Gerät').slice(0, 40), addedAt: new Date().toISOString(), lastSeen: '' };
+  list.push(rec); save('agents.json', agents); return rec;
+}
+function touchAgentDevice(agentId, hash) {
+  const a = getAgentById(agentId); if (!a) return false;
+  const d = findAgentDevice(a, hash); if (!d) return false;
+  d.lastSeen = new Date().toISOString(); save('agents.json', agents); return true;
+}
+function removeAgentDevice(agentId, deviceId) {
+  const a = getAgentById(agentId); if (!a) return false;
+  const list = agentDeviceList(a); const i = list.findIndex((d) => d.id === deviceId);
+  if (i < 0) return false;
+  list.splice(i, 1); save('agents.json', agents); return true;
+}
+/** Alle Geräte eines Prüfers lösen – beim nächsten Login wird neu gebunden. */
+function resetAgentDevices(agentId) {
+  const a = getAgentById(agentId); if (!a) return false;
+  a.devices = []; save('agents.json', agents); return true;
+}
+
 // ---- Anmelde-Protokoll (dauerhaft) -----------------------------------------
 // Hält fest, wer sich wann angemeldet hat – und vor allem, wer es versucht hat.
 // Bleibt anders als die Ereignisliste im Speicher auch nach einem Neustart
@@ -409,6 +446,8 @@ module.exports = {
   init, getScript, setScript, getIntro, setIntro, getAdminTotp, setAdminTotp,
   addCaseEntry, updateCaseEntry, deleteCaseEntry,
   addLoginEvent, listLoginEvents, loginFailCount, clearLoginLog,
+  agentDevices, findAgentDevice, addAgentDevice, touchAgentDevice,
+  removeAgentDevice, resetAgentDevices,
   listAdminDevices, adminDeviceCount, findAdminDevice, addAdminDevice,
   touchAdminDevice, renameAdminDevice, removeAdminDevice,
   getFigures, setFigures, getFigureScript, setFigureScript,

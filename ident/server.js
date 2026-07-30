@@ -67,6 +67,8 @@ const MIME = {
 // Login seine Kennung mit; gespeichert ist nur deren Hash.
 // Notausgang: ADMIN_DEVICE_LOCK=off (Env) + Redeploy schaltet die Prüfung ab.
 const ADMIN_DEVICE_LOCK_OFF = /^(off|0|false|no)$/i.test(process.env.ADMIN_DEVICE_LOCK || '');
+// Dasselbe für Prüfer/Mitarbeiter: AGENT_DEVICE_LOCK=off schaltet die Prüfung ab.
+const AGENT_DEVICE_LOCK_OFF = /^(off|0|false|no)$/i.test(process.env.AGENT_DEVICE_LOCK || '');
 function deviceHash(secret) {
   const s = String(secret || '');
   if (s.length < 20) return '';
@@ -162,6 +164,22 @@ async function handleApi(req, res, urlPath, ip) {
       const a = store.verifyAgent(username, body.password || '');
       const okTotp = a ? sec.verifyTotp(a.totpSecret, body.totp) : false;
       if (a && okTotp) {
+        // Gerät prüfen: Prüfer kommen nur von freigegebenen Geräten herein.
+        const adh = deviceHash(body.device);
+        const knownDev = adh ? store.findAgentDevice(a, adh) : null;
+        if (!AGENT_DEVICE_LOCK_OFF && !knownDev) {
+          if (!(a.devices || []).length && adh) {
+            // Erstes Gerät dieses Prüfers -> automatisch binden (Einrichtung).
+            store.addAgentDevice(a.id, { hash: adh, name: deviceLabel(req) + ' (erstes Gerät)' });
+            sec.recordEvent('audit', ip, 'Erstes Gerät für ' + a.username + ' gebunden: ' + deviceLabel(req));
+            store.addLoginEvent({ ok: true, kind: 'device', who: a.username, ip, detail: 'erstes Gerät gebunden (' + deviceLabel(req) + ')' });
+          } else {
+            sec.recordEvent('blocked', ip, 'Login von nicht freigegebenem Gerät: ' + a.username + ' (' + deviceLabel(req) + ')');
+            store.addLoginEvent({ ok: false, kind: 'device', who: a.username, ip, detail: 'Gerät nicht freigegeben (' + deviceLabel(req) + ')' });
+            sendJson(res, 403, { reason: 'device-not-approved', device: deviceLabel(req) }); return true;
+          }
+        }
+        if (adh) store.touchAgentDevice(a.id, adh);
         sec.resetFails(ip); sec.resetAccountFails(username);
         sec.recordEvent('login-ok', ip, 'Mitarbeiter: ' + a.username);
         store.addLoginEvent({ ok: true, kind: 'agent', who: a.username, ip });
@@ -472,6 +490,29 @@ async function handleApi(req, res, urlPath, ip) {
     store.setIntro(body.intro || ''); sec.recordEvent('audit', ip, 'Begrüßungstext geändert');
     sendJson(res, 200, { ok: true, intro: store.getIntro() }); return true;
   }
+  // ---- Geräte eines Prüfers verwalten (nur Admin) --------------------------
+  if (urlPath === '/api/agent-devices' && req.method === 'GET') {
+    if (!adminOnly()) return true;
+    const id = new URL(req.url, 'http://x').searchParams.get('id') || '';
+    sendJson(res, 200, { devices: store.agentDevices(id), lockOff: AGENT_DEVICE_LOCK_OFF }); return true;
+  }
+  if (urlPath === '/api/agent-device-remove' && req.method === 'POST') {
+    if (!adminOnly()) return true;
+    let body; try { body = await readJson(req, 8 * 1024); } catch { body = {}; }
+    const ok = store.removeAgentDevice(body.id, body.deviceId);
+    if (ok) sec.recordEvent('audit', ip, 'Gerät eines Prüfers entfernt');
+    sendJson(res, 200, { ok }); return true;
+  }
+  // Alle Geräte lösen: das nächste Gerät, mit dem sich der Prüfer anmeldet,
+  // wird automatisch wieder gebunden (praktisch bei neuem Handy).
+  if (urlPath === '/api/agent-devices-reset' && req.method === 'POST') {
+    if (!adminOnly()) return true;
+    let body; try { body = await readJson(req, 8 * 1024); } catch { body = {}; }
+    const ok = store.resetAgentDevices(body.id);
+    if (ok) sec.recordEvent('audit', ip, 'Geräte-Bindung eines Prüfers zurückgesetzt');
+    sendJson(res, 200, { ok }); return true;
+  }
+
   // ---- Anmelde-Protokoll (nur Admin) ---------------------------------------
   if (urlPath === '/api/login-log' && req.method === 'GET') {
     if (!adminOnly()) return true;
@@ -694,7 +735,12 @@ const server = http.createServer(async (req, res) => {
   if (urlPath === '/') urlPath = adminHost ? '/admin.html' : '/index.html';
   // Eigener Direkt-Link für Prüfer -> Startseite öffnet gleich den Mitarbeiter-Login
   if (['/pruefer', '/login', '/team', '/mitarbeiter'].includes(urlPath)) urlPath = '/index.html';
-  if (urlPath === '/panel' || urlPath === '/admin') urlPath = '/admin.html';
+  // Der Admin-Bereich ist AUSSCHLIESSLICH über admin.<domain> erreichbar.
+  // Auf allen anderen Adressen (z. B. ident.4ever1.tv/admin) gibt es ihn nicht.
+  if (urlPath === '/panel' || urlPath === '/admin' || urlPath === '/admin.html') {
+    if (!adminHost) { res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }); res.end('Nicht gefunden'); return; }
+    urlPath = '/admin.html';
+  }
   if (urlPath === '/figur' || urlPath === '/figuren') urlPath = '/figur.html';
   if (urlPath === '/datenschutz') urlPath = '/datenschutz.html';
   if (urlPath === '/impressum') urlPath = '/impressum.html';
