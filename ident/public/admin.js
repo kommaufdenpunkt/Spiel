@@ -121,6 +121,10 @@
     if ($('introSave')) $('introSave').addEventListener('click', saveIntro);
     if ($('caseSearch')) $('caseSearch').addEventListener('input', (e) => renderCases(e.target.value));
     if ($('addAgent')) $('addAgent').addEventListener('click', addAgent);
+    if ($('loginLogClear')) $('loginLogClear').addEventListener('click', async () => {
+      if (!confirm('Anmelde-Protokoll wirklich leeren? Die Einträge sind danach weg.')) return;
+      await api('POST', '/api/login-log-clear', {}); loadLoginLog();
+    });
     if ($('devInvite')) $('devInvite').addEventListener('click', async () => {
       const r = await api('POST', '/api/admin-devices/invite', {});
       if (r.status !== 200) { toast('Konnte keinen Code erzeugen.'); return; }
@@ -394,7 +398,31 @@
   }
 
   // ---- Überwachung ----
+  // ---- Anmelde-Protokoll: wer hat sich angemeldet / es versucht ----
+  async function loadLoginLog() {
+    const r = await api('GET', '/api/login-log');
+    const evs = (r.body && r.body.events) || [];
+    const sum = $('loginFailSum');
+    if (sum) sum.innerHTML = evs.length
+      ? 'Fehlversuche in den letzten 24 Stunden: <b style="color:' + ((r.body.fails24h || 0) > 0 ? 'var(--bad)' : 'var(--good)') + '">' + (r.body.fails24h || 0) + '</b> · insgesamt ' + evs.length + ' Einträge'
+      : 'Noch keine Anmeldeversuche protokolliert.';
+    const el = $('loginLogList'); if (!el) return;
+    if (!evs.length) { el.innerHTML = '<div class="empty">Noch keine Einträge.</div>'; return; }
+    const art = { admin: 'Admin', agent: 'Prüfer', passkey: 'Face ID', device: 'Gerät' };
+    el.innerHTML = evs.map((e) => {
+      const t = new Date(e.at).toLocaleString('de-DE');
+      const mark = e.ok ? '<span style="color:var(--good)">✓ erfolgreich</span>' : '<span style="color:var(--bad)">✗ fehlgeschlagen</span>';
+      return '<div class="evrow"' + (e.ok ? '' : ' style="background:#2a1618"') + '>'
+        + '<span class="t">' + esc(t) + '</span>'
+        + '<span>' + mark + '</span>'
+        + '<span>' + esc(e.who || '—') + ' <span class="muted">(' + esc(art[e.kind] || e.kind) + ')</span>'
+        + (e.detail ? ' · ' + esc(e.detail) : '') + ' · <span class="muted">' + esc(e.ip || '') + '</span></span>'
+        + '</div>';
+    }).join('');
+  }
+
   async function loadSecurity() {
+    loadLoginLog();
     const r = await api('GET', '/api/security'); const m = r.body || {};
     const bl = $('blockedList'); const blocked = m.blocked || [];
     bl.innerHTML = blocked.length ? '' : '<div class="empty">Keine IP gesperrt.</div>';

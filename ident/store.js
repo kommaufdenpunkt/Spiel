@@ -309,6 +309,35 @@ function setIntro(text) { settings.intro = String(text || '').slice(0, 8000); sa
 function getAdminTotp() { return typeof settings.adminTotp === 'string' ? settings.adminTotp : ''; }
 function setAdminTotp(secret) { settings.adminTotp = String(secret || ''); save('settings.json', settings); return true; }
 
+// ---- Anmelde-Protokoll (dauerhaft) -----------------------------------------
+// Hält fest, wer sich wann angemeldet hat – und vor allem, wer es versucht hat.
+// Bleibt anders als die Ereignisliste im Speicher auch nach einem Neustart
+// erhalten. Verschlüsselt gespeichert, auf die letzten Einträge begrenzt.
+const LOGIN_LOG_MAX = 800;
+function loginLog() { if (!Array.isArray(settings.loginLog)) settings.loginLog = []; return settings.loginLog; }
+function addLoginEvent({ ok, kind, who, ip, detail }) {
+  const list = loginLog();
+  list.push({
+    at: new Date().toISOString(),
+    ok: !!ok,
+    kind: String(kind || 'login').slice(0, 20),      // admin | agent | passkey | device
+    who: String(who || '').slice(0, 60),             // versuchter Benutzername
+    ip: String(ip || '').slice(0, 60),
+    detail: String(detail || '').slice(0, 120),      // z. B. Grund des Fehlschlags
+  });
+  if (list.length > LOGIN_LOG_MAX) list.splice(0, list.length - LOGIN_LOG_MAX);
+  save('settings.json', settings); return true;
+}
+function listLoginEvents(limit) {
+  const n = Math.max(1, Math.min(500, parseInt(limit, 10) || 200));
+  return loginLog().slice(-n).reverse();
+}
+function loginFailCount(hours) {
+  const since = Date.now() - (Math.max(1, parseInt(hours, 10) || 24) * 3600 * 1000);
+  return loginLog().filter((e) => !e.ok && new Date(e.at).getTime() >= since).length;
+}
+function clearLoginLog() { settings.loginLog = []; save('settings.json', settings); return true; }
+
 // ---- Protokoll-Einträge in der Akte ----------------------------------------
 // Fortlaufende Notizen zu einer Akte (Teamleitung schreibt, Admin darf ändern).
 function caseEntries(c) { if (!Array.isArray(c.entries)) c.entries = []; return c.entries; }
@@ -379,6 +408,7 @@ function setFigureScript(text) { settings.figureScript = (typeof text === 'strin
 module.exports = {
   init, getScript, setScript, getIntro, setIntro, getAdminTotp, setAdminTotp,
   addCaseEntry, updateCaseEntry, deleteCaseEntry,
+  addLoginEvent, listLoginEvents, loginFailCount, clearLoginLog,
   listAdminDevices, adminDeviceCount, findAdminDevice, addAdminDevice,
   touchAdminDevice, renameAdminDevice, removeAdminDevice,
   getFigures, setFigures, getFigureScript, setFigureScript,
