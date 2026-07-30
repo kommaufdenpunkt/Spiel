@@ -422,9 +422,33 @@ async function handleApi(req, res, urlPath, ip) {
   if (urlPath === '/api/waiting' && req.method === 'GET') {
     const list = Array.from(waiting.values()).sort((a, b) => a.joinedAt - b.joinedAt).map((w) => {
       const busy = waitingBusy(w);
-      return { code: w.code, note: w.note, joinedAt: w.joinedAt, busy, claimedBy: busy ? w.claimedBy : null };
+      const room = rooms.get(w.code);
+      // Namen der Prüfer, die gerade in diesem Gespräch sind
+      const hosts = [];
+      if (room) for (const ws of room.values()) if (ws.role === 'host' && ws.pname) hosts.push(ws.pname);
+      return {
+        code: w.code, note: w.note, joinedAt: w.joinedAt, busy,
+        claimedBy: busy ? w.claimedBy : null,
+        hosts, live: hosts.length > 0,
+        waitingSec: Math.max(0, Math.round((Date.now() - w.joinedAt) / 1000)),
+      };
     });
-    sendJson(res, 200, { waiting: list }); return true;
+    sendJson(res, 200, {
+      waiting: list,
+      free: list.filter((w) => !w.busy).length,
+      running: list.filter((w) => w.live).length,
+    }); return true;
+  }
+  // Ältesten wartenden Bewerber übernehmen ("Nächsten annehmen").
+  if (urlPath === '/api/waiting/next' && req.method === 'POST') {
+    if (!authed(req, ip)) { sendJson(res, 401, { reason: 'auth' }); return true; }
+    const name = reqName(req, ip) || 'Prüfer';
+    const next = Array.from(waiting.values())
+      .filter((w) => !waitingBusy(w))
+      .sort((a, b) => a.joinedAt - b.joinedAt)[0];
+    if (!next) { sendJson(res, 404, { reason: 'none-waiting' }); return true; }
+    next.claimedBy = name; next.claimedAt = Date.now();
+    sendJson(res, 200, { code: next.code }); return true;
   }
   if (urlPath === '/api/waiting/claim' && req.method === 'POST') {
     let body; try { body = await readJson(req, 16 * 1024); } catch { body = {}; }

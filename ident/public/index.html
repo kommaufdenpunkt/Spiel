@@ -76,6 +76,48 @@
   .dot{width:.6rem;height:.6rem;border-radius:50%;background:var(--rec);animation:pulse 1.3s infinite}
   @keyframes pulse{0%{box-shadow:0 0 0 0 #ef444466}70%{box-shadow:0 0 0 7px #ef444400}100%{box-shadow:0 0 0 0 #ef444400}}
 
+  /* Leitstand (Warteraum der Prüfer): links Menü, Mitte Warteschlange, rechts laufende Gespräche */
+  .deck{flex:1;display:grid;grid-template-columns:230px minmax(0,1fr) 320px;gap:1rem;padding:1rem 1.2rem;align-items:start;min-height:0}
+  .deck-nav,.deck-side{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:.9rem}
+  .deck-nav{display:flex;flex-direction:column;gap:.5rem;position:sticky;top:4.5rem}
+  .deck-me{display:flex;align-items:center;gap:.6rem;padding:.2rem .1rem .7rem;border-bottom:1px solid var(--line);margin-bottom:.3rem}
+  .deck-avatar{width:38px;height:38px;flex:none;border-radius:11px;display:grid;place-items:center;font-weight:700;
+    background:linear-gradient(135deg,#6f9bff,#3b6ef0);color:#fff}
+  .deck-me b{font-size:.95rem;display:block;line-height:1.2}
+  .deck-me .muted{font-size:.74rem;color:var(--dim)}
+  .deck-item{width:100%;text-align:left;font-size:.9rem}
+  .deck-stats{display:flex;gap:.5rem;margin-top:.3rem}
+  .deck-stats div{flex:1;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:.55rem .6rem;text-align:center}
+  .deck-stats b{display:block;font-size:1.35rem;line-height:1.1}
+  .deck-stats span{font-size:.68rem;color:var(--dim);text-transform:uppercase;letter-spacing:.07em}
+  .deck-spacer{flex:1;min-height:.5rem}
+  .deck-main{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:1rem 1.1rem;min-width:0}
+  .deck-head{display:flex;align-items:baseline;justify-content:space-between;gap:.7rem;margin-bottom:.8rem;flex-wrap:wrap}
+  .deck-head h2{margin:0;font-size:1.15rem}
+  .deck-head .muted{font-size:.8rem;color:var(--dim)}
+  .deck-list{display:flex;flex-direction:column;gap:.6rem}
+  .deck-card{background:var(--panel2);border:1px solid var(--line);border-radius:14px;padding:.8rem .9rem;
+    display:flex;align-items:center;gap:.8rem;flex-wrap:wrap;transition:border-color .15s,transform .15s}
+  .deck-card:hover{border-color:var(--line2)}
+  .deck-card.next{border-color:var(--accent);box-shadow:0 0 0 3px #5b8cff22}
+  .deck-card.busy{opacity:.72}
+  .deck-card .who{flex:1;min-width:150px}
+  .deck-card .who b{font-size:1rem;letter-spacing:.04em}
+  .deck-card .who .meta{font-size:.78rem;color:var(--dim);margin-top:.15rem;line-height:1.45}
+  .deck-card .acts{display:flex;gap:.4rem;flex-wrap:wrap}
+  .wait-pill{display:inline-block;font-size:.72rem;padding:.12rem .5rem;border-radius:999px;border:1px solid var(--line);white-space:nowrap}
+  .wait-pill.long{color:#ffc98a;border-color:#6b5220;background:#2c2411}
+  .wait-pill.live{color:#5fe0a0;border-color:#2f6b4a;background:#163024}
+  .deck-code{font-size:.88rem;color:var(--dim);margin-bottom:.7rem;line-height:1.6;word-break:break-all}
+  .deck-empty{color:var(--dim);font-size:.9rem;text-align:center;padding:1.6rem .8rem;border:1px dashed var(--line);border-radius:14px}
+  @media(max-width:1080px){
+    .deck{grid-template-columns:1fr;gap:.8rem;padding:.8rem}
+    .deck-nav{position:static;flex-direction:row;flex-wrap:wrap;align-items:center}
+    .deck-nav .deck-item{width:auto;flex:1;min-width:150px}
+    .deck-me{border-bottom:0;padding:0;margin:0;width:100%}
+    .deck-spacer{display:none}
+  }
+
   /* Lobby */
   .lobby{flex:1;display:flex;align-items:center;justify-content:center;padding:1.5rem}
   .card{width:100%;max-width:468px;background:var(--panel);border:1px solid var(--line);border-radius:24px;
@@ -369,21 +411,40 @@
 </div>
 
 <!-- ===================== WARTERAUM (Prüfer) ===================== -->
-<div id="waitingView" class="lobby" style="display:none">
-  <div class="card" style="max-width:560px">
-    <h2>📞 Warteraum</h2>
-    <p class="sub" id="waitWho"></p>
-    <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;margin-bottom:.4rem">
-      <button id="newCodeBtn" class="primary">➕ Zugangsnummer erzeugen</button>
-      <span id="newCodeResult" style="font-size:.9rem;color:var(--dim)"></span>
-    </div>
-    <div class="hint">Gib die Zugangsnummer (oder den Link) an den Bewerber weiter. Sobald er beitritt, erscheint er unten und kann abgeholt werden.</div>
-    <div class="sect" style="margin-top:1rem">Wartende Bewerber</div>
-    <div id="waitingList"></div>
-    <div class="actions" style="margin-top:1rem">
-      <button id="setupPasskeyBtn" type="button" style="display:none">🔐 Face ID / Fingerabdruck für dieses Gerät einrichten</button>
-      <button id="waitLogout">Abmelden</button>
-    </div>
+<div id="waitingView" style="display:none">
+  <div class="deck">
+    <!-- LINKS: Menü -->
+    <aside class="deck-nav">
+      <div class="deck-me">
+        <div class="deck-avatar" id="waitAvatar">P</div>
+        <div><b id="waitWho">–</b><div class="muted" id="waitRole">Prüfer</div></div>
+      </div>
+      <button class="deck-item primary" id="takeNextBtn">▶ Nächsten annehmen</button>
+      <button class="deck-item" id="newCodeBtn">➕ Zugangsnummer</button>
+      <div class="deck-stats">
+        <div><b id="statWaiting">0</b><span>wartend</span></div>
+        <div><b id="statRunning">0</b><span>laufend</span></div>
+      </div>
+      <div class="deck-spacer"></div>
+      <button class="deck-item" id="setupPasskeyBtn" type="button" style="display:none">🔐 Face ID einrichten</button>
+      <button class="deck-item danger" id="waitLogout">Abmelden</button>
+    </aside>
+
+    <!-- MITTE: Warteschlange -->
+    <main class="deck-main">
+      <div class="deck-head">
+        <h2>🕒 Warteschlange</h2>
+        <span class="muted" id="waitHint">Wer am längsten wartet, steht oben.</span>
+      </div>
+      <div id="newCodeResult" class="deck-code"></div>
+      <div id="waitingList" class="deck-list"></div>
+    </main>
+
+    <!-- RECHTS: laufende Gespräche -->
+    <aside class="deck-side">
+      <div class="deck-head"><h2>🎥 Laufende Gespräche</h2></div>
+      <div id="runningList" class="deck-list"></div>
+    </aside>
   </div>
 </div>
 
