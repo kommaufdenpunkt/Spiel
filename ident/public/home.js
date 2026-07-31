@@ -74,6 +74,38 @@
     });
   }
 
+  // ---- Rechner: Bohnen -> geschätztes Taschengeld ---------------------------
+  // Grundlage ist unser eigenes Target: 5.000 Bohnen entsprechen etwa 100 $.
+  // Das ist bewusst eine Beispielrechnung und keine Zusage – der Hinweis dazu
+  // steht direkt unter dem Regler auf der Seite.
+  var TARGET_BOHNEN = 5000, TARGET_DOLLAR = 100;
+  function rechner() {
+    var reg = $('rBohnen'); if (!reg) return;
+    var out = $('rOut'), val = $('rBohnenVal'), bar = $('rBar'), proz = $('rProz'), msg = $('rMsg');
+    function zahl(n) { return n.toLocaleString('de-DE'); }
+    function neu() {
+      var bohnen = parseInt(reg.value, 10) || 0;
+      var dollar = Math.round(bohnen / TARGET_BOHNEN * TARGET_DOLLAR);
+      var p = Math.round(bohnen / TARGET_BOHNEN * 100);
+      if (val) val.textContent = zahl(bohnen);
+      if (out) out.textContent = zahl(dollar) + ' $';
+      if (proz) proz.textContent = p + ' %';
+      if (bar) bar.style.width = Math.min(100, p) + '%';
+      if (msg) {
+        msg.textContent =
+          bohnen === 0 ? 'Zieh den Regler nach rechts – dann siehst du, wie sich das entwickelt.' :
+          p < 35 ? 'Noch ein gutes Stück bis zum Target. Genau da helfen wir dir weiter.' :
+          p < 70 ? 'Du bist auf dem Weg. Feste Streamzeiten bringen hier am meisten.' :
+          p < 100 ? 'Fast am Target – das letzte Stück schaffen wir zusammen.' :
+          p === 100 ? 'Target erreicht – genau da wollen wir mit dir hin.' :
+          'Deutlich über dem Target. Dann reden wir über ein höheres Ziel.';
+      }
+    }
+    reg.addEventListener('input', neu);
+    neu();
+  }
+  rechner();
+
   // ---- Echtes Logo und Team-Foto, falls hinterlegt --------------------------
   // Liegt logo.png im Ordner public, ersetzt es das gezeichnete Zeichen oben.
   // Liegt team.jpg dort, erscheint es groß über der Teamleitung.
@@ -140,5 +172,5 @@
   }
   vomServer();
 
-  zeigen(document.querySelectorAll('.sec-head, .card, .stepline, .stat, .faq details, .contact a, .cta, .phone, #teammanagement .grid > div:first-child, #voraussetzungen .grid > div, .foot > div'));
+  zeigen(document.querySelectorAll('.sec-head, .card, .stepline, .stat, .woche, .rechner, .faq details, .contact a, .cta, .phone, #teammanagement .grid > div:first-child, .foot > div'));
 })();

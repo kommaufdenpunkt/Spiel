@@ -241,6 +241,57 @@
   .need b{display:block;font-size:.97rem}
   .need span{color:var(--dim);font-size:.89rem}
 
+  .need .tick.no{background:linear-gradient(180deg,#f0a49a,#d4574a 60%,#a83a2f);color:#2a0b07}
+  .card.nope{border-color:#4a2620}
+  .card.nope::before{background:radial-gradient(300px 150px at 14% 0%,rgba(212,87,74,.10),transparent 72%)}
+
+  /* ---------- Rechner ---------- */
+  .rechner{background:linear-gradient(160deg,#191206,#0d0a04);border:1px solid var(--line2);border-radius:22px;
+    padding:1.9rem 1.8rem;max-width:52rem;margin:0 auto;position:relative;overflow:hidden}
+  .rechner::before{content:"";position:absolute;inset:-60% -20% auto -20%;height:340px;pointer-events:none;
+    background:radial-gradient(420px 190px at 70% 50%,rgba(232,179,60,.16),transparent 70%)}
+  .rechner>*{position:relative}
+  .rechner-head{display:flex;justify-content:space-between;align-items:flex-start;gap:1.6rem;flex-wrap:wrap;margin-bottom:1.4rem}
+  .rechner h3{font-family:var(--serif);font-variant:small-caps;font-size:1.7rem;margin:0 0 .35rem;font-weight:700}
+  .rechner-sub{color:var(--dim);margin:0;font-size:.92rem;max-width:26rem}
+  .rechner-sub b{color:var(--gold)}
+  .rechner-out{text-align:right;flex:none}
+  .rechner-out b{display:block;font-family:var(--serif);font-size:clamp(2.2rem,5vw,3rem);line-height:1;font-weight:700}
+  .rechner-out span{display:block;font-size:.68rem;letter-spacing:.16em;text-transform:uppercase;color:var(--dim2);margin-top:.35rem}
+  .rl{display:flex;justify-content:space-between;align-items:baseline;font-size:.85rem;color:var(--dim);
+    margin-bottom:.5rem;font-weight:600}
+  .rl em{font-style:normal;color:var(--ink);font-size:1rem;font-weight:700}
+  input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:6px;border-radius:4px;background:#2a2010;
+    outline:none;margin:0 0 1.5rem}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:24px;height:24px;border-radius:50%;cursor:grab;
+    background:linear-gradient(180deg,#fff2ce,#e8b33c 55%,#b8821c);box-shadow:0 3px 12px rgba(0,0,0,.7),0 0 0 1px #8d5f10}
+  input[type=range]::-moz-range-thumb{width:24px;height:24px;border:none;border-radius:50%;cursor:grab;
+    background:linear-gradient(180deg,#fff2ce,#e8b33c 55%,#b8821c);box-shadow:0 3px 12px rgba(0,0,0,.7)}
+  .rechner-ziel{background:#0b0803;border:1px solid var(--line);border-radius:14px;padding:.95rem 1.1rem}
+  .zl{display:flex;justify-content:space-between;align-items:baseline;font-size:.83rem;color:var(--dim);margin-bottom:.5rem}
+  .zl b{font-size:.95rem;color:var(--gold)}
+  .zbar{height:8px;border-radius:5px;background:#241b0d;overflow:hidden}
+  .zbar i{display:block;height:100%;border-radius:5px;width:100%;
+    background:linear-gradient(90deg,#c8901f,#e8b33c 60%,#fde79a);transition:width .3s cubic-bezier(.3,.8,.3,1)}
+  .zmsg{margin:.65rem 0 0;font-size:.85rem;color:var(--dim)}
+  .rechner-fuss{margin:1.1rem 0 0;font-size:.8rem;color:var(--dim2);line-height:1.6}
+
+  /* ---------- Wochen ---------- */
+  .wochen{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem}
+  @media(max-width:900px){.wochen{grid-template-columns:repeat(2,1fr)}}
+  @media(max-width:560px){.wochen{grid-template-columns:1fr}}
+  .woche{background:linear-gradient(180deg,#15100815,#0f0b0570);border:1px solid var(--line);border-radius:var(--r);
+    padding:1.4rem 1.25rem;position:relative;transition:border-color .2s,transform .2s}
+  .woche:hover{border-color:var(--line2);transform:translateY(-3px)}
+  .woche .wnr{display:inline-block;font-size:.66rem;letter-spacing:.18em;text-transform:uppercase;font-weight:700;
+    color:#2a1c02;background:linear-gradient(180deg,#fbdd8b,#e8b33c);border-radius:999px;padding:.2rem .6rem;margin-bottom:.7rem}
+  .woche b{display:block;font-family:var(--serif);font-size:1.22rem;margin-bottom:.35rem}
+  .woche p{margin:0;color:var(--dim);font-size:.9rem}
+
+  /* Tastatur-Bedienung sichtbar machen */
+  a:focus-visible,button:focus-visible,summary:focus-visible,input:focus-visible{
+    outline:2px solid var(--gold);outline-offset:3px;border-radius:6px}
+
   /* ---------- Fragen ---------- */
   .faq{display:grid;gap:.65rem;max-width:52rem;margin:0 auto}
   .faq details{background:linear-gradient(180deg,#15100815,#0f0b0570);border:1px solid var(--line);border-radius:14px;
@@ -314,11 +365,12 @@
     </a>
     <nav class="nav-links" id="navLinks">
       <a href="#vorteile">Vorteile</a>
+      <a href="#bohnen">Bohnen &amp; Taschengeld</a>
       <a href="#team">Team</a>
       <a href="#teammanagement">Teammanagement</a>
       <a href="#ablauf">Ablauf</a>
       <a href="#ratgeber">Ratgeber</a>
-      <a class="btn" href="#ablauf">Mehr erfahren</a>
+      <a class="btn" href="#bohnen">Mehr erfahren</a>
       <a class="btn primary" href="https://ident.4ever1.tv">Jetzt bewerben</a>
     </nav>
     <button class="burger" id="burger" aria-label="Menü" aria-expanded="false"><span></span></button>
@@ -411,8 +463,58 @@
     </div>
   </section>
 
+  <!-- Bohnen & Taschengeld -->
+  <section id="bohnen">
+    <div class="wrap">
+      <div class="sec-head">
+        <span class="eyebrow">Bohnen &amp; Taschengeld</span>
+        <h2 class="gold">Wie kommt Geld dabei heraus?</h2>
+        <p>Wir erklären es dir vorher, nicht hinterher. Ohne Kleingedrucktes.</p>
+      </div>
+
+      <div class="grid g3" style="margin-bottom:1.6rem">
+        <div class="card"><div class="ico">🎁</div><h3>1. Zuschauer schicken Geschenke</h3>
+          <p>Wer dir im Stream ein Geschenk sendet, verwandelt das bei BIGO in <b>Bohnen</b> auf deinem Konto.</p></div>
+        <div class="card"><div class="ico">🫘</div><h3>2. Bohnen sind deine Währung</h3>
+          <p>Bohnen sind der Maßstab für alles: dein Target, dein Level, deine Auszahlung. Du siehst sie jederzeit in der App.</p></div>
+        <div class="card"><div class="ico">💸</div><h3>3. Auszahlung über BIGO</h3>
+          <p>Ausgezahlt wird direkt von BIGO an dich – nicht über uns. Wir bekommen deine Bohnen nie in die Hand.</p></div>
+      </div>
+
+      <!-- Rechner -->
+      <div class="rechner" id="rechner">
+        <div class="rechner-head">
+          <div>
+            <span class="eyebrow" style="margin-bottom:.4rem">Beispielrechnung</span>
+            <h3>Rechne selbst nach</h3>
+            <p class="rechner-sub">Schieb den Regler auf die Bohnen, die du im Monat sammelst.
+              Grundlage ist unser Target: <b>5.000 Bohnen ≈ 100 $</b>.</p>
+          </div>
+          <div class="rechner-out">
+            <b id="rOut" class="gold">100 $</b>
+            <span>geschätztes Taschengeld</span>
+          </div>
+        </div>
+
+        <label class="rl" for="rBohnen">Bohnen im Monat<em id="rBohnenVal">5.000</em></label>
+        <input type="range" id="rBohnen" min="0" max="30000" step="500" value="5000"
+               aria-describedby="rHinweis">
+
+        <div class="rechner-ziel">
+          <div class="zl"><span>Unser Target: 5.000 Bohnen</span><b id="rProz">100 %</b></div>
+          <div class="zbar"><i id="rBar"></i></div>
+          <p class="zmsg" id="rMsg">Target erreicht – genau da wollen wir mit dir hin.</p>
+        </div>
+
+        <p class="rechner-fuss" id="rHinweis">Das ist eine Beispielrechnung, keine Zusage. Was am Ende dabei
+          herauskommt, hängt von deinen Stunden, deinen Tagen und deinen Zuschauern ab – und davon, was BIGO
+          gerade zahlt. Wir versprechen dir bewusst keine Summe. Aber wir zeigen dir, wie du hinkommst.</p>
+      </div>
+    </div>
+  </section>
+
   <!-- Team -->
-  <section id="team">
+  <section id="team" class="alt">
     <div class="wrap">
       <div class="sec-head">
         <span class="eyebrow">Das Gesicht dahinter</span>
@@ -425,7 +527,7 @@
   </section>
 
   <!-- Teammanagement / PK Board -->
-  <section id="teammanagement" class="alt">
+  <section id="teammanagement">
     <div class="wrap">
       <div class="grid g2" style="align-items:center;gap:3rem">
         <div>
@@ -453,7 +555,7 @@
   </section>
 
   <!-- Ablauf -->
-  <section id="ablauf">
+  <section id="ablauf" class="alt">
     <div class="wrap">
       <div class="sec-head">
         <span class="eyebrow">In vier Schritten</span>
@@ -469,23 +571,81 @@
     </div>
   </section>
 
-  <!-- Voraussetzungen -->
+  <!-- Erster Monat -->
+  <section id="erstermonat">
+    <div class="wrap">
+      <div class="sec-head">
+        <span class="eyebrow">Kein Sprung ins kalte Wasser</span>
+        <h2 class="gold">Dein erster Monat mit uns</h2>
+        <p>Damit du weißt, was auf dich zukommt – Woche für Woche.</p>
+      </div>
+      <div class="wochen">
+        <div class="woche"><span class="wnr">Woche 1</span><b>Ankommen</b>
+          <p>Wir richten dich im PK Board ein, du lernst die Teamleitung kennen und machst deine ersten Streams –
+            ohne Druck und ohne Zielvorgabe.</p></div>
+        <div class="woche"><span class="wnr">Woche 2</span><b>Rhythmus finden</b>
+          <p>Wir schauen zusammen, welche Zeiten bei dir laufen. Feste Streamzeiten sind der wichtigste Hebel,
+            damit Zuschauer wiederkommen.</p></div>
+        <div class="woche"><span class="wnr">Woche 3</span><b>Erste PK</b>
+          <p>Du steigst in deine erste PK ein – wir bereiten sie mit dir vor und sind dabei. Verlieren ist dabei
+            völlig in Ordnung, mitmachen zählt.</p></div>
+        <div class="woche"><span class="wnr">Woche 4</span><b>Ziele setzen</b>
+          <p>Jetzt kennst du deine Zahlen. Wir setzen gemeinsam ein realistisches Target für den nächsten Monat –
+            eines, das du auch erreichen kannst.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Voraussetzungen + ehrliche Absage -->
   <section id="voraussetzungen" class="alt">
     <div class="wrap">
-      <div class="grid g2" style="align-items:start;gap:2.6rem">
-        <div>
-          <span class="eyebrow">Kurz geprüft</span>
-          <h2 class="side gold">Passt das für dich?</h2>
-          <p style="color:var(--dim);margin:0 0 1.4rem">Du brauchst keine Erfahrung und keine teure Ausrüstung.
-            Wichtig ist nur, dass du volljährig bist und Lust hast, regelmäßig live zu gehen.</p>
-          <a class="btn primary big" href="https://ident.4ever1.tv">Audition starten <span class="ar">→</span></a>
-        </div>
+      <div class="sec-head">
+        <span class="eyebrow">Kurz geprüft</span>
+        <h2 class="gold">Passt das für dich?</h2>
+        <p>Wir sagen dir auch, wann du dir die Bewerbung sparen kannst. Das ist fairer für uns beide.</p>
+      </div>
+      <div class="grid g2" style="align-items:start">
         <div class="card">
+          <h3 style="margin:0 0 .9rem;font-size:1.02rem;color:var(--gold)">Das brauchst du</h3>
           <div class="need"><span class="tick">✓</span><div><b>Mindestens 18 Jahre alt</b><span>Wir prüfen das mit deinem Ausweis – Pflicht bei BIGO Live.</span></div></div>
           <div class="need"><span class="tick">✓</span><div><b>Handy oder Rechner mit Kamera</b><span>Mehr braucht es für die Audition nicht.</span></div></div>
           <div class="need"><span class="tick">✓</span><div><b>Gültiger Ausweis</b><span>Personalausweis oder Reisepass, Vorder- und Rückseite.</span></div></div>
-          <div class="need"><span class="tick">✓</span><div><b>Lust auf Live-Streaming</b><span>Alles Weitere zeigen wir dir – Schritt für Schritt.</span></div></div>
+          <div class="need"><span class="tick">✓</span><div><b>Lust, regelmäßig live zu gehen</b><span>Alles Weitere zeigen wir dir – Schritt für Schritt.</span></div></div>
         </div>
+        <div class="card nope">
+          <h3 style="margin:0 0 .9rem;font-size:1.02rem;color:#e98a7f">Dann passt es nicht</h3>
+          <div class="need"><span class="tick no">✕</span><div><b>Du suchst schnelles Geld ohne Aufwand</b><span>Das gibt es hier nicht. Bohnen kommen über Stunden und Zuschauer, nicht über Nacht.</span></div></div>
+          <div class="need"><span class="tick no">✕</span><div><b>Du willst nur ab und zu mal streamen</b><span>Ohne feste Zeiten kommen keine Zuschauer wieder. Dann bringt dir eine Agentur nichts.</span></div></div>
+          <div class="need"><span class="tick no">✕</span><div><b>Du bist bei einer anderen Agentur unter Vertrag</b><span>Dann klär das erst dort. Wir holen niemanden hinter dem Rücken weg.</span></div></div>
+          <div class="need"><span class="tick no">✕</span><div><b>Beleidigungen sind für dich normal</b><span>Bei uns nicht. Ein Ton, der andere runtermacht, führt zum Rauswurf.</span></div></div>
+        </div>
+      </div>
+      <div style="text-align:center;margin-top:1.8rem">
+        <a class="btn primary big" href="https://ident.4ever1.tv">Passt – Audition starten <span class="ar">→</span></a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Sicherheit -->
+  <section id="sicherheit">
+    <div class="wrap">
+      <div class="sec-head">
+        <span class="eyebrow">Klare Kante</span>
+        <h2 class="gold">Sicherheit ist kein Nebensatz</h2>
+        <p>Live zu gehen heißt, sich zu zeigen. Dafür muss der Rahmen stimmen.</p>
+      </div>
+      <div class="grid g2">
+        <div class="card"><div class="ico">📵</div><h3>Deine Nummer bleibt deine Sache</h3>
+          <p>Niemand bei uns braucht deine Handynummer. Alles läuft über das PK Board – auch wenn andere Agenturen
+            das anders machen.</p></div>
+        <div class="card"><div class="ico">🚫</div><h3>Grenzüberschreitungen fliegen raus</h3>
+          <p>Beleidigungen, Anmache, Druck: Melde es der Teamleitung. Wir klären das – und im Zweifel gegen den,
+            der die Grenze überschritten hat, nicht gegen dich.</p></div>
+        <div class="card"><div class="ico">🔐</div><h3>Deine Daten sind verschlüsselt</h3>
+          <p>Ausweisbilder und Aufnahmen liegen verschlüsselt auf Servern in Deutschland und werden spätestens
+            nach 90 Tagen gelöscht.</p></div>
+        <div class="card"><div class="ico">📄</div><h3>Du weißt, was du unterschreibst</h3>
+          <p>Transferregeln, Freigabe, Freikauf – wir erklären dir das vor dem Start, nicht wenn du raus willst.</p></div>
       </div>
     </div>
   </section>
@@ -560,6 +720,7 @@
         <h4>Seite</h4>
         <ul>
           <li><a href="#vorteile">Vorteile</a></li>
+          <li><a href="#bohnen">Bohnen &amp; Taschengeld</a></li>
           <li><a href="#team">Team</a></li>
           <li><a href="#teammanagement">Teammanagement</a></li>
           <li><a href="#ablauf">Ablauf</a></li>
