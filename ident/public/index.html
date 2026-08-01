@@ -170,6 +170,38 @@
   @keyframes spin{to{transform:rotate(360deg)}}
   .banner{padding:.8rem 1.1rem;background:var(--panel2);border-top:1px solid var(--line);min-height:3rem;display:flex;align-items:center;gap:.7rem;font-size:.92rem}
   .banner .lbl{font-size:.66rem;color:var(--accent);letter-spacing:.14em;text-transform:uppercase;white-space:nowrap}
+  /* ---- Wartezimmer des Bewerbers: Technik-Check und Wartezeit ---- */
+  .wroom{padding:.9rem 1.1rem 1rem;border-top:1px solid var(--line);background:linear-gradient(180deg,#101a2e,#0e1626)}
+  .wroom-head{display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;margin-bottom:.85rem}
+  .wroom-head b{display:block;font-size:1rem}
+  .wroom-head span{display:block;color:var(--dim);font-size:.85rem;margin-top:.1rem}
+  .wroom-time{text-align:right;flex:none}
+  .wroom-time b{display:block;font-variant-numeric:tabular-nums;font-size:1.35rem;color:var(--accent);line-height:1}
+  .wroom-time span{display:block;font-size:.62rem;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);margin-top:.2rem}
+  .wcheck{display:grid;grid-template-columns:repeat(4,1fr);gap:.6rem}
+  @media(max-width:820px){.wcheck{grid-template-columns:repeat(2,1fr)}}
+  @media(max-width:420px){.wcheck{grid-template-columns:1fr}}
+  .wc{display:flex;align-items:flex-start;gap:.6rem;background:#0d1728;border:1px solid var(--line);
+    border-radius:12px;padding:.62rem .7rem;position:relative;transition:border-color .25s}
+  .wc .wi{font-size:1.05rem;line-height:1.3;flex:none}
+  .wc>div{padding-right:.85rem;min-width:0}   /* Platz für den Statuspunkt oben rechts */
+  .wc b{display:block;font-size:.85rem}
+  .wc span{display:block;color:var(--dim);font-size:.76rem;line-height:1.35}
+  .wc .wdot{position:absolute;top:.6rem;right:.6rem;width:8px;height:8px;border-radius:50%;background:#4a5a7a;flex:none}
+  .wc.ok{border-color:#2f6b4a}.wc.ok .wdot{background:#3ec77b;box-shadow:0 0 8px #3ec77b99}
+  .wc.warn{border-color:#7a5a24}.wc.warn .wdot{background:#e8975d}
+  .wc.bad{border-color:#7a2f3a}.wc.bad .wdot{background:#e14b6a}
+  .wlevel{height:5px;border-radius:4px;background:#1b2740;overflow:hidden;margin-top:.35rem}
+  .wlevel i{display:block;height:100%;width:0;border-radius:4px;
+    background:linear-gradient(90deg,#3ec77b,#8ed7a2);transition:width .08s linear}
+  .wroom-next{margin:.85rem 0 0;font-size:.82rem;color:var(--dim);line-height:1.55}
+  /* Aufnahme-Hinweis, den auch der Bewerber sieht */
+  .recinfo{display:none;align-items:center;gap:.5rem;font-size:.84rem;color:#ffc9d2;
+    background:#2a1420;border:1px solid #5e2033;border-radius:999px;padding:.35rem .8rem}
+  .recinfo.on{display:inline-flex}
+  .recinfo i{width:8px;height:8px;border-radius:50%;background:#e14b6a;animation:recpuls 1.4s infinite}
+  @keyframes recpuls{50%{opacity:.25}}
+
   .controls{display:flex;flex-wrap:wrap;gap:.55rem;padding:.8rem 1.1rem;border-top:1px solid var(--line);background:var(--panel)}
   .controls .spacer{flex:1}
 
@@ -199,7 +231,9 @@
   .shot{position:relative;width:calc(50% - .25rem)}
   .shot img{width:100%;border:1px solid var(--line);border-radius:8px;display:block;cursor:zoom-in}
   .shot .cap{font-size:.66rem;color:var(--dim);text-align:center;margin-top:.15rem}
-  .prompter{height:190px;overflow-y:auto;-webkit-overflow-scrolling:touch;touch-action:pan-y;overscroll-behavior:contain;border:1px solid var(--line);border-radius:12px;background:#0b1220;padding:1rem 1.1rem;position:relative;scroll-behavior:auto}
+  /* Feste, nicht zusammenschrumpfbare Höhe: der Vorlese-Text darf nie
+     abgeschnitten werden, egal wie eng der Bildschirm ist. */
+  .prompter{height:clamp(160px,26vh,270px);flex:none;overflow-y:auto;-webkit-overflow-scrolling:touch;touch-action:pan-y;overscroll-behavior:contain;border:1px solid var(--line);border-radius:12px;background:#0b1220;padding:1rem 1.1rem;position:relative;scroll-behavior:auto}
   .prompter #prompterText{font-size:1.25rem;line-height:1.9;color:#eef3ff;white-space:pre-wrap;font-weight:500}
   .prompter::after{content:"";position:absolute;left:0;right:0;bottom:0;height:40px;background:linear-gradient(transparent,#0b1220);pointer-events:none}
   .prompter-ctrl{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;margin-top:.5rem;font-size:.82rem;color:var(--dim)}
@@ -287,6 +321,20 @@
       <button id="passkeyLoginBtn" type="button" style="width:100%;display:none">🔐 Mit Face ID / Fingerabdruck anmelden</button>
     </div>
 
+    <!-- Erster Login: neues Passwort setzen. Bewusst als Formular auf der Seite
+         und nicht als Browser-Fenster – das lässt sich nicht versehentlich
+         wegklicken und funktioniert auch auf dem iPhone zuverlässig. -->
+    <div id="pwChangeBox" style="display:none">
+      <div class="hint" style="margin-bottom:.8rem">👋 Willkommen! Weil du dich zum ersten Mal anmeldest,
+        vergib jetzt bitte dein <b>eigenes Passwort</b>. Das Startpasswort gilt danach nicht mehr.</div>
+      <div class="field"><label for="pwNew1">Neues Passwort</label>
+        <input id="pwNew1" type="password" placeholder="mindestens 8 Zeichen" autocomplete="new-password"></div>
+      <div class="field"><label for="pwNew2">Noch einmal zur Sicherheit</label>
+        <input id="pwNew2" type="password" placeholder="gleiches Passwort" autocomplete="new-password"></div>
+      <div class="actions"><button id="pwSaveBtn" class="primary">Passwort speichern und weiter</button></div>
+      <div class="err" id="pwMsg"></div>
+    </div>
+
     <div class="actions"><button id="enterBtn" class="primary">Audition starten</button></div>
     <div class="err" id="lobbyErr"></div>
     <button id="staffToggle" class="linklike">Mitarbeiter-Login →</button>
@@ -319,10 +367,33 @@
       <div class="vextras" id="vextras"></div>
     </div>
     <div class="banner"><span class="lbl">Status</span><span id="bannerText">Verbindung wird aufgebaut …</span></div>
+
+    <!-- Wartezimmer: nur für den Bewerber, solange noch kein Prüfer da ist -->
+    <div class="wroom" id="wroom" style="display:none">
+      <div class="wroom-head">
+        <div>
+          <b>Du bist im Warteraum</b>
+          <span id="wroomSub">Wir haben dich gesehen. Gleich kommt jemand aus der Teamleitung dazu.</span>
+        </div>
+        <div class="wroom-time"><b id="wroomTimer">00:00</b><span>Wartezeit</span></div>
+      </div>
+
+      <div class="wcheck">
+        <div class="wc" id="wcCam"><span class="wi">📷</span><div><b>Kamera</b><span id="wcCamMsg">wird geprüft …</span></div><i class="wdot"></i></div>
+        <div class="wc" id="wcMic"><span class="wi">🎤</span><div><b>Mikrofon</b><span id="wcMicMsg">Sag mal kurz „Hallo“</span>
+          <div class="wlevel"><i id="wcMicBar"></i></div></div><i class="wdot"></i></div>
+        <div class="wc" id="wcLight"><span class="wi">💡</span><div><b>Licht</b><span id="wcLightMsg">wird geprüft …</span></div><i class="wdot"></i></div>
+        <div class="wc" id="wcNet"><span class="wi">📶</span><div><b>Verbindung</b><span id="wcNetMsg">wird geprüft …</span></div><i class="wdot"></i></div>
+      </div>
+
+      <p class="wroom-next">Nutz die Zeit: Der Vorlese-Text ist schon da – lies ihn ruhig einmal in Ruhe durch.
+        Deine Ausweisbilder kannst du auch jetzt bereits hochladen, dann geht es später schneller.</p>
+    </div>
     <div class="controls">
       <button id="micBtn">🎤 Mikro an</button>
       <button id="camBtn">📷 Kamera an</button>
       <button id="leaveBtn" style="display:none">⤺ Zurück zum Warteraum</button>
+      <span class="recinfo" id="recInfo"><i></i> Dieses Gespräch wird aufgezeichnet</span>
       <span class="spacer"></span>
       <button id="recBtn" class="primary" style="display:none">⏺ Aufnahme starten</button>
       <button id="stopRecBtn" class="danger" style="display:none" disabled>⏹ Aufnahme stoppen</button>

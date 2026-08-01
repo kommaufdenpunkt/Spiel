@@ -499,8 +499,13 @@ async function handleApi(req, res, urlPath, ip) {
     const code = String(body.code || '').trim().toUpperCase();
     const entry = waiting.get(code);
     if (!entry) { sendJson(res, 404, { reason: 'gone' }); return true; }
-    if (waitingBusy(entry)) { sendJson(res, 409, { reason: 'busy', by: entry.claimedBy || '' }); return true; }
-    entry.claimedBy = reqName(req, ip) || 'Prüfer'; entry.claimedAt = Date.now();
+    const wer = reqName(req, ip) || 'Prüfer';
+    // Wer den Bewerber selbst gerade reserviert hat – etwa über „Nächsten
+    // annehmen" – darf natürlich auch beitreten. Sonst blockierte sich der
+    // Prüfer mit dem eigenen Klick.
+    const fremd = waitingBusy(entry) && entry.claimedBy !== wer;
+    if (fremd) { sendJson(res, 409, { reason: 'busy', by: entry.claimedBy || '' }); return true; }
+    entry.claimedBy = wer; entry.claimedAt = Date.now();
     sendJson(res, 200, { ok: true }); return true;
   }
   if (urlPath === '/api/waiting/release' && req.method === 'POST') {
