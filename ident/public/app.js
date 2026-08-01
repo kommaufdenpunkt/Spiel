@@ -201,13 +201,47 @@
   }
 
   // erzwungener Passwortwechsel (Erstlogin/Reset)
-  async function forcePwChange() {
-    const np = prompt('Erster Login: Bitte ein neues Passwort setzen (mind. 8 Zeichen).');
-    if (np === null) return false;
-    if (String(np).length < 8) { toast('Passwort zu kurz.'); return forcePwChange(); }
-    const r = await api('POST', '/api/change-password', { newPassword: np });
-    if (r.status === 200) { toast('Passwort gesetzt.'); state.mustChange = false; return true; }
-    toast('Passwort konnte nicht gesetzt werden.'); return false;
+  // Erster Login: eigenes Passwort setzen. Als Formular auf der Seite, damit es
+  // niemand versehentlich wegklickt und niemand denkt, sein Passwort sei falsch.
+  function forcePwChange() {
+    return new Promise((fertig) => {
+      const box = $('pwChangeBox'), msg = $('pwMsg'), btn = $('pwSaveBtn');
+      if (!box || !btn) { fertig(false); return; }
+      $('staffFields').style.display = 'none';
+      $('enterBtn').style.display = 'none';
+      if ($('staffToggle')) $('staffToggle').style.display = 'none';
+      $('lobbyTitle').textContent = 'Eigenes Passwort vergeben';
+      $('lobbySub').textContent = 'Nur noch ein Schritt, dann bist du drin.';
+      box.style.display = ''; msg.textContent = '';
+      $('pwNew1').value = ''; $('pwNew2').value = '';
+      setTimeout(() => $('pwNew1').focus(), 60);
+
+      const aufraeumen = () => {
+        box.style.display = 'none';
+        $('enterBtn').style.display = '';
+        if ($('staffToggle')) $('staffToggle').style.display = '';
+        btn.removeEventListener('click', speichern);
+        $('pwNew2').removeEventListener('keydown', beiEnter);
+      };
+      const beiEnter = (e) => { if (e.key === 'Enter') speichern(); };
+      async function speichern() {
+        const a = $('pwNew1').value, b = $('pwNew2').value;
+        if (a.length < 8) { msg.textContent = 'Das Passwort muss mindestens 8 Zeichen haben.'; return; }
+        if (a !== b) { msg.textContent = 'Die beiden Eingaben sind nicht gleich.'; return; }
+        btn.disabled = true; btn.textContent = 'Wird gespeichert …'; msg.textContent = '';
+        const r = await api('POST', '/api/change-password', { newPassword: a });
+        btn.disabled = false; btn.textContent = 'Passwort speichern und weiter';
+        if (r.status === 200) {
+          state.mustChange = false; aufraeumen();
+          toast('Passwort gespeichert – merk es dir gut.');
+          fertig(true);
+        } else {
+          msg.textContent = 'Das hat nicht geklappt. Bitte noch einmal versuchen.';
+        }
+      }
+      btn.addEventListener('click', speichern);
+      $('pwNew2').addEventListener('keydown', beiEnter);
+    });
   }
 
   // ================= WARTERAUM (Prüfer) =================
@@ -417,7 +451,103 @@
     setupRoleUI();
     loadIce().then((ice) => { state.iceServers = ice; connectSignaling(); });
     $('bannerText').textContent = state.role === 'host' ? 'Warte auf den Bewerber …' : 'Warte auf den Prüfer …';
+    if (state.role === 'guest') wroomAn();
   }
+  // ================= WARTEZIMMER DES BEWERBERS =================
+  // Solange kein Prüfer da ist, prüft der Bewerber hier selbst Kamera, Mikrofon,
+  // Licht und Verbindung. Ein totes Mikrofon ist der häufigste Grund, warum ein
+  // Video-Gespräch scheitert – das soll vorher auffallen, nicht mittendrin.
+  let wroomT = null, wroomAudio = null, wroomStart = 0;
+  function setzeCheck(id, zustand, text) {
+    const el = $(id); if (!el) return;
+    el.classList.remove('ok', 'warn', 'bad');
+    if (zustand) el.classList.add(zustand);
+    const m = $(id + 'Msg'); if (m && text != null) m.textContent = text;
+  }
+  function wroomAn() {
+    const box = $('wroom'); if (!box || state.role !== 'guest') return;
+    box.style.display = '';
+    wroomStart = Date.now();
+    clearInterval(wroomT);
+    wroomT = setInterval(() => {
+      const s = Math.floor((Date.now() - wroomStart) / 1000);
+      if ($('wroomTimer')) $('wroomTimer').textContent = pad(Math.floor(s / 60)) + ':' + pad(s % 60);
+      if (s === 120 && $('wroomSub')) $('wroomSub').textContent = 'Es dauert heute etwas länger – bleib bitte einfach hier, wir kommen zu dir.';
+    }, 500);
+    pruefeKamera();
+    pruefeMikro();
+    pruefeLicht();
+  }
+  function wroomAus() {
+    const box = $('wroom'); if (box) box.style.display = 'none';
+    clearInterval(wroomT); wroomT = null;
+    if (wroomAudio) { try { wroomAudio.ctx.close(); } catch {} wroomAudio = null; }
+  }
+  function pruefeKamera() {
+    const t = state.localStream && state.localStream.getVideoTracks()[0];
+    if (t && t.readyState === 'live' && !t.muted) {
+      const s = t.getSettings ? t.getSettings() : {};
+      setzeCheck('wcCam', 'ok', s.width ? 'läuft, ' + s.width + '×' + s.height : 'läuft');
+    } else setzeCheck('wcCam', 'bad', 'kein Bild – Kamera freigeben');
+  }
+  function pruefeMikro() {
+    const t = state.localStream && state.localStream.getAudioTracks()[0];
+    if (!t || t.readyState !== 'live') { setzeCheck('wcMic', 'bad', 'kein Mikrofon gefunden'); return; }
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const an = ctx.createAnalyser(); an.fftSize = 512;
+      ctx.createMediaStreamSource(state.localStream).connect(an);
+      const buf = new Uint8Array(an.fftSize);
+      wroomAudio = { ctx, an, gehoert: false };
+      const tick = () => {
+        if (!wroomAudio || !wroomT) return;
+        an.getByteTimeDomainData(buf);
+        let max = 0;
+        for (let i = 0; i < buf.length; i++) { const d = Math.abs(buf[i] - 128); if (d > max) max = d; }
+        const p = Math.min(100, Math.round(max / 40 * 100));
+        if ($('wcMicBar')) $('wcMicBar').style.width = p + '%';
+        if (p > 18 && !wroomAudio.gehoert) {
+          wroomAudio.gehoert = true;
+          setzeCheck('wcMic', 'ok', 'Ton kommt an – alles gut');
+        } else if (!wroomAudio.gehoert && t.enabled === false) {
+          setzeCheck('wcMic', 'warn', 'Mikrofon ist stumm geschaltet');
+        }
+        requestAnimationFrame(tick);
+      };
+      setzeCheck('wcMic', 'warn', 'Sag mal kurz „Hallo“');
+      tick();
+    } catch { setzeCheck('wcMic', 'warn', 'Ton kann hier nicht geprüft werden'); }
+  }
+  // Helligkeit aus einem Videobild schätzen: zu dunkel ist der zweite häufige
+  // Grund, warum ein Ausweis auf der Aufnahme später nicht lesbar ist.
+  function pruefeLicht() {
+    if (!wroomT) return;
+    const v = localVideo;
+    if (!v || !v.videoWidth) { setTimeout(pruefeLicht, 700); return; }
+    try {
+      const c = document.createElement('canvas'); c.width = 48; c.height = 27;
+      const cx = c.getContext('2d'); cx.drawImage(v, 0, 0, 48, 27);
+      const d = cx.getImageData(0, 0, 48, 27).data;
+      let sum = 0;
+      for (let i = 0; i < d.length; i += 4) sum += (d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114);
+      const hell = sum / (d.length / 4);
+      if (hell < 45) setzeCheck('wcLight', 'bad', 'zu dunkel – setz dich ans Licht');
+      else if (hell < 70) setzeCheck('wcLight', 'warn', 'etwas dunkel – Licht von vorne hilft');
+      else if (hell > 225) setzeCheck('wcLight', 'warn', 'sehr hell – Gegenlicht vermeiden');
+      else setzeCheck('wcLight', 'ok', 'gut ausgeleuchtet');
+    } catch { setzeCheck('wcLight', 'warn', 'kann nicht geprüft werden'); }
+    setTimeout(pruefeLicht, 4000);
+  }
+
+  function zeigeRec(an) { const el = $('recInfo'); if (el) el.classList.toggle('on', !!an); }
+
+  // Aufnahme läuft von selbst los, sobald der Bewerber im Bild ist.
+  function autoRec() {
+    if (state.recorder || state.recStarted) return;
+    state.recStarted = true;
+    setTimeout(() => { if (!state.recorder) { try { startRec(); } catch {} } }, 1200);
+  }
+
   function setupRoleUI() {
     const host = state.role === 'host';
     $('guidePane').style.display = host ? 'none' : '';
@@ -440,6 +570,7 @@
       switch (m.type) {
         case 'joined':
           state.role = m.role; state.selfId = m.peerId; setupRoleUI();
+          setzeCheck('wcNet', 'ok', 'Verbindung steht');
           (m.peers || []).forEach((p) => ensurePeer(p.peerId, p.role, p.name, false));
           if ((m.peers || []).length) $('bannerText').textContent = 'Verbunden.';
           break;
@@ -456,6 +587,7 @@
     ws.onclose = () => {
       if (state.leaving || !$('room').classList.contains('active')) { sysMsg('Verbindung zum Server getrennt.'); return; }
       sysMsg('Verbindung unterbrochen – neuer Versuch …'); $('bannerText').textContent = 'Verbindung wird wiederhergestellt …';
+      setzeCheck('wcNet', 'warn', 'kurz unterbrochen – wir versuchen es erneut');
       clearTimeout(state.reconnectT); state.reconnectT = setTimeout(() => { if (!state.leaving && $('room').classList.contains('active')) connectSignaling(); }, 2500);
     };
   }
@@ -489,7 +621,10 @@
       state.mainPeerId = peerId; P.isMain = true;
       remoteVideo.srcObject = stream; remoteWaiting.style.display = 'none';
       remoteTag.textContent = P.role === 'guest' ? 'Bewerber' : (P.name || 'Prüfer');
-      if (state.role === 'guest') toast('🎬 Es geht los – der Prüfer ist jetzt da!');
+      if (state.role === 'guest') { toast('🎬 Es geht los – der Prüfer ist jetzt da!'); wroomAus(); }
+      // Der Bewerber hat der Aufnahme ausdrücklich zugestimmt – also läuft sie
+      // von selbst, sobald das Gespräch beginnt. Niemand muss daran denken.
+      if (state.role === 'host' && P.role === 'guest') autoRec();
     } else { addTile(peerId, P.name || (P.role === 'host' ? 'Prüfer' : 'Bewerber'), stream); }
   }
   function addTile(peerId, name, stream) {
@@ -504,7 +639,12 @@
     if (state.mainPeerId === peerId) {
       state.mainPeerId = null; remoteVideo.srcObject = null;
       for (const [pid, pp] of state.peers) { if (pp.stream && isMainRole(pp.role)) { removeTile(pid); attachStream(pid, pp.stream); break; } }
-      if (!state.mainPeerId) { remoteWaiting.style.display = ''; remoteWaiting.textContent = 'Warte auf Teilnehmer …'; }
+      if (!state.mainPeerId) {
+        remoteWaiting.style.display = '';
+        remoteWaiting.textContent = state.role === 'guest' ? 'Warte auf den Prüfer …' : 'Warte auf Teilnehmer …';
+        // Prüfer ist weg -> der Bewerber sitzt wieder im Wartezimmer.
+        if (state.role === 'guest') { zeigeRec(false); wroomAn(); }
+      }
     }
   }
   function closeAllPeers() { if (state.peers) state.peers.forEach((P) => { try { P.pc.close(); } catch {} }); state.peers = new Map(); state.mainPeerId = null; if ($('vextras')) $('vextras').innerHTML = ''; if (remoteVideo) remoteVideo.srcObject = null; }
@@ -540,6 +680,9 @@
       else if (m.kind === 'doc-part') { const it = incoming[key]; if (!it) return; it.parts[m.i] = m.part; if (it.parts.filter(Boolean).length === it.n) { onDocReceived(it.label, it.parts.join('')); delete incoming[key]; } }
       else if (m.kind === 'result') onResult(m.result);
       else if (m.kind === 'profile') { if (m.bigoName && !$('vBigoName').value) $('vBigoName').value = m.bigoName; if (m.age && !$('vAge').value) $('vAge').value = m.age; }
+      // Der Bewerber soll sehen, wenn aufgezeichnet wird – er hat zugestimmt,
+      // also darf er es auch jederzeit erkennen.
+      else if (m.kind === 'rec') zeigeRec(!!m.on);
     };
   }
   function dcSendTo(dc, obj) { if (dc && dc.readyState === 'open') { dc.send(JSON.stringify(obj)); return true; } return false; }
@@ -696,8 +839,14 @@
     rec.onstop = finalizeRec; rec.start(1000); draw();
     state.recStart = Date.now(); $('recBadge').classList.add('on'); state.recTimer = setInterval(() => { const s = Math.floor((Date.now() - state.recStart) / 1000); $('recTime').textContent = pad(Math.floor(s / 60)) + ':' + pad(s % 60); }, 500);
     $('recBtn').disabled = true; $('stopRecBtn').disabled = false; toast('Aufnahme läuft');
+    zeigeRec(true); dcBroadcast({ kind: 'rec', on: true });
   }
-  function stopRec() { if (state.recorder && state.recorder.state !== 'inactive') state.recorder.stop(); state.recorder = null; clearInterval(state.recTimer); $('recBadge').classList.remove('on'); $('recBtn').disabled = false; $('stopRecBtn').disabled = true; }
+  function stopRec() {
+    if (state.recorder && state.recorder.state !== 'inactive') state.recorder.stop();
+    state.recorder = null; clearInterval(state.recTimer);
+    $('recBadge').classList.remove('on'); $('recBtn').disabled = false; $('stopRecBtn').disabled = true;
+    zeigeRec(false); dcBroadcast({ kind: 'rec', on: false });
+  }
   function cover(ctx, v, x, y, w, h) { if (!v || !v.videoWidth) { ctx.fillStyle = '#0d1526'; ctx.fillRect(x, y, w, h); return; } const s = Math.max(w / v.videoWidth, h / v.videoHeight); const dw = v.videoWidth * s, dh = v.videoHeight * s; ctx.drawImage(v, x + (w - dw) / 2, y + (h - dh) / 2, dw, dh); }
   async function finalizeRec() {
     const blob = new Blob(state.recChunks, { type: state.recMime || 'video/webm' });
@@ -719,7 +868,8 @@
     resetForNext(); $('room').classList.remove('active'); openWaiting();
   }
   function resetForNext() {
-    state.docs = []; state.snaps = []; state.pendingDocs = []; state.recChunks = [];
+    state.docs = []; state.snaps = []; state.pendingDocs = []; state.recChunks = []; state.recStarted = false;
+    zeigeRec(false); wroomAus();
     ['hostShots', 'snapShots', 'guestShots'].forEach((id) => $(id).innerHTML = '');
     ['vName', 'vDocNumber', 'vDocType'].forEach((id) => $(id).value = '');
     checkBoxes().forEach((c) => c.checked = false); $('approveBtn').disabled = true; $('rejectBtn').disabled = false;
