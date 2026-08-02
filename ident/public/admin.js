@@ -5,6 +5,9 @@
   let token = '';
   function toast(m) { const t = $('toast'); t.textContent = m; t.classList.add('show'); clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('show'), 2400); }
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+  // acp.<domain> ist der Diagnose-Bereich: nur dort darf endgültig gelöscht
+  // werden. Im Tagesgeschäft (mcp./verwaltung) sind die Knöpfe gar nicht da.
+  const AUF_ACP = /^acp\./.test(location.hostname.toLowerCase());
   function btn(label, cls, fn) { const b = document.createElement('button'); b.textContent = label; if (cls) b.className = cls; b.addEventListener('click', fn); return b; }
 
   async function api(method, path, body) {
@@ -112,9 +115,23 @@
       bindDash();
     }
     $('login').style.display = 'none'; $('dash').classList.add('on');
-    $('whoami').textContent = 'Angemeldet als Admin';
+    $('whoami').textContent = AUF_ACP ? 'Diagnose · Admin' : 'Verwaltung · Admin';
+    hinweisBereich();
     show('overview');
     return true;
+  }
+
+  // Kurz erklären, wo man gerade ist – Löschen gibt es nur im Diagnose-Bereich.
+  function hinweisBereich() {
+    if ($('bereichHinweis')) return;
+    const d = document.createElement('div');
+    d.id = 'bereichHinweis'; d.className = 'note';
+    d.style.cssText = 'margin:0 0 1rem';
+    d.innerHTML = AUF_ACP
+      ? '🩺 <b>Diagnose-Bereich.</b> Hier siehst du die Überwachung – und nur hier lässt sich endgültig löschen. Bitte mit Bedacht.'
+      : '⚙️ <b>Verwaltung.</b> Endgültiges Löschen von Akten, Aufnahmen und Konten geht bewusst nicht hier, sondern nur über <b>acp.4ever1.tv</b>.';
+    const inhalt = document.querySelector('.content');
+    if (inhalt) inhalt.prepend(d);
   }
 
   function bindDash() {
@@ -298,7 +315,7 @@
           loadCases();
         }));
       }
-      acts.appendChild(btn('🗑 Akte löschen', 'danger', async () => { if (!confirm('Diese Akte inkl. Bilder endgültig löschen?')) return; await api('POST', '/api/case-delete', { id: c.id }); loadCases(); loadOverview(); }));
+      if (AUF_ACP) acts.appendChild(btn('🗑 Akte löschen', 'danger', async () => { if (!confirm('Diese Akte inkl. Bilder endgültig löschen?')) return; await api('POST', '/api/case-delete', { id: c.id }); loadCases(); loadOverview(); }));
       div.appendChild(acts);
       div.appendChild(entriesBlock(c));
       el.appendChild(div);
@@ -423,7 +440,7 @@
       acts.appendChild(btn('🔍 Groß ansehen', '', () => window.open(src, '_blank')));
       const dl = document.createElement('a'); dl.href = src; dl.className = 'reclink'; dl.textContent = '⬇ Herunterladen'; dl.setAttribute('download', 'audition_' + (rec.bigoName || rec.code || 'x') + '.' + (rec.ext || 'webm'));
       acts.appendChild(dl);
-      acts.appendChild(btn('🗑 Löschen', 'danger', async () => { if (!confirm('Aufnahme endgültig löschen?')) return; await api('POST', '/api/recording-delete', { id: rec.id }); loadRec(); loadOverview(); }));
+      if (AUF_ACP) acts.appendChild(btn('🗑 Löschen', 'danger', async () => { if (!confirm('Aufnahme endgültig löschen?')) return; await api('POST', '/api/recording-delete', { id: rec.id }); loadRec(); loadOverview(); }));
       div.appendChild(acts); el.appendChild(div);
     });
   }
@@ -513,7 +530,7 @@
       if (a.locked) acts.appendChild(btn('🔓 Entsperren', '', async () => { await api('POST', '/api/agent-unlock', { id: a.id }); loadAgents(); }));
       acts.appendChild(btn('🔑 PW zurücksetzen', '', async () => { const np = prompt('Neues Startpasswort (mind. 8 Zeichen):'); if (!np || np.length < 8) { toast('Zu kurz.'); return; } const x = await api('POST', '/api/agent-reset', { id: a.id, newPassword: np }); toast(x.body.ok ? 'Zurückgesetzt.' : 'Fehlgeschlagen.'); }));
       acts.appendChild(btn('📱 Geräte', '', () => showAgentDevices(a, div)));
-      acts.appendChild(btn('🗑', 'danger', async () => { if (!confirm('Mitarbeiter löschen?')) return; await api('POST', '/api/agent-delete', { id: a.id }); loadAgents(); loadOverview(); }));
+      if (AUF_ACP) acts.appendChild(btn('🗑', 'danger', async () => { if (!confirm('Mitarbeiter löschen?')) return; await api('POST', '/api/agent-delete', { id: a.id }); loadAgents(); loadOverview(); }));
       div.appendChild(acts); el.appendChild(div);
     });
   }

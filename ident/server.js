@@ -226,6 +226,15 @@ async function handleApi(req, res, urlPath, ip) {
   if (!urlPath.startsWith('/api/')) return false;
   // Nur-Admin-Prüfung (früh definiert, damit sie überall im Handler nutzbar ist)
   const adminOnly = () => { if (!isAdmin(req, ip)) { sendJson(res, 403, { reason: 'admin-only' }); return false; } return true; };
+  // Endgültiges Löschen gibt es ausschliesslich über acp.<domain>. Wer aus
+  // Versehen im Tagesgeschäft auf einen Knopf kommt, kann damit nichts
+  // vernichten – dafür muss man bewusst den Diagnose-Bereich aufrufen.
+  const aufAcp = /^acp\./.test(String(req.headers.host || '').split(':')[0].toLowerCase());
+  const loeschenErlaubt = () => {
+    if (!adminOnly()) return false;
+    if (!aufAcp) { sendJson(res, 403, { reason: 'nur-acp' }); return false; }
+    return true;
+  };
 
   // ---- Login (Admin ODER Mitarbeiter) ----
   if (urlPath === '/api/login' && req.method === 'POST') {
@@ -672,7 +681,7 @@ async function handleApi(req, res, urlPath, ip) {
     sendJson(res, 200, { streamer: s }); return true;
   }
   if (urlPath === '/api/streamer-delete' && req.method === 'POST') {
-    if (!adminOnly()) return true;
+    if (!loeschenErlaubt()) return true;
     let body; try { body = await readJson(req, 16 * 1024); } catch { body = {}; }
     const ok = store.deleteStreamer(String(body.id || ''));
     if (ok) sec.recordEvent('audit', ip, 'Streamer-Ordner gelöscht');
@@ -738,7 +747,7 @@ async function handleApi(req, res, urlPath, ip) {
     sendJson(res, 200, { id: rec.id, username: rec.username, totpSecret: rec.totpSecret, otpauth, qr, has2fa: !!rec.totpSecret }); return true;
   }
   if (urlPath === '/api/agent-delete' && req.method === 'POST') {
-    if (!adminOnly()) return true; let body; try { body = await readJson(req, 16 * 1024); } catch { body = {}; }
+    if (!loeschenErlaubt()) return true; let body; try { body = await readJson(req, 16 * 1024); } catch { body = {}; }
     sendJson(res, 200, { ok: store.deleteAgent(body.id) }); return true;
   }
   if (urlPath === '/api/agent-reset' && req.method === 'POST') {
@@ -964,7 +973,7 @@ async function handleApi(req, res, urlPath, ip) {
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' }); res.end(html); return true;
   }
   if (urlPath === '/api/case-delete' && req.method === 'POST') {
-    if (!adminOnly()) return true; let body; try { body = await readJson(req, 16 * 1024); } catch { body = {}; }
+    if (!loeschenErlaubt()) return true; let body; try { body = await readJson(req, 16 * 1024); } catch { body = {}; }
     const ok = store.deleteCase(body.id); if (ok) sec.recordEvent('audit', ip, 'Fall gelöscht: ' + body.id);
     sendJson(res, 200, { ok }); return true;
   }
@@ -997,7 +1006,7 @@ async function handleApi(req, res, urlPath, ip) {
     res.end(data.buffer); return true;
   }
   if (urlPath === '/api/recording-delete' && req.method === 'POST') {
-    if (!adminOnly()) return true; let body; try { body = await readJson(req, 16 * 1024); } catch { body = {}; }
+    if (!loeschenErlaubt()) return true; let body; try { body = await readJson(req, 16 * 1024); } catch { body = {}; }
     const ok = store.deleteRecording(body.id); if (ok) sec.recordEvent('audit', ip, 'Aufnahme gelöscht: ' + body.id);
     sendJson(res, 200, { ok }); return true;
   }
@@ -1038,23 +1047,35 @@ const server = http.createServer(async (req, res) => {
   //   admin.*   -> Admin-Bereich            (admin.html)
   //   mcp.*     -> Streamer-Ordner          (mcp.html)
   const hostName = String(req.headers.host || '').split(':')[0].toLowerCase();
-  const adminHost = hostName.startsWith('admin.');
-  const mcpHost = hostName.startsWith('mcp.') || hostName.startsWith('mein.');
+  const acpHost = hostName.startsWith('acp.');          // Diagnose + Löschen
+  const mcpHost = hostName.startsWith('mcp.') || hostName.startsWith('mein.');  // Team
+  const altHost = hostName.startsWith('admin.') || hostName.startsWith('pruefer.');
+  // Alte Adressen leiten auf den Team-Bereich weiter, damit Lesezeichen und
+  // laufende Sitzungen nicht ins Leere laufen. Vorübergehend (302), damit
+  // Browser es nicht dauerhaft merken.
+  if (altHost) {
+    const ziel = 'https://mcp.' + hostName.split('.').slice(1).join('.') + (hostName.startsWith('admin.') ? '/verwaltung' : '/');
+    res.writeHead(302, { Location: ziel, 'Cache-Control': 'no-store' });
+    res.end('Umgezogen nach ' + ziel); return;
+  }
+  const adminHost = acpHost;   // der Admin-Bereich wird über acp. und mcp./verwaltung erreicht
   // Hauptdomain (4ever1.tv, www.4ever1.tv) -> öffentliche Startseite der Agentur.
   // ident./pruefer. -> Audition bzw. Mitarbeiter-Login, admin. -> Verwaltung.
-  const knownSub = /^(ident|pruefer|admin|mcp|mein)\./.test(hostName);
+  const knownSub = /^(ident|pruefer|admin|acp|mcp|mein)\./.test(hostName);
   const homeHost = !knownSub && !/^(localhost|127\.|\[|\d+\.\d+\.\d+\.\d+$)/.test(hostName);
-  if (urlPath === '/') urlPath = adminHost ? '/admin.html' : (mcpHost ? '/mcp.html' : (homeHost ? '/home.html' : '/index.html'));
+  // acp. -> Diagnose/Löschen, mcp. -> Team-Bereich (Warteraum + Ordner),
+  // Hauptdomain -> öffentliche Seite, sonst die Bewerber-Seite.
+  if (urlPath === '/') urlPath = acpHost ? '/admin.html' : (mcpHost ? '/index.html' : (homeHost ? '/home.html' : '/index.html'));
   if (urlPath === '/start' || urlPath === '/home') urlPath = '/home.html';
   // Eigener Direkt-Link für Prüfer -> Startseite öffnet gleich den Mitarbeiter-Login
   if (['/pruefer', '/login', '/team', '/mitarbeiter'].includes(urlPath)) urlPath = '/index.html';
-  // Der Admin-Bereich ist AUSSCHLIESSLICH über admin.<domain> erreichbar.
-  // Auf allen anderen Adressen (z. B. ident.4ever1.tv/admin) gibt es ihn nicht.
-  if (urlPath === '/panel' || urlPath === '/admin' || urlPath === '/admin.html') {
-    if (!adminHost) { res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }); res.end('Nicht gefunden'); return; }
+  // Die Verwaltung gibt es nur unter acp.<domain> und mcp.<domain>/verwaltung.
+  // Auf allen anderen Adressen (z. B. ident.4ever1.tv/admin) existiert sie nicht.
+  if (['/panel', '/admin', '/admin.html', '/verwaltung'].includes(urlPath)) {
+    if (!acpHost && !mcpHost) { res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }); res.end('Nicht gefunden'); return; }
     urlPath = '/admin.html';
   }
-  // Streamer-Ordner nur unter mcp.<domain> bzw. mein.<domain>
+  // Eigenständige Ordner-Seite nur unter mcp.<domain> bzw. mein.<domain>
   if (urlPath === '/mcp' || urlPath === '/ordner' || urlPath === '/mcp.html') {
     if (!mcpHost) { res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }); res.end('Nicht gefunden'); return; }
     urlPath = '/mcp.html';

@@ -55,9 +55,16 @@
   // Eigener Prüfer-Link (/pruefer, /login, /team, /mitarbeiter oder ?login) ->
   // die Lobby startet direkt im Mitarbeiter-Login statt in der Bewerber-Ansicht.
   const staffPaths = ['/pruefer', '/login', '/team', '/mitarbeiter'];
-  const staffHost = location.hostname.toLowerCase().startsWith('pruefer.');
+  // mcp./mein. ist der Team-Bereich – dort startet die Seite gleich im
+  // Mitarbeiter-Login, und der Umweg zur Bewerber-Ansicht entfällt.
+  const teamHost = /^(pruefer|mcp|mein)\./.test(location.hostname.toLowerCase());
+  const staffHost = teamHost;
   if (staffHost || staffPaths.includes(location.pathname.toLowerCase()) || params.has('login') || params.has('staff')) mode = 'host';
   setMode(mode);
+  if (/^(mcp|mein)\./.test(location.hostname.toLowerCase()) && $('staffToggle')) {
+    $('staffToggle').style.display = 'none';   // hier gibt es keine Bewerber-Ansicht
+    document.title = '4EVER1 · Team';
+  }
 
   $('staffToggle').addEventListener('click', () => { mode = mode === 'guest' ? 'host' : 'guest'; $('lobbyErr').textContent = ''; setMode(mode); });
   function setMode(m) {
@@ -252,7 +259,106 @@
     $('waitRole').textContent = state.isAdmin ? 'Admin' : 'Prüfer';
     $('waitAvatar').textContent = (state.name || 'P').charAt(0).toUpperCase();
     $('newCodeResult').textContent = '';
+    if ($('navVerwaltung')) $('navVerwaltung').style.display = state.isAdmin ? '' : 'none';
+    zeigeBereich('warteraum');
     refreshWaiting(); clearInterval(state.waitingTimer); state.waitingTimer = setInterval(refreshWaiting, 3000);
+  }
+
+  // ================= TEAM-BEREICH: Warteraum <-> Streamer-Ordner =============
+  // Beides in derselben Oberfläche, damit man sich nicht zweimal anmelden muss.
+  function zeigeBereich(was) {
+    const ordner = was === 'ordner';
+    if ($('paneWarteraum')) $('paneWarteraum').style.display = ordner ? 'none' : '';
+    if ($('paneLaufend')) $('paneLaufend').style.display = ordner ? 'none' : '';
+    if ($('paneOrdner')) $('paneOrdner').style.display = ordner ? '' : 'none';
+    if ($('navWarteraum')) $('navWarteraum').classList.toggle('sel', !ordner);
+    if ($('navOrdner')) $('navOrdner').classList.toggle('sel', ordner);
+    if (ordner) ladeOrdner();
+  }
+  if ($('navWarteraum')) $('navWarteraum').addEventListener('click', () => zeigeBereich('warteraum'));
+  if ($('navOrdner')) $('navOrdner').addEventListener('click', () => zeigeBereich('ordner'));
+  if ($('ordnerNeu')) $('ordnerNeu').addEventListener('click', () => ladeOrdner(true));
+  if ($('ordnerSuche')) $('ordnerSuche').addEventListener('input', () => zeichneOrdner());
+
+  const ORD_STATUS = { neu: 'neu', aktiv: 'aktiv', pausiert: 'pausiert', abgelehnt: 'abgelehnt', weg: 'nicht mehr dabei' };
+  function ordPill(s) {
+    const t = ORD_STATUS[s] || s || 'neu';
+    const k = s === 'aktiv' ? 'ok' : (s === 'abgelehnt' || s === 'weg') ? 'no' : 'warn';
+    return '<span class="wait-pill ' + k + '">' + esc(t) + '</span>';
+  }
+  async function ladeOrdner(neu) {
+    if (neu) $('ordnerInhalt').innerHTML = '<div class="deck-empty">Wird geladen …</div>';
+    const r = await api('GET', '/api/streamers');
+    state.ordner = (r.body && r.body.streamers) || [];
+    state.offenerOrdner = null;
+    zeichneOrdner();
+  }
+  function zeichneOrdner() {
+    const host = $('ordnerInhalt'); if (!host) return;
+    if (state.offenerOrdner) { zeichneEinenOrdner(state.offenerOrdner); return; }
+    const q = ($('ordnerSuche').value || '').trim().toLowerCase();
+    const liste = (state.ordner || []).filter((s) => !q
+      || (s.bigoId || '').toLowerCase().includes(q) || (s.name || '').toLowerCase().includes(q));
+    if (!liste.length) {
+      host.innerHTML = (state.ordner || []).length
+        ? '<div class="deck-empty">Nichts gefunden.</div>'
+        : '<div class="deck-empty">Noch keine Ordner.<br>Sobald eine Audition abgeschlossen ist, erscheint sie hier von selbst.</div>';
+      return;
+    }
+    host.innerHTML = '<div class="ord-grid"></div>';
+    const grid = host.querySelector('.ord-grid');
+    liste.forEach((s) => {
+      const d = document.createElement('div'); d.className = 'ord-card';
+      const n = (s.auditions || []).length;
+      d.innerHTML = '<div class="oid">' + esc(s.bigoId) + '</div>'
+        + '<div class="onm">' + esc(s.name || 'Name unbekannt') + (s.alter ? ' · ' + esc(s.alter) + ' J.' : '') + '</div>'
+        + '<div class="orow">' + ordPill(s.status) + '<span class="muted">' + n + ' Audition' + (n === 1 ? '' : 'en') + '</span></div>';
+      d.addEventListener('click', () => { state.offenerOrdner = s.id; zeichneOrdner(); });
+      grid.appendChild(d);
+    });
+  }
+  function zeichneEinenOrdner(id) {
+    const s = (state.ordner || []).find((x) => x.id === id);
+    const host = $('ordnerInhalt');
+    if (!s) { state.offenerOrdner = null; zeichneOrdner(); return; }
+    host.innerHTML = '';
+    const zurueck = document.createElement('button');
+    zurueck.textContent = '← Alle Ordner'; zurueck.style.marginBottom = '.8rem';
+    zurueck.addEventListener('click', () => { state.offenerOrdner = null; zeichneOrdner(); });
+    host.appendChild(zurueck);
+
+    const kopf = document.createElement('div'); kopf.className = 'ord-aud';
+    kopf.innerHTML = '<b style="font-size:1.1rem">' + esc(s.bigoId) + '</b> ' + ordPill(s.status)
+      + '<div class="ometa">' + esc(s.name || 'Name unbekannt') + (s.alter ? ' · ' + esc(s.alter) + ' Jahre' : '')
+      + (s.notiz ? '<br>Notiz: ' + esc(s.notiz) : '') + '</div>';
+    host.appendChild(kopf);
+
+    (s.auditions || []).forEach((a) => {
+      const auf = a.aufnahme;
+      const erg = a.ergebnis === 'approved' ? '<span class="wait-pill ok">✓ freigegeben</span>'
+        : a.ergebnis === 'rejected' ? '<span class="wait-pill no">✖ abgelehnt</span>'
+          : '<span class="wait-pill warn">offen</span>';
+      const aufTxt = !auf ? '<span class="muted">keine Aufnahme</span>'
+        : '🎬 ' + Math.floor((auf.sekunden || 0) / 60) + ':' + pad((auf.sekunden || 0) % 60) + ' · '
+          + (auf.auswertung === 'ok' ? '<span class="wait-pill ok">brauchbar</span>'
+            : auf.auswertung === 'bad' ? '<span class="wait-pill no">nicht brauchbar</span>'
+              : '<span class="wait-pill warn">nicht ausgewertet</span>')
+          + (auf.begruendung ? ' <span class="muted">' + esc(auf.begruendung) + '</span>' : '');
+      const d = document.createElement('div'); d.className = 'ord-aud';
+      d.innerHTML = '<div style="display:flex;justify-content:space-between;gap:.6rem;flex-wrap:wrap">'
+        + '<b>Audition vom ' + esc(new Date(a.erstelltAm).toLocaleString('de-DE')) + '</b>' + erg + '</div>'
+        + '<div class="ometa">Prüfer: ' + esc(a.pruefer || '—') + ' · Nummer: ' + esc(a.zugangsnummer || '—')
+        + '<br>' + esc(a.ausweisart || 'Ausweis unbekannt') + ' · Nr.: ' + esc(a.ausweisnummer || '—')
+        + (a.ablehnungsgrund ? '<br>Grund: ' + esc(a.ablehnungsgrund) : '') + '</div>'
+        + '<div style="margin-top:.45rem">' + aufTxt + '</div>'
+        + (auf ? '<video controls preload="metadata" src="/api/recording?id=' + encodeURIComponent(auf.id)
+            + '&token=' + encodeURIComponent(state.token) + '"></video>' : '')
+        + ((a.protokoll || []).length ? '<div class="ord-prot"><b>Protokoll</b>'
+            + a.protokoll.map((e) => '<div style="padding:.3rem 0">' + esc(e.text)
+              + '<small>' + esc(e.autor || '') + ' · ' + esc(new Date(e.am).toLocaleString('de-DE')) + '</small></div>').join('')
+            + '</div>' : '');
+      host.appendChild(d);
+    });
   }
   async function refreshWaiting() {
     const r = await api('GET', '/api/waiting');
