@@ -307,6 +307,46 @@ function listStreamers() {
   streamers.forEach((s) => { if (!s.art) s.art = 'streamer'; if (!Array.isArray(s.eintraege)) s.eintraege = []; });
   return streamers.slice().sort((a, b) => String(b.letzteAktivitaet || b.angelegtAm).localeCompare(String(a.letzteAktivitaet || a.angelegtAm)));
 }
+
+/**
+ * Dieselbe Liste, aber ohne Inhalte: Wer nicht Admin ist, sieht zunächst nur,
+ * DASS es eine Akte gibt – nicht, was drinsteht. Vermerke, Auditionen,
+ * Ausweisnummern und Protokolle bleiben draussen, bis ein Grund genannt ist.
+ * Das ist keine Anzeige-Entscheidung im Browser, sondern der Server schickt
+ * die Inhalte gar nicht erst mit.
+ */
+function listStreamersKurz() {
+  return listStreamers().map((s) => ({
+    id: s.id, bigoId: s.bigoId, name: s.name, alter: s.alter,
+    status: s.status, art: s.art || 'streamer', herkunft: s.herkunft || '',
+    angelegtAm: s.angelegtAm, letzteAktivitaet: s.letzteAktivitaet,
+    anzahlAuditions: (s.auditions || []).length,
+    anzahlVermerke: (s.eintraege || []).length,
+    verschlossen: true,
+  }));
+}
+
+/**
+ * Akteneinsicht festhalten. Wer eine Akte öffnet, hinterlässt eine Spur –
+ * mit Grund. Das steht anschliessend in der Akte selbst, für alle sichtbar.
+ * Nicht heimlich: Wer nachsieht, wird gesehen.
+ */
+function protokolliereZugriff(id, { wer, rolle, grund, ip }) {
+  const s = getStreamer(id); if (!s) return null;
+  if (!Array.isArray(s.zugriffe)) s.zugriffe = [];
+  const rec = {
+    id: crypto.randomUUID(),
+    wer: String(wer || 'unbekannt').slice(0, 60),
+    rolle: rolle === 'admin' ? 'admin' : 'pruefer',
+    grund: String(grund || '').slice(0, 300),
+    ip: String(ip || '').slice(0, 60),
+    am: new Date().toISOString(),
+  };
+  s.zugriffe.unshift(rec);
+  if (s.zugriffe.length > 300) s.zugriffe.length = 300;
+  save('streamers.json', streamers);
+  return rec;
+}
 function getStreamer(id) {
   return streamers.find((s) => s.id === id || ordnerSchluessel(s.bigoId) === ordnerSchluessel(id)) || null;
 }
@@ -734,7 +774,7 @@ module.exports = {
   setAgentPassword, changeOwnPassword, lockAgent, unlockAgent, deleteAgent, agentCount,
   addPasskey, getAgentByPasskeyId, setPasskeyCounter, agentPasskeys,
   createCode, getCode, isCodeUsable, consumeCode, revokeCode, listCodes,
-  suchePerson, ordnerAnlegen,
+  suchePerson, ordnerAnlegen, listStreamersKurz, protokolliereZugriff,
   saveCase, listCases, getCase, deleteCase, readDoc, purgeOlderThan,
   saveRecording, listRecordings, getRecording, readRecording, reviewRecording, deleteRecording,
   setCaseMcp, getRecordingByCode,

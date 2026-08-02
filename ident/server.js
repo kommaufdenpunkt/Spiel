@@ -707,9 +707,37 @@ async function handleApi(req, res, urlPath, ip) {
 
   // ---- Streamer-Ordner (mcp.4ever1.tv) ------------------------------------
   // Prüfer dürfen die Ordner sehen; ändern und löschen nur Admins.
+  // Der Adminbereich sieht alles. Prüfer bekommen zunächst nur die Hülle:
+  // dass es eine Akte gibt, wie sie heisst, wie viel drinsteht. Der Inhalt
+  // kommt erst nach /api/streamer-oeffnen mit genanntem Grund – und zwar
+  // wirklich erst dann, der Server schickt ihn vorher nicht mit.
   if (urlPath === '/api/streamers' && req.method === 'GET') {
     if (!authed(req, ip)) { sendJson(res, 401, { reason: 'auth' }); return true; }
-    sendJson(res, 200, { streamers: store.listStreamers() }); return true;
+    const admin = isAdmin(req, ip);
+    sendJson(res, 200, {
+      streamers: admin ? store.listStreamers() : store.listStreamersKurz(),
+      voll: admin,
+    });
+    return true;
+  }
+
+  // ---- Akteneinsicht: nur mit Grund ----
+  // Wer kein Admin ist, muss sagen, warum er hineinschaut. Der Grund landet
+  // in der Akte, sichtbar für alle, und im Sicherheitsprotokoll. Admins
+  // kommen ohne Angabe hinein – aber auch ihr Zugriff wird festgehalten.
+  if (urlPath === '/api/streamer-oeffnen' && req.method === 'POST') {
+    if (!authed(req, ip)) { sendJson(res, 401, { reason: 'auth' }); return true; }
+    let body; try { body = await readJson(req, 16 * 1024); } catch { body = {}; }
+    const admin = isAdmin(req, ip);
+    const grund = String(body.grund || '').trim();
+    if (!admin && grund.length < 5) { sendJson(res, 400, { reason: 'grund-fehlt' }); return true; }
+    const s = store.getStreamer(body.id);
+    if (!s) { sendJson(res, 404, { reason: 'nicht-gefunden' }); return true; }
+    const wer = reqName(req, ip) || 'Unbekannt';
+    store.protokolliereZugriff(s.id, { wer, rolle: admin ? 'admin' : 'pruefer', grund: admin ? (grund || 'Adminzugriff') : grund, ip });
+    sec.recordEvent('audit', ip, 'Akte geöffnet (' + wer + '): ' + s.bigoId + (grund ? ' – ' + grund : ''));
+    sendJson(res, 200, { ordner: store.getStreamer(s.id) });
+    return true;
   }
   if (urlPath === '/api/streamer' && req.method === 'GET') {
     if (!authed(req, ip)) { sendJson(res, 401, { reason: 'auth' }); return true; }

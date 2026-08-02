@@ -122,6 +122,27 @@
   .ord-card .oid{font-weight:700;word-break:break-all}
   .ord-card .onm{color:var(--dim);font-size:.83rem}
   .uebernommen{font-size:.72rem;color:#a9c2ff;line-height:1.35}
+  /* Akteneinsicht nur mit Grund - und offen sichtbar, wer nachgesehen hat. */
+  .grundbox{border:1px solid var(--warn);background:#2a2313;border-radius:16px;padding:1.1rem 1.2rem;max-width:520px}
+  .grundbox h3{margin:0 0 .5rem;font-size:1.05rem}
+  .grundbox p{margin:0 0 .8rem;font-size:.85rem;color:var(--dim);line-height:1.6}
+  .grund-schnell{display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:.7rem}
+  .grund-schnell button{font-size:.78rem;padding:.4rem .7rem}
+  .grundbox input{width:100%;margin-bottom:.7rem}
+  .grund-akt{display:flex;gap:.5rem;flex-wrap:wrap}
+  .ord-zugriffe{margin-top:.8rem}
+  .ord-zugriffe summary{cursor:pointer;user-select:none;color:var(--dim);font-size:.82rem}
+  .zg-liste{margin-top:.5rem;display:flex;flex-direction:column;gap:.45rem}
+  .zg{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:.5rem .65rem;font-size:.8rem}
+  .zg-rolle{font-size:.68rem;color:#bcd0ff;border:1px solid var(--line2);border-radius:999px;padding:.05rem .4rem;margin-left:.3rem}
+  .zg-zeit{float:right;color:var(--dim);font-size:.73rem}
+  .zg-grund{color:var(--dim);margin-top:.2rem;overflow-wrap:anywhere}
+  /* Fundstellen der Suche: zeigen, WARUM dieser Ordner dabei ist. */
+  .tr-fund{margin-top:.5rem;padding-top:.45rem;border-top:1px solid var(--line);font-size:.76rem;line-height:1.5}
+  .tr-zeile{color:var(--dim);margin-bottom:.2rem;overflow-wrap:anywhere}
+  .tr-zeile b{color:var(--ink);font-weight:600}
+  .tr-fund mark{background:#3a4f22;color:#dcf5b0;border-radius:3px;padding:0 .15em}
+  .tr-mehr{color:var(--dim);font-size:.72rem;opacity:.8}
   .ord-card .orow{display:flex;justify-content:space-between;align-items:center;margin-top:.5rem;gap:.4rem}
   .ord-aud{background:var(--panel2);border:1px solid var(--line);border-radius:14px;padding:.85rem .95rem;margin-bottom:.7rem}
   .ord-aud .ometa{color:var(--dim);font-size:.83rem;line-height:1.65}
@@ -463,12 +484,14 @@
         <input id="ageInput" inputmode="numeric" placeholder="z. B. 22" autocomplete="off">
       </div>
       <label class="consent"><input type="checkbox" id="consent">
-        Ich willige ausdrücklich und freiwillig ein, dass die Agentur 4EVER1 meine Angaben,
-        Ausweis- und Gesichtsbilder sowie die Bild- und Tonaufzeichnung dieses Bewerbungs-
-        gesprächs (Audition) zum Zweck meiner Bewerbung als Streamer:in bei BIGO Live
-        verarbeitet, verschlüsselt speichert und zur Bearbeitung meiner Bewerbung an den
-        BIGO-Support weiterleitet. Diese Einwilligung ist freiwillig und kann jederzeit mit
-        Wirkung für die Zukunft widerrufen werden.</label>
+        Ich werde als Streamer:in der Agentur <b>4EVER1</b> aufgefordert, meine
+        <b>Ausweisdaten</b> anzugeben, und willige ausdrücklich und freiwillig ein, dass
+        4EVER1 diese Angaben, meine Ausweis- und Gesichtsbilder sowie die Bild- und
+        Tonaufzeichnung dieser Audition <b>weiterverarbeitet</b>, verschlüsselt speichert
+        und zur Bearbeitung meiner Bewerbung an den BIGO-Support weiterleitet.<br>
+        <b>Nur ein sehr kleiner Kreis kommt an diese Daten</b> – jeder Zugriff wird mit Name,
+        Uhrzeit und Grund festgehalten. Diese Einwilligung ist freiwillig und kann jederzeit
+        mit Wirkung für die Zukunft widerrufen werden.</label>
       <div class="dslink"><a href="/datenschutz" target="_blank" rel="noopener">Datenschutzerklärung</a> · <a href="/impressum" target="_blank" rel="noopener">Impressum</a></div>
     </div>
 
@@ -753,7 +776,7 @@
         <span class="muted">Jede abgeschlossene Audition landet hier automatisch.</span>
       </div>
       <div style="display:flex;gap:.5rem;margin-bottom:.8rem;flex-wrap:wrap;align-items:center">
-        <input id="ordnerSuche" placeholder="🔎 BIGO-ID oder Name suchen …" style="flex:1;min-width:180px">
+        <input id="ordnerSuche" placeholder="🔎 Suchen: Name, BIGO-ID, Vermerke, wer was geschrieben hat, Prüfer, Ausweis-Nr. …" style="flex:1;min-width:180px">
         <div class="artfilter">
           <button data-art="alle" class="sel">Alle</button>
           <button data-art="familie">👨‍👩‍👧 Familie</button>

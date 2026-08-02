@@ -89,8 +89,11 @@
     const guest = m !== 'host';
     $('applicantFields').style.display = guest ? '' : 'none';
     $('staffFields').style.display = guest ? 'none' : '';
-    $('lobbyTitle').textContent = guest ? 'Audition starten' : 'Mitarbeiter-Anmeldung';
-    $('lobbySub').textContent = guest ? 'Gib deine Zugangsnummer ein, die du erhalten hast.' : 'Nur für Prüfer und Admins.';
+    // Der Team-Login bleibt bewusst wortkarg. Wer hierher gehoert, weiss, was
+    // das ist. Wer nicht, soll aus der Seite nichts ablesen koennen.
+    $('lobbyTitle').textContent = guest ? 'Audition starten' : 'Anmeldung';
+    $('lobbySub').textContent = guest ? 'Gib deine Zugangsnummer ein, die du erhalten hast.' : '';
+    $('lobbySub').style.display = guest ? '' : 'none';
     $('enterBtn').textContent = guest ? 'Audition starten' : 'Anmelden';
     $('staffToggle').textContent = guest ? 'Mitarbeiter-Login →' : '← Zurück';
   }
@@ -570,6 +573,138 @@
     zeichneOrdner();
     if (state.bereich === 'uebersicht') zeichneKacheln();
   }
+  // ---- Suche quer durch die ganze Akte -------------------------------------
+  // Nicht nur BIGO-ID und Name: auch Vermerke, wer sie geschrieben hat,
+  // Prüfer, Ausweisnummern, Zugangsnummern, Ablehnungsgründe und das
+  // Protokoll. Und die Trefferstelle wird gezeigt - sonst sucht man zwar
+  // erfolgreich, weiss aber nicht, warum dieser Ordner dabei ist.
+  const STATUSWORT = { neu: 'neu', aktiv: 'aktiv', pausiert: 'pausiert', abgelehnt: 'abgelehnt', raus: 'nicht mehr dabei' };
+  const ERGWORT = { approved: 'freigegeben', rejected: 'abgelehnt', open: 'offen' };
+  function trefferIn(s, q) {
+    const gefunden = [];
+    const pruef = (wo, text) => {
+      if (!text) return;
+      const t = String(text);
+      if (t.toLowerCase().includes(q)) gefunden.push({ wo, text: t });
+    };
+    pruef('BIGO-ID', s.bigoId);
+    pruef('Name', s.name);
+    pruef('Notiz', s.notiz);
+    pruef('Status', STATUSWORT[s.status] || s.status);
+    if ((s.art || 'streamer') === 'familie') pruef('Art', 'Familie');
+    if (s.herkunft === 'pkboard') pruef('Herkunft', 'aus dem PK-Board übernommen');
+    (s.eintraege || []).forEach((e) => {
+      pruef('Vermerk', e.text);
+      pruef('Vermerk von', e.author);
+    });
+    (s.auditions || []).forEach((a) => {
+      pruef('Prüfer', a.pruefer);
+      pruef('Zugangsnummer', a.zugangsnummer);
+      pruef('Ausweis-Nr.', a.ausweisnummer);
+      pruef('Ausweisart', a.ausweisart);
+      pruef('Notiz zur Audition', a.notiz);
+      pruef('Ablehnungsgrund', a.ablehnungsgrund);
+      pruef('Ergebnis', ERGWORT[a.ergebnis] || a.ergebnis);
+      if (a.aufnahme) pruef('Aufnahme', a.aufnahme.begruendung);
+      (a.checkliste || []).forEach((c) => pruef('Abgehakt', c));
+      (a.protokoll || []).forEach((e) => { pruef('Protokoll', e.text); pruef('Protokoll von', e.autor); });
+    });
+    return gefunden;
+  }
+  // Fundstelle mit hervorgehobenem Suchwort, gekürzt auf das Wesentliche.
+  function markiere(text, q) {
+    const t = String(text);
+    const i = t.toLowerCase().indexOf(q);
+    if (i < 0) return esc(t.slice(0, 90));
+    const von = Math.max(0, i - 28);
+    const bis = Math.min(t.length, i + q.length + 46);
+    return (von > 0 ? '…' : '') + esc(t.slice(von, i))
+      + '<mark>' + esc(t.slice(i, i + q.length)) + '</mark>'
+      + esc(t.slice(i + q.length, bis)) + (bis < t.length ? '…' : '');
+  }
+  function trefferZeilen(treffer) {
+    if (!treffer || !treffer.length) return '';
+    const q = ($('ordnerSuche').value || '').trim().toLowerCase();
+    // BIGO-ID und Name stehen schon oben auf der Karte - die muss man nicht
+    // nochmal als Fundstelle zeigen.
+    const zeigen = treffer.filter((t) => !['BIGO-ID', 'Name'].includes(t.wo));
+    if (!zeigen.length) return '';
+    const mehr = zeigen.length > 2 ? '<div class="tr-mehr">+ ' + (zeigen.length - 2) + ' weitere Fundstelle'
+      + (zeigen.length - 2 === 1 ? '' : 'n') + '</div>' : '';
+    return '<div class="tr-fund">' + zeigen.slice(0, 2).map((t) =>
+      '<div class="tr-zeile"><b>' + esc(t.wo) + ':</b> ' + markiere(t.text, q) + '</div>').join('') + mehr + '</div>';
+  }
+
+  // ---- Akteneinsicht: erst der Grund, dann der Inhalt ----------------------
+  // Prüfer müssen sagen, warum sie eine Akte öffnen. Der Grund steht danach in
+  // der Akte, für alle sichtbar. Admins kommen ohne Angabe hinein - ihr
+  // Zugriff wird trotzdem festgehalten. Kein heimliches Nachschauen.
+  async function akteOeffnen(id) {
+    if (state.isAdmin) return holeAkte(id, '');
+    const grund = await grundFragen();
+    if (grund === null) return;               // abgebrochen
+    return holeAkte(id, grund);
+  }
+  async function holeAkte(id, grund) {
+    const r = await api('POST', '/api/streamer-oeffnen', { id, grund });
+    if (r.status === 400) { toast('Bitte einen Grund angeben (mindestens 5 Zeichen).'); return; }
+    if (r.status !== 200 || !r.body.ordner) { toast('Akte konnte nicht geöffnet werden.'); return; }
+    // Den vollen Stand in die Liste zurückschreiben, damit die Ansicht ihn hat.
+    const i = (state.ordner || []).findIndex((x) => x.id === id);
+    if (i >= 0) state.ordner[i] = r.body.ordner; else (state.ordner = state.ordner || []).push(r.body.ordner);
+    state.offenerOrdner = id;
+    zeichneOrdner();
+  }
+  function grundFragen() {
+    return new Promise((fertig) => {
+      const host = $('ordnerInhalt'); if (!host) { fertig(null); return; }
+      host.innerHTML = '';
+      const k = document.createElement('div');
+      k.className = 'grundbox';
+      k.innerHTML = '<h3>🔒 Warum möchtest du diese Akte öffnen?</h3>'
+        + '<p>In der Akte stehen Ausweisdaten, Aufnahmen und Vermerke. Einsicht wird '
+        + 'protokolliert – dein Name, die Uhrzeit und dieser Grund stehen danach in der Akte.</p>'
+        + '<div class="grund-schnell">'
+        + ['Rückfrage vom Streamer', 'Vorbereitung Audition', 'Vermerk eintragen', 'Beschwerde prüfen', 'Datenabgleich']
+          .map((g) => '<button type="button" data-g="' + esc(g) + '">' + esc(g) + '</button>').join('')
+        + '</div>'
+        + '<input id="grundText" placeholder="oder eigenen Grund eintippen …" maxlength="300">'
+        + '<div class="grund-akt"><button id="grundOk" class="primary">Akte öffnen</button>'
+        + '<button id="grundAb">Abbrechen</button></div>'
+        + '<div class="err" id="grundErr"></div>';
+      host.appendChild(k);
+      const feld = k.querySelector('#grundText');
+      feld.focus();
+      k.querySelectorAll('.grund-schnell button').forEach((b) => {
+        b.addEventListener('click', () => { feld.value = b.dataset.g; feld.focus(); });
+      });
+      const ab = () => { fertig(null); state.offenerOrdner = null; zeichneOrdner(); };
+      k.querySelector('#grundAb').addEventListener('click', ab);
+      const ok = () => {
+        const g = feld.value.trim();
+        if (g.length < 5) { k.querySelector('#grundErr').textContent = 'Bitte kurz begründen – mindestens 5 Zeichen.'; feld.focus(); return; }
+        fertig(g);
+      };
+      k.querySelector('#grundOk').addEventListener('click', ok);
+      feld.addEventListener('keydown', (e) => { if (e.key === 'Enter') ok(); });
+    });
+  }
+
+  // Wer hat in diese Akte gesehen - und warum? Steht offen in der Akte.
+  function zugriffeBlock(s) {
+    const box = document.createElement('div');
+    box.className = 'ord-zugriffe';
+    const l = (s.zugriffe || []).slice(0, 12);
+    box.innerHTML = '<details' + (l.length ? '' : ' hidden') + '><summary>🔒 Akteneinsicht (' + (s.zugriffe || []).length + ')</summary>'
+      + '<div class="zg-liste">' + l.map((z) =>
+        '<div class="zg"><b>' + esc(z.wer) + '</b>'
+        + (z.rolle === 'admin' ? ' <span class="zg-rolle">Admin</span>' : '')
+        + '<span class="zg-zeit">' + esc(new Date(z.am).toLocaleString('de-DE')) + '</span>'
+        + '<div class="zg-grund">' + esc(z.grund || '—') + '</div></div>').join('')
+      + '</div></details>';
+    return box;
+  }
+
   function zeichneOrdner() {
     const host = $('ordnerInhalt'); if (!host) return;
     if (state.offenerOrdner) { zeichneEinenOrdner(state.offenerOrdner); return; }
@@ -579,7 +714,9 @@
       .filter((s) => f === 'alle' || (f === 'still'
         ? (['aktiv', 'neu'].includes(s.status) && stilleTage(s) >= STILL_AB)
         : (s.art || 'streamer') === f))
-      .filter((s) => !q || (s.bigoId || '').toLowerCase().includes(q) || (s.name || '').toLowerCase().includes(q));
+      .map((s) => ({ s, treffer: q ? trefferIn(s, q) : [] }))
+      .filter((x) => !q || x.treffer.length)
+      .map((x) => { x.s._treffer = x.treffer; return x.s; });
     if (!liste.length) {
       host.innerHTML = (state.ordner || []).length
         ? '<div class="deck-empty">' + (f === 'familie' ? 'Noch niemand als Familie eingetragen.<br>Ordner öffnen und dort umstellen.'
@@ -600,10 +737,11 @@
             ? '<span class="uebernommen" title="Aus dem PK-Board übernommen">aus dem PK-Board · noch keine Audition</span>'
             : '<span class="muted">' + n + ' Audition' + (n === 1 ? '' : 'en') + '</span>')
         + '</div>'
+        + trefferZeilen(s._treffer)
         + (['aktiv', 'neu'].includes(s.status) && stilleTage(s) >= STILL_AB
           ? '<div class="muted" style="margin-top:.35rem;font-size:.75rem;color:var(--warm)">🕰 seit '
             + stilleTage(s) + ' Tagen kein Eintrag</div>' : '');
-      d.addEventListener('click', () => { state.offenerOrdner = s.id; zeichneOrdner(); });
+      d.addEventListener('click', () => { akteOeffnen(s.id); });
       grid.appendChild(d);
     });
   }
@@ -733,6 +871,7 @@
     host.appendChild(kopf);
 
     host.appendChild(vermerkeBlock(s));
+    host.appendChild(zugriffeBlock(s));
 
     (s.auditions || []).forEach((a) => {
       const auf = a.aufnahme;
