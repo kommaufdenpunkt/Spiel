@@ -1,64 +1,164 @@
 
-  <nav class="nav">
-    <button data-sec="overview" class="sel">📊 Übersicht</button>
-    <button data-sec="cases">🗂 Fälle / Akten</button>
-    <button data-sec="rec">🎬 Aufnahmen</button>
-    <button data-sec="agents">👥 Mitarbeiter</button>
-    <button data-sec="script">📖 Audition-Text</button>
-    <button data-sec="adminsec">🔐 Sicherheit</button>
-    <button data-sec="security">🛡 Überwachung</button>
-    <button id="logout" style="margin-top:auto;color:var(--bad)">Abmelden</button>
+  <nav class="nav deck-nav">
+    <div class="deck-me">
+      <span class="deck-avatar" id="admAvatar">A</span>
+      <div><b id="admName">Admin</b><span class="muted" id="admWo">Verwaltung</span></div>
+    </div>
+
+    <div class="nav-gruppe" data-gruppe="betrieb">Tagesgeschäft</div>
+    <button class="deck-item sel" data-sec="overview">🏠 Übersicht</button>
+    <button class="deck-item" data-sec="cases">🗂 Fälle / Akten</button>
+    <button class="deck-item" data-sec="rec">🎬 Aufnahmen</button>
+
+    <div class="nav-gruppe" data-gruppe="einrichten">Einrichten</div>
+    <button class="deck-item" data-sec="agents">👥 Mitarbeiter</button>
+    <button class="deck-item" data-sec="script">📖 Audition-Texte</button>
+
+    <div class="nav-gruppe" data-gruppe="sicherheit">Sicherheit</div>
+    <button class="deck-item" data-sec="adminsec">🔐 Zugang &amp; Geräte</button>
+    <button class="deck-item" data-sec="security">🛡 Überwachung</button>
+
+    <div class="deck-spacer"></div>
+    <div class="nav-gruppe">Konto</div>
+    <a class="deck-item" id="zurueckTeam" href="/" style="display:none;text-decoration:none">← Team-Bereich</a>
+    <button class="deck-item" id="logout" style="color:var(--bad)">Abmelden</button>
   </nav>
-  <div class="content">
-    <div class="section on" data-pane="overview"><h2>Übersicht</h2><div class="stats" id="stats"></div></div>
-    <div class="section" data-pane="cases"><h2>Fälle / Akten</h2><p class="sub">Abgeschlossene Auditions inkl. Ausweis-/Gesichtsbilder – verschlüsselt.</p><input id="caseSearch" placeholder="🔎 Suchen: BIGO-ID, Name, Nummer, Prüfer, Status …" style="margin-bottom:1rem"><div id="caseList"></div></div>
-    <div class="section" data-pane="rec"><h2>Aufnahmen</h2><p class="sub">Aufgezeichnete Video-Gespräche – verschlüsselt gespeichert.</p><div id="recList"></div></div>
-    <div class="section" data-pane="agents"><h2>Mitarbeiter</h2>
-      <div class="note" style="margin-bottom:.7rem">Prüfer melden sich über ihren eigenen Link <b>pruefer.4ever1.tv</b> an. Benutzername + Startpasswort eingeben, Rolle wählen, anlegen – das reicht. Beim ersten Login setzt der Prüfer ein eigenes Passwort.</div>
-      <div class="addbar"><input id="newUser" placeholder="Benutzername"><input id="newPass" placeholder="Startpasswort"><select id="newRole" style="padding:.6rem;border-radius:10px;border:1px solid var(--line)"><option value="agent">Prüfer</option><option value="admin">Admin</option></select><button id="addAgent" class="primary">+ Anlegen</button></div>
+
+  <div class="content deck-main">
+    <div class="section on" data-pane="overview">
+      <div class="deck-head"><h2>Übersicht</h2><span class="muted" id="standMsg">Stand: gerade eben</span></div>
+      <div class="kacheln" id="stats"></div>
+      <div class="deck-head" style="margin-top:1.4rem"><h2 style="font-size:1rem">Zuletzt abgeschlossen</h2>
+        <span class="muted">die fünf jüngsten Auditions</span></div>
+      <div id="letzteFaelle"></div>
+    </div>
+
+    <div class="section" data-pane="cases">
+      <div class="deck-head"><h2>Fälle / Akten</h2><span class="muted">verschlüsselt gespeichert</span></div>
+      <input id="caseSearch" placeholder="🔎 Suchen: BIGO-ID, Name, Nummer, Prüfer, Status …" style="margin-bottom:1rem">
+      <div id="caseList"></div>
+    </div>
+
+    <div class="section" data-pane="rec">
+      <div class="deck-head"><h2>Aufnahmen</h2><span class="muted">verschlüsselt gespeichert</span></div>
+      <div id="recList"></div>
+    </div>
+
+    <div class="section" data-pane="agents">
+      <div class="deck-head"><h2>Mitarbeiter</h2><span class="muted">wer sich anmelden darf</span></div>
+      <div class="addbar">
+        <input id="newUser" placeholder="Benutzername">
+        <input id="newPass" placeholder="Startpasswort">
+        <select id="newRole" style="padding:.6rem;border-radius:10px;border:1px solid var(--line);background:#0f1728;color:var(--ink)">
+          <option value="agent">Prüfer</option><option value="admin">Admin</option>
+        </select>
+        <button id="addAgent" class="primary">+ Anlegen</button>
+      </div>
       <details style="margin-bottom:.9rem"><summary class="muted" style="cursor:pointer;user-select:none">🔐 Zusätzliche Sicherheit (optional)</summary>
         <label style="display:flex;align-items:center;gap:.45rem;font-size:.85rem;color:var(--dim);margin:.6rem 0 .2rem"><input type="checkbox" id="new2fa" style="width:auto"> 2FA verlangen – nach dem Anlegen erscheint ein QR-Code für Google Authenticator</label>
       </details>
       <div id="agentResult" class="note"></div><div id="agentList"></div>
     </div>
-    <div class="section" data-pane="script"><h2>Texte für die Audition</h2>
-      <h3 style="font-size:1rem;margin:.2rem 0 .3rem">Begrüßung / Ablauf (Warteraum)</h3>
+
+    <div class="section" data-pane="script">
+      <div class="deck-head"><h2>Audition-Texte</h2><span class="muted">was der Bewerber liest</span></div>
+      <h3 class="uh">Begrüßung / Ablauf</h3>
       <p class="sub">Sieht der Bewerber beim Reinkommen: Willkommen, Ablauf, PK-Board-Hinweis und die Einwilligung „ab jetzt wird aufgezeichnet". Zeilenumbrüche bleiben erhalten.</p>
-      <textarea id="introTextEdit" style="width:100%;min-height:220px;font-family:inherit;font-size:.95rem;line-height:1.6;padding:.8rem;border-radius:12px;border:1px solid var(--line);background:#0f1728;color:var(--ink)"></textarea>
-      <div style="margin-top:.7rem;display:flex;gap:.5rem;align-items:center"><button id="introSave" class="primary">Begrüßung speichern</button><span id="introMsg" class="muted"></span></div>
+      <textarea id="introTextEdit" class="gross"></textarea>
+      <div class="speicherzeile"><button id="introSave" class="primary">Begrüßung speichern</button><span id="introMsg" class="muted"></span></div>
       <div class="note" style="margin-top:1rem;display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap">
         <span>🎭 <b>Figuren &amp; Erklär-Video:</b> Baue eure Teamleitung als Comic-Figuren nach – sie tragen den Text oben als kleines Erklär-Video vor.</span>
         <a href="/figur" target="_blank" style="text-decoration:none"><button class="primary" type="button">Figuren-Baukasten öffnen →</button></a>
       </div>
-      <hr style="border:0;border-top:1px solid var(--line);margin:1.5rem 0">
-      <h3 style="font-size:1rem;margin:.2rem 0 .3rem">Vorlese-Text (Teleprompter)</h3>
+      <hr>
+      <h3 class="uh">Vorlese-Text (Teleprompter)</h3>
       <p class="sub">Diesen Text liest der Bewerber in die Kamera; das Tempo bestimmt er selbst. Platzhalter wie <b>[dein Name]</b> ruhig stehen lassen.</p>
-      <textarea id="scriptText" style="width:100%;min-height:280px;font-family:inherit;font-size:.95rem;line-height:1.6;padding:.8rem;border-radius:12px;border:1px solid var(--line);background:#0f1728;color:var(--ink)"></textarea>
-      <div style="margin-top:.7rem;display:flex;gap:.5rem;align-items:center"><button id="scriptSave" class="primary">Vorlese-Text speichern</button><span id="scriptMsg" class="muted"></span></div>
+      <textarea id="scriptText" class="gross" style="min-height:280px"></textarea>
+      <div class="speicherzeile"><button id="scriptSave" class="primary">Vorlese-Text speichern</button><span id="scriptMsg" class="muted"></span></div>
     </div>
-    <div class="section" data-pane="adminsec"><h2>Sicherheit</h2>
-      <h3 style="font-size:1rem;margin:.2rem 0 .3rem">📱 Geräte-Bindung</h3>
+
+    <div class="section" data-pane="adminsec">
+      <div class="deck-head"><h2>Zugang &amp; Geräte</h2><span class="muted">euer eigener Admin-Zugang</span></div>
+      <h3 class="uh">📱 Geräte-Bindung</h3>
       <p class="sub">Ist sie <b>eingeschaltet</b>, dürfen sich nur freigegebene Geräte im Admin-Bereich anmelden – alle anderen werden abgewiesen, selbst mit richtigem Passwort. <b>Standardmäßig ist sie aus</b>, damit man sich nicht versehentlich aussperrt. Du entscheidest, wann es losgeht.</p>
       <div id="devLockBox" class="note" style="margin-bottom:.8rem"></div>
       <div class="row" style="margin-bottom:.8rem"><span>Neues Gerät hinzufügen</span><button id="devInvite" class="primary">Freischalt-Code erzeugen</button></div>
       <div id="devInviteOut" class="note" style="margin-bottom:.8rem"></div>
       <div id="devList"></div>
-      <p class="muted" style="margin-top:.6rem">Notausgang, falls kein Gerät mehr geht: in Coolify <b>ADMIN_DEVICE_LOCK=off</b> setzen und Redeploy – dann zählt nur noch das Passwort.</p>
-      <hr style="border:0;border-top:1px solid var(--line);margin:1.5rem 0">
-      <h3 style="font-size:1rem;margin:.2rem 0 .3rem">🔐 Zusätzlicher Code beim Login <span class="pill">optional</span></h3>
-      <p class="sub"><b>Du musst hier nichts einrichten</b> – der Login mit Passwort und freigegebenem Gerät funktioniert auch ohne. Wer mag, kann zusätzlich einen 6-stelligen Code verlangen (Google Authenticator). <b>Notausgang:</b> in Coolify <b>ADMIN_2FA_OFF=1</b> setzen und Redeploy.</p>
+      <hr>
+      <h3 class="uh">🔐 Zusätzlicher Code beim Login <span class="pill">optional</span></h3>
+      <p class="sub"><b>Du musst hier nichts einrichten</b> – der Login mit Passwort und freigegebenem Gerät funktioniert auch ohne. Wer mag, kann zusätzlich einen 6-stelligen Code verlangen (Google Authenticator).</p>
       <div id="a2faStatus" class="note"></div>
       <div id="a2faSetup" style="margin-top:1rem"></div>
     </div>
-    <div class="section" data-pane="security"><h2>Überwachung</h2>
-      <h3 style="font-size:.95rem;margin-top:0">🔑 Anmeldeversuche</h3>
+
+    <div class="section" data-pane="security">
+      <div class="deck-head"><h2>Überwachung</h2><span class="muted">wer klopft an der Tür</span></div>
+      <h3 class="uh">🔑 Anmeldeversuche</h3>
       <p class="sub">Wer sich angemeldet hat – und wer es versucht hat. Bleibt auch nach einem Neustart erhalten.</p>
       <div class="row" style="margin-bottom:.7rem"><span id="loginFailSum" class="muted">–</span><button id="loginLogClear" class="danger">Protokoll leeren</button></div>
       <div id="loginLogList" class="evlog"></div>
-      <h3 style="font-size:.95rem;margin-top:1.4rem">Gesperrte IPs</h3><div id="blockedList"></div>
-      <h3 style="font-size:.95rem;margin-top:1rem">Letzte Ereignisse (seit dem Start)</h3><div id="eventList" class="evlog"></div>
+      <h3 class="uh" style="margin-top:1.4rem">Gesperrte IPs</h3><div id="blockedList"></div>
+      <h3 class="uh" style="margin-top:1.2rem">Letzte Ereignisse (seit dem Start)</h3><div id="eventList" class="evlog"></div>
     </div>
   </div>
+
+  <!-- RECHTE KANTE: erklärt den Bereich, in dem man gerade steht, und bietet
+       genau die Handgriffe an, die hier üblich sind. Ausblendbar – die
+       Entscheidung merkt sich der Browser. -->
+  <aside class="deck-side" id="admSide">
+    <div class="seiten-block" data-hilfe="overview">
+      <div class="deck-head"><h2>🏠 Wo bin ich?</h2><button class="block-zu" title="Ausblenden">✕</button></div>
+      <p class="hlp">Das ist die <b>Verwaltung</b>: einrichten und nachsehen. Das Tagesgeschäft – Warteraum,
+        Zugangsnummern, Streamer-Ordner – läuft im Team-Bereich.</p>
+      <div class="hlp-akt" id="hlpAkt"></div>
+    </div>
+    <div class="seiten-block" data-hilfe="cases">
+      <div class="deck-head"><h2>🗂 Zu den Akten</h2><button class="block-zu" title="Ausblenden">✕</button></div>
+      <p class="hlp">Jede abgeschlossene Audition liegt hier – mit Ausweisbildern, Selfie und Protokoll,
+        alles verschlüsselt. Die Suche nimmt BIGO-ID, Name, Zugangsnummer, Prüfer und Status.</p>
+      <p class="hlp">Eine Akte gehört immer auch in den <b>Streamer-Ordner</b>. Fehlt sie dort, lässt sie
+        sich unten in der Akte erneut übergeben.</p>
+    </div>
+    <div class="seiten-block" data-hilfe="rec">
+      <div class="deck-head"><h2>🎬 Zu den Aufnahmen</h2><button class="block-zu" title="Ausblenden">✕</button></div>
+      <p class="hlp">Die Video-Gespräche, verschlüsselt abgelegt. Direkt abspielbar – zum Weitergeben
+        gibt es einen <b>zeitlich begrenzten Link</b>, damit nichts dauerhaft offen im Netz liegt.</p>
+      <p class="hlp">Aufnahmen verschwinden automatisch nach der eingestellten Aufbewahrungszeit.</p>
+    </div>
+    <div class="seiten-block" data-hilfe="agents">
+      <div class="deck-head"><h2>👥 Neue Prüfer</h2><button class="block-zu" title="Ausblenden">✕</button></div>
+      <p class="hlp">Benutzername und ein Startpasswort eintragen, Rolle wählen, anlegen. Beim ersten
+        Login vergibt der Prüfer sein <b>eigenes</b> Passwort – das Startpasswort gilt danach nicht mehr.</p>
+      <p class="hlp">Anmelden tun sich alle über <b id="hlpTeamAdresse">den Team-Bereich</b>.
+        Als Admin bleibt das Benutzerfeld <b>leer</b>.</p>
+    </div>
+    <div class="seiten-block" data-hilfe="script">
+      <div class="deck-head"><h2>📖 Zu den Texten</h2><button class="block-zu" title="Ausblenden">✕</button></div>
+      <p class="hlp">Beide Texte wirken sofort – auch für Bewerber, die gerade im Warteraum sitzen.
+        Vor einer Änderung lohnt ein kurzer Blick, ob gerade jemand wartet.</p>
+      <p class="hlp">Der Vorlese-Text ist zugleich die <b>Einwilligung</b>, die der Bewerber in die Kamera
+        spricht. Kürzen nur mit Bedacht.</p>
+    </div>
+    <div class="seiten-block" data-hilfe="adminsec">
+      <div class="deck-head"><h2>🔐 Bevor du zusperrst</h2><button class="block-zu" title="Ausblenden">✕</button></div>
+      <p class="hlp"><b>Erst ein zweites Gerät freischalten</b>, dann die Bindung einschalten. Sonst
+        stehst du vor der eigenen Tür, falls das Handy verloren geht.</p>
+      <p class="hlp">Notausgang: auf dem Server in <code>app.env</code> <b>ADMIN_DEVICE_LOCK=off</b>
+        setzen und den Dienst neu starten – dann zählt nur noch das Passwort.
+        Für den Zusatzcode entsprechend <b>ADMIN_2FA_OFF=1</b>.</p>
+    </div>
+    <div class="seiten-block" data-hilfe="security">
+      <div class="deck-head"><h2>🛡 Was hier steht</h2><button class="block-zu" title="Ausblenden">✕</button></div>
+      <p class="hlp">Einzelne Fehlversuche sind normal – jemand vertippt sich. Auffällig wird es bei
+        <b>vielen Versuchen von derselben IP</b> in kurzer Zeit. Die sperrt der Server von selbst.</p>
+      <p class="hlp">Das Anmeldeprotokoll überlebt einen Neustart, die Ereignisliste darunter nicht.</p>
+    </div>
+    <div class="seiten-block" data-hilfe="*">
+      <div class="deck-head"><h2>↩︎ Ausgeblendetes</h2><button class="block-zu" title="Ausblenden">✕</button></div>
+      <button id="hilfeZurueck" style="width:100%">Alle Hinweise wieder einblenden</button>
+    </div>
+  </aside>
 </div>
 
 <div class="toast" id="toast">

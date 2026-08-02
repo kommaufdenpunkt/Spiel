@@ -129,8 +129,40 @@
     $('login').style.display = 'none'; $('dash').classList.add('on');
     $('whoami').textContent = AUF_ACP ? 'Diagnose · Admin' : 'Verwaltung · Admin';
     hinweisBereich();
+    menueKuerzen();
+    kopfzeile();
     show('overview');
     return true;
+  }
+
+  // Links oben: wo man ist. Dazu der Rückweg in den Team-Bereich – aber nur
+  // von der Verwaltung aus; im Diagnose-Bereich gehört er nicht hin.
+  function kopfzeile() {
+    if ($('admWo')) $('admWo').textContent = AUF_ACP ? 'Diagnose & Löschen' : 'Verwaltung';
+    if ($('admAvatar')) $('admAvatar').textContent = AUF_ACP ? '🩺' : 'A';
+    const wirt = location.hostname.toLowerCase();
+    const echteDomain = wirt.includes('.') && !/^(\d+\.){3}\d+$/.test(wirt);
+    const basis = wirt.replace(/^(mcp|pruefer|admin|ident|acp)\./, '');
+    if ($('hlpTeamAdresse')) $('hlpTeamAdresse').textContent = echteDomain ? 'mcp.' + basis : 'den Team-Bereich';
+    const z = $('zurueckTeam');
+    if (z && !AUF_ACP) { z.style.display = ''; }
+    else if (z && AUF_ACP && echteDomain) {
+      z.href = location.protocol + '//mcp.' + basis + (location.port ? ':' + location.port : '');
+      z.style.display = '';
+    }
+  }
+
+  // acp.<domain> ist ausdrücklich nur für Diagnose und Löschen. Alles, was
+  // zum Einrichten gehört – Audition-Text, eigene Konto-Sicherheit –, gehört
+  // in die Verwaltung auf mcp. und ist hier fehl am Platz. Die Listen der
+  // Akten, Aufnahmen und Mitarbeiter bleiben: ohne sie liesse sich nichts
+  // gezielt löschen.
+  const NUR_VERWALTUNG = ['script', 'adminsec'];
+  function menueKuerzen() {
+    if (!AUF_ACP) return;
+    document.querySelectorAll('.nav button[data-sec]').forEach((b) => {
+      if (NUR_VERWALTUNG.includes(b.dataset.sec)) b.style.display = 'none';
+    });
   }
 
   // Kurz erklären, wo man gerade ist – Löschen gibt es nur im Diagnose-Bereich.
@@ -149,6 +181,7 @@
   function bindDash() {
     $('logout').addEventListener('click', () => { token = ''; $('dash').classList.remove('on'); $('login').style.display = ''; $('pw').value = ''; $('totp').value = ''; });
     document.querySelector('.nav').addEventListener('click', (e) => { const b = e.target.closest('button[data-sec]'); if (b) show(b.dataset.sec); });
+    bindeKante();
     if ($('scriptSave')) $('scriptSave').addEventListener('click', saveScript);
     if ($('introSave')) $('introSave').addEventListener('click', saveIntro);
     if ($('caseSearch')) $('caseSearch').addEventListener('input', (e) => renderCases(e.target.value));
@@ -166,9 +199,50 @@
     });
   }
   function show(sec) {
+    if (AUF_ACP && NUR_VERWALTUNG.includes(sec)) sec = 'overview';   // gibt es hier nicht
     document.querySelectorAll('.nav button[data-sec]').forEach((b) => b.classList.toggle('sel', b.dataset.sec === sec));
     document.querySelectorAll('.section').forEach((s) => s.classList.toggle('on', s.dataset.pane === sec));
+    zeigeKante(sec);
     ({ overview: loadOverview, cases: loadCases, rec: loadRec, agents: loadAgents, script: loadScriptEditor, adminsec: loadA2fa, security: loadSecurity }[sec] || (() => {}))();
+  }
+
+  // ---- Rechte Kante --------------------------------------------------------
+  // Zu jedem Bereich der passende Hinweis, und nur der. Wer ihn nicht braucht,
+  // klickt ihn weg; der Browser merkt sich das je Bereich.
+  const KANTE_KEY = 'ident.admin.kante';
+  function kanteZu() { try { return JSON.parse(localStorage.getItem(KANTE_KEY) || '[]'); } catch { return []; } }
+  function merkeKante(l) { try { localStorage.setItem(KANTE_KEY, JSON.stringify(l)); } catch {} }
+  function zeigeKante(sec) {
+    const side = $('admSide'); if (!side) return;
+    const zu = kanteZu();
+    let sichtbar = 0;
+    side.querySelectorAll('.seiten-block').forEach((b) => {
+      const f = b.dataset.hilfe;
+      const dran = f === '*' ? zu.length > 0 : (f === sec && !zu.includes(f));
+      b.classList.toggle('an', dran);
+      if (dran) sichtbar++;
+    });
+    side.classList.toggle('leer', sichtbar === 0);
+  }
+  function bindeKante() {
+    const side = $('admSide'); if (!side) return;
+    side.querySelectorAll('.seiten-block').forEach((b) => {
+      const knopf = b.querySelector('.block-zu'); if (!knopf) return;
+      knopf.addEventListener('click', () => {
+        const f = b.dataset.hilfe;
+        if (f === '*') { b.classList.remove('an'); return; }
+        const zu = kanteZu(); if (!zu.includes(f)) zu.push(f);
+        merkeKante(zu); zeigeKante(aktuellerBereich());
+        toast('Ausgeblendet – unten wieder einblendbar.');
+      });
+    });
+    if ($('hilfeZurueck')) $('hilfeZurueck').addEventListener('click', () => {
+      merkeKante([]); zeigeKante(aktuellerBereich()); toast('Hinweise wieder da.');
+    });
+  }
+  function aktuellerBereich() {
+    const b = document.querySelector('.nav button[data-sec].sel');
+    return b ? b.dataset.sec : 'overview';
   }
   // ---- Freigegebene Geräte ----
   async function loadDevices() {
@@ -278,12 +352,76 @@
   async function loadOverview() {
     const [ag, cs, rc, se] = await Promise.all([api('GET', '/api/agents'), api('GET', '/api/cases'), api('GET', '/api/recordings'), api('GET', '/api/security')]);
     const cases = cs.body.cases || [];
-    const stat = (n, l) => `<div class="stat"><div class="n">${n}</div><div class="l">${esc(l)}</div></div>`;
-    $('stats').innerHTML = stat((ag.body.agents || []).length, 'Mitarbeiter')
-      + stat(cases.length, 'Fälle')
-      + stat(cases.filter((c) => c.result === 'approved').length, 'freigegeben')
-      + stat((rc.body.recordings || []).length, 'Aufnahmen')
-      + stat((se.body.blocked || []).length, 'gesperrte IPs');
+    const agents = ag.body.agents || [];
+    const recs = rc.body.recordings || [];
+    const gesperrt = (se.body.blocked || []).length;
+    const frei = cases.filter((c) => c.result === 'approved').length;
+    const offen = cases.filter((c) => c.result !== 'approved' && c.result !== 'rejected').length;
+    const ohne2fa = agents.filter((a) => !a.has2fa).length;
+
+    // Kacheln statt nackter Zahlenreihe: Jede führt dorthin, wo man etwas tun
+    // kann, und sagt selbst, ob sie in Ordnung ist oder ruft.
+    const host = $('stats'); host.innerHTML = '';
+    const kachel = (opt) => {
+      const el = document.createElement(opt.sec ? 'button' : 'div');
+      el.className = 'kachel' + (opt.ruft ? ' ruft' : '') + (opt.sec ? '' : ' still');
+      el.innerHTML = '<span class="ki">' + opt.ikon + '</span><span class="kz">' + opt.zahl + '</span>'
+        + '<span class="kt">' + esc(opt.titel) + '</span><span class="ku">' + opt.unten + '</span>';
+      if (opt.sec) el.addEventListener('click', () => show(opt.sec));
+      host.appendChild(el);
+    };
+    kachel({ ikon: '🗂', zahl: cases.length, titel: 'Fälle', sec: 'cases',
+      unten: cases.length ? frei + ' freigegeben' + (offen ? ' · ' + offen + ' offen' : '') : 'noch keine Audition' , ruft: offen > 0 });
+    kachel({ ikon: '🎬', zahl: recs.length, titel: 'Aufnahmen', sec: 'rec',
+      unten: recs.length ? 'verschlüsselt abgelegt' : 'noch keine' });
+    kachel({ ikon: '👥', zahl: agents.length, titel: 'Mitarbeiter', sec: 'agents',
+      unten: !agents.length ? 'noch keiner angelegt' : (ohne2fa ? ohne2fa + '× ohne 2FA' : 'alle mit 2FA'),
+      ruft: !agents.length });
+    kachel({ ikon: gesperrt ? '⛔' : '🛡', zahl: gesperrt, titel: 'gesperrte IPs', sec: 'security',
+      unten: gesperrt ? 'nachsehen, wer das war' : 'nichts Auffälliges', ruft: gesperrt > 0 });
+
+    // Die fünf jüngsten Fälle – damit man sieht, dass etwas passiert.
+    const l = $('letzteFaelle'); if (l) {
+      const jung = cases.slice().sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || ''))).slice(0, 5);
+      l.innerHTML = jung.length ? '' : '<div class="empty">Noch keine abgeschlossene Audition.</div>';
+      jung.forEach((c) => {
+        const d = document.createElement('div'); d.className = 'row';
+        const st = c.result === 'approved' ? 'ok' : (c.result === 'rejected' ? 'no' : 'warn');
+        d.innerHTML = '<span>' + esc(c.bigoName || c.code || '—')
+          + ' <span class="muted">· ' + esc(datumKurz(c.createdAt)) + '</span></span>'
+          + '<span class="pill ' + st + '">' + esc(statusText(c.result)) + '</span>';
+        l.appendChild(d);
+      });
+    }
+    if ($('standMsg')) $('standMsg').textContent = 'Stand: ' + new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) + ' Uhr';
+    hilfeAktionen(cases, agents, gesperrt);
+  }
+  function datumKurz(iso) {
+    if (!iso) return 'ohne Datum';
+    const d = new Date(iso); if (isNaN(d)) return 'ohne Datum';
+    return d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' });
+  }
+  // Rechts auf der Übersicht: nur das anbieten, was gerade wirklich ansteht.
+  function hilfeAktionen(cases, agents, gesperrt) {
+    const box = $('hlpAkt'); if (!box) return;
+    box.innerHTML = '';
+    const vorschlag = (text, sec) => {
+      const b = document.createElement('button');
+      b.style.cssText = 'width:100%;text-align:left;font-size:.83rem;line-height:1.4';
+      b.innerHTML = text;
+      b.addEventListener('click', () => show(sec));
+      box.appendChild(b);
+    };
+    const offen = cases.filter((c) => c.result !== 'approved' && c.result !== 'rejected').length;
+    if (offen) vorschlag('🗂 <b>' + offen + '</b> Akte(n) ohne Entscheidung ansehen', 'cases');
+    if (gesperrt) vorschlag('⛔ <b>' + gesperrt + '</b> gesperrte IP(s) prüfen', 'security');
+    if (!agents.length) vorschlag('👥 Ersten Prüfer anlegen', 'agents');
+    else if (agents.some((a) => a.mustChange)) vorschlag('👥 Konten mit Startpasswort ansehen', 'agents');
+    if (!box.children.length) {
+      const p = document.createElement('p'); p.className = 'hlp'; p.style.margin = '0';
+      p.textContent = 'Gerade steht nichts an. Alles ruhig.';
+      box.appendChild(p);
+    }
   }
 
   // ---- Fälle ----
