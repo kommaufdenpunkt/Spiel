@@ -1114,11 +1114,6 @@ const server = http.createServer(async (req, res) => {
     if (!acpHost && !mcpHost) { res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }); res.end('Nicht gefunden'); return; }
     urlPath = '/admin.html';
   }
-  // Eigenständige Ordner-Seite nur unter mcp.<domain>
-  if (urlPath === '/mcp' || urlPath === '/ordner' || urlPath === '/mcp.html') {
-    if (!mcpHost) { res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }); res.end('Nicht gefunden'); return; }
-    urlPath = '/mcp.html';
-  }
   // Suchmaschinen: Die Hauptseite darf gefunden werden, die Arbeitsbereiche
   // ausdrücklich nicht. Das wird je nach Adresse unterschiedlich beantwortet.
   if (urlPath === '/robots.txt') {

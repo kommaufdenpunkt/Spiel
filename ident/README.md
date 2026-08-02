@@ -1,116 +1,123 @@
-# ident – Video-Identifizierung (Agentur 4ever1)
+# ident – Video-Audition der Agentur 4EVER1
 
-Schlanke, selbst gehostete **Video-Identifizierung** im Stil bekannter Video‑Ident‑Dienste
-(IDnow/POSTIDENT), neu und sauber aufgebaut. Läuft unter **ident.4ever1.tv**.
+Bewerber melden sich mit einer Zugangsnummer, kommen in einen Warteraum und
+werden per Video-Gespräch geprüft. Danach liegt alles in einer Akte und im
+Ordner des Streamers.
 
-**Ablauf:** Der Bewerber bekommt eine **Zugangsnummer**, öffnet den Link, lädt
-**Ausweis‑Vorder-/Rückseite** und ein **Selfie mit Ausweis** hoch und spricht in
-einem **Live‑Video** mit einem Prüfer der Agentur. Der Prüfer sieht die Bilder,
-kann Live‑Fotos machen, hakt eine Checkliste ab und **gibt frei** oder **lehnt ab** –
-dabei wird die Akte verschlüsselt gespeichert.
+> **Ehrlicher Hinweis:** Das ist eine **assistierte Video-Ident** – ein Mensch
+> prüft. Der Ausweis wird **nicht automatisch ausgelesen**. Das ersetzt kein
+> zertifiziertes eIDAS-Verfahren (NFC-Chip, Lebend-Erkennung).
 
-> ⚠️ **Ehrlicher Hinweis:** Das ist eine **assistierte Video‑Ident** (Prüfung durch
-> einen Menschen). Sie liest den Ausweis **nicht automatisch aus** und ersetzt kein
-> zertifiziertes eIDAS‑Verfahren (NFC/Chip, Lebend‑Erkennung). Für rechtlich
-> „starke" Identifizierung braucht es einen zertifizierten Anbieter.
+## Wer wohin geht
+
+| Adresse | Für wen | Was |
+|---|---|---|
+| `4ever1.tv` / `www` | alle | öffentliche Startseite der Agentur (`www` leitet auf die kurze Form) |
+| `ident.4ever1.tv` | Bewerber | Zugangsnummer, Warteraum, Audition |
+| `mcp.4ever1.tv` | Team | Übersicht, Warteraum, Streamer-Ordner, Verwaltung unter `/verwaltung` |
+| `acp.4ever1.tv` | Admins | Diagnose, Überwachung – **und nur hier lässt sich löschen** |
+
+`pruefer.` und `admin.` leiten auf `mcp.` weiter (Übergang, kann später weg).
+`mein.4ever1.tv` gehört **nicht** hierher – dort läuft das PK-Board auf einem
+anderen Server.
+
+Suchmaschinen sehen nur die Startseite; alle Arbeitsbereiche antworten mit
+`Disallow: /`.
+
+## Der Weg einer Audition
+
+1. **Team** (`mcp.`) erzeugt eine **Zugangsnummer** und schickt sie dem Bewerber.
+2. **Bewerber** (`ident.`) gibt Nummer, BIGO-ID und Alter ein, stimmt zu.
+3. Die **Teamleitung als Comic-Figuren** erklärt den Ablauf; danach die
+   ausdrückliche Einwilligung in die Aufzeichnung.
+4. **Warteraum** mit Technik-Check: Kamera, Mikrofon (Aussteuerung in Echtzeit),
+   Licht (aus dem Bild geschätzt), Verbindung. Dazu die Wartezeit.
+5. **Prüfer** nimmt den Nächsten an. Die **Aufnahme startet von selbst**, beide
+   Seiten sehen den Hinweis. Kamera lässt sich beidseitig abschalten – das
+   Gegenüber bekommt dann eine Meldung statt eines Standbildes.
+6. Bewerber lädt Ausweis und Selfie hoch und liest den Text vom Teleprompter
+   (Tempo selbst bestimmbar, manuelles Scrollen möglich).
+7. **Stopp** → der Prüfer wertet die Aufnahme selbst aus: brauchbar oder nicht,
+   bei „nicht" mit Begründung. Das landet in der Akte.
+8. **Freigeben oder Ablehnen** → die Akte wird verschlüsselt gespeichert und
+   wandert in den **Ordner des Streamers**, zugeordnet über die BIGO-ID.
+
+## Streamer-Ordner
+
+Ein Ordner je BIGO-ID mit allen Auditions, Aufnahmen samt Auswertung,
+Ausweisbildern und Protokollen.
+
+- **Art:** Familie oder Streamer, mit Filter in der Übersicht
+- **Status:** neu · aktiv · pausiert · abgelehnt · nicht mehr dabei
+- **Vermerke:** Anrufe, Absprachen, Verwarnungen, Lob – mit acht Vorlagen und
+  Textaufbereitung vor dem Speichern. Schreiben darf jeder Prüfer, ändern nur
+  Admins, löschen nur über `acp.`
 
 ## Sicherheit
-- **Verschlüsselung ruhender Daten:** alle Bilder, Aufnahmen und Akten mit
-  **AES‑256‑GCM** (`STORAGE_KEY`). Ohne Schlüssel läuft es zwar, warnt aber laut.
-- **Übertragung:** HTTPS (Web) + **WebRTC/DTLS** (Video **und** die Ausweisbilder
-  gehen direkt Bewerber↔Prüfer, nicht über einen Server‑Zwischenspeicher).
-- **Zugriff:** Nichts ist öffentlich. Bilder/Akten/Aufnahmen nur nach **Admin‑Login**.
-  Prüfer melden sich mit **eigenem Login + 2FA** an; das Anlegen läuft über den Admin.
-- **Härtung:** persönliche Logins (scrypt), **TOTP‑2FA**, Konto‑Sperre nach
-  Fehlversuchen, IP‑Brute‑Force‑Sperre, Rate‑Limit, optionale IP‑Allowlist,
-  Sicherheits‑Header (CSP/HSTS), Zugangsnummern gelten genau einmal.
 
-## So funktioniert's
-1. **Admin:** `/admin` öffnen → Admin‑Passwort (+2FA) → unter **Mitarbeiter** die
-   Prüfer‑Logins anlegen (jeder bekommt einen eigenen 2FA‑Schlüssel, einmalig zeigen).
-2. **Prüfer:** Startseite → **„Mitarbeiter‑Login"** → anmelden → **Warteraum** →
-   **„Zugangsnummer erzeugen"** und dem Bewerber schicken.
-3. **Bewerber:** Link öffnen → **Zugangsnummer** + Einwilligung → **Starten** →
-   Kamera/Mikro erlauben → die drei Bilder hochladen.
-4. **Prüfer:** **„Abholen"** → Live‑Gespräch, Bilder prüfen, Checkliste, optional
-   **Aufnahme** → **Freigeben** oder **Ablehnen** (Akte wird verschlüsselt gespeichert).
-5. **Admin:** unter **Fälle**/**Aufnahmen** einsehen/löschen.
+- **Ruhende Daten** mit AES-256-GCM verschlüsselt (`STORAGE_KEY`). Ohne
+  Schlüssel läuft es, warnt aber beim Start.
+- **Übertragung** über HTTPS und WebRTC/DTLS. Ausweisbilder gehen direkt
+  zwischen Bewerber und Prüfer, nicht über einen Zwischenspeicher.
+- **Konten:** persönliche Logins (scrypt), optional TOTP-2FA und Passkeys.
+  Beim ersten Login vergibt jeder sein eigenes Passwort.
+- **Missbrauchsschutz:** Konto-Sperre nach Fehlversuchen, IP-Sperre,
+  Rate-Limit, optionale Geräte-Bindung (standardmäßig aus), Protokoll aller
+  Anmeldeversuche.
+- **Löschen** ist nur über `acp.<domain>` möglich – serverseitig erzwungen,
+  nicht bloß ausgeblendet.
+- **Aufbewahrung:** automatische Löschung nach `RETENTION_DAYS` (Vorgabe 90).
 
-## Streamer-Ordner (mcp.4ever1.tv)
+## Betrieb
 
-Ist eine Audition abgeschlossen, wandert die komplette Akte automatisch in den
-Ordner des Streamers. Zugeordnet wird über die **BIGO-ID** – die ändert sich
-nicht, anders als der angezeigte Name.
+Läuft als Container hinter einem Reverse-Proxy. Die Einstellungen kommen aus
+Umgebungsvariablen, siehe `.env.example`. Pflicht sind `STORAGE_KEY` und
+`ADMIN_PASSWORD`; für stabiles Video in Mobilfunknetzen `TURN_HOST` und
+`TURN_SECRET`.
 
-Der Ordner liegt **auf demselben Server** und ist unter `mcp.4ever1.tv`
-erreichbar (alternativ `mein.4ever1.tv`). Dort sieht man je Streamer alle
-Auditions, Aufnahmen samt Auswertung, Protokolle und Ausweisbilder; Admins
-können Status (`neu / aktiv / pausiert / abgelehnt / nicht mehr dabei`) und eine
-Notiz pflegen. Prüfer dürfen lesen, ändern dürfen nur Admins.
+**Neue Fassung einspielen** (auf einem Server mit Docker und nginx):
 
-Weil beides auf demselben Server läuft, geht nichts über das Netz – die Ablage
-kann nicht scheitern und der Prüfer wartet nicht darauf.
-
-### Ordner woanders betreiben (optional)
-
-Soll der Ordner später bei einem anderen System liegen, genügt `MCP_URL`. Dann
-schickt ident die Akte als JSON dorthin. Ohne `MCP_URL` bleibt alles hier.
-
-| Variable | Bedeutung |
-|---|---|
-| `MCP_URL` | Adresse, die die Akte entgegennimmt (POST, JSON) |
-| `MCP_TOKEN` | Schlüssel, wird als `Authorization: Bearer …` mitgeschickt |
-| `MCP_AUTO` | `off` = nur von Hand übergeben (Vorgabe: automatisch) |
-| `PUBLIC_URL` | eigene Adresse, z. B. `https://ident.4ever1.tv` – nötig für die Abhol-Links |
-
-**Was gesendet wird** (gekürzt):
-
-```jsonc
-{
-  "quelle": "ident.4ever1.tv", "version": 1,
-  "streamer": { "bigoId": "streamer4711", "name": "Lena Muster", "alter": "24" },
-  "audition": { "ergebnis": "approved", "pruefer": "eyDennis",
-                "ausweisart": "Personalausweis", "ausweisnummer": "…", … },
-  "aufnahme": { "sekunden": 95, "auswertung": "ok", "begruendung": "…" },
-  "protokoll": [ { "text": "…", "autor": "eyDennis", "am": "…" } ],
-  "dateien": [ { "art": "ausweis",  "bezeichnung": "Ausweis vorne", "url": "https://…/api/pull?…" },
-               { "art": "aufnahme", "bezeichnung": "Video der Audition", "url": "https://…/api/pull?…" } ]
-}
+```bash
+ssh <server> 'bash -s' < ident/deploy.sh
 ```
 
-Die Bilder und das Video werden **nicht** mitgeschickt, sondern über die Links
-abgeholt. Diese Links sind unterschrieben (HMAC) und gelten **24 Stunden** –
-danach und bei jedem manipulierten Link antwortet der Server mit `403`.
+Das Skript holt den Quellcode, baut das Abbild, tauscht den Container und
+prüft, ob er antwortet – sonst stellt es die vorige Fassung wieder her. Daten
+und Zugangsdaten liegen ausserhalb des Containers und bleiben unberührt.
 
-Die Gegenstelle soll mit `2xx` antworten. Klappt es nicht, versucht ident es
-nach 15 Sekunden, 1 Minute und 5 Minuten erneut. Danach steht der Grund in der
-Akte und man kann sie im Adminbereich von Hand nachschicken. Der Prüfer wartet
-nie darauf – die Übergabe läuft im Hintergrund.
+**Lokal starten:**
 
-## Betrieb (Coolify → ident.4ever1.tv)
-1. Repo/Ordner `ident/` als App in Coolify anlegen (Dockerfile‑Build).
-2. **Domain:** `ident.4ever1.tv` als DNS‑A‑Record auf den Server, in Coolify als
-   Domain hinterlegen (TLS via Let's Encrypt automatisch).
-3. **Volume** mounten und `DATA_DIR` daraufsetzen (z. B. `/data`).
-4. **Umgebungsvariablen** aus `.env.example` setzen – mindestens `STORAGE_KEY`,
-   `ADMIN_PASSWORD`, `ADMIN_TOTP_SECRET`. Für stabiles Video `TURN_HOST`/`TURN_SECRET`.
-5. Deployen. Erreichbar: Bewerber/Prüfer unter `/`, Admin unter `/admin`.
-
-## Lokal starten
-```
+```bash
 npm install
 STORAGE_KEY=test ADMIN_PASSWORD=admin123 DATA_DIR=./data npm start
-# http://localhost:8080  (Admin: http://localhost:8080/admin)
+# http://localhost:8080
 ```
 
+## Eigene Bilder
+
+Dateien einfach nach `public/` legen, der Server findet sie von selbst:
+
+| Datei | Wirkung |
+|---|---|
+| `logo.png` (auch `.webp/.jpg/.svg`) | ersetzt das gezeichnete Zeichen auf der Startseite |
+| `team.jpg` (auch `.png/.webp`) | echtes Team-Foto über der Teamleitung |
+
 ## Aufbau
+
 ```
 ident/
-├── server.js     HTTP-API + WebRTC-Signalisierung
-├── security.js   Krypto, Login, 2FA, Missbrauchsschutz, Header
-├── store.js      verschlüsselte Ablage (Codes, Mitarbeiter, Fälle, Aufnahmen)
+├── server.js      HTTP-API, Adressen-Verteilung, WebRTC-Signalisierung
+├── security.js    Verschlüsselung, Login, 2FA, Missbrauchsschutz, Header
+├── store.js       verschlüsselte Ablage (Codes, Konten, Akten, Aufnahmen, Ordner)
+├── mcp.js         Übergabe der fertigen Akte in den Streamer-Ordner
+├── textpolish.js  räumt Vermerke und Protokoll-Einträge auf (regelbasiert)
+├── deploy.sh      Quellcode holen, bauen, tauschen, im Fehlerfall zurück
 ├── public/
-│   ├── index.html / app.js   Bewerber- & Prüfer-App
-│   └── admin.html / admin.js  Admin-Panel
-├── Dockerfile · .env.example · README.md
+│   ├── home.html · home.js         öffentliche Startseite
+│   ├── index.html · app.js         Bewerber und Team-Bereich
+│   ├── admin.html · admin.js       Verwaltung und Diagnose
+│   ├── figur.html · figur.js       Baukasten für die Comic-Figuren
+│   └── figur-core.js               Figuren zeichnen und vorlesen
+├── views/admin-dash.html           Verwaltung (erst nach dem Login geladen)
+└── Dockerfile · .env.example · README.md
 ```
