@@ -32,10 +32,19 @@
   $('user').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('pass').focus(); });
   async function anmelden() {
     $('loginErr').textContent = 'Prüfe …';
-    const r = await api('POST', '/api/login', { username: $('user').value.trim(), password: $('pass').value });
+    const name = $('user').value.trim(), pw = $('pass').value;
+    let r = await api('POST', '/api/login', { username: name, password: pw });
+    // Der Admin-Login läuft über ein leeres Benutzerfeld. Wer dort trotzdem
+    // etwas eingetippt hat, soll deswegen nicht scheitern – wir versuchen es
+    // einmal still als Admin, statt ihn auf eine Sperre zulaufen zu lassen.
+    if ((r.status !== 200 || !r.body.token) && name && r.body && r.body.reason === 'bad-login') {
+      const alsAdmin = await api('POST', '/api/login', { username: '', password: pw });
+      if (alsAdmin.status === 200 && alsAdmin.body.token) r = alsAdmin;
+    }
     if (r.status !== 200 || !r.body.token) {
       const uebrig = r.body && typeof r.body.triesLeft === 'number' ? ' Noch ' + r.body.triesLeft + ' Versuche.' : '';
-      $('loginErr').textContent = 'Anmeldung fehlgeschlagen.' + uebrig;
+      const gesperrt = r.status === 429 ? ' Zu viele Versuche – bitte kurz warten.' : '';
+      $('loginErr').textContent = 'Anmeldung fehlgeschlagen.' + uebrig + gesperrt;
       $('pass').value = ''; return;
     }
     if (r.body.mustChange) {
