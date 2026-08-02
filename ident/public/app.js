@@ -994,6 +994,75 @@
     const b = $('upFront'); if (b) b.click();
   });
 
+  // ---- Selfie mit Ausweis: aus der laufenden Kamera --------------------------
+  // Bewusst kein Datei-Upload: Das Bild entsteht hier und jetzt aus dem
+  // eigenen Kamerabild. Ein altes Foto oder eine Montage kommt so nicht
+  // hinein. Der Countdown gibt Zeit, den Ausweis richtig zu halten.
+  function selfieBuehne() { return document.querySelector('.selfie-buehne'); }
+  function selfieKameraAn() {
+    const v = $('selfieVideo');
+    if (!v || !state.localStream) return;
+    if (v.srcObject !== state.localStream) { v.srcObject = state.localStream; v.play().catch(() => {}); }
+  }
+  function selfieAufnehmen() {
+    const v = $('selfieVideo');
+    if (!v || !v.videoWidth) { toast('Kamera ist noch nicht bereit – kurz warten.'); return; }
+    const c = document.createElement('canvas');
+    c.width = v.videoWidth; c.height = v.videoHeight;
+    c.getContext('2d').drawImage(v, 0, 0);
+    const url = c.toDataURL('image/jpeg', 0.9);
+    $('selfieVorschau').src = url;
+    selfieBuehne().classList.add('zeigt');
+    state.selfieEntwurf = url;
+    $('selfieStart').style.display = 'none';
+    $('selfieNochmal').style.display = '';
+    $('selfieOk').style.display = '';
+    $('selfieStatus').textContent = 'Sieht man dein Gesicht UND den Ausweis deutlich? Dann „Passt so".';
+    $('selfieStatus').classList.remove('ok');
+  }
+  function selfieCountdown() {
+    selfieKameraAn();
+    const k = $('selfieCount'); if (!k) return;
+    let n = 3;
+    k.textContent = n; k.classList.add('an');
+    $('selfieStart').disabled = true;
+    const t = setInterval(() => {
+      n--;
+      if (n > 0) { k.textContent = n; return; }
+      clearInterval(t);
+      k.classList.remove('an');
+      $('selfieStart').disabled = false;
+      selfieAufnehmen();
+    }, 1000);
+  }
+  function selfieVerwerfen() {
+    state.selfieEntwurf = '';
+    selfieBuehne().classList.remove('zeigt');
+    $('selfieStart').style.display = '';
+    $('selfieNochmal').style.display = 'none';
+    $('selfieOk').style.display = 'none';
+    $('selfieStatus').textContent = 'Noch kein Bild aufgenommen.';
+    $('selfieStatus').classList.remove('ok');
+    selfieKameraAn();
+  }
+  function selfieUebernehmen() {
+    const url = state.selfieEntwurf; if (!url) return;
+    const label = 'Selfie mit Ausweis';
+    state.myUploads = state.myUploads || [];
+    // Ein zweiter Versuch ersetzt den ersten - sonst sammeln sich Fehlgriffe.
+    state.myUploads = state.myUploads.filter((d) => d.label !== label);
+    state.myUploads.push({ label, dataUrl: url });
+    addShot('guestShots', label, url);
+    sendDocAll(label, url);              // Prüfer im Raum bekommt es sofort
+    $('selfieOk').style.display = 'none';
+    $('selfieStatus').textContent = '✓ Gespeichert. Der Prüfer bekommt es beim Gespräch.';
+    $('selfieStatus').classList.add('ok');
+    vorabStand();
+  }
+  if ($('selfieStart')) $('selfieStart').addEventListener('click', selfieCountdown);
+  if ($('selfieNochmal')) $('selfieNochmal').addEventListener('click', selfieVerwerfen);
+  if ($('selfieOk')) $('selfieOk').addEventListener('click', selfieUebernehmen);
+
   async function refreshWaiting() {
     const r = await api('GET', '/api/waiting');
     if (r.status === 200) renderWaiting(r.body.waiting || [], r.body);
@@ -1221,6 +1290,7 @@
     pruefeKamera();
     pruefeMikro();
     pruefeLicht();
+    selfieKameraAn();
   }
   function wroomAus() {
     const box = $('wroom'); if (box) box.style.display = 'none';
@@ -1448,10 +1518,15 @@
         setz('vDocType', m.ausweisArt);
         setz('vDocNumber', m.ausweisNr);
         if (m.ausweisName || m.ausweisNr) {
-          const st = $('reviewStatus');
-          if (st) st.textContent = m.echtBestaetigt
-            ? 'Ausweisdaten liegen vor. Der Bewerber hat 18+ und die Echtheit des Ausweises zugesichert – bitte im Bild überprüfen.'
-            : 'Ausweisdaten liegen vor – die Erklärung zu Alter und Echtheit fehlt noch. Bitte nachfragen.';
+          const z = $('zusicherung');
+          if (z) {
+            z.style.display = '';
+            z.className = 'zusicherung ' + (m.echtBestaetigt ? 'ja' : 'nein');
+            z.innerHTML = m.echtBestaetigt
+              ? '✓ <b>18+ und Echtheit zugesichert.</b> Der Bewerber hat erklärt, volljährig zu sein und '
+                + 'einen echten, eigenen Ausweis zu zeigen. <b>Bitte im Bild überprüfen.</b>'
+              : '⚠️ <b>Erklärung fehlt.</b> Der Bewerber hat 18+ und Echtheit noch nicht bestätigt – bitte nachfragen.';
+          }
         }
         personSuchen();   // gleich nachsehen, ob wir die Person kennen
       }

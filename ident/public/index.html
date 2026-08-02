@@ -379,6 +379,35 @@
     line-height:1.55;margin:.2rem 0 .7rem;cursor:pointer}
   .vorab-erklaerung input{width:auto;margin:.15rem 0 0;flex:none}
   .vorab-erklaerung b{color:var(--ink)}
+  /* Selfie mit Ausweis - direkt aus der Kamera, damit nichts montiert wird. */
+  .selfie{margin-top:.9rem;padding:.85rem .9rem;border:1px solid var(--accent);border-radius:14px;
+    background:linear-gradient(180deg,#16233d,var(--panel2))}
+  .selfie-kopf{font-size:.95rem;display:flex;align-items:center;gap:.5rem;flex-wrap:wrap}
+  .pflicht{font-size:.66rem;text-transform:uppercase;letter-spacing:.1em;color:#bcd0ff;
+    border:1px solid var(--line2);border-radius:999px;padding:.1rem .5rem}
+  .selfie-hilfe{margin:.5rem 0 .4rem;font-size:.83rem;color:var(--dim);line-height:1.55}
+  .selfie-hilfe b{color:var(--ink)}
+  .selfie-tipps{margin:0 0 .7rem;padding-left:1.1rem;font-size:.78rem;color:var(--dim);line-height:1.65}
+  .selfie-buehne{position:relative;border-radius:12px;overflow:hidden;background:#000;aspect-ratio:4/3;max-width:420px}
+  .selfie-buehne video,.selfie-buehne img{width:100%;height:100%;object-fit:cover;display:block}
+  .selfie-buehne img{display:none}
+  .selfie-buehne.zeigt video{display:none}
+  .selfie-buehne.zeigt img{display:block}
+  .selfie-rahmen{position:absolute;inset:8% 6%;pointer-events:none;display:flex;gap:4%}
+  .selfie-rahmen span,.selfie-rahmen i{flex:1;border:2px dashed #ffffff66;border-radius:12px;
+    font-style:normal;font-size:.7rem;color:#ffffffcc;display:flex;align-items:flex-end;justify-content:center;padding-bottom:.3rem}
+  .selfie-rahmen i{flex:.8}
+  .selfie-buehne.zeigt .selfie-rahmen{display:none}
+  .selfie-count{position:absolute;inset:0;display:none;align-items:center;justify-content:center;
+    font-size:4rem;font-weight:700;color:#fff;text-shadow:0 4px 24px #000;background:#0006}
+  .selfie-count.an{display:flex}
+  .selfie-akt{display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.6rem}
+  .selfie-status{font-size:.78rem;margin-top:.4rem}
+  .selfie-status.ok{color:#5fe0a0}
+  .zusicherung{margin:.5rem 0 .2rem;padding:.5rem .65rem;border-radius:10px;font-size:.8rem;line-height:1.5;
+    border:1px solid var(--line);background:var(--panel2);color:var(--dim)}
+  .zusicherung.ja{border-color:#2f6b4a;background:#163024;color:#bfe9d2}
+  .zusicherung.nein{border-color:var(--warn);background:#2a2313;color:#f0dca8}
   /* Aufnahme-Hinweis, den auch der Bewerber sieht */
   .recinfo{display:none;align-items:center;gap:.5rem;font-size:.84rem;color:#ffc9d2;
     background:#2a1420;border:1px solid #5e2033;border-radius:999px;padding:.35rem .8rem}
@@ -614,8 +643,36 @@
           dass falsche Angaben zur sofortigen Ablehnung führen.</label>
         <div class="vorab-fuss">
           <span id="vaStatus" class="muted">Wird beim Gespräch automatisch übermittelt.</span>
-          <button id="vaBilder" class="primary" type="button">📄 Ausweisbilder hochladen</button>
+          <button id="vaBilder" type="button">📄 Ausweis hochladen</button>
         </div>
+      </div>
+
+      <!-- Der wichtigste Schritt: Gesicht und Ausweis auf EINEM Bild. Direkt
+           aus der laufenden Kamera, damit es keine Montage sein kann und
+           niemand ein altes Foto hochlädt. -->
+      <div class="selfie">
+        <div class="selfie-kopf">🤳 <b>Selfie mit Ausweis</b>
+          <span class="pflicht">wichtigster Schritt</span></div>
+        <p class="selfie-hilfe">Halte deinen Ausweis <b>neben dein Gesicht</b> – beide
+          im Bild, beide scharf. Der Prüfer muss dich und den Ausweis zusammen sehen.</p>
+        <ul class="selfie-tipps">
+          <li>Ausweis auf Höhe deiner Wange, Bildseite zur Kamera</li>
+          <li>Helles Licht von vorn, keine Lampe im Rücken</li>
+          <li>Finger nicht über Foto, Namen oder Nummer</li>
+          <li>Brille kurz abnehmen, wenn sie spiegelt</li>
+        </ul>
+        <div class="selfie-buehne">
+          <video id="selfieVideo" autoplay muted playsinline></video>
+          <div class="selfie-rahmen"><span>Gesicht</span><i>Ausweis</i></div>
+          <div class="selfie-count" id="selfieCount"></div>
+          <img id="selfieVorschau" alt="">
+        </div>
+        <div class="selfie-akt">
+          <button id="selfieStart" class="primary" type="button">📸 Aufnahme starten (3 Sek.)</button>
+          <button id="selfieNochmal" type="button" style="display:none">↺ Nochmal</button>
+          <button id="selfieOk" class="good" type="button" style="display:none">✓ Passt so</button>
+        </div>
+        <div class="selfie-status muted" id="selfieStatus">Noch kein Bild aufgenommen.</div>
       </div>
     </div>
     <div class="controls">
@@ -662,6 +719,8 @@
     <!-- PRÜFER -->
     <div class="pane sel" data-pane="main" id="reviewPane" style="display:none">
       <div class="status pending" id="reviewStatus">Warte auf die Bilder des Bewerbers …</div>
+      <!-- Bleibt stehen, auch wenn die Statuszeile darüber weiterläuft. -->
+      <div id="zusicherung" class="zusicherung" style="display:none"></div>
 
       <div class="sect">🎤 Fragen (Audition) <span class="qhint">nur für dich sichtbar – nicht im Video</span></div>
       <div class="qintro">Vorab vorlesen: „Bist du damit einverstanden, dass wir deine Daten speichern und zur Bearbeitung an den <b>BIGO-Support</b> weiterleiten dürfen? Unser 4ever1-Support nimmt deine Daten selbstverständlich sehr ernst." <br><small>Antwort des Bewerbers abwarten – sie wird im Video mit aufgezeichnet.</small></div>
