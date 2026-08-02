@@ -290,7 +290,7 @@
   // ================= TEAM-BEREICH: Warteraum <-> Streamer-Ordner =============
   // Beides in derselben Oberfläche, damit man sich nicht zweimal anmelden muss.
   function zeigeBereich(was) {
-    const bereiche = { uebersicht: 'paneUebersicht', warteraum: 'paneWarteraum', ordner: 'paneOrdner', nummern: 'paneNummern' };
+    const bereiche = { uebersicht: 'paneUebersicht', warteraum: 'paneWarteraum', ordner: 'paneOrdner', nummern: 'paneNummern', suche: 'paneSuche' };
     state.bereich = bereiche[was] ? was : 'uebersicht';
     Object.keys(bereiche).forEach((k) => {
       const el = $(bereiche[k]); if (el) el.style.display = k === state.bereich ? '' : 'none';
@@ -298,14 +298,17 @@
     });
     // Die rechte Spalte gehört zur Arbeit am Warteraum und zur Übersicht.
     if ($('paneLaufend')) {
-      $('paneLaufend').style.display = (state.bereich === 'ordner' || state.bereich === 'nummern') ? 'none' : '';
+      $('paneLaufend').style.display = ['ordner', 'nummern', 'suche'].includes(state.bereich) ? 'none' : '';
       zeichneBloecke();   // weggeklickte Blöcke bleiben weg
     }
     if (state.bereich === 'ordner') ladeOrdner();
     if (state.bereich === 'uebersicht') zeichneKacheln();
     if (state.bereich === 'nummern') ladeNummern();
+    if (state.bereich === 'suche') { setTimeout(() => $('sucheFeld') && $('sucheFeld').focus(), 60); suchen(); }
   }
   if ($('navNummern')) $('navNummern').addEventListener('click', () => zeigeBereich('nummern'));
+  if ($('navSuche')) $('navSuche').addEventListener('click', () => zeigeBereich('suche'));
+  if ($('sucheFeld')) $('sucheFeld').addEventListener('input', suchen);
   if ($('navUebersicht')) $('navUebersicht').addEventListener('click', () => zeigeBereich('uebersicht'));
   if ($('navWarteraum')) $('navWarteraum').addEventListener('click', () => zeigeBereich('warteraum'));
   if ($('navOrdner')) $('navOrdner').addEventListener('click', () => zeigeBereich('ordner'));
@@ -404,6 +407,62 @@
   });
   if ($('blockeZurueck')) $('blockeZurueck').addEventListener('click', () => { merkeBloecke([]); zeichneBloecke(); });
   zeichneBloecke();
+
+  // ---- Suche über alles ----------------------------------------------------
+  // Sucht in Ordnern, Vermerken, Auditions und Zugangsnummern gleichzeitig.
+  // Wer jemanden sucht, weiss selten, wo er zuletzt aufgetaucht ist.
+  function hervor(text, q) {
+    const t = String(text || '');
+    const i = t.toLowerCase().indexOf(q);
+    if (i < 0) return esc(t.slice(0, 120));
+    const von = Math.max(0, i - 40), bis = Math.min(t.length, i + q.length + 60);
+    return (von ? '\u2026 ' : '') + esc(t.slice(von, i)) + '<mark>' + esc(t.slice(i, i + q.length)) + '</mark>'
+      + esc(t.slice(i + q.length, bis)) + (bis < t.length ? ' \u2026' : '');
+  }
+  function suchen() {
+    const host = $('sucheInhalt'); if (!host) return;
+    const q = ($('sucheFeld').value || '').trim().toLowerCase();
+    host.innerHTML = '';
+    if (q.length < 2) { host.innerHTML = '<div class="deck-empty">Mindestens zwei Zeichen eingeben.</div>'; return; }
+    const treffer = [];
+    (state.ordner || []).forEach((s) => {
+      const wo = [];
+      if ((s.bigoId || '').toLowerCase().includes(q)) wo.push(['BIGO-ID', s.bigoId]);
+      if ((s.name || '').toLowerCase().includes(q)) wo.push(['Name', s.name]);
+      if ((s.notiz || '').toLowerCase().includes(q)) wo.push(['Notiz', s.notiz]);
+      (s.eintraege || []).forEach((e) => { if ((e.text || '').toLowerCase().includes(q)) wo.push(['Vermerk von ' + (e.author || '\u2014'), e.text]); });
+      (s.auditions || []).forEach((a) => {
+        if ((a.ausweisnummer || '').toLowerCase().includes(q)) wo.push(['Ausweisnummer', a.ausweisnummer]);
+        if ((a.zugangsnummer || '').toLowerCase().includes(q)) wo.push(['Zugangsnummer', a.zugangsnummer]);
+        if ((a.notiz || '').toLowerCase().includes(q)) wo.push(['Notiz zur Audition', a.notiz]);
+        (a.protokoll || []).forEach((e) => { if ((e.text || '').toLowerCase().includes(q)) wo.push(['Protokoll', e.text]); });
+      });
+      if (wo.length) treffer.push({ art: 'ordner', s: s, wo: wo });
+    });
+    (state.nummern || []).forEach((c) => {
+      if ((c.code || '').toLowerCase().includes(q) || (c.note || '').toLowerCase().includes(q))
+        treffer.push({ art: 'nummer', c: c });
+    });
+    if (!treffer.length) { host.innerHTML = '<div class="deck-empty">Nichts gefunden zu \u201e' + esc(q) + '".</div>'; return; }
+    host.insertAdjacentHTML('beforeend', '<div class="muted" style="margin-bottom:.6rem">' + treffer.length + ' Treffer</div>');
+    treffer.forEach((t) => {
+      const d = document.createElement('div'); d.className = 'tr';
+      if (t.art === 'ordner') {
+        d.innerHTML = '<div class="tr-art">Streamer-Ordner</div>'
+          + '<div class="tt">' + esc(t.s.bigoId) + (t.s.name ? ' \u00b7 ' + esc(t.s.name) : '') + '</div>'
+          + t.wo.slice(0, 3).map((w) => '<div class="tw"><b>' + esc(w[0]) + ':</b> ' + hervor(w[1], q) + '</div>').join('')
+          + (t.wo.length > 3 ? '<div class="tw">\u2026 und ' + (t.wo.length - 3) + ' weitere Stellen</div>' : '');
+        d.addEventListener('click', () => { state.offenerOrdner = t.s.id; zeigeBereich('ordner'); });
+      } else {
+        d.innerHTML = '<div class="tr-art">Zugangsnummer</div>'
+          + '<div class="tt">' + hervor(t.c.code, q) + '</div>'
+          + '<div class="tw">' + (t.c.note ? hervor(t.c.note, q) + ' \u00b7 ' : '')
+          + (t.c.status === 'open' ? 'offen' : t.c.status === 'used' ? 'benutzt' : 'zur\u00fcckgezogen') + '</div>';
+        d.addEventListener('click', () => zeigeBereich('nummern'));
+      }
+      host.appendChild(d);
+    });
+  }
 
   // ---- Zugangsnummern: welche sind noch offen? -----------------------------
   // Eine Nummer wird erzeugt und weitergegeben - danach war bisher nicht mehr
@@ -553,8 +612,11 @@
   async function ladeOrdner(neu, still) {
     if (neu) $('ordnerInhalt').innerHTML = '<div class="deck-empty">Wird geladen …</div>';
     const r = await api('GET', '/api/streamers');
+    const vorher = state.offenerOrdner;
     state.ordner = (r.body && r.body.streamers) || [];
-    state.offenerOrdner = null;
+    // Einen bereits geöffneten Ordner nicht zuklappen – etwa wenn man aus der
+    // Suche hierher kommt oder gerade einen Vermerk geschrieben hat.
+    state.offenerOrdner = (vorher && state.ordner.some((x) => x.id === vorher)) ? vorher : null;
     if (still) { if (state.bereich === 'uebersicht') zeichneKacheln(); return; }
     zeichneOrdner();
     if (state.bereich === 'uebersicht') zeichneKacheln();
