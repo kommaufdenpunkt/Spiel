@@ -626,6 +626,9 @@
       // von selbst, sobald das Gespräch beginnt. Niemand muss daran denken.
       if (state.role === 'host' && P.role === 'guest') autoRec();
     } else { addTile(peerId, P.name || (P.role === 'host' ? 'Prüfer' : 'Bewerber'), stream); }
+    // Hatte der andere die Kamera schon aus, bevor sein Bild hier ankam,
+    // dann gleich die Meldung setzen statt eines schwarzen Vierecks.
+    if (P.camAus) zeigeCamAus(state.mainPeerId === peerId ? 'remote' : peerId, true, P.name || (P.role === 'host' ? 'Prüfer' : 'Bewerber'));
   }
   function addTile(peerId, name, stream) {
     let t = document.querySelector('.vextra[data-peer="' + peerId + '"]');
@@ -638,6 +641,7 @@
     state.peers.delete(peerId); removeTile(peerId);
     if (state.mainPeerId === peerId) {
       state.mainPeerId = null; remoteVideo.srcObject = null;
+      zeigeCamAus('remote', false);
       for (const [pid, pp] of state.peers) { if (pp.stream && isMainRole(pp.role)) { removeTile(pid); attachStream(pid, pp.stream); break; } }
       if (!state.mainPeerId) {
         remoteWaiting.style.display = '';
@@ -671,6 +675,10 @@
         (state.myUploads || []).forEach((d) => sendDocTo(dc, d.label, d.dataUrl)); // auch später dazugekommene Prüfer bekommen die Bilder
         $('guideStatus').textContent = 'Verbunden mit dem Prüfer. Bitte lade die Bilder hoch.';
       }
+      // Wer neu dazukommt, soll sofort wissen, ob meine Kamera gerade aus ist
+      // und ob aufgezeichnet wird – sonst sieht er ein schwarzes Bild ohne Grund.
+      if (!camAn()) dcSendTo(dc, { kind: 'cam', on: false });
+      if (state.recorder) dcSendTo(dc, { kind: 'rec', on: true });
     };
     dc.onmessage = (e) => {
       let m; try { m = JSON.parse(e.data); } catch { return; }
@@ -683,6 +691,13 @@
       // Der Bewerber soll sehen, wenn aufgezeichnet wird – er hat zugestimmt,
       // also darf er es auch jederzeit erkennen.
       else if (m.kind === 'rec') zeigeRec(!!m.on);
+      // Gegenüber hat die Kamera aus- oder wieder eingeschaltet.
+      else if (m.kind === 'cam') {
+        const P = state.peers.get(peerId);
+        const wer = P ? (P.name || (P.role === 'host' ? 'Prüfer' : 'Bewerber')) : 'Gegenüber';
+        if (P) P.camAus = !m.on;
+        zeigeCamAus(state.mainPeerId === peerId ? 'remote' : peerId, !m.on, wer);
+      }
     };
   }
   function dcSendTo(dc, obj) { if (dc && dc.readyState === 'open') { dc.send(JSON.stringify(obj)); return true; } return false; }
@@ -811,7 +826,29 @@
     if (b) { b.textContent = on ? '🎤 Mikro an' : '🔇 Mikro aus (stumm)'; b.classList.toggle('danger', !on); }
   }
   $('micBtn').addEventListener('click', () => { const t = state.localStream && state.localStream.getAudioTracks()[0]; if (!t) return; setMic(!t.enabled); });
-  $('camBtn').addEventListener('click', () => { const t = state.localStream && state.localStream.getVideoTracks()[0]; if (!t) return; t.enabled = !t.enabled; $('camBtn').textContent = t.enabled ? '📷 Kamera an' : '🚫 Kamera aus'; });
+  // Kamera an/aus – auch mitten im Gespräch. Der andere sieht dann eine klare
+  // Meldung statt eines eingefrorenen Bildes, und in der Aufnahme steht es auch.
+  $('camBtn').addEventListener('click', () => setCam(!camAn()));
+  function camAn() { const t = state.localStream && state.localStream.getVideoTracks()[0]; return !!(t && t.enabled); }
+  function setCam(an) {
+    const t = state.localStream && state.localStream.getVideoTracks()[0]; if (!t) return;
+    t.enabled = !!an;
+    const b = $('camBtn');
+    if (b) { b.textContent = an ? '📷 Kamera an' : '🚫 Kamera aus'; b.classList.toggle('danger', !an); }
+    zeigeCamAus('local', !an, 'Du');
+    dcBroadcast({ kind: 'cam', on: !!an });
+  }
+  // Blende über dem Bild, wenn jemand seine Kamera ausgeschaltet hat.
+  function zeigeCamAus(wo, aus, name) {
+    const host = wo === 'local' ? document.querySelector('.vwrap.local')
+      : wo === 'remote' ? document.querySelector('.vwrap.remote')
+        : document.querySelector('.vextra[data-peer="' + wo + '"]');
+    if (!host) return;
+    let el = host.querySelector('.camoff');
+    if (!aus) { if (el) el.remove(); return; }
+    if (!el) { el = document.createElement('div'); el.className = 'camoff'; host.appendChild(el); }
+    el.innerHTML = '<span class="co-ic">🚫</span><b>' + esc(name || 'Kamera') + '</b><span>Kamera ist aus</span>';
+  }
 
   // ================= AUFNAHME (Prüfer) =================
   function pickMime() { for (const m of ['video/mp4;codecs=h264,aac', 'video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm']) { const ext = m.startsWith('video/mp4') ? 'mp4' : 'webm'; if (window.MediaRecorder && MediaRecorder.isTypeSupported(m)) return { mime: m, ext }; } return { mime: '', ext: 'webm' }; }
@@ -824,7 +861,11 @@
     let lastDraw = 0;
     const draw = (ts) => {
       if (!state.recorder) return;
-      if (!lastDraw || ts - lastDraw >= 38) { lastDraw = ts; ctx.fillStyle = '#0d1526'; ctx.fillRect(0, 0, W, H); cover(ctx, remoteVideo, 0, 0, W / 2, H); cover(ctx, localVideo, W / 2, 0, W / 2, H); }
+      if (!lastDraw || ts - lastDraw >= 38) {
+        lastDraw = ts; ctx.fillStyle = '#0d1526'; ctx.fillRect(0, 0, W, H);
+        cover(ctx, remoteVideo, 0, 0, W / 2, H, gegenueberCamAus(), gegenueberName());
+        cover(ctx, localVideo, W / 2, 0, W / 2, H, !camAn(), state.name || 'Prüfer');
+      }
       requestAnimationFrame(draw);
     };
     const canvasStream = canvas.captureStream(25);
@@ -847,7 +888,24 @@
     $('recBadge').classList.remove('on'); $('recBtn').disabled = false; $('stopRecBtn').disabled = true;
     zeigeRec(false); dcBroadcast({ kind: 'rec', on: false });
   }
-  function cover(ctx, v, x, y, w, h) { if (!v || !v.videoWidth) { ctx.fillStyle = '#0d1526'; ctx.fillRect(x, y, w, h); return; } const s = Math.max(w / v.videoWidth, h / v.videoHeight); const dw = v.videoWidth * s, dh = v.videoHeight * s; ctx.drawImage(v, x + (w - dw) / 2, y + (h - dh) / 2, dw, dh); }
+  function cover(ctx, v, x, y, w, h, aus, wer) {
+    if (aus || !v || !v.videoWidth) {
+      // Kamera aus oder noch kein Bild: sauberer Platzhalter statt Standbild –
+      // so ist auf der Aufnahme später klar, dass hier bewusst nichts zu sehen war.
+      ctx.fillStyle = '#0d1526'; ctx.fillRect(x, y, w, h);
+      ctx.fillStyle = '#7f8fae'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.font = '600 20px -apple-system,Segoe UI,Roboto,sans-serif';
+      ctx.fillText(aus ? (wer || 'Kamera') + ' – Kamera aus' : 'kein Bild', x + w / 2, y + h / 2);
+      ctx.textAlign = 'start'; ctx.textBaseline = 'alphabetic';
+      return;
+    }
+    const s = Math.max(w / v.videoWidth, h / v.videoHeight);
+    const dw = v.videoWidth * s, dh = v.videoHeight * s;
+    ctx.drawImage(v, x + (w - dw) / 2, y + (h - dh) / 2, dw, dh);
+  }
+  // Ist die Kamera des Gegenübers gerade aus?
+  function gegenueberCamAus() { const P = state.mainPeerId && state.peers.get(state.mainPeerId); return !!(P && P.camAus); }
+  function gegenueberName() { const P = state.mainPeerId && state.peers.get(state.mainPeerId); return P ? (P.name || (P.role === 'host' ? 'Prüfer' : 'Bewerber')) : 'Gegenüber'; }
   async function finalizeRec() {
     const blob = new Blob(state.recChunks, { type: state.recMime || 'video/webm' });
     if (state.audioCtx) { try { state.audioCtx.close(); } catch {} state.audioCtx = null; }
@@ -856,8 +914,51 @@
     try {
       const res = await fetch('/api/recording?' + new URLSearchParams({ code: state.code, dur: String(dur), ext: state.recExt }), { method: 'POST', headers: { 'Content-Type': state.recMime || 'video/webm', 'Authorization': 'Bearer ' + state.token }, body: blob });
       sysMsg(res.ok ? 'Aufnahme verschlüsselt gespeichert.' : 'Aufnahme konnte nicht gespeichert werden (HTTP ' + res.status + ').');
+      if (res.ok) {
+        const j = await res.json().catch(() => null);
+        if (j && j.id) recCheckOeffnen(j.id, dur, blob.size);
+      }
     } catch { sysMsg('Aufnahme konnte nicht übertragen werden.'); }
   }
+
+  // ---- Aufnahme auswerten: der Prüfer entscheidet selbst, ob sie taugt -----
+  // Direkt nach dem Gespräch, solange man noch reagieren kann. Das Ergebnis
+  // landet als Eintrag in der Akte des Bewerbers.
+  function recCheckOeffnen(id, dauer, bytes) {
+    const box = $('recCheck'); if (!box) return;
+    state.recCheckId = id;
+    const v = $('recCheckVideo');
+    // Der eigene Zugriff läuft über das Token – deshalb als Blob laden.
+    fetch('/api/recording?id=' + encodeURIComponent(id), { headers: { Authorization: 'Bearer ' + state.token } })
+      .then((r) => (r.ok ? r.blob() : null))
+      .then((b) => { if (b) { if (state.recCheckUrl) URL.revokeObjectURL(state.recCheckUrl); state.recCheckUrl = URL.createObjectURL(b); v.src = state.recCheckUrl; } })
+      .catch(() => {});
+    const min = Math.floor(dauer / 60), sek = dauer % 60;
+    $('recCheckMeta').textContent = 'Länge ' + min + ':' + pad(sek) + ' · ' + (bytes / (1024 * 1024)).toFixed(1) + ' MB · verschlüsselt gespeichert';
+    $('recCheckNote').value = ''; $('recCheckMsg').textContent = '';
+    box.classList.add('on');
+  }
+  function recCheckSchliessen() {
+    const box = $('recCheck'); if (box) box.classList.remove('on');
+    const v = $('recCheckVideo'); if (v) { try { v.pause(); } catch {} v.removeAttribute('src'); v.load(); }
+    if (state.recCheckUrl) { URL.revokeObjectURL(state.recCheckUrl); state.recCheckUrl = ''; }
+    state.recCheckId = '';
+  }
+  async function recCheckSenden(quality) {
+    if (!state.recCheckId) { recCheckSchliessen(); return; }
+    const note = $('recCheckNote').value.trim();
+    if (quality === 'bad' && !note) { $('recCheckMsg').textContent = 'Bitte kurz angeben, was nicht in Ordnung war.'; return; }
+    $('recCheckOk').disabled = true; $('recCheckBad').disabled = true;
+    const r = await api('POST', '/api/recording-review', { id: state.recCheckId, quality, note });
+    $('recCheckOk').disabled = false; $('recCheckBad').disabled = false;
+    if (r.status !== 200) { $('recCheckMsg').textContent = 'Konnte nicht gespeichert werden. Bitte noch einmal.'; return; }
+    toast(quality === 'ok' ? 'Als brauchbar vermerkt.' : 'Als nicht brauchbar vermerkt.');
+    sysMsg(r.body && r.body.imFall ? 'Auswertung in der Akte festgehalten.' : 'Auswertung gespeichert – die Akte wird beim Abschluss ergänzt.');
+    recCheckSchliessen();
+  }
+  if ($('recCheckOk')) $('recCheckOk').addEventListener('click', () => recCheckSenden('ok'));
+  if ($('recCheckBad')) $('recCheckBad').addEventListener('click', () => recCheckSenden('bad'));
+  if ($('recCheckLater')) $('recCheckLater').addEventListener('click', recCheckSchliessen);
 
   // ================= VERLASSEN (Prüfer -> Warteraum) =================
   $('leaveBtn').addEventListener('click', leaveRoom);
@@ -870,6 +971,8 @@
   function resetForNext() {
     state.docs = []; state.snaps = []; state.pendingDocs = []; state.recChunks = []; state.recStarted = false;
     zeigeRec(false); wroomAus();
+    document.querySelectorAll('.camoff').forEach((e) => e.remove());
+    const cb = $('camBtn'); if (cb) { cb.textContent = '📷 Kamera an'; cb.classList.remove('danger'); }
     ['hostShots', 'snapShots', 'guestShots'].forEach((id) => $(id).innerHTML = '');
     ['vName', 'vDocNumber', 'vDocType'].forEach((id) => $(id).value = '');
     checkBoxes().forEach((c) => c.checked = false); $('approveBtn').disabled = true; $('rejectBtn').disabled = false;

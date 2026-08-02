@@ -274,6 +274,8 @@ function saveRecording(data) {
     bytes: buffer.length, durationSec: Math.max(0, Math.round(Number(data.durationSec) || 0)),
     code: String(data.code || '').slice(0, 20), agentName: String(data.agentName || '').slice(0, 60),
     createdAt: new Date().toISOString(),
+    // Auswertung durch den Prüfer: ist die Aufnahme brauchbar geworden?
+    quality: '', reviewNote: '', reviewedBy: '', reviewedAt: '',
   };
   recordings.push(rec); save('recordings.json', recordings); return rec;
 }
@@ -286,6 +288,17 @@ function readRecording(id) {
   let buf = fs.readFileSync(p);
   if (rec.enc) { if (!sec.hasKey()) return null; try { buf = sec.decrypt(buf); } catch { return null; } }
   return { buffer: buf, mime: rec.mime || 'video/webm' };
+}
+/** Auswertung des Prüfers festhalten: taugt die Aufnahme etwas? */
+function reviewRecording(id, data) {
+  const rec = getRecording(id); if (!rec) return null;
+  const q = String(data.quality || '');
+  rec.quality = (q === 'ok' || q === 'bad') ? q : '';
+  rec.reviewNote = String(data.note || '').slice(0, 300);
+  rec.reviewedBy = String(data.by || '').slice(0, 60);
+  rec.reviewedAt = new Date().toISOString();
+  save('recordings.json', recordings);
+  return rec;
 }
 function deleteRecording(id) {
   const i = recordings.findIndex((r) => r.id === id); if (i < 0) return false;
@@ -396,13 +409,15 @@ function clearLoginLog() { settings.loginLog = []; save('settings.json', setting
 // ---- Protokoll-Einträge in der Akte ----------------------------------------
 // Fortlaufende Notizen zu einer Akte (Teamleitung schreibt, Admin darf ändern).
 function caseEntries(c) { if (!Array.isArray(c.entries)) c.entries = []; return c.entries; }
-function addCaseEntry(caseId, { text, author, original }) {
+function addCaseEntry(caseId, { text, author, original, kind }) {
   const c = getCase(caseId); if (!c) return null;
   const t = String(text || '').trim().slice(0, 4000); if (!t) return null;
   const rec = {
     id: crypto.randomUUID(), text: t,
     original: original && String(original).trim() !== t ? String(original).slice(0, 4000) : '',
     author: String(author || '').slice(0, 60),
+    // 'recording' = automatisch beim Auswerten der Aufnahme angelegt
+    kind: String(kind || '').slice(0, 20),
     createdAt: new Date().toISOString(), editedAt: '', editedBy: '',
   };
   caseEntries(c).push(rec); save('cases.json', cases); return rec;
@@ -475,5 +490,5 @@ module.exports = {
   addPasskey, getAgentByPasskeyId, setPasskeyCounter, agentPasskeys,
   createCode, getCode, isCodeUsable, consumeCode, revokeCode, listCodes,
   saveCase, listCases, getCase, deleteCase, readDoc, purgeOlderThan,
-  saveRecording, listRecordings, getRecording, readRecording, deleteRecording,
+  saveRecording, listRecordings, getRecording, readRecording, reviewRecording, deleteRecording,
 };

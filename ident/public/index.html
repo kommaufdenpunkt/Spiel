@@ -150,6 +150,31 @@
   .videos{flex:1;position:relative;background:radial-gradient(120% 90% at 50% 20%,#152340,#0b1220);min-height:0;overflow:hidden}
   .vwrap{position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center}
   .vwrap video{width:100%;height:100%;object-fit:cover;background:#0d1526}
+  /* ---- Aufnahme auswerten (Prüfer) ---- */
+  .reccheck{display:none;position:fixed;inset:0;z-index:80;background:#050a14e8;backdrop-filter:blur(6px);
+    align-items:center;justify-content:center;padding:1rem;overflow-y:auto}
+  .reccheck.on{display:flex}
+  .reccheck-box{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:1.3rem 1.4rem;
+    width:min(640px,100%);box-shadow:0 40px 80px -30px #000}
+  .reccheck-box h2{margin:0 0 .35rem;font-size:1.15rem}
+  .rc-sub{margin:0 0 .9rem;color:var(--dim);font-size:.88rem;line-height:1.55}
+  .reccheck video{width:100%;max-height:46vh;border-radius:12px;background:#000;display:block}
+  .rc-meta{margin-top:.5rem;font-size:.8rem;color:var(--dim)}
+  .rc-actions{display:flex;gap:.55rem;align-items:center;flex-wrap:wrap;margin-top:.9rem}
+  .rc-actions .linklike{margin-left:auto}
+
+  /* Kamera bewusst aus: klare Meldung statt eingefrorenem Bild */
+  .camoff{position:absolute;inset:0;z-index:4;display:flex;flex-direction:column;align-items:center;
+    justify-content:center;gap:.2rem;text-align:center;background:#0d1526;padding:.5rem}
+  .camoff .co-ic{font-size:1.6rem;opacity:.85;margin-bottom:.15rem}
+  .camoff b{font-size:.95rem;color:var(--ink)}
+  .camoff span{font-size:.78rem;color:var(--dim)}
+  .vwrap.local .camoff .co-ic{font-size:1.1rem}
+  .vwrap.local .camoff b{font-size:.78rem}
+  .vwrap.local .camoff span{font-size:.66rem}
+  .vextra .camoff .co-ic{font-size:1.1rem}
+  .vextra .camoff b{font-size:.78rem}
+  .vextra .camoff span{font-size:.66rem}
   /* Gegenüber (Bewerber/Prüfer) groß im Vollbild */
   .vwrap.remote{position:absolute;inset:0}
   /* Eigenes Bild als schwebende Vorschau (Picture-in-Picture), gespiegelt */
@@ -516,6 +541,27 @@
       <div class="deck-head"><h2>🎥 Laufende Gespräche</h2></div>
       <div id="runningList" class="deck-list"></div>
     </aside>
+  </div>
+</div>
+
+<!-- ===== Aufnahme auswerten (Prüfer, direkt nach dem Gespräch) ===== -->
+<div id="recCheck" class="reccheck">
+  <div class="reccheck-box">
+    <h2>🎬 Ist die Aufnahme etwas geworden?</h2>
+    <p class="rc-sub">Schau sie dir kurz an – vor allem, ob man <b>Bild und Ton</b> hat und der Ausweis
+      lesbar war. Deine Einschätzung wird in der Akte festgehalten.</p>
+    <video id="recCheckVideo" controls playsinline preload="metadata"></video>
+    <div class="rc-meta" id="recCheckMeta"></div>
+    <div class="field" style="margin-top:.7rem">
+      <label for="recCheckNote">Anmerkung <span class="muted">(freiwillig – bei „nicht brauchbar" bitte kurz warum)</span></label>
+      <input id="recCheckNote" placeholder="z. B. Ton fehlt ab Minute 2" maxlength="300">
+    </div>
+    <div class="rc-actions">
+      <button id="recCheckOk" class="primary">✅ Brauchbar</button>
+      <button id="recCheckBad" class="danger">⚠️ Nicht brauchbar</button>
+      <button id="recCheckLater" class="linklike">Später entscheiden</button>
+    </div>
+    <div class="err" id="recCheckMsg"></div>
   </div>
 </div>
 
