@@ -46,12 +46,17 @@ function pruefeLink(caseId, file, exp, sig) {
   return a.length === b.length && crypto.timingSafeEqual(a, b);
 }
 
-function aktiv() { return !!MCP_URL; }
-function autoAn() { return aktiv() && MCP_AUTO; }
+// Ohne eigene Adresse liegt der Streamer-Ordner hier auf demselben Server
+// (erreichbar unter mcp.4ever1.tv). Dann wird direkt abgelegt – ohne Umweg
+// über das Netz, also ohne Wartezeit und ohne Ausfallrisiko.
+// MCP_URL setzt man nur, wenn der Ordner woanders liegen soll.
+function aktiv() { return true; }
+function eigenerOrdner() { return !MCP_URL; }
+function autoAn() { return MCP_AUTO; }
 function info() {
   return {
-    aktiv: aktiv(), auto: autoAn(),
-    ziel: MCP_URL ? MCP_URL.replace(/^(https?:\/\/[^/]+).*$/, '$1/…') : '',
+    aktiv: true, auto: autoAn(), lokal: eigenerOrdner(),
+    ziel: MCP_URL ? MCP_URL.replace(/^(https?:\/\/[^/]+).*$/, '$1/…') : 'mcp.4ever1.tv (auf diesem Server)',
     schluessel: !!MCP_TOKEN, oeffentlicheAdresse: PUBLIC_URL || '',
   };
 }
@@ -59,21 +64,21 @@ function info() {
 /** Baut das Paket, das an mcp geschickt wird. */
 function baueNutzlast(fall, aufnahme) {
   const exp = String(Date.now() + LINK_TTL);
-  const dateien = [];
-  if (PUBLIC_URL) {
-    (fall.docs || []).forEach((d) => {
-      dateien.push({
-        art: 'ausweis', bezeichnung: d.label, dateiname: d.file,
-        url: PUBLIC_URL + '/api/pull?' + new URLSearchParams({ fall: fall.id, datei: d.file, exp, sig: sign(fall.id, d.file, exp) }),
-      });
+  // Die Liste der Dateien gehört immer dazu – der Abhol-Link nur dann, wenn
+  // wir wissen, unter welcher Adresse wir erreichbar sind. Liegt der Ordner
+  // hier auf demselben Server, braucht es gar keinen Link.
+  const link = (datei) => (PUBLIC_URL
+    ? PUBLIC_URL + '/api/pull?' + new URLSearchParams({ fall: fall.id, datei, exp, sig: sign(fall.id, datei, exp) })
+    : '');
+  const dateien = (fall.docs || []).map((d) => ({
+    art: 'ausweis', bezeichnung: d.label, dateiname: d.file, url: link(d.file),
+  }));
+  if (aufnahme) {
+    dateien.push({
+      art: 'aufnahme', bezeichnung: 'Video der Audition', dateiname: 'video.' + (aufnahme.ext || 'webm'),
+      sekunden: aufnahme.durationSec || 0, bytes: aufnahme.bytes || 0,
+      url: link('rec:' + aufnahme.id),
     });
-    if (aufnahme) {
-      dateien.push({
-        art: 'aufnahme', bezeichnung: 'Video der Audition', dateiname: 'video.' + (aufnahme.ext || 'webm'),
-        sekunden: aufnahme.durationSec || 0, bytes: aufnahme.bytes || 0,
-        url: PUBLIC_URL + '/api/pull?' + new URLSearchParams({ fall: fall.id, datei: 'rec:' + aufnahme.id, exp, sig: sign(fall.id, 'rec:' + aufnahme.id, exp) }),
-      });
-    }
   }
   return {
     quelle: 'ident.4ever1.tv',
@@ -138,13 +143,25 @@ async function senden(nutzlast) {
  * @param {object} deps  { getCase, getRecordingByCode, setStatus, log }
  */
 async function uebergeben(fallId, deps, vonHand) {
-  if (!aktiv()) return { ok: false, grund: 'nicht-eingerichtet' };
   const fall = deps.getCase(fallId);
   if (!fall) return { ok: false, grund: 'akte-weg' };
-  if (!PUBLIC_URL) deps.log('MCP: PUBLIC_URL fehlt – die Gegenstelle bekommt keine Abhol-Links.');
-
   const aufnahme = deps.getRecordingByCode(fall.code);
   const nutzlast = baueNutzlast(fall, aufnahme);
+
+  // Liegt der Ordner hier, wird direkt abgelegt. Das kann nicht scheitern,
+  // weil nichts über das Netz geht.
+  if (eigenerOrdner()) {
+    const ordner = deps.ablegen(nutzlast);
+    if (!ordner) {
+      deps.setStatus(fallId, { status: 'fehlgeschlagen', text: 'Keine BIGO-ID in der Akte – ohne die gibt es keinen Ordner' });
+      return { ok: false, grund: 'keine-bigo-id' };
+    }
+    deps.setStatus(fallId, { status: 'uebergeben', text: 'Ordner ' + ordner.bigoId });
+    deps.log('MCP: Akte im Ordner ' + ordner.bigoId + ' abgelegt');
+    return { ok: true, ordner: ordner.bigoId };
+  }
+
+  if (!PUBLIC_URL) deps.log('MCP: PUBLIC_URL fehlt – die Gegenstelle bekommt keine Abhol-Links.');
   deps.setStatus(fallId, { status: 'laeuft', text: vonHand ? 'Übergabe von Hand gestartet' : 'Übergabe gestartet' });
 
   let letzte = null;
@@ -165,4 +182,12 @@ async function uebergeben(fallId, deps, vonHand) {
   return { ok: false, grund: 'fehlgeschlagen', status: letzte && letzte.status };
 }
 
-module.exports = { initSign, pruefeLink, aktiv, autoAn, info, uebergeben, baueNutzlast };
+/** Prüft den Schlüssel, mit dem sich eine fremde Quelle beim Posteingang ausweist. */
+function tokenOk(header) {
+  if (!MCP_TOKEN) return false;                 // ohne eingerichteten Schlüssel: kein Zugang von aussen
+  const gesendet = String(header || '').replace(/^Bearer\s+/i, '');
+  const a = Buffer.from(gesendet), b = Buffer.from(MCP_TOKEN);
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
+
+module.exports = { initSign, pruefeLink, aktiv, eigenerOrdner, autoAn, info, uebergeben, baueNutzlast, tokenOk };

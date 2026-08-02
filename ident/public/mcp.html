@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Streamer-Ordner · 4EVER1</title>
+<meta name="robots" content="noindex, nofollow, noarchive">
+<link rel="icon" href="/icon-192.png">
+<meta name="theme-color" content="#0d1320">
+<style>
+  :root{--bg:#0d1320;--panel:#161d2c;--panel2:#1c2438;--line:#2b3651;--line2:#3a4a6b;
+    --ink:#e9eefb;--dim:#9aabc6;--accent:#5b8cff;--good:#3ec77b;--warm:#e8975d;--bad:#e14b6a}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);line-height:1.6;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased}
+  button{font:inherit;cursor:pointer;border-radius:10px;border:1px solid var(--line);background:var(--panel2);
+    color:var(--ink);padding:.5rem .9rem;transition:border-color .15s,transform .15s}
+  button:hover{border-color:var(--line2);transform:translateY(-1px)}
+  button.primary{background:linear-gradient(180deg,#6a97ff,#3b6ef0);border-color:#2a55c8;color:#fff}
+  button.danger{color:#ffb3c0;border-color:#5e2033}
+  input,textarea,select{font:inherit;width:100%;padding:.55rem .7rem;border-radius:10px;
+    border:1px solid var(--line);background:#0f1728;color:var(--ink)}
+  .muted{color:var(--dim);font-size:.85rem}
+  .pill{display:inline-block;font-size:.7rem;padding:.15rem .55rem;border-radius:999px;border:1px solid var(--line2);color:var(--dim)}
+  .pill.ok{color:#9ff0c4;border-color:#2f6b4a;background:#12291f}
+  .pill.no{color:#ffb3c0;border-color:#6b2f3a;background:#291217}
+  .pill.warn{color:#ffd7ae;border-color:#6b552f;background:#291f12}
+
+  header{position:sticky;top:0;z-index:10;background:#0d1320e6;backdrop-filter:blur(10px);
+    border-bottom:1px solid var(--line);padding:.75rem 1.1rem;display:flex;align-items:center;gap:.8rem}
+  header .logo{width:34px;height:34px;border-radius:10px;flex:none;display:grid;place-items:center;
+    background:linear-gradient(135deg,#6f9bff,#3b6ef0)}
+  header b{display:block;line-height:1.15}
+  header small{display:block;font-size:.6rem;letter-spacing:.2em;text-transform:uppercase;color:var(--dim)}
+  header .sp{flex:1}
+
+  .wrap{max-width:1100px;margin:0 auto;padding:1.2rem 1.1rem 4rem}
+
+  /* Anmeldung */
+  .login{max-width:380px;margin:12vh auto;background:var(--panel);border:1px solid var(--line);
+    border-radius:16px;padding:1.6rem}
+  .login h1{font-size:1.15rem;margin:0 0 .3rem}
+  .login .f{margin:.9rem 0}
+  .login label{display:block;font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--dim);margin-bottom:.3rem}
+  .err{color:#ff9db0;font-size:.85rem;min-height:1.2em;margin-top:.6rem}
+
+  /* Ordner-Liste */
+  .bar{display:flex;gap:.6rem;align-items:center;margin-bottom:1rem;flex-wrap:wrap}
+  .bar input{max-width:340px}
+  .stats{display:flex;gap:.6rem;flex-wrap:wrap;margin-bottom:1rem}
+  .stat{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:.6rem .9rem;min-width:92px}
+  .stat b{display:block;font-size:1.35rem;line-height:1.1}
+  .stat span{font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--dim)}
+
+  .folders{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:.8rem}
+  .folder{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:.95rem 1rem;
+    cursor:pointer;transition:border-color .15s,transform .15s}
+  .folder:hover{border-color:var(--accent);transform:translateY(-2px)}
+  .folder .id{font-weight:700;font-size:1rem;word-break:break-all}
+  .folder .nm{color:var(--dim);font-size:.85rem}
+  .folder .row{display:flex;justify-content:space-between;align-items:center;gap:.5rem;margin-top:.55rem}
+  .empty{color:var(--dim);text-align:center;padding:3rem 1rem;border:1px dashed var(--line);border-radius:14px}
+
+  /* Ordner-Ansicht */
+  .back{margin-bottom:.9rem}
+  .head{display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap;align-items:flex-start;
+    background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:1.1rem 1.2rem;margin-bottom:1rem}
+  .head h1{margin:0;font-size:1.3rem;word-break:break-all}
+  .head .sub{color:var(--dim);font-size:.88rem}
+  .head .rechts{display:flex;gap:.5rem;align-items:center;flex-wrap:wrap}
+  .head select{width:auto;min-width:130px}
+
+  .aud{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:1rem 1.1rem;margin-bottom:.8rem}
+  .aud .top{display:flex;justify-content:space-between;gap:.8rem;align-items:flex-start;flex-wrap:wrap}
+  .aud .meta{color:var(--dim);font-size:.85rem;line-height:1.7}
+  .aud h3{margin:0;font-size:1rem}
+  .files{display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.7rem}
+  .files a{display:inline-flex;align-items:center;gap:.4rem;font-size:.82rem;color:var(--ink);text-decoration:none;
+    background:#0f1728;border:1px solid var(--line);border-radius:10px;padding:.4rem .7rem}
+  .files a:hover{border-color:var(--accent)}
+  .prot{margin-top:.8rem;padding-top:.7rem;border-top:1px solid var(--line)}
+  .prot .e{font-size:.86rem;padding:.4rem 0;border-bottom:1px solid #202a40}
+  .prot .e:last-child{border-bottom:0}
+  .prot .e small{display:block;color:var(--dim);font-size:.74rem}
+  video{width:100%;max-width:420px;border-radius:10px;border:1px solid var(--line);background:#000;margin-top:.6rem}
+  .notiz{margin-top:1rem;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:1rem 1.1rem}
+  .notiz textarea{min-height:90px;resize:vertical}
+  .toast{position:fixed;left:50%;bottom:1.2rem;transform:translateX(-50%) translateY(120%);background:#1c2438;
+    border:1px solid var(--line2);border-radius:12px;padding:.6rem 1rem;font-size:.9rem;transition:transform .25s;z-index:50}
+  .toast.show{transform:translateX(-50%)}
+</style>
+</head>
+<body>
+
+<div id="login" class="login">
+  <h1>Streamer-Ordner</h1>
+  <p class="muted" style="margin:0">Bitte anmelden.</p>
+  <div class="f"><label for="user">Benutzername</label><input id="user" autocomplete="username"></div>
+  <div class="f"><label for="pass">Passwort</label><input id="pass" type="password" autocomplete="current-password"></div>
+  <button id="loginBtn" class="primary" style="width:100%">Anmelden</button>
+  <div class="err" id="loginErr"></div>
+</div>
+
+<div id="app" style="display:none">
+  <header>
+    <span class="logo"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" aria-hidden="true"><path d="M12 2.6l6.8 2.5v5.2c0 4.3-2.9 7.4-6.8 8.8-3.9-1.4-6.8-4.5-6.8-8.8V5.1L12 2.6z" fill="#fff"/><path d="M8.6 12.1l2.2 2.2 4.6-4.8" stroke="#2a55c8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+    <span><b>Streamer-Ordner</b><small id="whoami">4EVER1</small></span>
+    <span class="sp"></span>
+    <button id="logout">Abmelden</button>
+  </header>
+  <div class="wrap">
+    <div id="liste"></div>
+    <div id="detail" style="display:none"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<script src="/mcp-app.js"></script>
+</body>
+</html>
