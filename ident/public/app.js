@@ -43,7 +43,25 @@
     try { res = await fetch(path, { method, headers, body: body ? JSON.stringify(body) : undefined }); }
     catch { return { status: 0, body: {} }; }
     let json = {}; try { json = await res.json(); } catch {}
+    if (res.status === 401 && state.token) sitzungAbgelaufen();
     return { status: res.status, body: json };
+  }
+
+  // Der Anmelde-Nachweis liegt im Arbeitsspeicher des Servers. Startet der
+  // Server neu – oder zeigt die Adresse auf einen anderen Server, wie beim
+  // Umzug –, gilt er nicht mehr. Vorher zeigte der Bereich dann stumm leere
+  // Listen und nichts liess sich mehr anlegen. Jetzt landet man sauber wieder
+  // beim Login und weiss auch, warum.
+  function sitzungAbgelaufen() {
+    if (!state.token) return;
+    state.token = ''; state.name = ''; state.isAdmin = false;
+    clearInterval(state.waitingTimer); state.waitingTimer = 0;
+    if ($('waitingView')) $('waitingView').style.display = 'none';
+    if ($('lobby')) $('lobby').style.display = '';
+    if ($('passInput')) $('passInput').value = '';
+    if ($('totpInput')) $('totpInput').value = '';
+    if ($('lobbyErr')) $('lobbyErr').textContent = 'Die Anmeldung gilt nicht mehr – bitte neu anmelden.';
+    toast('Anmeldung abgelaufen. Bitte neu anmelden.');
   }
   async function loadIce() { try { const r = await fetch('ice', { cache: 'no-store' }); return (await r.json()).iceServers; } catch { return FALLBACK_ICE; } }
 
@@ -470,7 +488,13 @@
     const b = $('nummerNeu'); b.disabled = true;
     const r = await api('POST', '/api/code', { note: $('nummerNotiz').value.trim() });
     b.disabled = false;
-    if (r.status !== 200) { toast('Nummer konnte nicht erzeugt werden.'); return; }
+    if (r.status !== 200) {
+      // Sagen, woran es liegt – „ging nicht" hilft niemandem weiter.
+      if (r.status === 401) return;                       // Login-Hinweis kommt schon
+      toast(r.status === 0 ? 'Keine Verbindung zum Server.'
+        : 'Nummer konnte nicht erzeugt werden (Fehler ' + r.status + ').');
+      return;
+    }
     $('nummerNotiz').value = '';
     toast('Neue Nummer: ' + r.body.code);
     ladeNummern();

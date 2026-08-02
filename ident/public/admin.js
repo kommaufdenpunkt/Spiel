@@ -14,7 +14,19 @@
     const headers = {}; if (body) headers['Content-Type'] = 'application/json'; if (token) headers['Authorization'] = 'Bearer ' + token;
     let res; try { res = await fetch(path, { method, headers, body: body ? JSON.stringify(body) : undefined }); } catch { return { status: 0, body: {} }; }
     let json = {}; try { json = await res.json(); } catch {}
+    if (res.status === 401 && token) sitzungAbgelaufen();
     return { status: res.status, body: json };
+  }
+
+  // Der Anmelde-Nachweis lebt im Arbeitsspeicher des Servers. Nach einem
+  // Neustart gilt er nicht mehr – dann zurück zum Login statt leerer Seiten.
+  function sitzungAbgelaufen() {
+    if (!token) return;
+    token = '';
+    $('dash').style.display = 'none';
+    $('login').style.display = '';
+    $('pw').value = ''; if ($('totp')) $('totp').value = '';
+    $('loginErr').textContent = 'Die Anmeldung gilt nicht mehr – bitte neu anmelden.';
   }
 
   // ---- Geräte-Kennung ----
