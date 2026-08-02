@@ -810,6 +810,41 @@
       + esc(teile.join(' \u00b7 ')) + '</span>';
   }
 
+  // ---- Ausweisdaten schon im Warteraum -------------------------------------
+  // Wer wartet, kann die Zeit nutzen. Der Pruefer bekommt die Angaben beim
+  // Verbinden uebertragen und muss im Gespraech nichts mehr abtippen.
+  function vorabPaket() {
+    const w = (id) => { const e = $(id); return e ? e.value.trim() : ''; };
+    return {
+      kind: 'profile',
+      bigoName: (state.profile && state.profile.bigoName) || '',
+      age: (state.profile && state.profile.age) || '',
+      ausweisName: w('vaName'), ausweisArt: w('vaArt'), ausweisNr: w('vaNr'),
+    };
+  }
+  function vorabStand() {
+    const box = document.querySelector('.vorab'); if (!box) return;
+    const p = vorabPaket();
+    const fertig = !!(p.ausweisName && p.ausweisArt && p.ausweisNr);
+    box.classList.toggle('fertig', fertig);
+    const st = $('vaStatus');
+    if (st) st.textContent = fertig
+      ? '✓ Alles da – der Prüfer bekommt es beim Gespräch automatisch.'
+      : 'Wird beim Gespräch automatisch übermittelt.';
+    // Sitzt schon ein Prüfer im Raum? Dann gleich nachreichen.
+    dcBroadcast(p);
+  }
+  ['vaName', 'vaArt', 'vaNr'].forEach((id) => {
+    const el = $(id); if (!el) return;
+    el.addEventListener('change', vorabStand);
+    el.addEventListener('blur', vorabStand);
+  });
+  if ($('vaBilder')) $('vaBilder').addEventListener('click', () => {
+    // Fuehrt in denselben Ablauf wie im Gespraech - die Bilder warten dann
+    // auf den Pruefer und gehen los, sobald er da ist.
+    const b = $('upFront'); if (b) b.click();
+  });
+
   async function refreshWaiting() {
     const r = await api('GET', '/api/waiting');
     if (r.status === 200) renderWaiting(r.body.waiting || [], r.body);
@@ -1237,7 +1272,7 @@
     const P = state.peers.get(peerId); if (P) P.dc = dc;
     dc.onopen = () => {
       if (state.role === 'guest') {
-        if (state.profile) dcSendTo(dc, { kind: 'profile', bigoName: state.profile.bigoName, age: state.profile.age });
+        if (state.profile) dcSendTo(dc, vorabPaket());
         (state.myUploads || []).forEach((d) => sendDocTo(dc, d.label, d.dataUrl)); // auch später dazugekommene Prüfer bekommen die Bilder
         $('guideStatus').textContent = 'Verbunden mit dem Prüfer. Bitte lade die Bilder hoch.';
       }
@@ -1254,8 +1289,19 @@
       else if (m.kind === 'doc-part') { const it = incoming[key]; if (!it) return; it.parts[m.i] = m.part; if (it.parts.filter(Boolean).length === it.n) { onDocReceived(it.label, it.parts.join('')); delete incoming[key]; } }
       else if (m.kind === 'result') onResult(m.result);
       else if (m.kind === 'profile') {
-        if (m.bigoName && !$('vBigoName').value) $('vBigoName').value = m.bigoName;
-        if (m.age && !$('vAge').value) $('vAge').value = m.age;
+        // Der Bewerber hat im Warteraum schon eingetragen, was im Ausweis
+        // steht. Der Pruefer bekommt das Formular ausgefuellt - er prueft nur
+        // noch, statt im Gespraech zu tippen.
+        const setz = (id, wert) => { if (wert && !$(id).value) $(id).value = wert; };
+        setz('vBigoName', m.bigoName);
+        setz('vAge', m.age);
+        setz('vName', m.ausweisName);
+        setz('vDocType', m.ausweisArt);
+        setz('vDocNumber', m.ausweisNr);
+        if (m.ausweisName || m.ausweisNr) {
+          const st = $('reviewStatus');
+          if (st) st.textContent = 'Der Bewerber hat seine Ausweisdaten schon eingetragen – bitte gegen den Ausweis prüfen.';
+        }
         personSuchen();   // gleich nachsehen, ob wir die Person kennen
       }
       // Der Bewerber soll sehen, wenn aufgezeichnet wird – er hat zugestimmt,

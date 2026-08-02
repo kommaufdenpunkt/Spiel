@@ -336,6 +336,23 @@
   .wlevel i{display:block;height:100%;width:0;border-radius:4px;
     background:linear-gradient(90deg,#3ec77b,#8ed7a2);transition:width .08s linear}
   .wroom-next{margin:.85rem 0 0;font-size:.82rem;color:var(--dim);line-height:1.55}
+  /* Was gleich passiert - beim Warten liest man so etwas wirklich. */
+  .ablauf{margin-top:.9rem;padding:.8rem .9rem;border:1px solid var(--line);border-radius:14px;background:var(--panel2);font-size:.85rem}
+  .ablauf b{font-size:.9rem}
+  .ablauf ol{margin:.5rem 0 .6rem;padding-left:1.2rem;line-height:1.7;color:var(--ink)}
+  .ablauf li{margin-bottom:.15rem}
+  .ablauf .muted{color:var(--dim);font-size:.8rem;line-height:1.55;display:block}
+  /* Ausweisdaten schon im Warteraum - der Pruefer hat sie dann vorliegen. */
+  .vorab{margin-top:.9rem;padding:.85rem .9rem;border:1px solid var(--line);border-radius:14px;background:var(--panel2)}
+  .vorab-kopf{font-size:.9rem;margin-bottom:.6rem}
+  .vorab-kopf .muted{font-size:.78rem;color:var(--dim)}
+  .vorab input,.vorab select{width:100%;margin-bottom:.5rem;font-size:.95rem;padding:.6rem .8rem;border-radius:10px;
+    border:1px solid var(--line);background:#0f1728;color:var(--ink)}
+  .vorab-zeile{display:flex;gap:.5rem;flex-wrap:wrap}
+  .vorab-zeile select,.vorab-zeile input{flex:1;min-width:150px}
+  .vorab-fuss{display:flex;gap:.6rem;align-items:center;justify-content:space-between;flex-wrap:wrap}
+  .vorab-fuss .muted{font-size:.78rem;color:var(--dim);flex:1;min-width:150px}
+  .vorab.fertig{border-color:var(--good);background:#132a20}
   /* Aufnahme-Hinweis, den auch der Bewerber sieht */
   .recinfo{display:none;align-items:center;gap:.5rem;font-size:.84rem;color:#ffc9d2;
     background:#2a1420;border:1px solid #5e2033;border-radius:999px;padding:.35rem .8rem}
@@ -528,8 +545,41 @@
         <div class="wc" id="wcNet"><span class="wi">📶</span><div><b>Verbindung</b><span id="wcNetMsg">wird geprüft …</span></div><i class="wdot"></i></div>
       </div>
 
-      <p class="wroom-next">Nutz die Zeit: Der Vorlese-Text ist schon da – lies ihn ruhig einmal in Ruhe durch.
-        Deine Ausweisbilder kannst du auch jetzt bereits hochladen, dann geht es später schneller.</p>
+      <div class="ablauf">
+        <b>So geht es gleich weiter</b>
+        <ol>
+          <li>Ein Prüfer holt dich ins Gespräch – kurzes Hallo.</li>
+          <li>Er schaut sich deinen Ausweis an und vergleicht ihn mit dir.</li>
+          <li>Du liest den Text rechts in die Kamera. <b>Das Tempo bestimmst du selbst</b> –
+              mit dem Regler „Ablese-Tempo", auch währenddessen.</li>
+          <li>Fertig. Du erfährst gleich, ob es geklappt hat.</li>
+        </ol>
+        <span class="muted">Das Gespräch wird aufgezeichnet – du hast dem zugestimmt.
+          Nutz die Wartezeit: Text durchlesen und unten die Ausweisdaten eintragen,
+          dann geht es später viel schneller.</span>
+      </div>
+
+      <!-- Ausweisdaten schon im Warteraum. Der Prüfer bekommt sie beim
+           Verbinden übertragen und hat das Formular ausgefüllt vor sich –
+           statt im Gespräch zu tippen, während der Bewerber wartet. -->
+      <div class="vorab">
+        <div class="vorab-kopf">🪪 <b>Deine Ausweisdaten</b> <span class="muted">jetzt schon eintragen – spart Zeit</span></div>
+        <input id="vaName" placeholder="Name, genau wie er im Ausweis steht" autocomplete="name">
+        <div class="vorab-zeile">
+          <select id="vaArt">
+            <option value="">Ausweisart wählen …</option>
+            <option>Personalausweis</option>
+            <option>Reisepass</option>
+            <option>Aufenthaltstitel</option>
+            <option>Führerschein</option>
+          </select>
+          <input id="vaNr" placeholder="Ausweis-Nummer" autocomplete="off">
+        </div>
+        <div class="vorab-fuss">
+          <span id="vaStatus" class="muted">Wird beim Gespräch automatisch übermittelt.</span>
+          <button id="vaBilder" class="primary" type="button">📄 Ausweisbilder hochladen</button>
+        </div>
+      </div>
     </div>
     <div class="controls">
       <button id="micBtn">🎤 Mikro an</button>
