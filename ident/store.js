@@ -244,6 +244,11 @@ function saveCase(data) {
     rejectReason: String(data.rejectReason || '').slice(0, 200),
     agentName: String(data.agentName || '').slice(0, 60),
     checklist: Array.isArray(data.checklist) ? data.checklist.slice(0, 20) : [],
+    // Wortlaut, der an diesem Tag galt. Der Vorlese-Text ist die Einwilligung,
+    // die der Bewerber in die Kamera gesprochen hat – ohne ihn liesse sich
+    // später nicht mehr belegen, worin genau eingewilligt wurde.
+    skript: String(data.skript || '').slice(0, 20000),
+    einleitung: String(data.einleitung || '').slice(0, 20000),
     createdAt: new Date().toISOString(), docs,
     // Übergabe an mcp.4ever1.tv: '' | laeuft | uebergeben | fehlgeschlagen
     mcpStatus: '', mcpText: '', mcpAt: '',
@@ -305,6 +310,54 @@ function listStreamers() {
 function getStreamer(id) {
   return streamers.find((s) => s.id === id || ordnerSchluessel(s.bigoId) === ordnerSchluessel(id)) || null;
 }
+
+/**
+ * Kennen wir die Person schon? Sucht in den Ordnern und – falls dort noch
+ * nichts liegt – auch in den Akten. Drei Wege führen zu einem Treffer:
+ *   1. dieselbe BIGO-ID          (sicher, danach wird zugeordnet)
+ *   2. dieselbe Ausweisnummer    (dieselbe Person mit neuer BIGO-ID)
+ *   3. derselbe Name + Alter     (schwacher Hinweis, nur zum Nachschauen)
+ * Zurück kommt, was der Prüfer wissen muss – nicht die ganze Akte.
+ */
+function suchePerson({ bigoId, docNumber, name, age }) {
+  const norm = (x) => String(x || '').trim().toLowerCase();
+  const nurZiffern = (x) => String(x || '').replace(/[^a-z0-9]/gi, '').toLowerCase();
+  const bId = norm(bigoId), dNr = nurZiffern(docNumber), nm = norm(name), alt = norm(age);
+  if (!bId && !dNr && !nm) return null;
+
+  const treffer = (ordner, grund, sicher) => ({
+    grund, sicher,
+    ordnerId: ordner.id, bigoId: ordner.bigoId, name: ordner.name || '', alter: ordner.alter || '',
+    status: ordner.status || 'neu', art: ordner.art || 'streamer',
+    auditionen: (ordner.auditions || []).length,
+    letzteAudition: (ordner.auditions || []).map((a) => a.erstelltAm).sort().pop() || '',
+    letzteAktivitaet: ordner.letzteAktivitaet || ordner.angelegtAm || '',
+    vermerke: (ordner.eintraege || []).length,
+    notiz: ordner.notiz || '',
+  });
+
+  if (bId) {
+    const o = streamers.find((s) => ordnerSchluessel(s.bigoId) === bId);
+    if (o) return treffer(o, 'bigo', true);
+  }
+  if (dNr) {
+    // Die Ausweisnummer steht in den Akten, nicht im Ordner – über sie führt
+    // der Weg zur BIGO-ID und damit zum Ordner.
+    const f = cases.find((c) => nurZiffern(c.docNumber) && nurZiffern(c.docNumber) === dNr);
+    if (f) {
+      const o = streamers.find((s) => ordnerSchluessel(s.bigoId) === norm(f.bigoName));
+      if (o) return { ...treffer(o, 'ausweis', true), andereBigoId: norm(f.bigoName) !== bId ? f.bigoName : '' };
+    }
+  }
+  if (nm) {
+    const f = cases.find((c) => norm(c.verifiedName) === nm && (!alt || norm(c.age) === alt));
+    if (f) {
+      const o = streamers.find((s) => ordnerSchluessel(s.bigoId) === norm(f.bigoName));
+      if (o) return treffer(o, 'name', false);
+    }
+  }
+  return null;
+}
 /**
  * Eine fertige Audition in den Ordner des Streamers legen. Gibt es noch keinen
  * Ordner, wird er angelegt. Kommt dieselbe Audition ein zweites Mal (etwa beim
@@ -346,6 +399,18 @@ function ablegen(paket) {
     ausweisnummer: String(a.ausweisnummer || '').slice(0, 60),
     notiz: String(a.notiz || '').slice(0, 500),
     erstelltAm: String(a.erstelltAm || jetzt),
+    // Was der Prüfer abgehakt hat und welcher Wortlaut galt – beides gehört
+    // dauerhaft in den Ordner, nicht nur in die Akte auf der anderen Seite.
+    // Die Fragen kommen als {label, checked} - hier wird daraus lesbarer Text,
+    // damit im Ordner steht, was tatsaechlich abgehakt wurde.
+    checkliste: Array.isArray(a.checkliste) ? a.checkliste.slice(0, 20).map((x) => {
+      if (x && typeof x === 'object') return ((x.checked ? '\u2611 ' : '\u2610 ') + String(x.label || '')).slice(0, 300);
+      return String(x).slice(0, 300);
+    }) : [],
+    texte: {
+      vorlese: String((paket.texte && paket.texte.vorlese) || '').slice(0, 20000),
+      begruessung: String((paket.texte && paket.texte.begruessung) || '').slice(0, 20000),
+    },
     aufnahme: paket.aufnahme || null,
     protokoll: Array.isArray(paket.protokoll) ? paket.protokoll.slice(0, 200) : [],
     dateien: Array.isArray(paket.dateien) ? paket.dateien.slice(0, 20).map((d) => ({
@@ -624,6 +689,7 @@ module.exports = {
   setAgentPassword, changeOwnPassword, lockAgent, unlockAgent, deleteAgent, agentCount,
   addPasskey, getAgentByPasskeyId, setPasskeyCounter, agentPasskeys,
   createCode, getCode, isCodeUsable, consumeCode, revokeCode, listCodes,
+  suchePerson,
   saveCase, listCases, getCase, deleteCase, readDoc, purgeOlderThan,
   saveRecording, listRecordings, getRecording, readRecording, reviewRecording, deleteRecording,
   setCaseMcp, getRecordingByCode,

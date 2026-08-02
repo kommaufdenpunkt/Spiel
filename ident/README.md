@@ -47,10 +47,32 @@ Suchmaschinen sehen nur die Startseite; alle Arbeitsbereiche antworten mit
 8. **Freigeben oder Ablehnen** → die Akte wird verschlüsselt gespeichert und
    wandert in den **Ordner des Streamers**, zugeordnet über die BIGO-ID.
 
+## Wird die Person schon geführt?
+
+Das prüft ident von selbst – zweimal:
+
+1. **Beim Reinkommen.** Der Bewerber nennt seine BIGO-ID; der Server sieht
+   nach und die Warteschlange zeigt „📁 schon im Ordner" samt Zahl der
+   Auditions, Status und Vermerken. Der Prüfer weiss es also, **bevor** er
+   das Gespräch annimmt.
+2. **Beim Ausfüllen der Akte.** Während der Prüfer die Ausweisdaten eintippt,
+   läuft der Abgleich mit. Drei Wege führen zu einem Treffer:
+   - dieselbe **BIGO-ID** – sicher, die Audition wird angehängt
+   - dieselbe **Ausweisnummer** – dieselbe Person mit neuer BIGO-ID; dann
+     erscheint eine Warnung mit der alten Nummer
+   - derselbe **Name und dasselbe Alter** – nur ein Hinweis zum Nachprüfen
+
+Gibt es keinen Treffer, steht da „Neu bei uns – mit der Freigabe wird ein
+neuer Ordner angelegt." Es entsteht also nie versehentlich ein zweiter Ordner
+für dieselbe Person.
+
 ## Streamer-Ordner
 
 Ein Ordner je BIGO-ID mit allen Auditions, Aufnahmen samt Auswertung,
-Ausweisbildern und Protokollen.
+Ausweisbildern, abgehakten Fragen, dem Wortlaut der Texte und Protokollen.
+Der **Vorlese-Text wird bei jeder Audition mitgespeichert** – er ist die
+Einwilligung, die der Bewerber in die Kamera gesprochen hat. Wird er später
+geändert, steht in der alten Akte weiterhin, was an dem Tag galt.
 
 - **Art:** Familie oder Streamer, mit Filter in der Übersicht
 - **Status:** neu · aktiv · pausiert · abgelehnt · nicht mehr dabei

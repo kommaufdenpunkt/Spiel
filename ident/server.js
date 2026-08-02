@@ -546,6 +546,7 @@ async function handleApi(req, res, urlPath, ip) {
       if (room) for (const ws of room.values()) if (ws.role === 'host' && ws.pname) hosts.push(ws.pname);
       return {
         code: w.code, note: w.note, joinedAt: w.joinedAt, busy,
+        bigoId: w.bigoId || '', bekannt: w.bekannt || null,
         claimedBy: busy ? w.claimedBy : null,
         hosts, live: hosts.length > 0,
         waitingSec: Math.max(0, Math.round((Date.now() - w.joinedAt) / 1000)),
@@ -590,11 +591,30 @@ async function handleApi(req, res, urlPath, ip) {
     sendJson(res, 200, { ok: true }); return true;
   }
 
+  // ---- Kennen wir die Person schon? ----
+  // Wird beim Eintippen der Ausweisdaten gefragt. Der Prüfer soll wissen,
+  // ob die Audition an einen bestehenden Ordner angehängt wird oder ob ein
+  // neuer entsteht – vor der Freigabe, nicht danach.
+  if (urlPath === '/api/person-suche' && req.method === 'POST') {
+    let body; try { body = await readJson(req, 8 * 1024); } catch { body = {}; }
+    const t = store.suchePerson({
+      bigoId: body.bigoId, docNumber: body.docNumber, name: body.name, age: body.age,
+    });
+    sendJson(res, 200, { treffer: t }); return true;
+  }
+
   // ---- Fall speichern (Prüfer) ----
   if (urlPath === '/api/case' && req.method === 'POST') {
     let body; try { body = await readJson(req); } catch { sendJson(res, 413, { reason: 'too-large' }); return true; }
     if (!body.code || !store.isCodeUsable(body.code)) { sendJson(res, 400, { reason: 'bad-code' }); return true; }
-    const rec = store.saveCase({ ...body, agentName: reqName(req, ip) || body.agentName });
+    // Die beiden Texte kommen vom Server, nicht vom Browser: Sie sind die
+    // Einwilligung, die der Bewerber abgegeben hat, und gehören unverändert
+    // in die Akte. Wird der Text später geändert, bleibt hier stehen, was
+    // an diesem Tag galt.
+    const rec = store.saveCase({
+      ...body, agentName: reqName(req, ip) || body.agentName,
+      skript: store.getScript(), einleitung: store.getIntro(),
+    });
     // Wurde die Aufnahme schon ausgewertet, bevor die Akte angelegt war?
     // Dann gehört die Einschätzung jetzt hier hinein.
     const auf = store.listRecordings().find((r) => r.code === rec.code && r.quality);
@@ -981,6 +1001,7 @@ async function handleApi(req, res, urlPath, ip) {
       table{border-collapse:collapse;width:100%;margin:1rem 0} th,td{border:1px solid #e3e9f2;padding:.5rem .7rem;text-align:left;font-size:.92rem;vertical-align:top} th{width:34%;background:#f6f8fc;font-weight:600}
       figure{margin:0} .imgs{display:flex;flex-wrap:wrap;gap:1rem;margin-top:1rem} .imgs img{max-width:240px;border:1px solid #e3e9f2;border-radius:8px} figcaption{font-size:.75rem;color:#6b7a90;text-align:center;margin-top:.2rem}
       ul{padding-left:1.1rem;margin:.4rem 0} .print{margin:1rem 0;padding:.6rem 1rem;border:1px solid #3b6ef0;background:#eef3ff;border-radius:8px}
+      pre.wortlaut{white-space:pre-wrap;font-family:inherit;font-size:.9rem;line-height:1.6;background:#f6f8fc;border:1px solid #e3e9f2;border-radius:8px;padding:.7rem .9rem;margin:.3rem 0}
       @media print{.print{display:none}}
     </style></head><body>
       <h1>4EVER1 · Audition</h1><p class="sub">BIGO Live · Bewerbungs-/Auditionsakte</p>
@@ -998,6 +1019,8 @@ async function handleApi(req, res, urlPath, ip) {
       </table>
       ${checks ? `<h3>Prüf-Checkliste</h3><ul>${checks}</ul>` : ''}
       ${imgs ? `<h3>Bilder</h3><div class="imgs">${imgs}</div>` : ''}
+      ${c.skript ? `<h3>Vorgelesener Text (Einwilligung)</h3><pre class="wortlaut">${eh(c.skript)}</pre>` : ''}
+      ${c.einleitung ? `<h3>Begrüßung / Ablauf</h3><pre class="wortlaut">${eh(c.einleitung)}</pre>` : ''}
     </body></html>`;
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' }); res.end(html); return true;
   }
@@ -1199,7 +1222,15 @@ wss.on('connection', (ws, req) => {
 
       if (role === 'guest') {
         const note = store.getCode(code); // Notiz aus dem Code (falls hinterlegt)
-        waiting.set(code, { code, note: note ? note.note : '', joinedAt: Date.now(), claimedBy: null, claimedAt: 0 });
+        // Gleich nachsehen, ob wir die Person kennen. Steht damit in der
+        // Warteschlange, noch bevor jemand das Gespräch annimmt.
+        const bigo = String(msg.bigo || '').trim().slice(0, 80);
+        let bekannt = null;
+        try { bekannt = store.suchePerson({ bigoId: bigo, age: msg.alter }); } catch { bekannt = null; }
+        waiting.set(code, {
+          code, note: note ? note.note : '', joinedAt: Date.now(), claimedBy: null, claimedAt: 0,
+          bigoId: bigo, bekannt,
+        });
       } else {
         const w = waiting.get(code); if (w) { w.claimedBy = ws.pname; w.claimedAt = Date.now(); }
       }

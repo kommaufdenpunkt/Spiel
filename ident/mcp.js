@@ -102,6 +102,11 @@ function baueNutzlast(fall, aufnahme) {
       checkliste: fall.checklist || [],
       erstelltAm: fall.createdAt,
     },
+    // Der Wortlaut, der an diesem Tag galt – gehört zur Akte wie die Bilder.
+    texte: {
+      vorlese: fall.skript || '',
+      begruessung: fall.einleitung || '',
+    },
     aufnahme: aufnahme ? {
       id: aufnahme.id, sekunden: aufnahme.durationSec || 0, bytes: aufnahme.bytes || 0,
       auswertung: aufnahme.quality || '', begruendung: aufnahme.reviewNote || '',

@@ -442,7 +442,7 @@
              <video src="/api/recording?id=${encodeURIComponent(rc.id)}&token=${encodeURIComponent(token)}" controls preload="metadata" style="width:100%;max-width:340px;border-radius:10px;border:1px solid var(--line);background:#000"></video>
            </div>`
         : '<div class="muted" style="margin-top:.6rem">🎬 Keine Aufnahme zu dieser Akte gefunden.</div>';
-      div.innerHTML = `<div class="top"><div><div class="nm">${esc(c.bigoName || c.verifiedName || '—')}</div><div class="meta">${c.bigoName ? 'BIGO-ID: <b>' + esc(c.bigoName) + '</b> · ' : ''}${c.age ? 'Alter: ' + esc(c.age) + ' · ' : ''}Name: ${esc(c.verifiedName || '-')}<br>${esc(c.docType || '-')} · Nr.: ${esc(c.docNumber || '-')}<br>Nummer: ${esc(c.code || '-')} · Prüfer: ${esc(c.agentName || '-')} · ${esc(date)}${c.note ? '<br>Notiz: ' + esc(c.note) : ''}${c.rejectReason ? '<br>Grund: ' + esc(c.rejectReason) : ''}</div></div>${pill}</div><div class="thumbs">${thumbs}</div>${recBlock}${mcpZeile(c)}`;
+      div.innerHTML = `<div class="top"><div><div class="nm">${esc(c.bigoName || c.verifiedName || '—')}</div><div class="meta">${c.bigoName ? 'BIGO-ID: <b>' + esc(c.bigoName) + '</b> · ' : ''}${c.age ? 'Alter: ' + esc(c.age) + ' · ' : ''}Name: ${esc(c.verifiedName || '-')}<br>${esc(c.docType || '-')} · Nr.: ${esc(c.docNumber || '-')}<br>Nummer: ${esc(c.code || '-')} · Prüfer: ${esc(c.agentName || '-')} · ${esc(date)}${c.note ? '<br>Notiz: ' + esc(c.note) : ''}${c.rejectReason ? '<br>Grund: ' + esc(c.rejectReason) : ''}</div></div>${pill}</div><div class="thumbs">${thumbs}</div>${recBlock}${checkBlock(c)}${texteBlock(c)}${mcpZeile(c)}`;
       const acts = document.createElement('div'); acts.style.marginTop = '.7rem'; acts.style.display = 'flex'; acts.style.gap = '.4rem'; acts.style.flexWrap = 'wrap';
       acts.appendChild(btn('📄 Export / PDF', '', () => window.open(`/api/case-export?id=${c.id}&token=${encodeURIComponent(token)}`, '_blank')));
       if (mcpAn) {
@@ -463,6 +463,33 @@
   // ---- Protokoll-Einträge in der Akte ----
   // Text wird vor dem Speichern aufgeräumt; der Nutzer entscheidet, ob er den
   // verbesserten Vorschlag übernimmt.
+  // Der Wortlaut, der bei dieser Audition galt. Zugeklappt, damit die Akte
+  // übersichtlich bleibt – aber vorhanden, denn der Vorlese-Text IST die
+  // Einwilligung. Ältere Akten haben ihn nicht; dann steht das auch da.
+  function texteBlock(c) {
+    const teil = (titel, text, hinweis) => (text
+      ? `<details style="margin-top:.5rem"><summary class="muted" style="cursor:pointer;user-select:none">${titel}</summary>
+           <div class="wortlaut">${esc(text)}</div></details>`
+      : `<div class="muted" style="margin-top:.5rem">${titel} – ${hinweis}</div>`);
+    return '<div style="margin-top:.7rem;padding-top:.7rem;border-top:1px solid var(--line)">'
+      + teil('📖 Vorlese-Text (die gesprochene Einwilligung)', c.skript,
+        'nicht mitgespeichert (Akte von vor dieser Änderung)')
+      + teil('👋 Begrüßung / Ablauf', c.einleitung,
+        'nicht mitgespeichert')
+      + '</div>';
+  }
+  // Was der Prüfer im Gespräch abgehakt hat.
+  function checkBlock(c) {
+    const l = Array.isArray(c.checklist) ? c.checklist : [];
+    if (!l.length) return '';
+    const zeile = (x) => (x && typeof x === 'object'
+      ? (x.checked ? '☑ ' : '☐ ') + String(x.label || '') : String(x));
+    const gesetzt = l.filter((x) => !x || typeof x !== 'object' || x.checked).length;
+    return '<details style="margin-top:.7rem"><summary class="muted" style="cursor:pointer;user-select:none">'
+      + '✅ Abgehakte Fragen (' + gesetzt + ' von ' + l.length + ')</summary><ul class="hakenliste">'
+      + l.map((x) => '<li>' + esc(zeile(x)) + '</li>').join('') + '</ul></details>';
+  }
+
   // Stand der Übergabe an mcp.4ever1.tv
   function mcpZeile(c) {
     const wann = c.mcpAt ? new Date(c.mcpAt).toLocaleString('de-DE') : '';

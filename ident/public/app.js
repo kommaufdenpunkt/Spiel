@@ -750,6 +750,9 @@
         + '<div style="margin-top:.45rem">' + aufTxt + '</div>'
         + (auf ? '<video controls preload="metadata" src="/api/recording?id=' + encodeURIComponent(auf.id)
             + '&token=' + encodeURIComponent(state.token) + '"></video>' : '')
+        + ausweisBilder(a)
+        + hakenListe(a)
+        + wortlaut(a)
         + ((a.protokoll || []).length ? '<div class="ord-prot"><b>Protokoll</b>'
             + a.protokoll.map((e) => '<div style="padding:.3rem 0">' + esc(e.text)
               + '<small>' + esc(e.autor || '') + ' · ' + esc(new Date(e.am).toLocaleString('de-DE')) + '</small></div>').join('')
@@ -757,6 +760,56 @@
       host.appendChild(d);
     });
   }
+  // ---- Was in einer Audition steckt, gehört auch in den Ordner ------------
+  // Ausweisbilder, abgehakte Fragen und der Wortlaut, der an dem Tag galt.
+  // Die Bilder liegen bei der Akte; abgeholt werden sie über deren Nummer.
+  function ausweisBilder(a) {
+    const bilder = (a.dateien || []).filter((d) => d.art === 'ausweis' && d.dateiname);
+    if (!bilder.length || !a.auditionId) return '';
+    return '<div class="ord-bilder">' + bilder.map((d) => {
+      const src = '/api/doc?id=' + encodeURIComponent(a.auditionId)
+        + '&file=' + encodeURIComponent(d.dateiname) + '&token=' + encodeURIComponent(state.token);
+      return '<figure><a href="' + src + '" target="_blank" rel="noopener">'
+        + '<img src="' + src + '" alt="" loading="lazy"></a>'
+        + '<figcaption>' + esc(d.bezeichnung || 'Bild') + '</figcaption></figure>';
+    }).join('') + '</div>';
+  }
+  function hakenListe(a) {
+    const l = Array.isArray(a.checkliste) ? a.checkliste : [];
+    if (!l.length) return '';
+    return '<details class="ord-klapp"><summary>\u2705 Abgehakte Fragen (' + l.length + ')</summary>'
+      + '<ul class="ord-haken">' + l.map((x) => '<li>' + esc(x) + '</li>').join('') + '</ul></details>';
+  }
+  function wortlaut(a) {
+    const t = a.texte || {};
+    const teil = (titel, text) => (text
+      ? '<details class="ord-klapp"><summary>' + titel + '</summary>'
+        + '<div class="ord-wortlaut">' + esc(text) + '</div></details>' : '');
+    const beides = teil('\ud83d\udcd6 Vorlese-Text (die gesprochene Einwilligung)', t.vorlese)
+      + teil('\ud83d\udc4b Begr\u00fc\u00dfung / Ablauf', t.begruessung);
+    return beides || '<div class="muted" style="margin-top:.4rem;font-size:.78rem">'
+      + 'Wortlaut nicht mitgespeichert \u2013 Audition von vor dieser \u00c4nderung.</div>';
+  }
+
+  // ---- Kennen wir die Person schon? ---------------------------------------
+  // Der Bewerber gibt seine BIGO-ID beim Reinkommen an; der Server sieht damit
+  // sofort nach. Der Prüfer weiss also schon in der Warteschlange, ob er einen
+  // bestehenden Ordner vor sich hat - und liest vorher die Vermerke.
+  function bekanntPille(w) {
+    if (!w.bekannt) return '';
+    return ' <span class="wait-pill bekannt">\ud83d\udcc1 schon im Ordner</span>';
+  }
+  function bekanntZeile(w) {
+    const t = w.bekannt; if (!t) return '';
+    const teile = [];
+    teile.push(t.auditionen + ' Audition' + (t.auditionen === 1 ? '' : 'en'));
+    if (t.status) teile.push('Status: ' + t.status);
+    if (t.vermerke) teile.push(t.vermerke + ' Vermerk' + (t.vermerke === 1 ? '' : 'e'));
+    if (t.art === 'familie') teile.push('Familie');
+    return '<br><span class="bekannt-info">\ud83d\udcc1 ' + esc(t.name || t.bigoId) + ' \u2013 '
+      + esc(teile.join(' \u00b7 ')) + '</span>';
+  }
+
   async function refreshWaiting() {
     const r = await api('GET', '/api/waiting');
     if (r.status === 200) renderWaiting(r.body.waiting || [], r.body);
@@ -787,9 +840,11 @@
         const div = document.createElement('div');
         div.className = 'deck-card' + (i === 0 ? ' next' : '');
         const pill = '<span class="wait-pill' + (secs > 180 ? ' long' : '') + '">⏱ ' + sinceText(secs) + '</span>';
-        div.innerHTML = '<div class="who"><b>' + esc(w.code) + '</b> ' + pill
+        div.innerHTML = '<div class="who"><b>' + esc(w.code) + '</b> ' + pill + bekanntPille(w)
           + '<div class="meta">' + (i === 0 ? 'Als Nächster dran' : 'Platz ' + (i + 1) + ' in der Schlange')
-          + (w.note ? ' · ' + esc(w.note) : '') + '</div></div>';
+          + (w.bigoId ? ' · BIGO-ID ' + esc(w.bigoId) : '')
+          + (w.note ? ' · ' + esc(w.note) : '')
+          + bekanntZeile(w) + '</div></div>';
         const acts = document.createElement('div'); acts.className = 'acts';
         const b = document.createElement('button');
         b.className = 'primary'; b.textContent = '📞 Abholen';
@@ -1069,7 +1124,13 @@
     closeAllPeers(); state.myUploads = state.myUploads || []; state.leaving = false;
     const proto = location.protocol === 'https:' ? 'wss' : 'ws';
     const ws = new WebSocket(`${proto}://${location.host}`); state.ws = ws;
-    ws.onopen = () => ws.send(JSON.stringify({ type: 'join', room: state.code, role: state.role, token: state.token || '', name: state.name }));
+    // BIGO-ID und Alter gehen gleich mit: Der Server schaut damit nach, ob es
+    // die Person schon gibt, und der Prüfer sieht es in der Warteschlange -
+    // bevor er das Gespräch annimmt, nicht erst danach.
+    ws.onopen = () => ws.send(JSON.stringify({
+      type: 'join', room: state.code, role: state.role, token: state.token || '', name: state.name,
+      bigo: (state.profile && state.profile.bigoName) || '', alter: (state.profile && state.profile.age) || '',
+    }));
     ws.onmessage = async (ev) => {
       let m; try { m = JSON.parse(ev.data); } catch { return; }
       switch (m.type) {
@@ -1192,7 +1253,11 @@
       else if (m.kind === 'doc-start') incoming[key] = { label: m.label, n: m.n, parts: [] };
       else if (m.kind === 'doc-part') { const it = incoming[key]; if (!it) return; it.parts[m.i] = m.part; if (it.parts.filter(Boolean).length === it.n) { onDocReceived(it.label, it.parts.join('')); delete incoming[key]; } }
       else if (m.kind === 'result') onResult(m.result);
-      else if (m.kind === 'profile') { if (m.bigoName && !$('vBigoName').value) $('vBigoName').value = m.bigoName; if (m.age && !$('vAge').value) $('vAge').value = m.age; }
+      else if (m.kind === 'profile') {
+        if (m.bigoName && !$('vBigoName').value) $('vBigoName').value = m.bigoName;
+        if (m.age && !$('vAge').value) $('vAge').value = m.age;
+        personSuchen();   // gleich nachsehen, ob wir die Person kennen
+      }
       // Der Bewerber soll sehen, wenn aufgezeichnet wird – er hat zugestimmt,
       // also darf er es auch jederzeit erkennen.
       else if (m.kind === 'rec') zeigeRec(!!m.on);
@@ -1260,6 +1325,66 @@
   }
   function checkBoxes() { return Array.from(document.querySelectorAll('#checklist input[data-chk]')); }
   $('checklist').addEventListener('change', () => { $('approveBtn').disabled = state.caseDone || !checkBoxes().every((c) => c.checked); });
+
+  // ---- Abgleich beim Ausfuellen der Akte -----------------------------------
+  // Waehrend der Pruefer die Ausweisdaten eintippt, wird nachgesehen, ob es
+  // die Person schon gibt. Drei Wege: BIGO-ID, Ausweisnummer, Name + Alter.
+  // Die Ausweisnummer findet auch jemanden, der mit einer neuen BIGO-ID
+  // wiederkommt - genau dann muss der Pruefer stutzig werden.
+  let sucheT = 0, letzteSuche = '';
+  function personKasten() {
+    let k = $('personTreffer');
+    if (!k) {
+      k = document.createElement('div');
+      k.id = 'personTreffer'; k.className = 'treffer';
+      const anker = $('vBigoName');
+      if (anker && anker.parentNode) anker.parentNode.insertBefore(k, anker);
+    }
+    return k;
+  }
+  async function personSuchen() {
+    const daten = {
+      bigoId: $('vBigoName').value.trim(),
+      docNumber: $('vDocNumber').value.trim(),
+      name: $('vName').value.trim(),
+      age: $('vAge').value.trim(),
+    };
+    const schluessel = JSON.stringify(daten);
+    if (schluessel === letzteSuche) return;
+    letzteSuche = schluessel;
+    const k = personKasten();
+    if (!daten.bigoId && !daten.docNumber && !daten.name) { k.className = 'treffer'; k.innerHTML = ''; return; }
+    const r = await api('POST', '/api/person-suche', daten);
+    const t = r.body && r.body.treffer;
+    if (!t) {
+      k.className = 'treffer neu';
+      k.innerHTML = '\u2728 <b>Neu bei uns.</b> Mit der Freigabe wird ein neuer Ordner angelegt.';
+      return;
+    }
+    const wieso = t.grund === 'bigo' ? 'gleiche BIGO-ID'
+      : t.grund === 'ausweis' ? 'gleiche Ausweisnummer' : 'gleicher Name und gleiches Alter';
+    const zeilen = [];
+    zeilen.push(t.auditionen + ' Audition' + (t.auditionen === 1 ? '' : 'en'));
+    if (t.letzteAudition) zeilen.push('zuletzt ' + new Date(t.letzteAudition).toLocaleDateString('de-DE'));
+    if (t.status) zeilen.push('Status: ' + t.status);
+    if (t.vermerke) zeilen.push(t.vermerke + ' Vermerk' + (t.vermerke === 1 ? '' : 'e'));
+    k.className = 'treffer ' + (t.sicher ? 'da' : 'vielleicht');
+    k.innerHTML = (t.sicher ? '\ud83d\udcc1 <b>Kennen wir schon.</b>' : '\u2753 <b>K\u00f6nnte dieselbe Person sein.</b>')
+      + ' <span class="muted">(' + esc(wieso) + ')</span>'
+      + '<div class="t-name">' + esc(t.name || '\u2014') + ' \u00b7 BIGO-ID ' + esc(t.bigoId) + '</div>'
+      + '<div class="t-meta">' + esc(zeilen.join(' \u00b7 ')) + '</div>'
+      + (t.andereBigoId ? '<div class="t-warn">\u26a0\ufe0f Damals unter BIGO-ID <b>' + esc(t.andereBigoId)
+          + '</b> \u2013 bitte nachfragen, warum sie sich ge\u00e4ndert hat.</div>' : '')
+      + (t.notiz ? '<div class="t-meta">Notiz: ' + esc(t.notiz) + '</div>' : '')
+      + '<div class="t-meta">' + (t.sicher
+        ? 'Die Audition wird an diesen Ordner angeh\u00e4ngt, nicht neu angelegt.'
+        : 'Pr\u00fcfe kurz, ob das wirklich dieselbe Person ist.') + '</div>';
+  }
+  ['vBigoName', 'vAge', 'vName', 'vDocNumber'].forEach((id) => {
+    const el = $(id); if (!el) return;
+    el.addEventListener('input', () => { clearTimeout(sucheT); sucheT = setTimeout(personSuchen, 450); });
+    el.addEventListener('blur', () => { clearTimeout(sucheT); personSuchen(); });
+  });
 
   $('approveBtn').addEventListener('click', () => saveCase('approved'));
   $('rejectBtn').addEventListener('click', () => {
@@ -1481,6 +1606,8 @@
     ['hostShots', 'snapShots', 'guestShots'].forEach((id) => $(id).innerHTML = '');
     ['vName', 'vDocNumber', 'vDocType'].forEach((id) => $(id).value = '');
     checkBoxes().forEach((c) => c.checked = false); $('approveBtn').disabled = true; $('rejectBtn').disabled = false;
+    // Der Abgleich gehoert zum vorigen Bewerber - fuer den naechsten von vorn.
+    letzteSuche = ''; const tk = $('personTreffer'); if (tk) { tk.className = 'treffer'; tk.innerHTML = ''; }
     $('reviewStatus').className = 'status pending'; $('reviewStatus').textContent = 'Warte auf die Bilder des Bewerbers …';
     $('okBadge').classList.remove('on'); chatLog.innerHTML = '';
     remoteVideo.srcObject = null; remoteWaiting.style.display = ''; remoteWaiting.textContent = 'Warte auf Gegenüber …';
