@@ -36,14 +36,25 @@ dabei wird die Akte verschlüsselt gespeichert.
    **Aufnahme** → **Freigeben** oder **Ablehnen** (Akte wird verschlüsselt gespeichert).
 5. **Admin:** unter **Fälle**/**Aufnahmen** einsehen/löschen.
 
-## Übergabe an mcp.4ever1.tv
+## Streamer-Ordner (mcp.4ever1.tv)
 
-Ist eine Audition abgeschlossen, wandert die komplette Akte in den Ordner des
-Streamers. Zugeordnet wird über die **BIGO-ID** – die ändert sich nicht, anders
-als der angezeigte Name.
+Ist eine Audition abgeschlossen, wandert die komplette Akte automatisch in den
+Ordner des Streamers. Zugeordnet wird über die **BIGO-ID** – die ändert sich
+nicht, anders als der angezeigte Name.
 
-Eingerichtet wird das über vier Umgebungsvariablen. Solange `MCP_URL` leer ist,
-passiert nichts; die Akte bleibt dann einfach hier liegen, es geht nichts verloren.
+Der Ordner liegt **auf demselben Server** und ist unter `mcp.4ever1.tv`
+erreichbar (alternativ `mein.4ever1.tv`). Dort sieht man je Streamer alle
+Auditions, Aufnahmen samt Auswertung, Protokolle und Ausweisbilder; Admins
+können Status (`neu / aktiv / pausiert / abgelehnt / nicht mehr dabei`) und eine
+Notiz pflegen. Prüfer dürfen lesen, ändern dürfen nur Admins.
+
+Weil beides auf demselben Server läuft, geht nichts über das Netz – die Ablage
+kann nicht scheitern und der Prüfer wartet nicht darauf.
+
+### Ordner woanders betreiben (optional)
+
+Soll der Ordner später bei einem anderen System liegen, genügt `MCP_URL`. Dann
+schickt ident die Akte als JSON dorthin. Ohne `MCP_URL` bleibt alles hier.
 
 | Variable | Bedeutung |
 |---|---|

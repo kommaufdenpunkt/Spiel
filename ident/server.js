@@ -74,6 +74,7 @@ function mcpUebergeben(fallId, vonHand) {
       return c ? { ...c, entries: (c.entries || []) } : null;
     },
     getRecordingByCode: (code) => store.getRecordingByCode(code),
+    ablegen: (paket) => store.ablegen(paket),
     setStatus: (id, s) => { try { store.setCaseMcp(id, s); } catch {} },
     log: (m) => { try { sec.recordEvent('audit', 'system', m); } catch {} console.log(m); },
   }, vonHand).catch((e) => {
@@ -433,6 +434,21 @@ async function handleApi(req, res, urlPath, ip) {
   // Figuren (Team-Avatare) – Abruf öffentlich (Bewerber sieht sie im Warteraum)
   if (urlPath === '/api/figures' && req.method === 'GET') { sendJson(res, 200, { figures: store.getFigures(), script: store.getFigureScript() }); return true; }
 
+  // Posteingang: nimmt eine Akte von aussen entgegen und legt sie im Ordner
+  // des Streamers ab. Ausweisen über MCP_TOKEN. Damit kann später auch ein
+  // anderes System Akten hierher schicken – der Aufbau ist derselbe.
+  if (urlPath === '/api/mcp/inbox' && req.method === 'POST') {
+    if (!mcp.tokenOk(req.headers['authorization'])) {
+      sec.recordFail(ip, 'MCP-Posteingang: falscher Schlüssel');
+      sendJson(res, 401, { reason: 'auth' }); return true;
+    }
+    let paket; try { paket = await readJson(req, 4 * 1024 * 1024); } catch { sendJson(res, 413, { reason: 'too-large' }); return true; }
+    const ordner = store.ablegen(paket || {});
+    if (!ordner) { sendJson(res, 400, { reason: 'keine-bigo-id' }); return true; }
+    sec.recordEvent('audit', ip, 'Akte im Ordner ' + ordner.bigoId + ' eingegangen');
+    sendJson(res, 200, { ok: true, ordner: ordner.bigoId, id: ordner.id }); return true;
+  }
+
   // Abhol-Punkt für die Gegenstelle: nur mit unterschriebenem, kurzlebigem Link.
   if (urlPath === '/api/pull' && req.method === 'GET') {
     const q = new URL(req.url, 'http://x').searchParams;
@@ -633,6 +649,34 @@ async function handleApi(req, res, urlPath, ip) {
     if (!rec) { sendJson(res, 400, { reason: 'bad-recording' }); return true; }
     sec.recordEvent('audit', ip, 'Aufnahme gespeichert: ' + rec.id);
     sendJson(res, 200, { id: rec.id, bytes: rec.bytes, durationSec: rec.durationSec }); return true;
+  }
+
+  // ---- Streamer-Ordner (mcp.4ever1.tv) ------------------------------------
+  // Prüfer dürfen die Ordner sehen; ändern und löschen nur Admins.
+  if (urlPath === '/api/streamers' && req.method === 'GET') {
+    if (!authed(req, ip)) { sendJson(res, 401, { reason: 'auth' }); return true; }
+    sendJson(res, 200, { streamers: store.listStreamers() }); return true;
+  }
+  if (urlPath === '/api/streamer' && req.method === 'GET') {
+    if (!authed(req, ip)) { sendJson(res, 401, { reason: 'auth' }); return true; }
+    const s = store.getStreamer(new URL(req.url, 'http://x').searchParams.get('id') || '');
+    if (!s) { sendJson(res, 404, { reason: 'gone' }); return true; }
+    sendJson(res, 200, { streamer: s }); return true;
+  }
+  if (urlPath === '/api/streamer' && req.method === 'POST') {
+    if (!adminOnly()) return true;
+    let body; try { body = await readJson(req, 64 * 1024); } catch { body = {}; }
+    const s = store.setStreamer(String(body.id || ''), body);
+    if (!s) { sendJson(res, 404, { reason: 'gone' }); return true; }
+    sec.recordEvent('audit', ip, 'Streamer-Ordner geändert: ' + s.bigoId);
+    sendJson(res, 200, { streamer: s }); return true;
+  }
+  if (urlPath === '/api/streamer-delete' && req.method === 'POST') {
+    if (!adminOnly()) return true;
+    let body; try { body = await readJson(req, 16 * 1024); } catch { body = {}; }
+    const ok = store.deleteStreamer(String(body.id || ''));
+    if (ok) sec.recordEvent('audit', ip, 'Streamer-Ordner gelöscht');
+    sendJson(res, 200, { ok }); return true;
   }
 
   // ---- Übergabe an mcp.4ever1.tv ------------------------------------------
@@ -992,13 +1036,15 @@ const server = http.createServer(async (req, res) => {
   //   ident.*   -> Bewerber-Startseite      (index.html)
   //   pruefer.* -> Mitarbeiter-Login        (index.html, Modus per JS)
   //   admin.*   -> Admin-Bereich            (admin.html)
+  //   mcp.*     -> Streamer-Ordner          (mcp.html)
   const hostName = String(req.headers.host || '').split(':')[0].toLowerCase();
   const adminHost = hostName.startsWith('admin.');
+  const mcpHost = hostName.startsWith('mcp.') || hostName.startsWith('mein.');
   // Hauptdomain (4ever1.tv, www.4ever1.tv) -> öffentliche Startseite der Agentur.
   // ident./pruefer. -> Audition bzw. Mitarbeiter-Login, admin. -> Verwaltung.
-  const knownSub = /^(ident|pruefer|admin)\./.test(hostName);
+  const knownSub = /^(ident|pruefer|admin|mcp|mein)\./.test(hostName);
   const homeHost = !knownSub && !/^(localhost|127\.|\[|\d+\.\d+\.\d+\.\d+$)/.test(hostName);
-  if (urlPath === '/') urlPath = adminHost ? '/admin.html' : (homeHost ? '/home.html' : '/index.html');
+  if (urlPath === '/') urlPath = adminHost ? '/admin.html' : (mcpHost ? '/mcp.html' : (homeHost ? '/home.html' : '/index.html'));
   if (urlPath === '/start' || urlPath === '/home') urlPath = '/home.html';
   // Eigener Direkt-Link für Prüfer -> Startseite öffnet gleich den Mitarbeiter-Login
   if (['/pruefer', '/login', '/team', '/mitarbeiter'].includes(urlPath)) urlPath = '/index.html';
@@ -1007,6 +1053,11 @@ const server = http.createServer(async (req, res) => {
   if (urlPath === '/panel' || urlPath === '/admin' || urlPath === '/admin.html') {
     if (!adminHost) { res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }); res.end('Nicht gefunden'); return; }
     urlPath = '/admin.html';
+  }
+  // Streamer-Ordner nur unter mcp.<domain> bzw. mein.<domain>
+  if (urlPath === '/mcp' || urlPath === '/ordner' || urlPath === '/mcp.html') {
+    if (!mcpHost) { res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }); res.end('Nicht gefunden'); return; }
+    urlPath = '/mcp.html';
   }
   if (urlPath === '/figur' || urlPath === '/figuren') urlPath = '/figur.html';
   if (urlPath === '/datenschutz') urlPath = '/datenschutz.html';
@@ -1112,7 +1163,8 @@ server.listen(PORT, () => {
   console.log(`Aufbewahrung: ${RETENTION_DAYS > 0 ? 'Auto-Löschung nach ' + RETENTION_DAYS + ' Tagen' : 'aus (Akten bleiben)'}`);
   const mi = mcp.info();
   console.log(`Übergabe an MCP: ${mi.aktiv ? (mi.auto ? 'automatisch' : 'nur von Hand') + ' -> ' + mi.ziel : 'nicht eingerichtet (MCP_URL fehlt)'}`);
-  if (mi.aktiv && !mi.oeffentlicheAdresse) console.warn('!! Hinweis: PUBLIC_URL fehlt – MCP bekommt keine Abhol-Links für Bilder und Video.');
+  if (!mi.lokal && !mi.oeffentlicheAdresse) console.warn('!! Hinweis: PUBLIC_URL fehlt – die Gegenstelle bekommt keine Abhol-Links für Bilder und Video.');
+  console.log(`Streamer-Ordner: ${store.streamerCount()}`);
   if (!sec.hasKey()) console.warn('!! WARNUNG: STORAGE_KEY fehlt – Daten werden UNVERSCHLÜSSELT gespeichert!');
 });
 

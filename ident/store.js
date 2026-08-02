@@ -6,6 +6,7 @@
  *   agents.json     Mitarbeiter-Konten (Prüfer/Admin-Logins)
  *   cases.json      abgeschlossene Fälle (Akten, Metadaten)
  *   recordings.json  Metadaten der Aufnahmen
+ *   streamers.json   Ordner je Streamer (mcp.4ever1.tv), Zuordnung über die BIGO-ID
  *   docs/<caseId>/  Ausweis-/Selfie-Bilder (verschlüsselt)
  *   rec/<id>.<ext>   Video-Aufnahmen (verschlüsselt)
  *
@@ -25,6 +26,7 @@ let codes = [];
 let agents = [];
 let cases = [];
 let recordings = [];
+let streamers = [];   // Ordner je Streamer (mcp.4ever1.tv)
 let settings = {};
 
 const DEFAULT_SCRIPT = [
@@ -87,6 +89,7 @@ function init({ dir } = {}) {
   agents = load('agents.json', []);
   cases = load('cases.json', []);
   recordings = load('recordings.json', []);
+  streamers = load('streamers.json', []);
   settings = load('settings.json', {});
   return { DATA_DIR };
 }
@@ -291,6 +294,86 @@ function readRecording(id) {
   if (rec.enc) { if (!sec.hasKey()) return null; try { buf = sec.decrypt(buf); } catch { return null; } }
   return { buffer: buf, mime: rec.mime || 'video/webm' };
 }
+// ---- Streamer-Ordner (mcp.4ever1.tv) ---------------------------------------
+// Jeder Streamer hat genau einen Ordner, zugeordnet über die BIGO-ID. Dort
+// sammelt sich alles: die Audition, spätere Einträge, Notizen.
+function ordnerSchluessel(bigoId) { return String(bigoId || '').trim().toLowerCase(); }
+function listStreamers() {
+  return streamers.slice().sort((a, b) => String(b.letzteAktivitaet || b.angelegtAm).localeCompare(String(a.letzteAktivitaet || a.angelegtAm)));
+}
+function getStreamer(id) {
+  return streamers.find((s) => s.id === id || ordnerSchluessel(s.bigoId) === ordnerSchluessel(id)) || null;
+}
+/**
+ * Eine fertige Audition in den Ordner des Streamers legen. Gibt es noch keinen
+ * Ordner, wird er angelegt. Kommt dieselbe Audition ein zweites Mal (etwa beim
+ * Nachschicken), wird der vorhandene Eintrag aktualisiert statt verdoppelt.
+ */
+function ablegen(paket) {
+  const bigoId = String((paket.streamer && paket.streamer.bigoId) || '').trim();
+  const schluessel = ordnerSchluessel(bigoId);
+  if (!schluessel) return null;
+  const jetzt = new Date().toISOString();
+
+  let ordner = streamers.find((s) => ordnerSchluessel(s.bigoId) === schluessel);
+  if (!ordner) {
+    ordner = {
+      id: crypto.randomUUID(), bigoId,
+      name: String((paket.streamer && paket.streamer.name) || '').slice(0, 120),
+      alter: String((paket.streamer && paket.streamer.alter) || '').slice(0, 10),
+      status: 'neu', notiz: '',
+      angelegtAm: jetzt, letzteAktivitaet: jetzt,
+      auditions: [],
+    };
+    streamers.push(ordner);
+  }
+  // Name und Alter nachziehen, falls sie beim ersten Mal fehlten
+  if (!ordner.name && paket.streamer && paket.streamer.name) ordner.name = String(paket.streamer.name).slice(0, 120);
+  if (!ordner.alter && paket.streamer && paket.streamer.alter) ordner.alter = String(paket.streamer.alter).slice(0, 10);
+
+  const a = paket.audition || {};
+  const eintrag = {
+    auditionId: String(a.id || '').slice(0, 60),
+    zugangsnummer: String(a.zugangsnummer || '').slice(0, 20),
+    ergebnis: a.ergebnis === 'approved' ? 'approved' : (a.ergebnis === 'rejected' ? 'rejected' : 'open'),
+    ablehnungsgrund: String(a.ablehnungsgrund || '').slice(0, 300),
+    pruefer: String(a.pruefer || '').slice(0, 60),
+    ausweisart: String(a.ausweisart || '').slice(0, 40),
+    ausweisnummer: String(a.ausweisnummer || '').slice(0, 60),
+    notiz: String(a.notiz || '').slice(0, 500),
+    erstelltAm: String(a.erstelltAm || jetzt),
+    aufnahme: paket.aufnahme || null,
+    protokoll: Array.isArray(paket.protokoll) ? paket.protokoll.slice(0, 200) : [],
+    dateien: Array.isArray(paket.dateien) ? paket.dateien.slice(0, 20).map((d) => ({
+      art: String(d.art || '').slice(0, 20), bezeichnung: String(d.bezeichnung || '').slice(0, 80),
+      dateiname: String(d.dateiname || '').slice(0, 120),
+    })) : [],
+    eingegangenAm: jetzt,
+  };
+  const i = ordner.auditions.findIndex((x) => x.auditionId && x.auditionId === eintrag.auditionId);
+  if (i >= 0) ordner.auditions[i] = eintrag; else ordner.auditions.unshift(eintrag);
+
+  // Ordner-Status ergibt sich aus der jüngsten Audition
+  if (eintrag.ergebnis === 'approved') ordner.status = 'aktiv';
+  else if (eintrag.ergebnis === 'rejected' && ordner.status === 'neu') ordner.status = 'abgelehnt';
+  ordner.letzteAktivitaet = jetzt;
+  save('streamers.json', streamers);
+  return ordner;
+}
+function setStreamer(id, { name, status, notiz }) {
+  const s = getStreamer(id); if (!s) return null;
+  if (name != null) s.name = String(name).slice(0, 120);
+  if (status != null && ['neu', 'aktiv', 'pausiert', 'abgelehnt', 'weg'].includes(status)) s.status = status;
+  if (notiz != null) s.notiz = String(notiz).slice(0, 2000);
+  s.letzteAktivitaet = new Date().toISOString();
+  save('streamers.json', streamers); return s;
+}
+function deleteStreamer(id) {
+  const i = streamers.findIndex((s) => s.id === id); if (i < 0) return false;
+  streamers.splice(i, 1); save('streamers.json', streamers); return true;
+}
+function streamerCount() { return streamers.length; }
+
 /** Stand der Übergabe an mcp.4ever1.tv in der Akte festhalten. */
 function setCaseMcp(caseId, { status, text }) {
   const c = getCase(caseId); if (!c) return null;
@@ -509,4 +592,5 @@ module.exports = {
   saveCase, listCases, getCase, deleteCase, readDoc, purgeOlderThan,
   saveRecording, listRecordings, getRecording, readRecording, reviewRecording, deleteRecording,
   setCaseMcp, getRecordingByCode,
+  ablegen, listStreamers, getStreamer, setStreamer, deleteStreamer, streamerCount,
 };
