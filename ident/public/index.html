@@ -99,6 +99,13 @@
   .ord-aud .ometa{color:var(--dim);font-size:.83rem;line-height:1.65}
   .ord-aud video{width:100%;max-width:360px;border-radius:10px;border:1px solid var(--line);background:#000;margin-top:.5rem}
   .ord-prot{margin-top:.6rem;padding-top:.5rem;border-top:1px solid var(--line);font-size:.84rem}
+  .artfilter{display:flex;gap:.25rem;background:#0f1728;border:1px solid var(--line);border-radius:10px;padding:.2rem}
+  .artfilter button{border:0;background:transparent;padding:.35rem .7rem;font-size:.83rem;border-radius:8px;color:var(--dim)}
+  .artfilter button.sel{background:var(--accent);color:#fff}
+  /* Familie hebt sich in der Übersicht deutlich ab */
+  .ord-card.familie{border-color:#7a5a24;background:linear-gradient(180deg,#1f1a10,#161d2c)}
+  .fam-pill{display:inline-block;font-size:.68rem;padding:.1rem .5rem;border-radius:999px;font-weight:700;
+    background:linear-gradient(180deg,#f0cf8a,#d9a53f);color:#2a1c02}
   .ord-prot small{display:block;color:var(--dim);font-size:.73rem}
   .deck-stats{display:flex;gap:.5rem;margin-top:.3rem}
   .deck-stats div{flex:1;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:.55rem .6rem;text-align:center}
@@ -567,9 +574,14 @@
         <h2>📁 Streamer-Ordner</h2>
         <span class="muted">Jede abgeschlossene Audition landet hier automatisch.</span>
       </div>
-      <div style="display:flex;gap:.5rem;margin-bottom:.8rem;flex-wrap:wrap">
-        <input id="ordnerSuche" placeholder="🔎 BIGO-ID oder Name suchen …" style="flex:1;min-width:200px">
-        <button id="ordnerNeu">↻ Aktualisieren</button>
+      <div style="display:flex;gap:.5rem;margin-bottom:.8rem;flex-wrap:wrap;align-items:center">
+        <input id="ordnerSuche" placeholder="🔎 BIGO-ID oder Name suchen …" style="flex:1;min-width:180px">
+        <div class="artfilter">
+          <button data-art="alle" class="sel">Alle</button>
+          <button data-art="familie">👨‍👩‍👧 Familie</button>
+          <button data-art="streamer">Streamer</button>
+        </div>
+        <button id="ordnerNeu">↻</button>
       </div>
       <div id="ordnerInhalt"></div>
     </main>

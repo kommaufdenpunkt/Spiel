@@ -299,6 +299,7 @@ function readRecording(id) {
 // sammelt sich alles: die Audition, spätere Einträge, Notizen.
 function ordnerSchluessel(bigoId) { return String(bigoId || '').trim().toLowerCase(); }
 function listStreamers() {
+  streamers.forEach((s) => { if (!s.art) s.art = 'streamer'; });
   return streamers.slice().sort((a, b) => String(b.letzteAktivitaet || b.angelegtAm).localeCompare(String(a.letzteAktivitaet || a.angelegtAm)));
 }
 function getStreamer(id) {
@@ -322,6 +323,9 @@ function ablegen(paket) {
       name: String((paket.streamer && paket.streamer.name) || '').slice(0, 120),
       alter: String((paket.streamer && paket.streamer.alter) || '').slice(0, 10),
       status: 'neu', notiz: '',
+      // Familie = engerer Kreis, sichtbar unter mein.4ever1.tv. Neue kommen
+      // erst einmal als normale Streamer herein.
+      art: 'streamer',
       angelegtAm: jetzt, letzteAktivitaet: jetzt,
       auditions: [],
     };
@@ -360,11 +364,12 @@ function ablegen(paket) {
   save('streamers.json', streamers);
   return ordner;
 }
-function setStreamer(id, { name, status, notiz }) {
+function setStreamer(id, { name, status, notiz, art }) {
   const s = getStreamer(id); if (!s) return null;
   if (name != null) s.name = String(name).slice(0, 120);
   if (status != null && ['neu', 'aktiv', 'pausiert', 'abgelehnt', 'weg'].includes(status)) s.status = status;
   if (notiz != null) s.notiz = String(notiz).slice(0, 2000);
+  if (art != null && ['familie', 'streamer'].includes(art)) s.art = art;
   s.letzteAktivitaet = new Date().toISOString();
   save('streamers.json', streamers); return s;
 }
