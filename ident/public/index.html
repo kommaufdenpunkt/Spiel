@@ -86,6 +86,20 @@
   .deck-me b{font-size:.95rem;display:block;line-height:1.2}
   .deck-me .muted{font-size:.74rem;color:var(--dim)}
   .deck-item{width:100%;text-align:left;font-size:.9rem}
+  .deck-item.sel{border-color:var(--accent);background:#1b2740;color:var(--ink)}
+  /* Streamer-Ordner im Team-Bereich */
+  .ord-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(215px,1fr));gap:.7rem}
+  .ord-card{background:var(--panel2);border:1px solid var(--line);border-radius:14px;padding:.8rem .9rem;cursor:pointer;
+    transition:border-color .15s,transform .15s}
+  .ord-card:hover{border-color:var(--accent);transform:translateY(-2px)}
+  .ord-card .oid{font-weight:700;word-break:break-all}
+  .ord-card .onm{color:var(--dim);font-size:.83rem}
+  .ord-card .orow{display:flex;justify-content:space-between;align-items:center;margin-top:.5rem;gap:.4rem}
+  .ord-aud{background:var(--panel2);border:1px solid var(--line);border-radius:14px;padding:.85rem .95rem;margin-bottom:.7rem}
+  .ord-aud .ometa{color:var(--dim);font-size:.83rem;line-height:1.65}
+  .ord-aud video{width:100%;max-width:360px;border-radius:10px;border:1px solid var(--line);background:#000;margin-top:.5rem}
+  .ord-prot{margin-top:.6rem;padding-top:.5rem;border-top:1px solid var(--line);font-size:.84rem}
+  .ord-prot small{display:block;color:var(--dim);font-size:.73rem}
   .deck-stats{display:flex;gap:.5rem;margin-top:.3rem}
   .deck-stats div{flex:1;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:.55rem .6rem;text-align:center}
   .deck-stats b{display:block;font-size:1.35rem;line-height:1.1}
@@ -521,13 +535,18 @@
         <div><b id="statWaiting">0</b><span>wartend</span></div>
         <div><b id="statRunning">0</b><span>laufend</span></div>
       </div>
+      <hr style="border:0;border-top:1px solid var(--line);margin:.7rem 0">
+      <button class="deck-item" id="navWarteraum">🕒 Warteraum</button>
+      <button class="deck-item" id="navOrdner">📁 Streamer-Ordner</button>
+      <a class="deck-item" id="navVerwaltung" href="/verwaltung" target="_blank" rel="noopener"
+         style="display:none;text-decoration:none;text-align:left">⚙️ Verwaltung</a>
       <div class="deck-spacer"></div>
       <button class="deck-item" id="setupPasskeyBtn" type="button" style="display:none">🔐 Face ID einrichten</button>
       <button class="deck-item danger" id="waitLogout">Abmelden</button>
     </aside>
 
     <!-- MITTE: Warteschlange -->
-    <main class="deck-main">
+    <main class="deck-main" id="paneWarteraum">
       <div class="deck-head">
         <h2>🕒 Warteschlange</h2>
         <span class="muted" id="waitHint">Wer am längsten wartet, steht oben.</span>
@@ -537,10 +556,23 @@
     </main>
 
     <!-- RECHTS: laufende Gespräche -->
-    <aside class="deck-side">
+    <aside class="deck-side" id="paneLaufend">
       <div class="deck-head"><h2>🎥 Laufende Gespräche</h2></div>
       <div id="runningList" class="deck-list"></div>
     </aside>
+
+    <!-- MITTE (alternativ): Streamer-Ordner -->
+    <main class="deck-main" id="paneOrdner" style="display:none;grid-column:2 / -1">
+      <div class="deck-head">
+        <h2>📁 Streamer-Ordner</h2>
+        <span class="muted">Jede abgeschlossene Audition landet hier automatisch.</span>
+      </div>
+      <div style="display:flex;gap:.5rem;margin-bottom:.8rem;flex-wrap:wrap">
+        <input id="ordnerSuche" placeholder="🔎 BIGO-ID oder Name suchen …" style="flex:1;min-width:200px">
+        <button id="ordnerNeu">↻ Aktualisieren</button>
+      </div>
+      <div id="ordnerInhalt"></div>
+    </main>
   </div>
 </div>
 
