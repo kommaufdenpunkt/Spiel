@@ -36,6 +36,46 @@ dabei wird die Akte verschlüsselt gespeichert.
    **Aufnahme** → **Freigeben** oder **Ablehnen** (Akte wird verschlüsselt gespeichert).
 5. **Admin:** unter **Fälle**/**Aufnahmen** einsehen/löschen.
 
+## Übergabe an mcp.4ever1.tv
+
+Ist eine Audition abgeschlossen, wandert die komplette Akte in den Ordner des
+Streamers. Zugeordnet wird über die **BIGO-ID** – die ändert sich nicht, anders
+als der angezeigte Name.
+
+Eingerichtet wird das über vier Umgebungsvariablen. Solange `MCP_URL` leer ist,
+passiert nichts; die Akte bleibt dann einfach hier liegen, es geht nichts verloren.
+
+| Variable | Bedeutung |
+|---|---|
+| `MCP_URL` | Adresse, die die Akte entgegennimmt (POST, JSON) |
+| `MCP_TOKEN` | Schlüssel, wird als `Authorization: Bearer …` mitgeschickt |
+| `MCP_AUTO` | `off` = nur von Hand übergeben (Vorgabe: automatisch) |
+| `PUBLIC_URL` | eigene Adresse, z. B. `https://ident.4ever1.tv` – nötig für die Abhol-Links |
+
+**Was gesendet wird** (gekürzt):
+
+```jsonc
+{
+  "quelle": "ident.4ever1.tv", "version": 1,
+  "streamer": { "bigoId": "streamer4711", "name": "Lena Muster", "alter": "24" },
+  "audition": { "ergebnis": "approved", "pruefer": "eyDennis",
+                "ausweisart": "Personalausweis", "ausweisnummer": "…", … },
+  "aufnahme": { "sekunden": 95, "auswertung": "ok", "begruendung": "…" },
+  "protokoll": [ { "text": "…", "autor": "eyDennis", "am": "…" } ],
+  "dateien": [ { "art": "ausweis",  "bezeichnung": "Ausweis vorne", "url": "https://…/api/pull?…" },
+               { "art": "aufnahme", "bezeichnung": "Video der Audition", "url": "https://…/api/pull?…" } ]
+}
+```
+
+Die Bilder und das Video werden **nicht** mitgeschickt, sondern über die Links
+abgeholt. Diese Links sind unterschrieben (HMAC) und gelten **24 Stunden** –
+danach und bei jedem manipulierten Link antwortet der Server mit `403`.
+
+Die Gegenstelle soll mit `2xx` antworten. Klappt es nicht, versucht ident es
+nach 15 Sekunden, 1 Minute und 5 Minuten erneut. Danach steht der Grund in der
+Akte und man kann sie im Adminbereich von Hand nachschicken. Der Prüfer wartet
+nie darauf – die Übergabe läuft im Hintergrund.
+
 ## Betrieb (Coolify → ident.4ever1.tv)
 1. Repo/Ordner `ident/` als App in Coolify anlegen (Dockerfile‑Build).
 2. **Domain:** `ident.4ever1.tv` als DNS‑A‑Record auf den Server, in Coolify als

@@ -259,8 +259,11 @@
 
   // ---- Fälle ----
   let allCases = [];
+  let mcpAn = false;
   async function loadCases() {
-    const r = await api('GET', '/api/cases'); allCases = r.body.cases || [];
+    const [r, m] = await Promise.all([api('GET', '/api/cases'), api('GET', '/api/mcp-status')]);
+    allCases = r.body.cases || [];
+    mcpAn = !!(m.body && m.body.aktiv);
     renderCases($('caseSearch') ? $('caseSearch').value : '');
   }
   function statusText(res) { return res === 'approved' ? 'freigegeben' : (res === 'rejected' ? 'abgelehnt' : 'offen'); }
@@ -284,9 +287,17 @@
              <video src="/api/recording?id=${encodeURIComponent(rc.id)}&token=${encodeURIComponent(token)}" controls preload="metadata" style="width:100%;max-width:340px;border-radius:10px;border:1px solid var(--line);background:#000"></video>
            </div>`
         : '<div class="muted" style="margin-top:.6rem">🎬 Keine Aufnahme zu dieser Akte gefunden.</div>';
-      div.innerHTML = `<div class="top"><div><div class="nm">${esc(c.bigoName || c.verifiedName || '—')}</div><div class="meta">${c.bigoName ? 'BIGO-ID: <b>' + esc(c.bigoName) + '</b> · ' : ''}${c.age ? 'Alter: ' + esc(c.age) + ' · ' : ''}Name: ${esc(c.verifiedName || '-')}<br>${esc(c.docType || '-')} · Nr.: ${esc(c.docNumber || '-')}<br>Nummer: ${esc(c.code || '-')} · Prüfer: ${esc(c.agentName || '-')} · ${esc(date)}${c.note ? '<br>Notiz: ' + esc(c.note) : ''}${c.rejectReason ? '<br>Grund: ' + esc(c.rejectReason) : ''}</div></div>${pill}</div><div class="thumbs">${thumbs}</div>${recBlock}`;
+      div.innerHTML = `<div class="top"><div><div class="nm">${esc(c.bigoName || c.verifiedName || '—')}</div><div class="meta">${c.bigoName ? 'BIGO-ID: <b>' + esc(c.bigoName) + '</b> · ' : ''}${c.age ? 'Alter: ' + esc(c.age) + ' · ' : ''}Name: ${esc(c.verifiedName || '-')}<br>${esc(c.docType || '-')} · Nr.: ${esc(c.docNumber || '-')}<br>Nummer: ${esc(c.code || '-')} · Prüfer: ${esc(c.agentName || '-')} · ${esc(date)}${c.note ? '<br>Notiz: ' + esc(c.note) : ''}${c.rejectReason ? '<br>Grund: ' + esc(c.rejectReason) : ''}</div></div>${pill}</div><div class="thumbs">${thumbs}</div>${recBlock}${mcpZeile(c)}`;
       const acts = document.createElement('div'); acts.style.marginTop = '.7rem'; acts.style.display = 'flex'; acts.style.gap = '.4rem'; acts.style.flexWrap = 'wrap';
       acts.appendChild(btn('📄 Export / PDF', '', () => window.open(`/api/case-export?id=${c.id}&token=${encodeURIComponent(token)}`, '_blank')));
+      if (mcpAn) {
+        acts.appendChild(btn(c.mcpStatus === 'uebergeben' ? '📤 Erneut an MCP' : '📤 An MCP übergeben', '', async (e) => {
+          const b = e.target; b.disabled = true; b.textContent = 'Wird übergeben …';
+          const r = await api('POST', '/api/mcp-push', { id: c.id });
+          toast(r.status === 200 ? 'An MCP übergeben.' : 'Übergabe hat nicht geklappt – Grund steht in der Akte.');
+          loadCases();
+        }));
+      }
       acts.appendChild(btn('🗑 Akte löschen', 'danger', async () => { if (!confirm('Diese Akte inkl. Bilder endgültig löschen?')) return; await api('POST', '/api/case-delete', { id: c.id }); loadCases(); loadOverview(); }));
       div.appendChild(acts);
       div.appendChild(entriesBlock(c));
@@ -297,6 +308,15 @@
   // ---- Protokoll-Einträge in der Akte ----
   // Text wird vor dem Speichern aufgeräumt; der Nutzer entscheidet, ob er den
   // verbesserten Vorschlag übernimmt.
+  // Stand der Übergabe an mcp.4ever1.tv
+  function mcpZeile(c) {
+    const wann = c.mcpAt ? new Date(c.mcpAt).toLocaleString('de-DE') : '';
+    if (c.mcpStatus === 'uebergeben') return `<div style="margin-top:.5rem"><span class="pill ok">📤 an MCP übergeben</span> <span class="muted">${wann}</span></div>`;
+    if (c.mcpStatus === 'laeuft') return `<div style="margin-top:.5rem"><span class="pill warn">⏳ Übergabe läuft …</span></div>`;
+    if (c.mcpStatus === 'fehlgeschlagen') return `<div style="margin-top:.5rem"><span class="pill no">📤 Übergabe fehlgeschlagen</span> <span class="muted">${esc(c.mcpText || '')} ${wann}</span></div>`;
+    return '';
+  }
+
   // Auswertung des Prüfers: taugt die Aufnahme etwas?
   function qualiPill(rc) {
     if (!rc || !rc.quality) {

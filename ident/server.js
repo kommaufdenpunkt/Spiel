@@ -21,6 +21,7 @@ const {
 } = require('@simplewebauthn/server');
 const sec = require('./security.js');
 const store = require('./store.js');
+const mcp = require('./mcp.js');
 const textpolish = require('./textpolish.js');
 
 const PORT = process.env.PORT || 8080;
@@ -54,6 +55,32 @@ const bufToB64url = (u) => Buffer.from(u).toString('base64url');
 
 sec.init({ storageKey: STORAGE_KEY, adminTotp: ADMIN_TOTP, loginAllowIps: process.env.LOGIN_ALLOW_IPS });
 const storeInfo = store.init({ dir: DATA_DIR });
+// Schlüssel für die unterschriebenen Abhol-Links der MCP-Übergabe
+mcp.initSign(STORAGE_KEY || 'ident-ohne-schluessel');
+
+// Wurde der Server mitten in einer Übergabe neu gestartet, hinge die Akte für
+// immer auf "läuft". Beim Start einmal aufräumen, damit man sie nachschicken kann.
+try {
+  store.listCases().forEach((c) => {
+    if (c.mcpStatus === 'laeuft') store.setCaseMcp(c.id, { status: 'fehlgeschlagen', text: 'Server wurde neu gestartet – bitte erneut übergeben' });
+  });
+} catch { /* beim ersten Start gibt es noch keine Akten */ }
+
+/** Eine fertige Akte an mcp.4ever1.tv übergeben. Wirft nie – Fehler landen in der Akte. */
+function mcpUebergeben(fallId, vonHand) {
+  return mcp.uebergeben(fallId, {
+    getCase: (id) => {
+      const c = store.getCase(id);
+      return c ? { ...c, entries: (c.entries || []) } : null;
+    },
+    getRecordingByCode: (code) => store.getRecordingByCode(code),
+    setStatus: (id, s) => { try { store.setCaseMcp(id, s); } catch {} },
+    log: (m) => { try { sec.recordEvent('audit', 'system', m); } catch {} console.log(m); },
+  }, vonHand).catch((e) => {
+    try { store.setCaseMcp(fallId, { status: 'fehlgeschlagen', text: String(e && e.message || e).slice(0, 200) }); } catch {}
+    return { ok: false, grund: 'fehler' };
+  });
+}
 
 const MIME = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
@@ -406,6 +433,28 @@ async function handleApi(req, res, urlPath, ip) {
   // Figuren (Team-Avatare) – Abruf öffentlich (Bewerber sieht sie im Warteraum)
   if (urlPath === '/api/figures' && req.method === 'GET') { sendJson(res, 200, { figures: store.getFigures(), script: store.getFigureScript() }); return true; }
 
+  // Abhol-Punkt für die Gegenstelle: nur mit unterschriebenem, kurzlebigem Link.
+  if (urlPath === '/api/pull' && req.method === 'GET') {
+    const q = new URL(req.url, 'http://x').searchParams;
+    const fallId = q.get('fall') || '', datei = q.get('datei') || '';
+    if (!mcp.pruefeLink(fallId, datei, q.get('exp'), q.get('sig'))) {
+      sec.recordEvent('audit', ip, 'MCP-Abholung abgewiesen (Link ungültig)');
+      res.writeHead(403); res.end('Forbidden'); return true;
+    }
+    if (datei.startsWith('rec:')) {
+      const data = store.readRecording(datei.slice(4));
+      if (!data) { res.writeHead(404); res.end('not found'); return true; }
+      res.writeHead(200, { 'Content-Type': data.mime, 'Content-Length': data.buffer.length, 'Cache-Control': 'no-store' });
+      res.end(data.buffer); return true;
+    }
+    const fall = store.getCase(fallId);
+    const doc = fall && (fall.docs || []).find((d) => d.file === datei);
+    const data = doc && store.readDoc(fallId, doc);
+    if (!data) { res.writeHead(404); res.end('not found'); return true; }
+    res.writeHead(200, { 'Content-Type': data.mime, 'Content-Length': data.buffer.length, 'Cache-Control': 'no-store' });
+    res.end(data.buffer); return true;
+  }
+
   // ---- ab hier: gültiges Login nötig ----
   if (!authed(req, ip)) { sendJson(res, 401, { reason: 'auth' }); return true; }
 
@@ -533,7 +582,11 @@ async function handleApi(req, res, urlPath, ip) {
       });
     }
     sec.recordEvent('audit', ip, 'Fall ' + rec.result + ': ' + (rec.verifiedName || rec.id));
-    sendJson(res, 200, { id: rec.id }); return true;
+    // Fertige Akte wandert in den Ordner des Streamers auf mcp.4ever1.tv.
+    // Das läuft im Hintergrund – der Prüfer wartet nicht darauf, und wenn die
+    // Gegenstelle gerade nicht erreichbar ist, bleibt die Akte trotzdem hier.
+    if (mcp.autoAn()) mcpUebergeben(rec.id, false);
+    sendJson(res, 200, { id: rec.id, mcp: mcp.aktiv() }); return true;
   }
 
   // ---- Protokoll-Einträge in der Akte --------------------------------------
@@ -582,6 +635,19 @@ async function handleApi(req, res, urlPath, ip) {
     sendJson(res, 200, { id: rec.id, bytes: rec.bytes, durationSec: rec.durationSec }); return true;
   }
 
+  // ---- Übergabe an mcp.4ever1.tv ------------------------------------------
+  if (urlPath === '/api/mcp-status' && req.method === 'GET') {
+    if (!adminOnly()) return true;
+    sendJson(res, 200, mcp.info()); return true;
+  }
+  // Von Hand nachschicken, wenn es beim ersten Mal nicht geklappt hat.
+  if (urlPath === '/api/mcp-push' && req.method === 'POST') {
+    if (!adminOnly()) return true;
+    let body; try { body = await readJson(req, 16 * 1024); } catch { body = {}; }
+    if (!mcp.aktiv()) { sendJson(res, 400, { reason: 'nicht-eingerichtet' }); return true; }
+    const erg = await mcpUebergeben(String(body.id || ''), true);
+    sendJson(res, erg.ok ? 200 : 502, erg); return true;
+  }
   // ---- Aufnahme auswerten: ist sie brauchbar geworden? ----
   // Das entscheidet der Prüfer selbst, direkt nach dem Gespräch. Er darf dafür
   // seine eigene Aufnahme ansehen; Admins dürfen alle.
@@ -1044,6 +1110,9 @@ server.listen(PORT, () => {
   console.log(`TURN: ${TURN_SECRET && TURN_HOST ? 'aktiv (' + TURN_HOST + ')' : 'nur STUN'}`);
   console.log(`Login-IP-Sperre: ${sec.loginIpRestricted() ? 'aktiv' : 'aus'}`);
   console.log(`Aufbewahrung: ${RETENTION_DAYS > 0 ? 'Auto-Löschung nach ' + RETENTION_DAYS + ' Tagen' : 'aus (Akten bleiben)'}`);
+  const mi = mcp.info();
+  console.log(`Übergabe an MCP: ${mi.aktiv ? (mi.auto ? 'automatisch' : 'nur von Hand') + ' -> ' + mi.ziel : 'nicht eingerichtet (MCP_URL fehlt)'}`);
+  if (mi.aktiv && !mi.oeffentlicheAdresse) console.warn('!! Hinweis: PUBLIC_URL fehlt – MCP bekommt keine Abhol-Links für Bilder und Video.');
   if (!sec.hasKey()) console.warn('!! WARNUNG: STORAGE_KEY fehlt – Daten werden UNVERSCHLÜSSELT gespeichert!');
 });
 
