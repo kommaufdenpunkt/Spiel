@@ -24,7 +24,10 @@
   function sitzungAbgelaufen() {
     if (!token) return;
     token = '';
-    $('dash').style.display = 'none';
+    // Nicht per style ausblenden: openDash() blendet später über die Klasse
+    // "on" wieder ein und würde ein inline gesetztes display:none nicht
+    // loswerden – der Bereich bliebe nach dem erneuten Anmelden leer.
+    $('dash').classList.remove('on');
     $('login').style.display = '';
     $('pw').value = ''; if ($('totp')) $('totp').value = '';
     $('loginErr').textContent = 'Die Anmeldung gilt nicht mehr – bitte neu anmelden.';
