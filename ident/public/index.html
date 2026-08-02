@@ -138,6 +138,14 @@
   .vermerk small{display:block;color:var(--dim);font-size:.73rem;margin-top:.3rem}
   .vermerk-acts{margin-top:.45rem}
   .vermerk-acts button{padding:.25rem .6rem;font-size:.75rem;box-shadow:none}
+  /* Zugangsnummern */
+  .num{display:flex;align-items:center;gap:.7rem;background:var(--panel2);border:1px solid var(--line);
+    border-radius:12px;padding:.65rem .8rem;margin-bottom:.55rem;flex-wrap:wrap}
+  .num .code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:1.05rem;font-weight:700;letter-spacing:.06em}
+  .num .info{flex:1;min-width:150px;font-size:.8rem;color:var(--dim);line-height:1.5}
+  .num.offen{border-color:#3a4a6b}
+  .num.alt{border-color:#7a5a24}
+  .num button{padding:.3rem .65rem;font-size:.78rem}
   .artfilter{display:flex;gap:.25rem;background:#0f1728;border:1px solid var(--line);border-radius:10px;padding:.2rem}
   .artfilter button{border:0;background:transparent;padding:.35rem .7rem;font-size:.83rem;border-radius:8px;color:var(--dim)}
   .artfilter button.sel{background:var(--accent);color:#fff}
@@ -589,6 +597,7 @@
       <button class="deck-item" id="navUebersicht">🏠 Übersicht</button>
       <button class="deck-item" id="navWarteraum">🕒 Warteraum</button>
       <button class="deck-item" id="navOrdner">📁 Streamer-Ordner</button>
+      <button class="deck-item" id="navNummern">🎟 Zugangsnummern</button>
 
       <div class="nav-gruppe" id="gruppeVerwaltung" style="display:none">Verwaltung</div>
       <a class="deck-item" id="navVerwaltung" href="/verwaltung" target="_blank" rel="noopener"
@@ -657,6 +666,19 @@
         <button id="ordnerNeu">↻</button>
       </div>
       <div id="ordnerInhalt"></div>
+    </main>
+
+    <!-- MITTE (alternativ): Zugangsnummern -->
+    <main class="deck-main" id="paneNummern" style="display:none;grid-column:2 / -1">
+      <div class="deck-head">
+        <h2>🎟 Zugangsnummern</h2>
+        <span class="muted">Wer hat eine bekommen und noch nicht eingelöst?</span>
+      </div>
+      <div style="display:flex;gap:.5rem;margin-bottom:.8rem;flex-wrap:wrap;align-items:center">
+        <input id="nummerNotiz" placeholder="Notiz, z. B. „Lena – über Instagram“" style="flex:1;min-width:200px">
+        <button id="nummerNeu" class="primary">➕ Neue Nummer</button>
+      </div>
+      <div id="nummerInhalt"></div>
     </main>
   </div>
 </div>

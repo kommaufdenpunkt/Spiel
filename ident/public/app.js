@@ -282,6 +282,7 @@
     }
     // Ordner im Voraus holen, damit die Kacheln gleich Zahlen zeigen.
     ladeOrdner(false, true);
+    ladeNummern().then(() => { if (state.bereich === 'uebersicht') zeichneKacheln(); }).catch(() => {});
     zeigeBereich('uebersicht');
     refreshWaiting(); clearInterval(state.waitingTimer); state.waitingTimer = setInterval(refreshWaiting, 3000);
   }
@@ -289,7 +290,7 @@
   // ================= TEAM-BEREICH: Warteraum <-> Streamer-Ordner =============
   // Beides in derselben Oberfläche, damit man sich nicht zweimal anmelden muss.
   function zeigeBereich(was) {
-    const bereiche = { uebersicht: 'paneUebersicht', warteraum: 'paneWarteraum', ordner: 'paneOrdner' };
+    const bereiche = { uebersicht: 'paneUebersicht', warteraum: 'paneWarteraum', ordner: 'paneOrdner', nummern: 'paneNummern' };
     state.bereich = bereiche[was] ? was : 'uebersicht';
     Object.keys(bereiche).forEach((k) => {
       const el = $(bereiche[k]); if (el) el.style.display = k === state.bereich ? '' : 'none';
@@ -297,12 +298,14 @@
     });
     // Die rechte Spalte gehört zur Arbeit am Warteraum und zur Übersicht.
     if ($('paneLaufend')) {
-      $('paneLaufend').style.display = state.bereich === 'ordner' ? 'none' : '';
+      $('paneLaufend').style.display = (state.bereich === 'ordner' || state.bereich === 'nummern') ? 'none' : '';
       zeichneBloecke();   // weggeklickte Blöcke bleiben weg
     }
     if (state.bereich === 'ordner') ladeOrdner();
     if (state.bereich === 'uebersicht') zeichneKacheln();
+    if (state.bereich === 'nummern') ladeNummern();
   }
+  if ($('navNummern')) $('navNummern').addEventListener('click', () => zeigeBereich('nummern'));
   if ($('navUebersicht')) $('navUebersicht').addEventListener('click', () => zeigeBereich('uebersicht'));
   if ($('navWarteraum')) $('navWarteraum').addEventListener('click', () => zeigeBereich('warteraum'));
   if ($('navOrdner')) $('navOrdner').addEventListener('click', () => zeigeBereich('ordner'));
@@ -343,6 +346,19 @@
       host.appendChild(kachel('🎬', offen, 'Aufnahmen offen',
         'noch nicht ausgewertet', () => zeigeBereich('ordner'), true));
     }
+    // Ordner, in denen lange nichts mehr steht - damit die Akte gepflegt bleibt.
+    const still = ord.filter((s) => ['aktiv', 'neu'].includes(s.status) && stilleTage(s) >= STILL_AB);
+    if (still.length) {
+      host.appendChild(kachel('🕰', still.length, 'lange nichts gehört',
+        'seit ' + STILL_AB + ' Tagen kein Eintrag', () => {
+          state.artFilter = 'still';
+          document.querySelectorAll('.artfilter button').forEach((x) => x.classList.remove('sel'));
+          state.offenerOrdner = null; zeigeBereich('ordner');
+        }, true));
+    }
+    const offeneNummern = (state.nummern || []).filter((c) => c.status === 'open').length;
+    host.appendChild(kachel('🎟', offeneNummern, 'Nummern offen',
+      'ausgegeben, noch nicht benutzt', () => zeigeBereich('nummern')));
     host.appendChild(kachel('➕', null, 'Zugangsnummer',
       'für den nächsten Bewerber', () => { zeigeBereich('warteraum'); $('newCodeBtn').click(); }));
     if (state.isAdmin) {
@@ -388,6 +404,77 @@
   });
   if ($('blockeZurueck')) $('blockeZurueck').addEventListener('click', () => { merkeBloecke([]); zeichneBloecke(); });
   zeichneBloecke();
+
+  // ---- Zugangsnummern: welche sind noch offen? -----------------------------
+  // Eine Nummer wird erzeugt und weitergegeben - danach war bisher nicht mehr
+  // zu sehen, welche noch aussteht. Genau das zeigt dieser Bereich.
+  async function ladeNummern() {
+    const r = await api('GET', '/api/codes');
+    state.nummern = (r.body && r.body.codes) || [];
+    zeichneNummern();
+  }
+  function alterText(iso) {
+    const min = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
+    if (min < 60) return 'vor ' + min + ' Min';
+    const std = Math.round(min / 60);
+    if (std < 24) return 'vor ' + std + ' Std';
+    return 'vor ' + Math.round(std / 24) + ' Tagen';
+  }
+  function zeichneNummern() {
+    const host = $('nummerInhalt'); if (!host) return;
+    const liste = state.nummern || [];
+    const offen = liste.filter((c) => c.status === 'open');
+    const rest = liste.filter((c) => c.status !== 'open').slice(0, 20);
+    host.innerHTML = '';
+    const kopf = (t) => { const d = document.createElement('div'); d.className = 'deck-head';
+      d.style.marginTop = '.4rem'; d.innerHTML = '<h2 style="font-size:.98rem">' + t + '</h2>'; host.appendChild(d); };
+
+    kopf('Offen (' + offen.length + ')');
+    if (!offen.length) host.insertAdjacentHTML('beforeend', '<div class="deck-empty">Keine offene Nummer. Oben eine neue erzeugen.</div>');
+    offen.forEach((c) => {
+      const tage = (Date.now() - new Date(c.createdAt).getTime()) / 86400000;
+      const d = document.createElement('div'); d.className = 'num offen' + (tage > 3 ? ' alt' : '');
+      d.innerHTML = '<span class="code">' + esc(c.code) + '</span>'
+        + '<span class="info">' + (c.note ? esc(c.note) + '<br>' : '')
+        + 'von ' + esc(c.createdBy || '—') + ' · ' + esc(alterText(c.createdAt))
+        + (tage > 3 ? ' · <b style="color:var(--warm)">liegt lange</b>' : '') + '</span>';
+      const kopieren = document.createElement('button');
+      kopieren.textContent = '📋 Kopieren';
+      kopieren.addEventListener('click', async () => {
+        try { await navigator.clipboard.writeText(c.code); toast('Nummer kopiert.'); }
+        catch { toast('Kopieren ging nicht – Nummer: ' + c.code); }
+      });
+      const weg = document.createElement('button');
+      weg.className = 'danger'; weg.textContent = '✕ Zurückziehen';
+      weg.addEventListener('click', async () => {
+        if (!confirm('Nummer ' + c.code + ' zurückziehen? Sie gilt danach nicht mehr.')) return;
+        await api('POST', '/api/code-revoke', { code: c.code });
+        toast('Zurückgezogen.'); ladeNummern();
+      });
+      d.appendChild(kopieren); d.appendChild(weg);
+      host.appendChild(d);
+    });
+
+    if (rest.length) {
+      kopf('Erledigt');
+      rest.forEach((c) => {
+        const d = document.createElement('div'); d.className = 'num';
+        d.innerHTML = '<span class="code" style="opacity:.55">' + esc(c.code) + '</span>'
+          + '<span class="info">' + (c.note ? esc(c.note) + ' · ' : '')
+          + (c.status === 'used' ? 'benutzt' : 'zurückgezogen') + ' · ' + esc(alterText(c.createdAt)) + '</span>';
+        host.appendChild(d);
+      });
+    }
+  }
+  if ($('nummerNeu')) $('nummerNeu').addEventListener('click', async () => {
+    const b = $('nummerNeu'); b.disabled = true;
+    const r = await api('POST', '/api/code', { note: $('nummerNotiz').value.trim() });
+    b.disabled = false;
+    if (r.status !== 200) { toast('Nummer konnte nicht erzeugt werden.'); return; }
+    $('nummerNotiz').value = '';
+    toast('Neue Nummer: ' + r.body.code);
+    ladeNummern();
+  });
 
   // ---- Geräte-Test für den Prüfer -----------------------------------------
   // Damit ein stummes Mikrofon vor dem Gespräch auffällt, nicht mittendrin.
@@ -446,6 +533,17 @@
     });
   });
 
+  // Wie viele Tage steht in diesem Ordner nichts Neues? Zaehlt Vermerke und
+  // Auditions - die Anlage des Ordners allein reicht nicht.
+  function stilleTage(s) {
+    const zeiten = [];
+    (s.eintraege || []).forEach((e) => zeiten.push(new Date(e.createdAt).getTime()));
+    (s.auditions || []).forEach((a) => zeiten.push(new Date(a.eingegangenAm || a.erstelltAm).getTime()));
+    if (!zeiten.length) return Math.floor((Date.now() - new Date(s.angelegtAm).getTime()) / 86400000);
+    return Math.floor((Date.now() - Math.max(...zeiten)) / 86400000);
+  }
+  const STILL_AB = 30;   // ab so vielen Tagen gilt ein Ordner als liegengeblieben
+
   const ORD_STATUS = { neu: 'neu', aktiv: 'aktiv', pausiert: 'pausiert', abgelehnt: 'abgelehnt', weg: 'nicht mehr dabei' };
   function ordPill(s) {
     const t = ORD_STATUS[s] || s || 'neu';
@@ -467,11 +565,14 @@
     const q = ($('ordnerSuche').value || '').trim().toLowerCase();
     const f = state.artFilter || 'alle';
     const liste = (state.ordner || [])
-      .filter((s) => f === 'alle' || (s.art || 'streamer') === f)
+      .filter((s) => f === 'alle' || (f === 'still'
+        ? (['aktiv', 'neu'].includes(s.status) && stilleTage(s) >= STILL_AB)
+        : (s.art || 'streamer') === f))
       .filter((s) => !q || (s.bigoId || '').toLowerCase().includes(q) || (s.name || '').toLowerCase().includes(q));
     if (!liste.length) {
       host.innerHTML = (state.ordner || []).length
-        ? '<div class="deck-empty">' + (f === 'familie' ? 'Noch niemand als Familie eingetragen.<br>Ordner öffnen und dort umstellen.' : 'Nichts gefunden.') + '</div>'
+        ? '<div class="deck-empty">' + (f === 'familie' ? 'Noch niemand als Familie eingetragen.<br>Ordner öffnen und dort umstellen.'
+          : f === 'still' ? 'Bei niemandem ist es still – alle Akten sind gepflegt. 👍' : 'Nichts gefunden.') + '</div>'
         : '<div class="deck-empty">Noch keine Ordner.<br>Sobald eine Audition abgeschlossen ist, erscheint sie hier von selbst.</div>';
       return;
     }
@@ -483,7 +584,10 @@
       const n = (s.auditions || []).length;
       d.innerHTML = '<div class="oid">' + esc(s.bigoId) + (fam ? ' <span class="fam-pill">Familie</span>' : '') + '</div>'
         + '<div class="onm">' + esc(s.name || 'Name unbekannt') + (s.alter ? ' · ' + esc(s.alter) + ' J.' : '') + '</div>'
-        + '<div class="orow">' + ordPill(s.status) + '<span class="muted">' + n + ' Audition' + (n === 1 ? '' : 'en') + '</span></div>';
+        + '<div class="orow">' + ordPill(s.status) + '<span class="muted">' + n + ' Audition' + (n === 1 ? '' : 'en') + '</span></div>'
+        + (['aktiv', 'neu'].includes(s.status) && stilleTage(s) >= STILL_AB
+          ? '<div class="muted" style="margin-top:.35rem;font-size:.75rem;color:var(--warm)">🕰 seit '
+            + stilleTage(s) + ' Tagen kein Eintrag</div>' : '');
       d.addEventListener('click', () => { state.offenerOrdner = s.id; zeichneOrdner(); });
       grid.appendChild(d);
     });
