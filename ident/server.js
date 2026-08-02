@@ -1058,6 +1058,13 @@ const server = http.createServer(async (req, res) => {
     res.writeHead(302, { Location: ziel, 'Cache-Control': 'no-store' });
     res.end('Umgezogen nach ' + ziel); return;
   }
+  // www. und die kurze Form sind sonst zwei Adressen mit demselben Inhalt.
+  // Alles läuft auf der kurzen Form zusammen.
+  if (hostName.startsWith('www.')) {
+    const ziel = 'https://' + hostName.slice(4) + req.url;
+    res.writeHead(301, { Location: ziel, 'Cache-Control': 'no-store' });
+    res.end('Weiter zu ' + ziel); return;
+  }
   const adminHost = acpHost;   // der Admin-Bereich wird über acp. und mcp./verwaltung erreicht
   // Hauptdomain (4ever1.tv, www.4ever1.tv) -> öffentliche Startseite der Agentur.
   // ident./pruefer. -> Audition bzw. Mitarbeiter-Login, admin. -> Verwaltung.
@@ -1079,6 +1086,25 @@ const server = http.createServer(async (req, res) => {
   if (urlPath === '/mcp' || urlPath === '/ordner' || urlPath === '/mcp.html') {
     if (!mcpHost) { res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }); res.end('Nicht gefunden'); return; }
     urlPath = '/mcp.html';
+  }
+  // Suchmaschinen: Die Hauptseite darf gefunden werden, die Arbeitsbereiche
+  // ausdrücklich nicht. Das wird je nach Adresse unterschiedlich beantwortet.
+  if (urlPath === '/robots.txt') {
+    const txt = homeHost
+      ? 'User-agent: *\nAllow: /\nDisallow: /api/\n\nSitemap: https://' + hostName + '/sitemap.xml\n'
+      : 'User-agent: *\nDisallow: /\n';
+    res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'public, max-age=3600' });
+    res.end(txt); return;
+  }
+  if (urlPath === '/sitemap.xml') {
+    if (!homeHost) { res.writeHead(404); res.end('Nicht gefunden'); return; }
+    const heute = new Date().toISOString().slice(0, 10);
+    const seiten = ['/', '/impressum', '/datenschutz'];
+    const xml = '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+      + seiten.map((u) => '  <url><loc>https://' + hostName + u + '</loc><lastmod>' + heute + '</lastmod></url>').join('\n')
+      + '\n</urlset>\n';
+    res.writeHead(200, { 'Content-Type': 'application/xml; charset=utf-8', 'Cache-Control': 'public, max-age=3600' });
+    res.end(xml); return;
   }
   if (urlPath === '/figur' || urlPath === '/figuren') urlPath = '/figur.html';
   if (urlPath === '/datenschutz') urlPath = '/datenschutz.html';
