@@ -242,6 +242,8 @@ function saveCase(data) {
     agentName: String(data.agentName || '').slice(0, 60),
     checklist: Array.isArray(data.checklist) ? data.checklist.slice(0, 20) : [],
     createdAt: new Date().toISOString(), docs,
+    // Übergabe an mcp.4ever1.tv: '' | laeuft | uebergeben | fehlgeschlagen
+    mcpStatus: '', mcpText: '', mcpAt: '',
   };
   cases.push(rec); save('cases.json', cases);
   if (rec.code) consumeCode(rec.code);
@@ -289,6 +291,21 @@ function readRecording(id) {
   if (rec.enc) { if (!sec.hasKey()) return null; try { buf = sec.decrypt(buf); } catch { return null; } }
   return { buffer: buf, mime: rec.mime || 'video/webm' };
 }
+/** Stand der Übergabe an mcp.4ever1.tv in der Akte festhalten. */
+function setCaseMcp(caseId, { status, text }) {
+  const c = getCase(caseId); if (!c) return null;
+  c.mcpStatus = String(status || '').slice(0, 20);
+  c.mcpText = String(text || '').slice(0, 300);
+  c.mcpAt = new Date().toISOString();
+  save('cases.json', cases); return c;
+}
+/** Aufnahme zu einer Zugangsnummer finden (eine Audition = eine Aufnahme). */
+function getRecordingByCode(code) {
+  const c = String(code || '').toUpperCase();
+  if (!c) return null;
+  return recordings.slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt)).find((r) => String(r.code).toUpperCase() === c) || null;
+}
+
 /** Auswertung des Prüfers festhalten: taugt die Aufnahme etwas? */
 function reviewRecording(id, data) {
   const rec = getRecording(id); if (!rec) return null;
@@ -491,4 +508,5 @@ module.exports = {
   createCode, getCode, isCodeUsable, consumeCode, revokeCode, listCodes,
   saveCase, listCases, getCase, deleteCase, readDoc, purgeOlderThan,
   saveRecording, listRecordings, getRecording, readRecording, reviewRecording, deleteRecording,
+  setCaseMcp, getRecordingByCode,
 };
