@@ -212,6 +212,27 @@
     .deck-me{border-bottom:0;padding:0;margin:0;width:100%}
     .deck-spacer{display:none}
   }
+  /* Handy: Nichts darf die Seite breiter machen als das Geraet. Feste
+     Mindestbreiten (Suchfelder, Kacheln, Ordner) werden hier aufgehoben -
+     sonst zieht der Browser die ganze Seite auseinander und alles wird winzig.
+     Dazu ueberall genug Flaeche zum Antippen: Daumen statt Mauszeiger. */
+  @media(max-width:520px){
+    .kacheln{grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:.6rem}
+    .ord-grid{grid-template-columns:1fr;gap:.6rem}
+    #ordnerSuche,#nummerNotiz{min-width:0;width:100%;flex:1 1 100%}
+    .num .info,.deck-card .who,.obrow button,.snap-btns button{min-width:0}
+    .deck-nav .deck-item{min-width:0;flex:1 1 46%}
+    button,.deck-item,input,select{min-height:44px}
+    .block-zu{min-height:36px;min-width:36px;padding:.3rem .55rem}
+    .ord-bilder figure,.ord-bilder img{width:84px}
+    .deck-main{padding:.85rem .8rem}
+    /* Letzte Bremse: Kein Kasten darf breiter werden als das Geraet. Sonst
+       zoomt der Browser die Seite heraus und die Schrift wird unlesbar. */
+    body{overflow-x:hidden}
+    #waitingView,.deck,.deck-nav,.deck-main,.deck-side{max-width:100vw;min-width:0}
+    .deck-main *,.deck-nav *,.deck-side *{min-width:0;max-width:100%}
+    .deck-code,.ord-card .oid,.num .code{overflow-wrap:anywhere}
+  }
 
   /* Lobby */
   .lobby{flex:1;display:flex;align-items:center;justify-content:center;padding:1.5rem}
