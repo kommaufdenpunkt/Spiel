@@ -375,6 +375,10 @@
   .vorab-fuss{display:flex;gap:.6rem;align-items:center;justify-content:space-between;flex-wrap:wrap}
   .vorab-fuss .muted{font-size:.78rem;color:var(--dim);flex:1;min-width:150px}
   .vorab.fertig{border-color:var(--good);background:#132a20}
+  .vorab-erklaerung{display:flex;gap:.55rem;align-items:flex-start;font-size:.78rem;color:var(--dim);
+    line-height:1.55;margin:.2rem 0 .7rem;cursor:pointer}
+  .vorab-erklaerung input{width:auto;margin:.15rem 0 0;flex:none}
+  .vorab-erklaerung b{color:var(--ink)}
   /* Aufnahme-Hinweis, den auch der Bewerber sieht */
   .recinfo{display:none;align-items:center;gap:.5rem;font-size:.84rem;color:#ffc9d2;
     background:#2a1420;border:1px solid #5e2033;border-radius:999px;padding:.35rem .8rem}
@@ -484,6 +488,9 @@
         <input id="ageInput" inputmode="numeric" placeholder="z. B. 22" autocomplete="off">
       </div>
       <label class="consent"><input type="checkbox" id="consent">
+        Ich bestätige, dass ich <b>mindestens 18 Jahre alt</b> bin und mich mit einem
+        <b>echten, gültigen Ausweis</b> ausweise, der mir gehört – das wird im Gespräch
+        überprüft (<b>Echtheitsnachweis</b>).<br>
         Ich werde als Streamer:in der Agentur <b>4EVER1</b> aufgefordert, meine
         <b>Ausweisdaten</b> anzugeben, und willige ausdrücklich und freiwillig ein, dass
         4EVER1 diese Angaben, meine Ausweis- und Gesichtsbilder sowie die Bild- und
@@ -573,7 +580,8 @@
         <b>So geht es gleich weiter</b>
         <ol>
           <li>Ein Prüfer holt dich ins Gespräch – kurzes Hallo.</li>
-          <li>Er schaut sich deinen Ausweis an und vergleicht ihn mit dir.</li>
+          <li><b>Echtheitsnachweis:</b> Er schaut sich deinen Ausweis live an, vergleicht
+              ihn mit deinem Gesicht und prüft, ob er echt ist. Halt ihn bereit.</li>
           <li>Du liest den Text rechts in die Kamera. <b>Das Tempo bestimmst du selbst</b> –
               mit dem Regler „Ablese-Tempo", auch währenddessen.</li>
           <li>Fertig. Du erfährst gleich, ob es geklappt hat.</li>
@@ -599,6 +607,11 @@
           </select>
           <input id="vaNr" placeholder="Ausweis-Nummer" autocomplete="off">
         </div>
+        <label class="vorab-erklaerung"><input type="checkbox" id="vaEcht">
+          Ich bin <b>mindestens 18 Jahre alt</b>. Der Ausweis, den ich zeige, ist <b>echt,
+          gültig und meiner</b> – keine Kopie, kein fremder, kein bearbeitetes Bild.
+          Mir ist bewusst, dass der Prüfer das im Video überprüft (Echtheitsnachweis) und
+          dass falsche Angaben zur sofortigen Ablehnung führen.</label>
         <div class="vorab-fuss">
           <span id="vaStatus" class="muted">Wird beim Gespräch automatisch übermittelt.</span>
           <button id="vaBilder" class="primary" type="button">📄 Ausweisbilder hochladen</button>
@@ -684,6 +697,7 @@
         <label><input type="checkbox" data-chk> Ausweis gut lesbar & unverändert</label>
         <label><input type="checkbox" data-chk> Gesicht stimmt mit dem Ausweis überein</label>
         <label><input type="checkbox" data-chk> Ausweis wirkt echt (Hologramm/kein Foto vom Foto)</label>
+        <label><input type="checkbox" data-chk> <b>Mindestens 18 Jahre</b> – Geburtsdatum im Ausweis geprüft</label>
       </div>
       <button id="approveBtn" class="good" disabled>✅ Freigeben &amp; Akte anlegen</button>
       <button id="rejectBtn" class="danger">✖ Ablehnen</button>

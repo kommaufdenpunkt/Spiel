@@ -963,21 +963,27 @@
       bigoName: (state.profile && state.profile.bigoName) || '',
       age: (state.profile && state.profile.age) || '',
       ausweisName: w('vaName'), ausweisArt: w('vaArt'), ausweisNr: w('vaNr'),
+      // Selbstauskunft des Bewerbers: volljaehrig und echter Ausweis. Ersetzt
+      // die Pruefung nicht - der Pruefer sieht sie sich trotzdem an -, macht
+      // aber sichtbar, was der Bewerber zugesichert hat.
+      echtBestaetigt: !!($('vaEcht') && $('vaEcht').checked),
     };
   }
   function vorabStand() {
     const box = document.querySelector('.vorab'); if (!box) return;
     const p = vorabPaket();
-    const fertig = !!(p.ausweisName && p.ausweisArt && p.ausweisNr);
+    const fertig = !!(p.ausweisName && p.ausweisArt && p.ausweisNr && p.echtBestaetigt);
     box.classList.toggle('fertig', fertig);
     const st = $('vaStatus');
     if (st) st.textContent = fertig
       ? '✓ Alles da – der Prüfer bekommt es beim Gespräch automatisch.'
-      : 'Wird beim Gespräch automatisch übermittelt.';
+      : (p.ausweisName && p.ausweisArt && p.ausweisNr && !p.echtBestaetigt)
+        ? 'Bitte noch die Erklärung zu Alter und Echtheit bestätigen.'
+        : 'Wird beim Gespräch automatisch übermittelt.';
     // Sitzt schon ein Prüfer im Raum? Dann gleich nachreichen.
     dcBroadcast(p);
   }
-  ['vaName', 'vaArt', 'vaNr'].forEach((id) => {
+  ['vaName', 'vaArt', 'vaNr', 'vaEcht'].forEach((id) => {
     const el = $(id); if (!el) return;
     el.addEventListener('change', vorabStand);
     el.addEventListener('blur', vorabStand);
@@ -1443,7 +1449,9 @@
         setz('vDocNumber', m.ausweisNr);
         if (m.ausweisName || m.ausweisNr) {
           const st = $('reviewStatus');
-          if (st) st.textContent = 'Der Bewerber hat seine Ausweisdaten schon eingetragen – bitte gegen den Ausweis prüfen.';
+          if (st) st.textContent = m.echtBestaetigt
+            ? 'Ausweisdaten liegen vor. Der Bewerber hat 18+ und die Echtheit des Ausweises zugesichert – bitte im Bild überprüfen.'
+            : 'Ausweisdaten liegen vor – die Erklärung zu Alter und Echtheit fehlt noch. Bitte nachfragen.';
         }
         personSuchen();   // gleich nachsehen, ob wir die Person kennen
       }
