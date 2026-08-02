@@ -521,6 +521,17 @@ async function handleApi(req, res, urlPath, ip) {
     let body; try { body = await readJson(req); } catch { sendJson(res, 413, { reason: 'too-large' }); return true; }
     if (!body.code || !store.isCodeUsable(body.code)) { sendJson(res, 400, { reason: 'bad-code' }); return true; }
     const rec = store.saveCase({ ...body, agentName: reqName(req, ip) || body.agentName });
+    // Wurde die Aufnahme schon ausgewertet, bevor die Akte angelegt war?
+    // Dann gehört die Einschätzung jetzt hier hinein.
+    const auf = store.listRecordings().find((r) => r.code === rec.code && r.quality);
+    if (auf) {
+      store.addCaseEntry(rec.id, {
+        text: auf.quality === 'ok'
+          ? 'Aufnahme geprüft: brauchbar.' + (auf.reviewNote ? ' ' + auf.reviewNote : '')
+          : 'Aufnahme geprüft: nicht brauchbar.' + (auf.reviewNote ? ' Grund: ' + auf.reviewNote : ''),
+        author: auf.reviewedBy || 'Prüfer', kind: 'recording',
+      });
+    }
     sec.recordEvent('audit', ip, 'Fall ' + rec.result + ': ' + (rec.verifiedName || rec.id));
     sendJson(res, 200, { id: rec.id }); return true;
   }
@@ -568,7 +579,34 @@ async function handleApi(req, res, urlPath, ip) {
     const rec = store.saveRecording({ buffer: buf, mime: (req.headers['content-type'] || 'video/webm').split(';')[0].trim(), ext: q.get('ext') || 'webm', durationSec: q.get('dur'), code: q.get('code') || '', agentName: reqName(req, ip) });
     if (!rec) { sendJson(res, 400, { reason: 'bad-recording' }); return true; }
     sec.recordEvent('audit', ip, 'Aufnahme gespeichert: ' + rec.id);
-    sendJson(res, 200, { id: rec.id }); return true;
+    sendJson(res, 200, { id: rec.id, bytes: rec.bytes, durationSec: rec.durationSec }); return true;
+  }
+
+  // ---- Aufnahme auswerten: ist sie brauchbar geworden? ----
+  // Das entscheidet der Prüfer selbst, direkt nach dem Gespräch. Er darf dafür
+  // seine eigene Aufnahme ansehen; Admins dürfen alle.
+  if (urlPath === '/api/recording-review' && req.method === 'POST') {
+    if (!authed(req, ip)) { sendJson(res, 401, { reason: 'auth' }); return true; }
+    let body; try { body = await readJson(req, 16 * 1024); } catch { body = {}; }
+    const rec = store.getRecording(String(body.id || ''));
+    if (!rec) { sendJson(res, 404, { reason: 'gone' }); return true; }
+    const wer = reqName(req, ip) || 'Prüfer';
+    if (!isAdmin(req, ip) && rec.agentName && rec.agentName !== wer) {
+      sendJson(res, 403, { reason: 'not-yours' }); return true;
+    }
+    const neu = store.reviewRecording(rec.id, { quality: body.quality, note: body.note, by: wer });
+    sec.recordEvent('audit', ip, 'Aufnahme ausgewertet (' + (neu.quality || 'offen') + '): ' + rec.id);
+    // Die Auswertung gehört in die Akte – dort wird sie später nachgelesen.
+    const fall = store.listCases().find((c) => c.code === rec.code);
+    if (fall) {
+      store.addCaseEntry(fall.id, {
+        text: neu.quality === 'ok'
+          ? 'Aufnahme geprüft: brauchbar.' + (neu.reviewNote ? ' ' + neu.reviewNote : '')
+          : 'Aufnahme geprüft: nicht brauchbar.' + (neu.reviewNote ? ' Grund: ' + neu.reviewNote : ''),
+        author: wer, kind: 'recording',
+      });
+    }
+    sendJson(res, 200, { ok: true, recording: neu, imFall: !!fall }); return true;
   }
 
   // ---- ab hier: NUR Admin ----
@@ -759,7 +797,12 @@ async function handleApi(req, res, urlPath, ip) {
         return {
           ...c,
           docs: c.docs.map((d) => ({ label: d.label, file: d.file })),
-          recording: r ? { id: r.id, bytes: r.bytes, durationSec: r.durationSec, ext: r.ext, createdAt: r.createdAt } : null,
+          recording: r ? {
+            id: r.id, bytes: r.bytes, durationSec: r.durationSec, ext: r.ext, createdAt: r.createdAt,
+            // Auswertung des Prüfers gehört sichtbar in die Akte
+            quality: r.quality || '', reviewNote: r.reviewNote || '',
+            reviewedBy: r.reviewedBy || '', reviewedAt: r.reviewedAt || '',
+          } : null,
         };
       }),
     }); return true;
@@ -823,8 +866,13 @@ async function handleApi(req, res, urlPath, ip) {
     sendJson(res, 200, { recordings: recs }); return true;
   }
   if (urlPath === '/api/recording' && req.method === 'GET') {
-    if (!isAdmin(req, ip)) { res.writeHead(403); res.end('Forbidden'); return true; }
-    const data = store.readRecording(new URL(req.url, 'http://x').searchParams.get('id'));
+    // Admins sehen alles. Ein Prüfer darf die Aufnahme ansehen, die er selbst
+    // gemacht hat – sonst könnte er nicht beurteilen, ob sie etwas geworden ist.
+    const recId = new URL(req.url, 'http://x').searchParams.get('id');
+    const meta = store.getRecording(recId || '');
+    const eigene = meta && authed(req, ip) && meta.agentName && meta.agentName === (reqName(req, ip) || '');
+    if (!isAdmin(req, ip) && !eigene) { res.writeHead(403); res.end('Forbidden'); return true; }
+    const data = store.readRecording(recId);
     if (!data) { res.writeHead(404); res.end('not found'); return true; }
     const total = data.buffer.length; const range = req.headers['range'];
     const m = range && /^bytes=(\d*)-(\d*)$/.exec(range);

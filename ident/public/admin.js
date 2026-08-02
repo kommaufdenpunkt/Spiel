@@ -280,6 +280,7 @@
       const recBlock = rc
         ? `<div style="margin-top:.7rem;padding-top:.7rem;border-top:1px solid var(--line)">
              <div class="muted" style="margin-bottom:.35rem">🎬 Aufnahme des Gesprächs · ${(rc.bytes / (1024 * 1024)).toFixed(1)} MB${rc.durationSec ? ' · ' + Math.floor(rc.durationSec / 60) + ':' + String(rc.durationSec % 60).padStart(2, '0') : ''}</div>
+             ${qualiPill(rc)}
              <video src="/api/recording?id=${encodeURIComponent(rc.id)}&token=${encodeURIComponent(token)}" controls preload="metadata" style="width:100%;max-width:340px;border-radius:10px;border:1px solid var(--line);background:#000"></video>
            </div>`
         : '<div class="muted" style="margin-top:.6rem">🎬 Keine Aufnahme zu dieser Akte gefunden.</div>';
@@ -296,6 +297,19 @@
   // ---- Protokoll-Einträge in der Akte ----
   // Text wird vor dem Speichern aufgeräumt; der Nutzer entscheidet, ob er den
   // verbesserten Vorschlag übernimmt.
+  // Auswertung des Prüfers: taugt die Aufnahme etwas?
+  function qualiPill(rc) {
+    if (!rc || !rc.quality) {
+      return '<div class="muted" style="margin-bottom:.4rem">⏳ Noch nicht ausgewertet.</div>';
+    }
+    const wann = rc.reviewedAt ? new Date(rc.reviewedAt).toLocaleString('de-DE') : '';
+    const wer = rc.reviewedBy ? ' von ' + esc(rc.reviewedBy) : '';
+    const note = rc.reviewNote ? ' – ' + esc(rc.reviewNote) : '';
+    return rc.quality === 'ok'
+      ? `<div style="margin-bottom:.4rem"><span class="pill ok">✓ Aufnahme brauchbar</span> <span class="muted">${wer}${wann ? ', ' + wann : ''}${note}</span></div>`
+      : `<div style="margin-bottom:.4rem"><span class="pill no">⚠ Aufnahme nicht brauchbar</span> <span class="muted">${wer}${wann ? ', ' + wann : ''}${note}</span></div>`;
+  }
+
   function entriesBlock(c) {
     const wrap = document.createElement('div');
     wrap.style.cssText = 'margin-top:.9rem;padding-top:.8rem;border-top:1px solid var(--line)';
@@ -372,8 +386,20 @@
         <div class="recbody">
           <div class="rectop"><div class="nm">${esc(title)}</div>${pill}</div>
           <div class="meta">${rec.bigoName && rec.name ? 'Name: ' + esc(rec.name) + ' · ' : ''}Nr.: ${esc(rec.code || '-')}<br>${esc(date)} · ${mb} MB · Prüfer: ${esc(rec.agentName || '-')}</div>
+          ${qualiPill(rec)}
         </div>`;
       const acts = document.createElement('div'); acts.className = 'recacts';
+      // Admins können die Einschätzung nachtragen oder korrigieren.
+      acts.appendChild(btn(rec.quality === 'ok' ? '✓ brauchbar' : '✅ Als brauchbar', '', async () => {
+        await api('POST', '/api/recording-review', { id: rec.id, quality: 'ok', note: rec.reviewNote || '' });
+        loadRec(); loadCases();
+      }));
+      acts.appendChild(btn('⚠️ Nicht brauchbar', '', async () => {
+        const grund = prompt('Was war nicht in Ordnung?', rec.reviewNote || '');
+        if (grund === null || !grund.trim()) return;
+        await api('POST', '/api/recording-review', { id: rec.id, quality: 'bad', note: grund.trim() });
+        loadRec(); loadCases();
+      }));
       acts.appendChild(btn('🔍 Groß ansehen', '', () => window.open(src, '_blank')));
       const dl = document.createElement('a'); dl.href = src; dl.className = 'reclink'; dl.textContent = '⬇ Herunterladen'; dl.setAttribute('download', 'audition_' + (rec.bigoName || rec.code || 'x') + '.' + (rec.ext || 'webm'));
       acts.appendChild(dl);

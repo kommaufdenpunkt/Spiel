@@ -914,8 +914,51 @@
     try {
       const res = await fetch('/api/recording?' + new URLSearchParams({ code: state.code, dur: String(dur), ext: state.recExt }), { method: 'POST', headers: { 'Content-Type': state.recMime || 'video/webm', 'Authorization': 'Bearer ' + state.token }, body: blob });
       sysMsg(res.ok ? 'Aufnahme verschlüsselt gespeichert.' : 'Aufnahme konnte nicht gespeichert werden (HTTP ' + res.status + ').');
+      if (res.ok) {
+        const j = await res.json().catch(() => null);
+        if (j && j.id) recCheckOeffnen(j.id, dur, blob.size);
+      }
     } catch { sysMsg('Aufnahme konnte nicht übertragen werden.'); }
   }
+
+  // ---- Aufnahme auswerten: der Prüfer entscheidet selbst, ob sie taugt -----
+  // Direkt nach dem Gespräch, solange man noch reagieren kann. Das Ergebnis
+  // landet als Eintrag in der Akte des Bewerbers.
+  function recCheckOeffnen(id, dauer, bytes) {
+    const box = $('recCheck'); if (!box) return;
+    state.recCheckId = id;
+    const v = $('recCheckVideo');
+    // Der eigene Zugriff läuft über das Token – deshalb als Blob laden.
+    fetch('/api/recording?id=' + encodeURIComponent(id), { headers: { Authorization: 'Bearer ' + state.token } })
+      .then((r) => (r.ok ? r.blob() : null))
+      .then((b) => { if (b) { if (state.recCheckUrl) URL.revokeObjectURL(state.recCheckUrl); state.recCheckUrl = URL.createObjectURL(b); v.src = state.recCheckUrl; } })
+      .catch(() => {});
+    const min = Math.floor(dauer / 60), sek = dauer % 60;
+    $('recCheckMeta').textContent = 'Länge ' + min + ':' + pad(sek) + ' · ' + (bytes / (1024 * 1024)).toFixed(1) + ' MB · verschlüsselt gespeichert';
+    $('recCheckNote').value = ''; $('recCheckMsg').textContent = '';
+    box.classList.add('on');
+  }
+  function recCheckSchliessen() {
+    const box = $('recCheck'); if (box) box.classList.remove('on');
+    const v = $('recCheckVideo'); if (v) { try { v.pause(); } catch {} v.removeAttribute('src'); v.load(); }
+    if (state.recCheckUrl) { URL.revokeObjectURL(state.recCheckUrl); state.recCheckUrl = ''; }
+    state.recCheckId = '';
+  }
+  async function recCheckSenden(quality) {
+    if (!state.recCheckId) { recCheckSchliessen(); return; }
+    const note = $('recCheckNote').value.trim();
+    if (quality === 'bad' && !note) { $('recCheckMsg').textContent = 'Bitte kurz angeben, was nicht in Ordnung war.'; return; }
+    $('recCheckOk').disabled = true; $('recCheckBad').disabled = true;
+    const r = await api('POST', '/api/recording-review', { id: state.recCheckId, quality, note });
+    $('recCheckOk').disabled = false; $('recCheckBad').disabled = false;
+    if (r.status !== 200) { $('recCheckMsg').textContent = 'Konnte nicht gespeichert werden. Bitte noch einmal.'; return; }
+    toast(quality === 'ok' ? 'Als brauchbar vermerkt.' : 'Als nicht brauchbar vermerkt.');
+    sysMsg(r.body && r.body.imFall ? 'Auswertung in der Akte festgehalten.' : 'Auswertung gespeichert – die Akte wird beim Abschluss ergänzt.');
+    recCheckSchliessen();
+  }
+  if ($('recCheckOk')) $('recCheckOk').addEventListener('click', () => recCheckSenden('ok'));
+  if ($('recCheckBad')) $('recCheckBad').addEventListener('click', () => recCheckSenden('bad'));
+  if ($('recCheckLater')) $('recCheckLater').addEventListener('click', recCheckSchliessen);
 
   // ================= VERLASSEN (Prüfer -> Warteraum) =================
   $('leaveBtn').addEventListener('click', leaveRoom);
