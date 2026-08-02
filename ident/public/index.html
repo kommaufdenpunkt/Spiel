@@ -150,6 +150,18 @@
   .videos{flex:1;position:relative;background:radial-gradient(120% 90% at 50% 20%,#152340,#0b1220);min-height:0;overflow:hidden}
   .vwrap{position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center}
   .vwrap video{width:100%;height:100%;object-fit:cover;background:#0d1526}
+  /* Kamera bewusst aus: klare Meldung statt eingefrorenem Bild */
+  .camoff{position:absolute;inset:0;z-index:4;display:flex;flex-direction:column;align-items:center;
+    justify-content:center;gap:.2rem;text-align:center;background:#0d1526;padding:.5rem}
+  .camoff .co-ic{font-size:1.6rem;opacity:.85;margin-bottom:.15rem}
+  .camoff b{font-size:.95rem;color:var(--ink)}
+  .camoff span{font-size:.78rem;color:var(--dim)}
+  .vwrap.local .camoff .co-ic{font-size:1.1rem}
+  .vwrap.local .camoff b{font-size:.78rem}
+  .vwrap.local .camoff span{font-size:.66rem}
+  .vextra .camoff .co-ic{font-size:1.1rem}
+  .vextra .camoff b{font-size:.78rem}
+  .vextra .camoff span{font-size:.66rem}
   /* Gegenüber (Bewerber/Prüfer) groß im Vollbild */
   .vwrap.remote{position:absolute;inset:0}
   /* Eigenes Bild als schwebende Vorschau (Picture-in-Picture), gespiegelt */
