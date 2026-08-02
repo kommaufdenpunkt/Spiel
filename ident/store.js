@@ -299,7 +299,7 @@ function readRecording(id) {
 // sammelt sich alles: die Audition, spätere Einträge, Notizen.
 function ordnerSchluessel(bigoId) { return String(bigoId || '').trim().toLowerCase(); }
 function listStreamers() {
-  streamers.forEach((s) => { if (!s.art) s.art = 'streamer'; });
+  streamers.forEach((s) => { if (!s.art) s.art = 'streamer'; if (!Array.isArray(s.eintraege)) s.eintraege = []; });
   return streamers.slice().sort((a, b) => String(b.letzteAktivitaet || b.angelegtAm).localeCompare(String(a.letzteAktivitaet || a.angelegtAm)));
 }
 function getStreamer(id) {
@@ -364,6 +364,36 @@ function ablegen(paket) {
   save('streamers.json', streamers);
   return ordner;
 }
+// ---- Vermerke im Streamer-Ordner ------------------------------------------
+// Alles, was im Laufe der Zeit dazukommt: Anrufe, Absprachen, Auffälligkeiten.
+function streamerEintraege(s) { if (!Array.isArray(s.eintraege)) s.eintraege = []; return s.eintraege; }
+function addStreamerEintrag(id, { text, author, original }) {
+  const s = getStreamer(id); if (!s) return null;
+  const t = String(text || '').trim().slice(0, 4000); if (!t) return null;
+  const rec = {
+    id: crypto.randomUUID(), text: t,
+    original: original && String(original).trim() !== t ? String(original).slice(0, 4000) : '',
+    author: String(author || '').slice(0, 60),
+    createdAt: new Date().toISOString(), editedAt: '', editedBy: '',
+  };
+  streamerEintraege(s).unshift(rec);          // neueste zuerst
+  s.letzteAktivitaet = rec.createdAt;
+  save('streamers.json', streamers); return rec;
+}
+function updateStreamerEintrag(id, eintragId, { text, editor }) {
+  const s = getStreamer(id); if (!s) return false;
+  const e = streamerEintraege(s).find((x) => x.id === eintragId); if (!e) return false;
+  const t = String(text || '').trim().slice(0, 4000); if (!t) return false;
+  e.text = t; e.editedAt = new Date().toISOString(); e.editedBy = String(editor || '').slice(0, 60);
+  save('streamers.json', streamers); return true;
+}
+function deleteStreamerEintrag(id, eintragId) {
+  const s = getStreamer(id); if (!s) return false;
+  const liste = streamerEintraege(s);
+  const i = liste.findIndex((x) => x.id === eintragId); if (i < 0) return false;
+  liste.splice(i, 1); save('streamers.json', streamers); return true;
+}
+
 function setStreamer(id, { name, status, notiz, art }) {
   const s = getStreamer(id); if (!s) return null;
   if (name != null) s.name = String(name).slice(0, 120);
@@ -598,4 +628,5 @@ module.exports = {
   saveRecording, listRecordings, getRecording, readRecording, reviewRecording, deleteRecording,
   setCaseMcp, getRecordingByCode,
   ablegen, listStreamers, getStreamer, setStreamer, deleteStreamer, streamerCount,
+  addStreamerEintrag, updateStreamerEintrag, deleteStreamerEintrag,
 };
