@@ -260,7 +260,8 @@
     $('waitAvatar').textContent = (state.name || 'P').charAt(0).toUpperCase();
     $('newCodeResult').textContent = '';
     if ($('navVerwaltung')) $('navVerwaltung').style.display = state.isAdmin ? '' : 'none';
-    zeigeBereich('warteraum');
+    // Unter mein. geht es direkt in die Familien-Ansicht, sonst in den Warteraum.
+    zeigeBereich(/^mein\./.test(location.hostname.toLowerCase()) ? 'ordner' : 'warteraum');
     refreshWaiting(); clearInterval(state.waitingTimer); state.waitingTimer = setInterval(refreshWaiting, 3000);
   }
 
@@ -280,6 +281,18 @@
   if ($('ordnerNeu')) $('ordnerNeu').addEventListener('click', () => ladeOrdner(true));
   if ($('ordnerSuche')) $('ordnerSuche').addEventListener('input', () => zeichneOrdner());
 
+  // mein.4ever1.tv ist die Familien-Ansicht: dort ist der Filter von Anfang an
+  // gesetzt. Unter mcp. sieht man alle und schaltet selbst um.
+  state.artFilter = /^mein\./.test(location.hostname.toLowerCase()) ? 'familie' : 'alle';
+  document.querySelectorAll('.artfilter button').forEach((b) => {
+    b.classList.toggle('sel', b.dataset.art === state.artFilter);
+    b.addEventListener('click', () => {
+      state.artFilter = b.dataset.art;
+      document.querySelectorAll('.artfilter button').forEach((x) => x.classList.toggle('sel', x === b));
+      state.offenerOrdner = null; zeichneOrdner();
+    });
+  });
+
   const ORD_STATUS = { neu: 'neu', aktiv: 'aktiv', pausiert: 'pausiert', abgelehnt: 'abgelehnt', weg: 'nicht mehr dabei' };
   function ordPill(s) {
     const t = ORD_STATUS[s] || s || 'neu';
@@ -297,20 +310,23 @@
     const host = $('ordnerInhalt'); if (!host) return;
     if (state.offenerOrdner) { zeichneEinenOrdner(state.offenerOrdner); return; }
     const q = ($('ordnerSuche').value || '').trim().toLowerCase();
-    const liste = (state.ordner || []).filter((s) => !q
-      || (s.bigoId || '').toLowerCase().includes(q) || (s.name || '').toLowerCase().includes(q));
+    const f = state.artFilter || 'alle';
+    const liste = (state.ordner || [])
+      .filter((s) => f === 'alle' || (s.art || 'streamer') === f)
+      .filter((s) => !q || (s.bigoId || '').toLowerCase().includes(q) || (s.name || '').toLowerCase().includes(q));
     if (!liste.length) {
       host.innerHTML = (state.ordner || []).length
-        ? '<div class="deck-empty">Nichts gefunden.</div>'
+        ? '<div class="deck-empty">' + (f === 'familie' ? 'Noch niemand als Familie eingetragen.<br>Ordner öffnen und dort umstellen.' : 'Nichts gefunden.') + '</div>'
         : '<div class="deck-empty">Noch keine Ordner.<br>Sobald eine Audition abgeschlossen ist, erscheint sie hier von selbst.</div>';
       return;
     }
     host.innerHTML = '<div class="ord-grid"></div>';
     const grid = host.querySelector('.ord-grid');
     liste.forEach((s) => {
-      const d = document.createElement('div'); d.className = 'ord-card';
+      const fam = (s.art || 'streamer') === 'familie';
+      const d = document.createElement('div'); d.className = 'ord-card' + (fam ? ' familie' : '');
       const n = (s.auditions || []).length;
-      d.innerHTML = '<div class="oid">' + esc(s.bigoId) + '</div>'
+      d.innerHTML = '<div class="oid">' + esc(s.bigoId) + (fam ? ' <span class="fam-pill">Familie</span>' : '') + '</div>'
         + '<div class="onm">' + esc(s.name || 'Name unbekannt') + (s.alter ? ' · ' + esc(s.alter) + ' J.' : '') + '</div>'
         + '<div class="orow">' + ordPill(s.status) + '<span class="muted">' + n + ' Audition' + (n === 1 ? '' : 'en') + '</span></div>';
       d.addEventListener('click', () => { state.offenerOrdner = s.id; zeichneOrdner(); });
@@ -327,10 +343,31 @@
     zurueck.addEventListener('click', () => { state.offenerOrdner = null; zeichneOrdner(); });
     host.appendChild(zurueck);
 
-    const kopf = document.createElement('div'); kopf.className = 'ord-aud';
-    kopf.innerHTML = '<b style="font-size:1.1rem">' + esc(s.bigoId) + '</b> ' + ordPill(s.status)
+    const fam = (s.art || 'streamer') === 'familie';
+    const kopf = document.createElement('div'); kopf.className = 'ord-aud' + (fam ? ' familie' : '');
+    kopf.innerHTML = '<b style="font-size:1.1rem">' + esc(s.bigoId) + '</b> '
+      + (fam ? '<span class="fam-pill">Familie</span> ' : '') + ordPill(s.status)
       + '<div class="ometa">' + esc(s.name || 'Name unbekannt') + (s.alter ? ' · ' + esc(s.alter) + ' Jahre' : '')
       + (s.notiz ? '<br>Notiz: ' + esc(s.notiz) : '') + '</div>';
+    // Nur Admins entscheiden, wer zur Familie gehört.
+    if (state.isAdmin) {
+      const zeile = document.createElement('div');
+      zeile.style.cssText = 'margin-top:.7rem;display:flex;gap:.5rem;flex-wrap:wrap;align-items:center';
+      const um = document.createElement('button');
+      um.textContent = fam ? '➖ Aus der Familie nehmen' : '👨‍👩‍👧 Zur Familie hinzufügen';
+      um.addEventListener('click', async () => {
+        um.disabled = true;
+        const r = await api('POST', '/api/streamer', { id: s.id, art: fam ? 'streamer' : 'familie' });
+        um.disabled = false;
+        if (r.status !== 200) { toast('Hat nicht geklappt.'); return; }
+        toast(fam ? 'Aus der Familie genommen.' : 'Zur Familie hinzugefügt.');
+        const rr = await api('GET', '/api/streamers');
+        state.ordner = (rr.body && rr.body.streamers) || [];
+        zeichneOrdner();
+      });
+      zeile.appendChild(um);
+      kopf.appendChild(zeile);
+    }
     host.appendChild(kopf);
 
     (s.auditions || []).forEach((a) => {
