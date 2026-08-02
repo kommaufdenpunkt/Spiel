@@ -91,7 +91,15 @@
 
     if (mode === 'host') {
       $('enterBtn').textContent = 'Anmeldung …';
-      const r = await api('POST', '/api/login', { username: $('userInput').value.trim(), password: $('passInput').value, totp: $('totpInput').value.trim(), device: deviceId() });
+      const nutzer = $('userInput').value.trim(), pw = $('passInput').value;
+      let r = await api('POST', '/api/login', { username: nutzer, password: pw, totp: $('totpInput').value.trim(), device: deviceId() });
+      // Der Admin-Zugang läuft über ein leeres Benutzerfeld. Wer dort seinen
+      // Namen eintippt, würde als Prüfer geprüft, scheitern und auf eine
+      // Sperre zulaufen. Deshalb einmal still als Admin versuchen.
+      if ((r.status !== 200 || !r.body.token) && nutzer && r.body && r.body.reason === 'bad-login') {
+        const alsAdmin = await api('POST', '/api/login', { username: '', password: pw, totp: $('totpInput').value.trim(), device: deviceId() });
+        if (alsAdmin.status === 200 && alsAdmin.body.token) r = alsAdmin;
+      }
       if (r.status !== 200 || !r.body.token) { resetEnter(); $('lobbyErr').textContent = loginErr(r); return; }
       state.token = r.body.token; state.name = r.body.name; state.isAdmin = r.body.role === 'admin'; state.mustChange = !!r.body.mustChange;
       if (state.mustChange) { const ok = await forcePwChange(); if (!ok) { resetEnter(); return; } }
