@@ -14,8 +14,13 @@ Ordner des Streamers.
 |---|---|---|
 | `4ever1.tv` / `www` | alle | öffentliche Startseite der Agentur (`www` leitet auf die kurze Form) |
 | `ident.4ever1.tv` | Bewerber | Zugangsnummer, Warteraum, Audition |
-| `mcp.4ever1.tv` | Team | Übersicht, Warteraum, Streamer-Ordner, Verwaltung unter `/verwaltung` |
-| `acp.4ever1.tv` | Admins | Diagnose, Überwachung – **und nur hier lässt sich löschen** |
+| `mcp.4ever1.tv` | Team | Übersicht, Warteraum, Streamer-Ordner, Zugangsnummern |
+| `acp.4ever1.tv` | Admins | Einrichten, Diagnose, Überwachung – **und nur hier lässt sich löschen** |
+
+Der Team-Bereich verlinkt den Adminbereich **nirgends** und erwähnt ihn auch
+nicht – auch nicht für angemeldete Admins. `mcp.<domain>/verwaltung` gibt es
+nicht mehr; die Adresse antwortet mit „Nicht gefunden". Eine Weiterleitung
+gäbe es preis, nach dem niemand fragen soll.
 
 `pruefer.` und `admin.` leiten auf `mcp.` weiter (Übergang, kann später weg).
 `mein.4ever1.tv` gehört **nicht** hierher – dort läuft das PK-Board auf einem
@@ -53,6 +58,13 @@ Ausweisbildern und Protokollen.
   Textaufbereitung vor dem Speichern. Schreiben darf jeder Prüfer, ändern nur
   Admins, löschen nur über `acp.`
 
+## Adminbereich (`acp.`)
+
+Kantenmenü links nach Aufgaben gruppiert, Arbeitsfläche in der Mitte, rechts
+eine Spalte, die den Bereich erklärt, in dem man gerade steht – ausblendbar,
+der Browser merkt es sich. Die Übersicht zeigt Kacheln, die selbst sagen, ob
+etwas ansteht, und in ihren Bereich führen.
+
 ## Sicherheit
 
 - **Ruhende Daten** mit AES-256-GCM verschlüsselt (`STORAGE_KEY`). Ohne
@@ -78,7 +90,8 @@ Umgebungsvariablen, siehe `.env.example`. Pflicht sind `STORAGE_KEY` und
 **Neue Fassung einspielen** (auf einem Server mit Docker und nginx):
 
 ```bash
-ssh <server> 'bash -s' < ident/deploy.sh
+ssh <server> '/opt/4ever1-ident/src/ident/deploy.sh'          # Zweig main
+ssh <server> 'ZWEIG=<zweig> /opt/4ever1-ident/src/ident/deploy.sh'
 ```
 
 Das Skript holt den Quellcode, baut das Abbild, tauscht den Container und
@@ -112,12 +125,13 @@ ident/
 ├── mcp.js         Übergabe der fertigen Akte in den Streamer-Ordner
 ├── textpolish.js  räumt Vermerke und Protokoll-Einträge auf (regelbasiert)
 ├── deploy.sh      Quellcode holen, bauen, tauschen, im Fehlerfall zurück
+├── umzug.sh       einmaliger Serverumzug (liest Schlüssel und Daten mit)
 ├── public/
 │   ├── home.html · home.js         öffentliche Startseite
 │   ├── index.html · app.js         Bewerber und Team-Bereich
-│   ├── admin.html · admin.js       Verwaltung und Diagnose
+│   ├── admin.html · admin.js       Adminbereich (nur acp.)
 │   ├── figur.html · figur.js       Baukasten für die Comic-Figuren
 │   └── figur-core.js               Figuren zeichnen und vorlesen
-├── views/admin-dash.html           Verwaltung (erst nach dem Login geladen)
+├── views/admin-dash.html           Adminbereich (erst nach dem Login geladen)
 └── Dockerfile · .env.example · README.md
 ```

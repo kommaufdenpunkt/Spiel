@@ -285,19 +285,8 @@
     $('waitRole').textContent = state.isAdmin ? 'Admin' : 'Prüfer';
     $('waitAvatar').textContent = (state.name || 'P').charAt(0).toUpperCase();
     $('newCodeResult').textContent = '';
-    if ($('navVerwaltung')) $('navVerwaltung').style.display = state.isAdmin ? '' : 'none';
-    if ($('gruppeVerwaltung')) $('gruppeVerwaltung').style.display = state.isAdmin ? '' : 'none';
-    if ($('navDiagnose') && state.isAdmin) {
-      // acp.<domain> aus der eigenen Adresse ableiten. Bei einer IP-Adresse
-      // oder localhost gibt es keine Unteradressen – dann bleibt der Punkt weg.
-      const wirt = location.hostname.toLowerCase();
-      const echteDomain = wirt.includes('.') && !/^(\d+\.){3}\d+$/.test(wirt);
-      if (echteDomain) {
-        const basis = wirt.replace(/^(mcp|pruefer|admin|ident|acp)\./, '');
-        $('navDiagnose').href = location.protocol + '//acp.' + basis + (location.port ? ':' + location.port : '');
-        $('navDiagnose').style.display = '';
-      }
-    }
+    // Der Team-Bereich verlinkt bewusst nichts Administratives – weder für
+    // Prüfer noch für Admins. Wer dorthin muss, kennt die Adresse.
     // Ordner im Voraus holen, damit die Kacheln gleich Zahlen zeigen.
     ladeOrdner(false, true);
     ladeNummern().then(() => { if (state.bereich === 'uebersicht') zeichneKacheln(); }).catch(() => {});
@@ -379,10 +368,8 @@
       'ausgegeben, noch nicht benutzt', () => zeigeBereich('nummern')));
     host.appendChild(kachel('➕', null, 'Zugangsnummer',
       'für den nächsten Bewerber', () => { zeigeBereich('warteraum'); $('newCodeBtn').click(); }));
-    if (state.isAdmin) {
-      host.appendChild(kachel('⚙️', null, 'Verwaltung',
-        'Konten, Texte, Sicherheit', () => window.open('/verwaltung', '_blank', 'noopener')));
-    }
+    // Keine Kachel für Adminaufgaben – die liegen auf einer eigenen Adresse,
+    // und der Team-Bereich verrät sie nicht. Auch Admins nicht.
   }
 
   // ---- Blöcke rechts wegklicken und zurückholen ----------------------------

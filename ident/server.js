@@ -1086,7 +1086,9 @@ const server = http.createServer(async (req, res) => {
   // laufende Sitzungen nicht ins Leere laufen. Vorübergehend (302), damit
   // Browser es nicht dauerhaft merken.
   if (altHost) {
-    const ziel = 'https://mcp.' + hostName.split('.').slice(1).join('.') + (hostName.startsWith('admin.') ? '/verwaltung' : '/');
+    // Beide landen im Team-Bereich. Auch admin.<domain> führt bewusst NICHT
+    // mehr in die Verwaltung – die liegt woanders und wird nicht verraten.
+    const ziel = 'https://mcp.' + hostName.split('.').slice(1).join('.') + '/';
     res.writeHead(302, { Location: ziel, 'Cache-Control': 'no-store' });
     res.end('Umgezogen nach ' + ziel); return;
   }
@@ -1108,10 +1110,12 @@ const server = http.createServer(async (req, res) => {
   if (urlPath === '/start' || urlPath === '/home') urlPath = '/home.html';
   // Eigener Direkt-Link für Prüfer -> Startseite öffnet gleich den Mitarbeiter-Login
   if (['/pruefer', '/login', '/team', '/mitarbeiter'].includes(urlPath)) urlPath = '/index.html';
-  // Die Verwaltung gibt es nur unter acp.<domain> und mcp.<domain>/verwaltung.
-  // Auf allen anderen Adressen (z. B. ident.4ever1.tv/admin) existiert sie nicht.
+  // Alles Administrative liegt ausschliesslich auf acp.<domain>: einrichten,
+  // Diagnose, Löschen. Auf jeder anderen Adresse – auch auf mcp. – gibt es
+  // die Verwaltung schlicht nicht. Kein Hinweis, keine Weiterleitung: eine
+  // Weiterleitung würde die Adresse verraten, nach der niemand fragen soll.
   if (['/panel', '/admin', '/admin.html', '/verwaltung'].includes(urlPath)) {
-    if (!acpHost && !mcpHost) { res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }); res.end('Nicht gefunden'); return; }
+    if (!acpHost) { res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }); res.end('Nicht gefunden'); return; }
     urlPath = '/admin.html';
   }
   // Suchmaschinen: Die Hauptseite darf gefunden werden, die Arbeitsbereiche

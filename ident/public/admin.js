@@ -5,8 +5,9 @@
   let token = '';
   function toast(m) { const t = $('toast'); t.textContent = m; t.classList.add('show'); clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('show'), 2400); }
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
-  // acp.<domain> ist der Diagnose-Bereich: nur dort darf endgültig gelöscht
-  // werden. Im Tagesgeschäft (mcp./verwaltung) sind die Knöpfe gar nicht da.
+  // Diese Seite gibt es nur auf acp.<domain>. Der Team-Bereich verlinkt sie
+  // nirgends. Nur hier darf endgültig gelöscht werden – das erzwingt der
+  // Server, die Knöpfe sind nicht bloss ausgeblendet.
   const AUF_ACP = /^acp\./.test(location.hostname.toLowerCase());
   function btn(label, cls, fn) { const b = document.createElement('button'); b.textContent = label; if (cls) b.className = cls; b.addEventListener('click', fn); return b; }
 
@@ -127,43 +128,32 @@
       bindDash();
     }
     $('login').style.display = 'none'; $('dash').classList.add('on');
-    $('whoami').textContent = AUF_ACP ? 'Diagnose · Admin' : 'Verwaltung · Admin';
+    $('whoami').textContent = 'Verwaltung · Admin';
     hinweisBereich();
-    menueKuerzen();
     kopfzeile();
     show('overview');
     return true;
   }
 
-  // Links oben: wo man ist. Dazu der Rückweg in den Team-Bereich – aber nur
-  // von der Verwaltung aus; im Diagnose-Bereich gehört er nicht hin.
+  // Links oben: wo man ist, dazu der Rückweg in den Team-Bereich. Umgekehrt
+  // führt von dort kein Weg hierher – das ist Absicht.
   function kopfzeile() {
-    if ($('admWo')) $('admWo').textContent = AUF_ACP ? 'Diagnose & Löschen' : 'Verwaltung';
-    if ($('admAvatar')) $('admAvatar').textContent = AUF_ACP ? '🩺' : 'A';
+    if ($('admWo')) $('admWo').textContent = 'Einrichten & Diagnose';
+    if ($('admAvatar')) $('admAvatar').textContent = 'A';
     const wirt = location.hostname.toLowerCase();
     const echteDomain = wirt.includes('.') && !/^(\d+\.){3}\d+$/.test(wirt);
     const basis = wirt.replace(/^(mcp|pruefer|admin|ident|acp)\./, '');
     if ($('hlpTeamAdresse')) $('hlpTeamAdresse').textContent = echteDomain ? 'mcp.' + basis : 'den Team-Bereich';
     const z = $('zurueckTeam');
-    if (z && !AUF_ACP) { z.style.display = ''; }
-    else if (z && AUF_ACP && echteDomain) {
+    if (z && echteDomain) {
       z.href = location.protocol + '//mcp.' + basis + (location.port ? ':' + location.port : '');
       z.style.display = '';
-    }
+    } else if (z && !AUF_ACP) { z.style.display = ''; }
   }
 
-  // acp.<domain> ist ausdrücklich nur für Diagnose und Löschen. Alles, was
-  // zum Einrichten gehört – Audition-Text, eigene Konto-Sicherheit –, gehört
-  // in die Verwaltung auf mcp. und ist hier fehl am Platz. Die Listen der
-  // Akten, Aufnahmen und Mitarbeiter bleiben: ohne sie liesse sich nichts
-  // gezielt löschen.
-  const NUR_VERWALTUNG = ['script', 'adminsec'];
-  function menueKuerzen() {
-    if (!AUF_ACP) return;
-    document.querySelectorAll('.nav button[data-sec]').forEach((b) => {
-      if (NUR_VERWALTUNG.includes(b.dataset.sec)) b.style.display = 'none';
-    });
-  }
+  // Der Team-Bereich verlinkt nichts Administratives mehr. Alles, was zum
+  // Einrichten, Nachsehen und Löschen gehört, liegt hier zusammen – ein Ort
+  // je Aufgabe, statt zwei halbe.
 
   // Kurz erklären, wo man gerade ist – Löschen gibt es nur im Diagnose-Bereich.
   function hinweisBereich() {
@@ -171,9 +161,8 @@
     const d = document.createElement('div');
     d.id = 'bereichHinweis'; d.className = 'note';
     d.style.cssText = 'margin:0 0 1rem';
-    d.innerHTML = AUF_ACP
-      ? '🩺 <b>Diagnose-Bereich.</b> Hier siehst du die Überwachung – und nur hier lässt sich endgültig löschen. Bitte mit Bedacht.'
-      : '⚙️ <b>Verwaltung.</b> Endgültiges Löschen von Akten, Aufnahmen und Konten geht bewusst nicht hier, sondern nur über <b>acp.4ever1.tv</b>.';
+    d.innerHTML = '⚙️ <b>Verwaltung.</b> Einrichten, nachsehen, Diagnose – und als einziger Ort das '
+      + 'endgültige Löschen von Akten, Aufnahmen und Konten. Bitte mit Bedacht.';
     const inhalt = document.querySelector('.content');
     if (inhalt) inhalt.prepend(d);
   }
@@ -199,7 +188,6 @@
     });
   }
   function show(sec) {
-    if (AUF_ACP && NUR_VERWALTUNG.includes(sec)) sec = 'overview';   // gibt es hier nicht
     document.querySelectorAll('.nav button[data-sec]').forEach((b) => b.classList.toggle('sel', b.dataset.sec === sec));
     document.querySelectorAll('.section').forEach((s) => s.classList.toggle('on', s.dataset.pane === sec));
     zeigeKante(sec);
