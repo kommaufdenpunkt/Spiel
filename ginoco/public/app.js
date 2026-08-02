@@ -405,8 +405,11 @@ function openTour() {
 window.__openTour = openTour;
 
 // ---------- Was ist neu? (Changelog) ----------
-const CHANGELOG_VER = '3.46';
+const CHANGELOG_VER = '3.47';
 const CHANGELOG = [
+  { v: '3.47', d: '26.07.2026', title: 'Privatmodus', items: [
+    '🔒 Ginoco läuft jetzt im Privatmodus: neue Anmeldungen sind geschlossen – nur du (und bestehende Zugänge) nutzen die App.',
+    '⚙️ Jederzeit umschaltbar unter Einstellungen → „Privatmodus & Registrierung“, falls du später Fahrschüler einladen willst.'] },
   { v: '3.46', d: '26.07.2026', title: 'Neue Live-Karte direkt in der App', items: [
     '🗺️ Echte Live-Karte in Ginoco: der Fahrlehrer-Punkt bewegt sich live, die Route wird eingezeichnet – kein Wechsel zu Google Maps mehr nötig.',
     '📍 Entfernung & Ankunftszeit direkt dabei; die Karte aktualisiert sich automatisch.',
@@ -773,11 +776,13 @@ function portalMode() {
 }
 function renderAuth() {
   const mode = portalMode();
+  const regOpen = state.settings?.registration_open === '1'; // privat, wenn geschlossen
+  const reg = regOpen ? [['register', 'Neu (mit Code)']] : [];
   const TABS = mode === 'admin'
     ? [['instr', 'Fahrlehrer']]
     : mode === 'student'
-      ? [['login', 'Anmelden'], ['register', 'Neu (mit Code)']]
-      : [['login', 'Anmelden'], ['register', 'Neu (mit Code)'], ['instr', 'Fahrlehrer']];
+      ? [['login', 'Anmelden'], ...reg]
+      : [['login', 'Anmelden'], ...reg, ['instr', 'Fahrlehrer']];
   let tab = TABS[0][0];
   const tagline = mode === 'admin' ? 'Fahrlehrer-Bereich' : 'Fahrstunden einfach online buchen';
   const draw = () => {
@@ -3463,6 +3468,10 @@ function tabEinstellungen() {
         <div class="hint" id="e-meet-info" style="margin:.3rem 0 0">${s.meet_default_lat ? '✓ Koordinaten hinterlegt' : 'Ohne Koordinaten nur als Text.'}</div>
         <div class="hint" style="margin:.3rem 0 0">Wird nur genutzt, wenn weder beim Schüler noch beim Termin ein Treffpunkt gesetzt ist.</div></div>`)}
 
+    ${sec('🔒', 'Privatmodus & Registrierung', 'Wer darf sich neu anmelden?', `
+      <label class="ck-line"><input type="checkbox" id="e-reg-open" ${s.registration_open === '1' ? 'checked' : ''}> Neue Fahrschüler dürfen sich mit Code registrieren</label>
+      <div class="hint" style="margin:.4rem 0 0">Ist der Haken <strong>weg</strong>, läuft Ginoco im <strong>Privatmodus</strong>: Auf der Startseite gibt es keinen „Neu (mit Code)“-Reiter mehr und niemand Neues kann sich anmelden. Deine bestehenden Zugänge (und du selbst) funktionieren weiter. Du kannst das jederzeit wieder öffnen, wenn du Fahrschüler einladen willst.</div>`, s.registration_open !== '1')}
+
     ${sec('👤', 'Zugang & Kontakt', 'Name, Handynummer, Passwort', `
       <div class="field"><label>Angezeigter Name</label><input id="e-name" value="${esc(s.instructor_name)}"></div>
       <div class="field"><label>Deine Handynummer (Schüler können anrufen/schreiben)</label><input id="e-phone" value="${esc(s.instructor_phone || '')}" placeholder="z.B. 0151 23456789"></div>
@@ -3513,6 +3522,7 @@ function tabEinstellungen() {
         anonymous_swaps: $('#e-anon').checked ? '1' : '0',
         req_ueberland: Number($('#e-req-u').value), req_autobahn: Number($('#e-req-a').value), req_nacht: Number($('#e-req-n').value),
         rank2_min_lessons: Number($('#e-rank2').value), booking_horizon_days_rank2: Number($('#e-horizon2').value),
+        registration_open: $('#e-reg-open').checked ? '1' : '0',
         new_pin: $('#e-pin').value || undefined } });
       state.settings = r.settings; state.user.name = r.settings.instructor_name;
       toast('Einstellungen gespeichert ✓', 'ok'); $('#e-msg').textContent = 'Gespeichert.';

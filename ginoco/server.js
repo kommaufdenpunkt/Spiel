@@ -15,11 +15,12 @@ const PUBLIC = join(__dirname, 'public');
 const PORT = Number(process.env.PORT || 3000);
 const HOST = process.env.HOST || '0.0.0.0'; // hinter Caddy: HOST=127.0.0.1 (nur Proxy erreicht Node)
 const SESSION_DAYS = 30;
-const APP_VERSION = "3.46.0";
+const APP_VERSION = "3.47.0";
 // Einstellungen, die Schueler/Oeffentlichkeit sehen duerfen (Rest bleibt beim Fahrlehrer)
 const PUBLIC_SETTINGS = ['instructor_name', 'instructor_phone', 'policy_text',
   'cancel_hours', 'lock_hours', 'booking_horizon_days', 'booking_horizon_days_rank2',
-  'live_lead_min', 'lesson_min', 'break_min', 'start_time', 'last_start', 'max_per_week', 'release_time'];
+  'live_lead_min', 'lesson_min', 'break_min', 'start_time', 'last_start', 'max_per_week', 'release_time',
+  'registration_open'];
 
 // ---------- Passwort-Richtlinie (stark, mit Sonderzeichen) ----------
 // Gibt null zurueck, wenn ok, sonst die fehlende Anforderung.
@@ -269,6 +270,8 @@ async function handleApi(req, res, url) {
   }
 
   if (p === '/api/auth/register' && method === 'POST') {
+    if (getSettingRaw('registration_open') !== '1')
+      return bad(res, 'Die Registrierung ist derzeit geschlossen. Bitte wende dich an deinen Fahrlehrer.', 403);
     const { code, name, email, phone, password, birth_year } = await readBody(req);
     if (!code || !name || !password) return bad(res, 'Bitte Name, Code und Passwort ausfuellen');
     const prob = passwordProblem(password);
@@ -1329,7 +1332,7 @@ async function handleApi(req, res, url) {
       'instructor_phone', 'avg_speed_kmh', 'live_lead_min',
       'meet_default_label', 'meet_default_lat', 'meet_default_lng',
       'anonymous_swaps', 'req_ueberland', 'req_autobahn', 'req_nacht',
-      'rank2_min_lessons', 'booking_horizon_days_rank2'];
+      'rank2_min_lessons', 'booking_horizon_days_rank2', 'registration_open'];
     const emptyOk = new Set(['instructor_phone', 'meet_default_label', 'meet_default_lat', 'meet_default_lng', 'policy_text']);
     for (const k of allowed) {
       if (!(k in b) || b[k] == null) continue;

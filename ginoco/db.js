@@ -235,6 +235,7 @@ const DEFAULTS = {
   req_nacht: '3',            // Soll-Sonderfahrten: Nachtfahrt
   rank2_min_lessons: '15',   // ab so vielen gefahrenen Stunden -> Rang 2
   booking_horizon_days_rank2: '21', // Rang 2 darf so viele Tage im Voraus buchen
+  registration_open: '0',    // '1' = neue Fahrschüler dürfen sich mit Code registrieren, '0' = geschlossen (privat)
   policy_text: 'Gebuchte Termine sind verbindlich. Kostenfrei stornieren nur bis '
     + '48 Std. vorher; ab 36 Std. vorher steht der Termin fest. Bei Nichterscheinen '
     + 'werden bis zu 75 % berechnet. Ab 20 Min Verspätung verkürzt sich die Fahrstunde '
