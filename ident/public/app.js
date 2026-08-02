@@ -268,24 +268,171 @@
     $('waitAvatar').textContent = (state.name || 'P').charAt(0).toUpperCase();
     $('newCodeResult').textContent = '';
     if ($('navVerwaltung')) $('navVerwaltung').style.display = state.isAdmin ? '' : 'none';
-    // Unter mein. geht es direkt in die Familien-Ansicht, sonst in den Warteraum.
-    zeigeBereich(/^mein\./.test(location.hostname.toLowerCase()) ? 'ordner' : 'warteraum');
+    if ($('gruppeVerwaltung')) $('gruppeVerwaltung').style.display = state.isAdmin ? '' : 'none';
+    if ($('navDiagnose') && state.isAdmin) {
+      // acp.<domain> aus der eigenen Adresse ableiten. Bei einer IP-Adresse
+      // oder localhost gibt es keine Unteradressen – dann bleibt der Punkt weg.
+      const wirt = location.hostname.toLowerCase();
+      const echteDomain = wirt.includes('.') && !/^(\d+\.){3}\d+$/.test(wirt);
+      if (echteDomain) {
+        const basis = wirt.replace(/^(mcp|mein|pruefer|admin|ident|acp)\./, '');
+        $('navDiagnose').href = location.protocol + '//acp.' + basis + (location.port ? ':' + location.port : '');
+        $('navDiagnose').style.display = '';
+      }
+    }
+    // Ordner im Voraus holen, damit die Kacheln gleich Zahlen zeigen.
+    ladeOrdner(false, true);
+    // Unter mein. geht es direkt in die Familien-Ansicht, sonst auf die Übersicht.
+    zeigeBereich(/^mein\./.test(location.hostname.toLowerCase()) ? 'ordner' : 'uebersicht');
     refreshWaiting(); clearInterval(state.waitingTimer); state.waitingTimer = setInterval(refreshWaiting, 3000);
   }
 
   // ================= TEAM-BEREICH: Warteraum <-> Streamer-Ordner =============
   // Beides in derselben Oberfläche, damit man sich nicht zweimal anmelden muss.
   function zeigeBereich(was) {
-    const ordner = was === 'ordner';
-    if ($('paneWarteraum')) $('paneWarteraum').style.display = ordner ? 'none' : '';
-    if ($('paneLaufend')) $('paneLaufend').style.display = ordner ? 'none' : '';
-    if ($('paneOrdner')) $('paneOrdner').style.display = ordner ? '' : 'none';
-    if ($('navWarteraum')) $('navWarteraum').classList.toggle('sel', !ordner);
-    if ($('navOrdner')) $('navOrdner').classList.toggle('sel', ordner);
-    if (ordner) ladeOrdner();
+    const bereiche = { uebersicht: 'paneUebersicht', warteraum: 'paneWarteraum', ordner: 'paneOrdner' };
+    state.bereich = bereiche[was] ? was : 'uebersicht';
+    Object.keys(bereiche).forEach((k) => {
+      const el = $(bereiche[k]); if (el) el.style.display = k === state.bereich ? '' : 'none';
+      const n = $('nav' + k.charAt(0).toUpperCase() + k.slice(1)); if (n) n.classList.toggle('sel', k === state.bereich);
+    });
+    // Die rechte Spalte gehört zur Arbeit am Warteraum und zur Übersicht.
+    if ($('paneLaufend')) {
+      $('paneLaufend').style.display = state.bereich === 'ordner' ? 'none' : '';
+      zeichneBloecke();   // weggeklickte Blöcke bleiben weg
+    }
+    if (state.bereich === 'ordner') ladeOrdner();
+    if (state.bereich === 'uebersicht') zeichneKacheln();
   }
+  if ($('navUebersicht')) $('navUebersicht').addEventListener('click', () => zeigeBereich('uebersicht'));
   if ($('navWarteraum')) $('navWarteraum').addEventListener('click', () => zeigeBereich('warteraum'));
   if ($('navOrdner')) $('navOrdner').addEventListener('click', () => zeigeBereich('ordner'));
+
+  // ---- Kacheln der Übersicht ----------------------------------------------
+  // Zeigen den Stand in Zahlen und führen mit einem Tippen dorthin.
+  function kachel(icon, zahl, titel, unten, klick, ruft) {
+    const b = document.createElement('button');
+    b.className = 'kachel' + (ruft ? ' ruft' : '');
+    b.innerHTML = '<span class="ki">' + icon + '</span>'
+      + (zahl !== null ? '<span class="kz">' + esc(String(zahl)) + '</span>' : '')
+      + '<span class="kt">' + esc(titel) + '</span>'
+      + '<span class="ku">' + esc(unten) + '</span>';
+    if (klick) b.addEventListener('click', klick); else b.disabled = true;
+    return b;
+  }
+  function zeichneKacheln() {
+    const host = $('kacheln'); if (!host) return;
+    const w = state.letzteWarteschlange || { free: 0, running: 0 };
+    const ord = state.ordner || [];
+    const fam = ord.filter((s) => (s.art || 'streamer') === 'familie').length;
+    const offen = ord.reduce((n, s) => n + (s.auditions || []).filter((a) => a.aufnahme && !a.aufnahme.auswertung).length, 0);
+    host.innerHTML = '';
+    host.appendChild(kachel('🕒', w.free || 0, 'wartet gerade',
+      w.free ? 'Antippen und annehmen' : 'Niemand in der Schlange',
+      () => zeigeBereich('warteraum'), (w.free || 0) > 0));
+    host.appendChild(kachel('🎥', w.running || 0, 'laufende Gespräche',
+      'gerade in Bearbeitung', () => zeigeBereich('warteraum')));
+    host.appendChild(kachel('📁', ord.length, 'Streamer-Ordner',
+      'alle Akten an einem Ort', () => zeigeBereich('ordner')));
+    host.appendChild(kachel('👨‍👩‍👧', fam, 'in der Familie',
+      'engerer Kreis', () => {
+        state.artFilter = 'familie';
+        document.querySelectorAll('.artfilter button').forEach((x) => x.classList.toggle('sel', x.dataset.art === 'familie'));
+        state.offenerOrdner = null; zeigeBereich('ordner');
+      }));
+    if (offen) {
+      host.appendChild(kachel('🎬', offen, 'Aufnahmen offen',
+        'noch nicht ausgewertet', () => zeigeBereich('ordner'), true));
+    }
+    host.appendChild(kachel('➕', null, 'Zugangsnummer',
+      'für den nächsten Bewerber', () => { zeigeBereich('warteraum'); $('newCodeBtn').click(); }));
+    if (state.isAdmin) {
+      host.appendChild(kachel('⚙️', null, 'Verwaltung',
+        'Konten, Texte, Sicherheit', () => window.open('/verwaltung', '_blank', 'noopener')));
+    }
+  }
+
+  // ---- Blöcke rechts wegklicken und zurückholen ----------------------------
+  // Die Auswahl bleibt in diesem Browser gespeichert, damit sie nach dem
+  // nächsten Anmelden noch gilt.
+  const BLOCK_KEY = 'ident.zugeklappt';
+  function zugeklappte() {
+    try { return JSON.parse(localStorage.getItem(BLOCK_KEY) || '[]'); } catch { return []; }
+  }
+  function merkeBloecke(liste) { try { localStorage.setItem(BLOCK_KEY, JSON.stringify(liste)); } catch {} }
+  function zeichneBloecke() {
+    const zu = zugeklappte();
+    let sichtbar = 0;
+    document.querySelectorAll('.seiten-block').forEach((b) => {
+      const versteckt = zu.includes(b.dataset.block);
+      b.classList.toggle('zu', versteckt);
+      if (!versteckt) sichtbar++;
+    });
+    // Ist rechts nichts mehr übrig, verschwindet die ganze Spalte – sonst
+    // stünde da ein leerer Kasten.
+    const spalte = $('paneLaufend');
+    if (spalte) spalte.classList.toggle('leer', sichtbar === 0);
+    const zurueck = $('blockeZurueck');
+    if (zurueck) {
+      zurueck.style.display = zu.length ? '' : 'none';
+      zurueck.textContent = '↩︎ Ausgeblendetes zeigen (' + zu.length + ')';
+    }
+  }
+  document.querySelectorAll('.block-zu').forEach((k) => {
+    k.addEventListener('click', () => {
+      const b = k.closest('.seiten-block'); if (!b) return;
+      const zu = zugeklappte();
+      if (!zu.includes(b.dataset.block)) zu.push(b.dataset.block);
+      merkeBloecke(zu); zeichneBloecke();
+      toast('Ausgeblendet – links im Menü wieder einblendbar.');
+    });
+  });
+  if ($('blockeZurueck')) $('blockeZurueck').addEventListener('click', () => { merkeBloecke([]); zeichneBloecke(); });
+  zeichneBloecke();
+
+  // ---- Geräte-Test für den Prüfer -----------------------------------------
+  // Damit ein stummes Mikrofon vor dem Gespräch auffällt, nicht mittendrin.
+  let dkAudio = null;
+  if ($('dkTest')) $('dkTest').addEventListener('click', async () => {
+    const b = $('dkTest'); b.disabled = true; b.textContent = 'wird geprüft …';
+    try {
+      const s = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      const v = s.getVideoTracks()[0], a = s.getAudioTracks()[0];
+      const g = v && v.getSettings ? v.getSettings() : {};
+      setzeCheck('dkCam', v ? 'ok' : 'bad', v ? ('läuft' + (g.width ? ', ' + g.width + '×' + g.height : '')) : 'kein Bild');
+      if (!a) { setzeCheck('dkMic', 'bad', 'kein Mikrofon gefunden'); }
+      else {
+        setzeCheck('dkMic', 'warn', 'Sag mal kurz „Hallo“');
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const an = ctx.createAnalyser(); an.fftSize = 512;
+        ctx.createMediaStreamSource(s).connect(an);
+        const buf = new Uint8Array(an.fftSize);
+        dkAudio = { ctx, gehoert: false, bis: Date.now() + 12000 };
+        const tick = () => {
+          if (!dkAudio) return;
+          an.getByteTimeDomainData(buf);
+          let max = 0; for (let i = 0; i < buf.length; i++) { const d = Math.abs(buf[i] - 128); if (d > max) max = d; }
+          if ($('dkMicBar')) $('dkMicBar').style.width = Math.min(100, Math.round(max / 40 * 100)) + '%';
+          if (max > 7 && !dkAudio.gehoert) { dkAudio.gehoert = true; setzeCheck('dkMic', 'ok', 'Ton kommt an – alles gut'); }
+          if (Date.now() > dkAudio.bis) {
+            if (!dkAudio.gehoert) setzeCheck('dkMic', 'warn', 'kein Ton gehört – Mikro prüfen');
+            try { dkAudio.ctx.close(); } catch {}
+            s.getTracks().forEach((t) => { try { t.stop(); } catch {} });
+            dkAudio = null; if ($('dkMicBar')) $('dkMicBar').style.width = '0';
+            return;
+          }
+          requestAnimationFrame(tick);
+        };
+        tick();
+      }
+      // Das Bild brauchen wir nicht anzuzeigen – nur wissen, dass es geht.
+      setTimeout(() => { if (!dkAudio) s.getTracks().forEach((t) => { try { t.stop(); } catch {} }); }, 500);
+    } catch {
+      setzeCheck('dkCam', 'bad', 'Zugriff nicht erlaubt');
+      setzeCheck('dkMic', 'bad', 'Zugriff nicht erlaubt');
+    }
+    b.disabled = false; b.textContent = 'Kamera & Mikro testen';
+  });
   if ($('ordnerNeu')) $('ordnerNeu').addEventListener('click', () => ladeOrdner(true));
   if ($('ordnerSuche')) $('ordnerSuche').addEventListener('input', () => zeichneOrdner());
 
@@ -307,12 +454,14 @@
     const k = s === 'aktiv' ? 'ok' : (s === 'abgelehnt' || s === 'weg') ? 'no' : 'warn';
     return '<span class="wait-pill ' + k + '">' + esc(t) + '</span>';
   }
-  async function ladeOrdner(neu) {
+  async function ladeOrdner(neu, still) {
     if (neu) $('ordnerInhalt').innerHTML = '<div class="deck-empty">Wird geladen …</div>';
     const r = await api('GET', '/api/streamers');
     state.ordner = (r.body && r.body.streamers) || [];
     state.offenerOrdner = null;
+    if (still) { if (state.bereich === 'uebersicht') zeichneKacheln(); return; }
     zeichneOrdner();
+    if (state.bereich === 'uebersicht') zeichneKacheln();
   }
   function zeichneOrdner() {
     const host = $('ordnerInhalt'); if (!host) return;
@@ -418,6 +567,8 @@
   function renderWaiting(list, info) {
     const queue = list.filter((w) => !w.busy);
     const running = list.filter((w) => w.busy);
+    state.letzteWarteschlange = { free: queue.length, running: running.length };
+    if (state.bereich === 'uebersicht') zeichneKacheln();
     $('statWaiting').textContent = queue.length;
     $('statRunning').textContent = running.length;
     $('takeNextBtn').disabled = queue.length === 0;
