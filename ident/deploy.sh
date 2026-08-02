@@ -38,8 +38,12 @@ command -v docker >/dev/null || fehler "docker ist nicht installiert"
 # ---- 1. Quellcode ---------------------------------------------------------
 sage "Quellcode holen ($ZWEIG)"
 if [ -d "$QUELLE/.git" ]; then
-  git -C "$QUELLE" fetch --depth 1 origin "$ZWEIG"
-  git -C "$QUELLE" reset --hard "origin/$ZWEIG"
+  # Ausdrücklicher Refspec: Der Ordner wurde flach und nur für einen Zweig
+  # geklont. Ohne diese Angabe kennt er "origin/<anderer Zweig>" nicht und
+  # das Aufspielen bricht ab.
+  git -C "$QUELLE" fetch --depth 1 origin "+refs/heads/$ZWEIG:refs/remotes/origin/$ZWEIG"
+  git -C "$QUELLE" reset --hard "refs/remotes/origin/$ZWEIG"
+  git -C "$QUELLE" clean -fdq
 else
   rm -rf "$QUELLE"
   git clone --depth 1 --branch "$ZWEIG" "$REPO" "$QUELLE"
