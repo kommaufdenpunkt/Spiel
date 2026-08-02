@@ -360,7 +360,8 @@
     </div>
 
     <div id="staffFields" style="display:none">
-      <div class="field"><label for="userInput">Benutzername</label><input id="userInput" placeholder="dein persönlicher Login" autocomplete="username"></div>
+      <div class="field"><label for="userInput">Benutzername</label><input id="userInput" placeholder="dein persönlicher Login" autocomplete="username">
+        <div class="hint" style="margin:.35rem 0 0;padding:.4rem .6rem;font-size:.78rem">Als Admin das Feld <b>leer lassen</b> und nur das Admin-Passwort eingeben.</div></div>
       <div class="field"><label for="passInput">Passwort</label><input id="passInput" type="password" placeholder="dein Passwort" autocomplete="current-password"></div>
       <!-- 2FA ist optional: Feld erscheint nur, wenn der Server einen Code verlangt. -->
       <div class="field" id="totpField" style="display:none"><label for="totpInput">2FA-Code</label><input id="totpInput" inputmode="numeric" placeholder="6-stelliger Code" autocomplete="one-time-code"></div>
