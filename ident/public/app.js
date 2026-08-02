@@ -55,13 +55,13 @@
   // Eigener Prüfer-Link (/pruefer, /login, /team, /mitarbeiter oder ?login) ->
   // die Lobby startet direkt im Mitarbeiter-Login statt in der Bewerber-Ansicht.
   const staffPaths = ['/pruefer', '/login', '/team', '/mitarbeiter'];
-  // mcp./mein. ist der Team-Bereich – dort startet die Seite gleich im
+  // mcp. ist der Team-Bereich – dort startet die Seite gleich im
   // Mitarbeiter-Login, und der Umweg zur Bewerber-Ansicht entfällt.
-  const teamHost = /^(pruefer|mcp|mein)\./.test(location.hostname.toLowerCase());
+  const teamHost = /^(pruefer|mcp)\./.test(location.hostname.toLowerCase());
   const staffHost = teamHost;
   if (staffHost || staffPaths.includes(location.pathname.toLowerCase()) || params.has('login') || params.has('staff')) mode = 'host';
   setMode(mode);
-  if (/^(mcp|mein)\./.test(location.hostname.toLowerCase()) && $('staffToggle')) {
+  if (/^mcp\./.test(location.hostname.toLowerCase()) && $('staffToggle')) {
     $('staffToggle').style.display = 'none';   // hier gibt es keine Bewerber-Ansicht
     document.title = '4EVER1 · Team';
   }
@@ -275,15 +275,14 @@
       const wirt = location.hostname.toLowerCase();
       const echteDomain = wirt.includes('.') && !/^(\d+\.){3}\d+$/.test(wirt);
       if (echteDomain) {
-        const basis = wirt.replace(/^(mcp|mein|pruefer|admin|ident|acp)\./, '');
+        const basis = wirt.replace(/^(mcp|pruefer|admin|ident|acp)\./, '');
         $('navDiagnose').href = location.protocol + '//acp.' + basis + (location.port ? ':' + location.port : '');
         $('navDiagnose').style.display = '';
       }
     }
     // Ordner im Voraus holen, damit die Kacheln gleich Zahlen zeigen.
     ladeOrdner(false, true);
-    // Unter mein. geht es direkt in die Familien-Ansicht, sonst auf die Übersicht.
-    zeigeBereich(/^mein\./.test(location.hostname.toLowerCase()) ? 'ordner' : 'uebersicht');
+    zeigeBereich('uebersicht');
     refreshWaiting(); clearInterval(state.waitingTimer); state.waitingTimer = setInterval(refreshWaiting, 3000);
   }
 
@@ -436,9 +435,8 @@
   if ($('ordnerNeu')) $('ordnerNeu').addEventListener('click', () => ladeOrdner(true));
   if ($('ordnerSuche')) $('ordnerSuche').addEventListener('input', () => zeichneOrdner());
 
-  // mein.4ever1.tv ist die Familien-Ansicht: dort ist der Filter von Anfang an
-  // gesetzt. Unter mcp. sieht man alle und schaltet selbst um.
-  state.artFilter = /^mein\./.test(location.hostname.toLowerCase()) ? 'familie' : 'alle';
+  // Der Filter startet auf "Alle"; Familie ist einen Klick entfernt.
+  state.artFilter = 'alle';
   document.querySelectorAll('.artfilter button').forEach((b) => {
     b.classList.toggle('sel', b.dataset.art === state.artFilter);
     b.addEventListener('click', () => {

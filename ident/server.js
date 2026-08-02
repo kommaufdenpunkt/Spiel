@@ -1074,10 +1074,13 @@ const server = http.createServer(async (req, res) => {
   //   ident.*   -> Bewerber-Startseite      (index.html)
   //   pruefer.* -> Mitarbeiter-Login        (index.html, Modus per JS)
   //   admin.*   -> Admin-Bereich            (admin.html)
-  //   mcp.*     -> Streamer-Ordner          (mcp.html)
+  //   mcp.*     -> Team-Bereich             (index.html, Warteraum + Ordner)
+  //   acp.*     -> Diagnose + Löschen       (admin.html)
+  //   mein.*    -> gehört dem PK-Board auf dem anderen Server, nicht hier
   const hostName = String(req.headers.host || '').split(':')[0].toLowerCase();
   const acpHost = hostName.startsWith('acp.');          // Diagnose + Löschen
-  const mcpHost = hostName.startsWith('mcp.') || hostName.startsWith('mein.');  // Team
+  // mein.<domain> gehört dem PK-Board auf dem anderen Server – hier nicht mehr.
+  const mcpHost = hostName.startsWith('mcp.');  // Team
   const altHost = hostName.startsWith('admin.') || hostName.startsWith('pruefer.');
   // Alte Adressen leiten auf den Team-Bereich weiter, damit Lesezeichen und
   // laufende Sitzungen nicht ins Leere laufen. Vorübergehend (302), damit
@@ -1097,7 +1100,7 @@ const server = http.createServer(async (req, res) => {
   const adminHost = acpHost;   // der Admin-Bereich wird über acp. und mcp./verwaltung erreicht
   // Hauptdomain (4ever1.tv, www.4ever1.tv) -> öffentliche Startseite der Agentur.
   // ident./pruefer. -> Audition bzw. Mitarbeiter-Login, admin. -> Verwaltung.
-  const knownSub = /^(ident|pruefer|admin|acp|mcp|mein)\./.test(hostName);
+  const knownSub = /^(ident|pruefer|admin|acp|mcp)\./.test(hostName);
   const homeHost = !knownSub && !/^(localhost|127\.|\[|\d+\.\d+\.\d+\.\d+$)/.test(hostName);
   // acp. -> Diagnose/Löschen, mcp. -> Team-Bereich (Warteraum + Ordner),
   // Hauptdomain -> öffentliche Seite, sonst die Bewerber-Seite.
@@ -1111,7 +1114,7 @@ const server = http.createServer(async (req, res) => {
     if (!acpHost && !mcpHost) { res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }); res.end('Nicht gefunden'); return; }
     urlPath = '/admin.html';
   }
-  // Eigenständige Ordner-Seite nur unter mcp.<domain> bzw. mein.<domain>
+  // Eigenständige Ordner-Seite nur unter mcp.<domain>
   if (urlPath === '/mcp' || urlPath === '/ordner' || urlPath === '/mcp.html') {
     if (!mcpHost) { res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }); res.end('Nicht gefunden'); return; }
     urlPath = '/mcp.html';
