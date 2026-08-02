@@ -680,6 +680,35 @@ async function handleApi(req, res, urlPath, ip) {
     sec.recordEvent('audit', ip, 'Streamer-Ordner geändert: ' + s.bigoId);
     sendJson(res, 200, { streamer: s }); return true;
   }
+  // Vermerke im Streamer-Ordner: schreiben darf jeder Prüfer, ändern nur
+  // Admins, löschen nur über acp. – wie bei den Akten auch.
+  if (urlPath === '/api/streamer-entry' && req.method === 'POST') {
+    if (!authed(req, ip)) { sendJson(res, 401, { reason: 'auth' }); return true; }
+    let body; try { body = await readJson(req, 64 * 1024); } catch { body = {}; }
+    const rec = store.addStreamerEintrag(String(body.id || ''), {
+      text: body.text, original: body.original, author: reqName(req, ip) || 'Unbekannt',
+    });
+    if (!rec) { sendJson(res, 400, { reason: 'bad-entry' }); return true; }
+    sec.recordEvent('audit', ip, 'Vermerk im Streamer-Ordner hinzugefügt');
+    sendJson(res, 200, { entry: rec }); return true;
+  }
+  if (urlPath === '/api/streamer-entry-update' && req.method === 'POST') {
+    if (!adminOnly()) return true;
+    let body; try { body = await readJson(req, 64 * 1024); } catch { body = {}; }
+    const ok = store.updateStreamerEintrag(String(body.id || ''), String(body.entryId || ''), {
+      text: body.text, editor: reqName(req, ip) || 'Admin',
+    });
+    if (ok) sec.recordEvent('audit', ip, 'Vermerk geändert');
+    sendJson(res, ok ? 200 : 400, { ok }); return true;
+  }
+  if (urlPath === '/api/streamer-entry-delete' && req.method === 'POST') {
+    if (!loeschenErlaubt()) return true;
+    let body; try { body = await readJson(req, 16 * 1024); } catch { body = {}; }
+    const ok = store.deleteStreamerEintrag(String(body.id || ''), String(body.entryId || ''));
+    if (ok) sec.recordEvent('audit', ip, 'Vermerk gelöscht');
+    sendJson(res, ok ? 200 : 400, { ok }); return true;
+  }
+
   if (urlPath === '/api/streamer-delete' && req.method === 'POST') {
     if (!loeschenErlaubt()) return true;
     let body; try { body = await readJson(req, 16 * 1024); } catch { body = {}; }

@@ -490,6 +490,94 @@
       grid.appendChild(d);
     });
   }
+  // ---- Vermerke: alles, was im Laufe der Zeit dazukommt --------------------
+  // Vorlagen, damit man nicht jedes Mal neu formulieren muss. Sie schreiben nur
+  // den Anfang ins Feld - den Rest ergaenzt man selbst.
+  const VORLAGEN = [
+    ['\u{1F4DE} Angerufen', 'Angerufen \u2013 '],
+    ['\u{1F4AC} Geschrieben', 'Nachricht geschrieben \u2013 '],
+    ['\u{1F515} Meldet sich nicht', 'Meldet sich nicht. Versucht am '],
+    ['\u{1F4C9} Streamt zu wenig', 'Streamt zu wenig \u2013 angesprochen auf '],
+    ['\u26A0\uFE0F Verwarnung', 'Verwarnung: '],
+    ['\u{1F3C6} Lob', 'Lob: '],
+    ['\u{1F3AF} Ziel vereinbart', 'Ziel vereinbart: '],
+    ['\u23F8 Pause', 'Pause abgesprochen von \u2026 bis \u2026, Grund: '],
+  ];
+  function vermerkeBlock(s) {
+    const wrap = document.createElement('div'); wrap.className = 'ord-aud';
+    const liste = s.eintraege || [];
+    wrap.innerHTML = '<div class="deck-head" style="margin-bottom:.5rem"><h2 style="font-size:1rem">\u{1F4DD} Vermerke ('
+      + liste.length + ')</h2><span class="muted">Anrufe, Absprachen, Auff\u00e4lligkeiten</span></div>';
+
+    const vor = document.createElement('div'); vor.className = 'vorlagen';
+    VORLAGEN.forEach((v) => {
+      const b = document.createElement('button'); b.type = 'button'; b.textContent = v[0];
+      b.addEventListener('click', () => {
+        const ta = wrap.querySelector('.vermerk-feld');
+        ta.value = v[1]; ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length);
+      });
+      vor.appendChild(b);
+    });
+    wrap.appendChild(vor);
+
+    const ta = document.createElement('textarea');
+    ta.className = 'vermerk-feld'; ta.rows = 3;
+    ta.placeholder = 'Was ist passiert? Ruhig in eigenen Worten \u2013 der Text l\u00e4sst sich vor dem Speichern aufr\u00e4umen.';
+    wrap.appendChild(ta);
+
+    const leiste = document.createElement('div');
+    leiste.style.cssText = 'display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;margin-top:.5rem';
+    const speichern = document.createElement('button');
+    speichern.className = 'primary'; speichern.textContent = '\u2728 Eintragen';
+    const hinweis = document.createElement('span'); hinweis.className = 'muted'; hinweis.style.fontSize = '.8rem';
+    speichern.addEventListener('click', async () => {
+      const roh = ta.value.trim();
+      if (!roh) { hinweis.textContent = 'Bitte erst etwas schreiben.'; return; }
+      speichern.disabled = true; hinweis.textContent = 'Text wird aufger\u00e4umt \u2026';
+      let text = roh;
+      const p = await api('POST', '/api/entry-polish', { text: roh });
+      if (p.status === 200 && p.body.text && p.body.text !== roh) {
+        const aend = (p.body.changes || []).map((x) => '\u2022 ' + x).join('\n');
+        text = confirm('Aufbereiteter Text:\n\n' + p.body.text + '\n\n\u00c4nderungen:\n' + aend + '\n\nSo einpflegen?  (Abbrechen = dein Originaltext)')
+          ? p.body.text : roh;
+      }
+      hinweis.textContent = '';
+      const r = await api('POST', '/api/streamer-entry', { id: s.id, text: text, original: roh });
+      speichern.disabled = false;
+      if (r.status !== 200) { toast('Vermerk konnte nicht gespeichert werden.'); return; }
+      ta.value = ''; toast('Vermerk eingetragen.');
+      await ladeOrdner(false, true); state.offenerOrdner = s.id; zeichneOrdner();
+    });
+    leiste.appendChild(speichern); leiste.appendChild(hinweis);
+    wrap.appendChild(leiste);
+
+    if (liste.length) {
+      const l = document.createElement('div'); l.className = 'vermerk-liste';
+      liste.forEach((e) => {
+        const d = document.createElement('div'); d.className = 'vermerk';
+        d.innerHTML = '<div class="vt"></div><small>' + esc(e.author || '') + ' \u00b7 '
+          + esc(new Date(e.createdAt).toLocaleString('de-DE'))
+          + (e.editedAt ? ' \u00b7 ge\u00e4ndert von ' + esc(e.editedBy) : '') + '</small>';
+        d.querySelector('.vt').textContent = e.text;
+        if (state.isAdmin) {
+          const acts = document.createElement('div'); acts.className = 'vermerk-acts';
+          const bearb = document.createElement('button'); bearb.textContent = '\u270F\uFE0F Bearbeiten';
+          bearb.addEventListener('click', async () => {
+            const neu = prompt('Vermerk \u00e4ndern:', e.text);
+            if (neu === null || !neu.trim()) return;
+            const r = await api('POST', '/api/streamer-entry-update', { id: s.id, entryId: e.id, text: neu.trim() });
+            if (r.status !== 200) { toast('\u00c4ndern hat nicht geklappt.'); return; }
+            await ladeOrdner(false, true); state.offenerOrdner = s.id; zeichneOrdner();
+          });
+          acts.appendChild(bearb); d.appendChild(acts);
+        }
+        l.appendChild(d);
+      });
+      wrap.appendChild(l);
+    }
+    return wrap;
+  }
+
   function zeichneEinenOrdner(id) {
     const s = (state.ordner || []).find((x) => x.id === id);
     const host = $('ordnerInhalt');
@@ -526,6 +614,8 @@
       kopf.appendChild(zeile);
     }
     host.appendChild(kopf);
+
+    host.appendChild(vermerkeBlock(s));
 
     (s.auditions || []).forEach((a) => {
       const auf = a.aufnahme;
