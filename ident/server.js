@@ -591,6 +591,31 @@ async function handleApi(req, res, urlPath, ip) {
     sendJson(res, 200, { ok: true }); return true;
   }
 
+  // ---- Streamer übernehmen, die es schon gibt (ohne Audition) ----
+  // Wer im PK-Board mitläuft, soll auch hier eine Akte haben. Das Skript
+  // pkboard-import.sh liest die Mitglieder und schickt sie hierher. Der
+  // Aufruf darf beliebig oft kommen: Vorhandenes wird nicht überschrieben.
+  if (urlPath === '/api/streamer-import' && req.method === 'POST') {
+    if (!adminOnly()) return true;
+    let body; try { body = await readJson(req, 2 * 1024 * 1024); } catch { sendJson(res, 413, { reason: 'too-large' }); return true; }
+    const leute = Array.isArray(body.leute) ? body.leute.slice(0, 5000) : [];
+    if (!leute.length) { sendJson(res, 400, { reason: 'keine-daten' }); return true; }
+    let neu = 0, vorhanden = 0, ergaenzt = 0, ohneId = 0;
+    const angelegt = [];
+    for (const p of leute) {
+      const r = store.ordnerAnlegen({
+        bigoId: p.bigoId, name: p.name, alter: p.alter, art: p.art,
+        notiz: p.notiz, status: p.status, herkunft: p.herkunft || 'pkboard',
+      });
+      if (r.grund === 'keine-bigo-id') { ohneId++; continue; }
+      if (r.angelegt) { neu++; angelegt.push(r.ordner.bigoId); }
+      else { vorhanden++; if (r.ergaenzt) ergaenzt++; }
+    }
+    sec.recordEvent('audit', ip, 'Streamer übernommen: ' + neu + ' neu, ' + vorhanden + ' vorhanden');
+    sendJson(res, 200, { neu, vorhanden, ergaenzt, ohneId, gesamt: leute.length, angelegt: angelegt.slice(0, 50) });
+    return true;
+  }
+
   // ---- Kennen wir die Person schon? ----
   // Wird beim Eintippen der Ausweisdaten gefragt. Der Prüfer soll wissen,
   // ob die Audition an einen bestehenden Ordner angehängt wird oder ob ein

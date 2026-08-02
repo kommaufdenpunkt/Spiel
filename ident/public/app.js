@@ -595,7 +595,11 @@
       const n = (s.auditions || []).length;
       d.innerHTML = '<div class="oid">' + esc(s.bigoId) + (fam ? ' <span class="fam-pill">Familie</span>' : '') + '</div>'
         + '<div class="onm">' + esc(s.name || 'Name unbekannt') + (s.alter ? ' · ' + esc(s.alter) + ' J.' : '') + '</div>'
-        + '<div class="orow">' + ordPill(s.status) + '<span class="muted">' + n + ' Audition' + (n === 1 ? '' : 'en') + '</span></div>'
+        + '<div class="orow">' + ordPill(s.status)
+        + (n === 0 && s.herkunft === 'pkboard'
+            ? '<span class="uebernommen" title="Aus dem PK-Board übernommen">aus dem PK-Board · noch keine Audition</span>'
+            : '<span class="muted">' + n + ' Audition' + (n === 1 ? '' : 'en') + '</span>')
+        + '</div>'
         + (['aktiv', 'neu'].includes(s.status) && stilleTage(s) >= STILL_AB
           ? '<div class="muted" style="margin-top:.35rem;font-size:.75rem;color:var(--warm)">🕰 seit '
             + stilleTage(s) + ' Tagen kein Eintrag</div>' : '');

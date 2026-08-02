@@ -359,6 +359,51 @@ function suchePerson({ bigoId, docNumber, name, age }) {
   return null;
 }
 /**
+ * Ordner anlegen, ohne dass eine Audition stattgefunden hat.
+ *
+ * Wer schon im PK-Board mitläuft, soll auch hier eine Akte haben – sonst
+ * fangen wir bei jedem bestehenden Streamer bei null an. Der Ordner ist von
+ * Anfang an da, Vermerke lassen sich pflegen, und wenn später doch eine
+ * Audition kommt, hängt sie sich einfach an.
+ *
+ * Gibt es den Ordner schon, wird NICHTS überschrieben – nur ergänzt, was
+ * bisher leer war. Das Skript darf also jederzeit erneut laufen.
+ */
+function ordnerAnlegen({ bigoId, name, alter, art, notiz, herkunft, status }) {
+  const id = String(bigoId || '').trim();
+  const schluessel = ordnerSchluessel(id);
+  if (!schluessel) return { angelegt: false, grund: 'keine-bigo-id' };
+  const jetzt = new Date().toISOString();
+
+  const vorhanden = streamers.find((s) => ordnerSchluessel(s.bigoId) === schluessel);
+  if (vorhanden) {
+    // Nur Lücken füllen. Was das Team hier gepflegt hat, bleibt unangetastet.
+    let geaendert = false;
+    if (!vorhanden.name && name) { vorhanden.name = String(name).slice(0, 120); geaendert = true; }
+    if (!vorhanden.alter && alter) { vorhanden.alter = String(alter).slice(0, 10); geaendert = true; }
+    if (geaendert) save('streamers.json', streamers);
+    return { angelegt: false, ergaenzt: geaendert, ordner: vorhanden };
+  }
+
+  const ordner = {
+    id: crypto.randomUUID(), bigoId: id,
+    name: String(name || '').slice(0, 120),
+    alter: String(alter || '').slice(0, 10),
+    status: ['neu', 'aktiv', 'pausiert', 'abgelehnt', 'raus'].includes(status) ? status : 'aktiv',
+    notiz: String(notiz || '').slice(0, 500),
+    art: art === 'familie' ? 'familie' : 'streamer',
+    // Woher kommt dieser Ordner? Ein übernommener sieht anders aus als einer,
+    // der aus einer Audition entstanden ist – das soll man sehen.
+    herkunft: String(herkunft || 'uebernommen').slice(0, 40),
+    angelegtAm: jetzt, letzteAktivitaet: jetzt,
+    auditions: [], eintraege: [],
+  };
+  streamers.push(ordner);
+  save('streamers.json', streamers);
+  return { angelegt: true, ordner };
+}
+
+/**
  * Eine fertige Audition in den Ordner des Streamers legen. Gibt es noch keinen
  * Ordner, wird er angelegt. Kommt dieselbe Audition ein zweites Mal (etwa beim
  * Nachschicken), wird der vorhandene Eintrag aktualisiert statt verdoppelt.
@@ -689,7 +734,7 @@ module.exports = {
   setAgentPassword, changeOwnPassword, lockAgent, unlockAgent, deleteAgent, agentCount,
   addPasskey, getAgentByPasskeyId, setPasskeyCounter, agentPasskeys,
   createCode, getCode, isCodeUsable, consumeCode, revokeCode, listCodes,
-  suchePerson,
+  suchePerson, ordnerAnlegen,
   saveCase, listCases, getCase, deleteCase, readDoc, purgeOlderThan,
   saveRecording, listRecordings, getRecording, readRecording, reviewRecording, deleteRecording,
   setCaseMcp, getRecordingByCode,
