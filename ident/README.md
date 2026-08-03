@@ -151,9 +151,12 @@ Umgebungsvariablen, siehe `.env.example`. Pflicht sind `STORAGE_KEY` und
 **Neue Fassung einspielen** (auf einem Server mit Docker und nginx):
 
 ```bash
-ssh <server> '/opt/4ever1-ident/src/ident/deploy.sh'          # Zweig main
-ssh <server> 'ZWEIG=<zweig> /opt/4ever1-ident/src/ident/deploy.sh'
+ssh <server> '/opt/4ever1-ident/src/ident/deploy.sh'                 # Zweig main
+ssh <server> '/opt/4ever1-ident/src/ident/deploy.sh claude/mein-zweig'
 ```
+
+Der ganze Pfad heisst `4ever1-ident` (mit Bindestrich), nicht `4ever1/ident`.
+`ZWEIG=<zweig> …` geht weiterhin, der Zweig hinten dran ist nur bequemer.
 
 Das Skript holt den Quellcode, baut das Abbild, tauscht den Container und
 prüft, ob er antwortet – sonst stellt es die vorige Fassung wieder her. Daten

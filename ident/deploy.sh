@@ -2,10 +2,16 @@
 # ---------------------------------------------------------------------------
 # deploy.sh – neue Fassung von ident auf den 4ever1-Server bringen.
 #
-# Wird AUF DEM SERVER ausgeführt. Vom Mac aus:
+# Wird AUF DEM SERVER ausgeführt. Vom Mac aus – der ganze Befehl, so wie er
+# ist, der Zweig steht einfach dahinter:
+#
+#     ssh team4ever1 '/opt/4ever1-ident/src/ident/deploy.sh main'
+#     ssh team4ever1 '/opt/4ever1-ident/src/ident/deploy.sh claude/mein-zweig'
+#
+# Ohne Angabe wird "main" aufgespielt. Wenn das Repo noch nicht auf dem Server
+# liegt, geht es auch vom Mac aus durch die Leitung:
+#
 #     ssh team4ever1 'bash -s' < ident/deploy.sh
-# oder, wenn das Repo schon auf dem Server liegt:
-#     ssh team4ever1 '/opt/4ever1-ident/src/ident/deploy.sh'
 #
 # Was passiert:
 #   1. Quellcode holen (beim ersten Mal klonen, danach nur aktualisieren)
@@ -19,7 +25,16 @@
 set -euo pipefail
 
 REPO="${REPO:-https://github.com/kommaufdenpunkt/Spiel.git}"
-ZWEIG="${ZWEIG:-main}"
+# Der Zweig darf einfach hinten dranstehen – das ist die Schreibweise, die man
+# sich merkt. ZWEIG=... geht weiterhin, damit alte Notizen nicht falsch werden.
+ZWEIG="${1:-${ZWEIG:-main}}"
+case "$ZWEIG" in
+  -h|--hilfe|--help)
+    echo "So wird aufgespielt:"
+    echo "  $0 [zweig]        z. B. $0 main   oder   $0 claude/mein-zweig"
+    echo "Ohne Angabe: main."
+    exit 0 ;;
+esac
 BASIS="${BASIS:-/opt/4ever1-ident}"
 QUELLE="$BASIS/src"
 DATEN="$BASIS/data"
