@@ -616,6 +616,23 @@ async function handleApi(req, res, urlPath, ip) {
     return true;
   }
 
+  // ---- Altersverifikation ohne Audition ----
+  // Kurzer Weg für Leute, die schon dabei sind: Ausweis ansehen, mit dem
+  // Gesicht vergleichen, abhaken. Bleibt dauerhaft in der Akte.
+  if (urlPath === '/api/streamer-verifizieren' && req.method === 'POST') {
+    if (!authed(req, ip)) { sendJson(res, 401, { reason: 'auth' }); return true; }
+    let body; try { body = await readJson(req, 32 * 1024); } catch { body = {}; }
+    const s = store.getStreamer(body.id);
+    if (!s) { sendJson(res, 404, { reason: 'nicht-gefunden' }); return true; }
+    if (body.ergebnis === 'bestanden' && (!body.ausweisart || !body.grundlage)) {
+      sendJson(res, 400, { reason: 'angaben-fehlen' }); return true;
+    }
+    const rec = store.verifikationEintragen(s.id, { ...body, geprueftVon: reqName(req, ip) || 'Prüfer' });
+    sec.recordEvent('audit', ip, 'Verifikation ' + rec.ergebnis + ' (' + rec.geprueftVon + '): ' + s.bigoId);
+    sendJson(res, 200, { verifikation: rec, ordner: store.getStreamer(s.id) });
+    return true;
+  }
+
   // ---- Kennen wir die Person schon? ----
   // Wird beim Eintippen der Ausweisdaten gefragt. Der Prüfer soll wissen,
   // ob die Audition an einen bestehenden Ordner angehängt wird oder ob ein

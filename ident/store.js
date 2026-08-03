@@ -322,6 +322,8 @@ function listStreamersKurz() {
     angelegtAm: s.angelegtAm, letzteAktivitaet: s.letzteAktivitaet,
     anzahlAuditions: (s.auditions || []).length,
     anzahlVermerke: (s.eintraege || []).length,
+    // Der blaue Haken ist kein Geheimnis - er sagt nur, DASS geprüft wurde.
+    verifiziert: s.verifiziert || null,
     verschlossen: true,
   }));
 }
@@ -514,6 +516,50 @@ function ablegen(paket) {
   save('streamers.json', streamers);
   return ordner;
 }
+/**
+ * Altersverifikation eintragen – ohne Audition.
+ *
+ * Für alle, die längst dabei sind: kein Gespräch, kein Teleprompter. Der
+ * Prüfer sieht den Ausweis (live oder im Video), vergleicht ihn mit dem
+ * Gesicht, hakt ab – fertig. Das Ergebnis bleibt dauerhaft in der Akte, mit
+ * Datum, Prüfer und Grundlage. Wer bestanden hat, trägt den blauen Haken.
+ *
+ * Eine erneute Verifikation überschreibt die alte nicht: beide bleiben stehen,
+ * damit man später nachvollziehen kann, was wann geprüft wurde.
+ */
+function verifikationEintragen(id, { geprueftVon, nameLautAusweis, ausweisart, ausweisnummer,
+                                     geburtsdatum, ergebnis, notiz, grundlage }) {
+  const s = getStreamer(id); if (!s) return null;
+  if (!Array.isArray(s.verifikationen)) s.verifikationen = [];
+  const jetzt = new Date().toISOString();
+  const rec = {
+    id: crypto.randomUUID(),
+    ergebnis: ergebnis === 'bestanden' ? 'bestanden' : 'abgelehnt',
+    geprueftVon: String(geprueftVon || 'Unbekannt').slice(0, 60),
+    nameLautAusweis: String(nameLautAusweis || '').slice(0, 120),
+    ausweisart: String(ausweisart || '').slice(0, 40),
+    ausweisnummer: String(ausweisnummer || '').slice(0, 60),
+    geburtsdatum: String(geburtsdatum || '').slice(0, 20),
+    // Woran wurde geprüft: im Videogespräch, im Original vor Ort, aus der Akte
+    grundlage: String(grundlage || '').slice(0, 80),
+    notiz: String(notiz || '').slice(0, 500),
+    am: jetzt,
+  };
+  s.verifikationen.unshift(rec);
+  if (s.verifikationen.length > 50) s.verifikationen.length = 50;
+  // Der blaue Haken hängt an der jüngsten bestandenen Prüfung.
+  if (rec.ergebnis === 'bestanden') {
+    s.verifiziert = { am: jetzt, von: rec.geprueftVon, grundlage: rec.grundlage };
+    if (!s.name && rec.nameLautAusweis) s.name = rec.nameLautAusweis;
+  } else {
+    // Abgelehnt hebt einen früheren Haken auf – sonst stimmt die Anzeige nicht.
+    s.verifiziert = null;
+  }
+  s.letzteAktivitaet = jetzt;
+  save('streamers.json', streamers);
+  return rec;
+}
+
 // ---- Vermerke im Streamer-Ordner ------------------------------------------
 // Alles, was im Laufe der Zeit dazukommt: Anrufe, Absprachen, Auffälligkeiten.
 function streamerEintraege(s) { if (!Array.isArray(s.eintraege)) s.eintraege = []; return s.eintraege; }
@@ -774,7 +820,7 @@ module.exports = {
   setAgentPassword, changeOwnPassword, lockAgent, unlockAgent, deleteAgent, agentCount,
   addPasskey, getAgentByPasskeyId, setPasskeyCounter, agentPasskeys,
   createCode, getCode, isCodeUsable, consumeCode, revokeCode, listCodes,
-  suchePerson, ordnerAnlegen, listStreamersKurz, protokolliereZugriff,
+  suchePerson, ordnerAnlegen, listStreamersKurz, protokolliereZugriff, verifikationEintragen,
   saveCase, listCases, getCase, deleteCase, readDoc, purgeOlderThan,
   saveRecording, listRecordings, getRecording, readRecording, reviewRecording, deleteRecording,
   setCaseMcp, getRecordingByCode,

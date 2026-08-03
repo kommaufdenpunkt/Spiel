@@ -80,6 +80,45 @@ geändert, steht in der alten Akte weiterhin, was an dem Tag galt.
   Textaufbereitung vor dem Speichern. Schreiben darf jeder Prüfer, ändern nur
   Admins, löschen nur über `acp.`
 
+## Der blaue Haken (Altersverifikation ohne Audition)
+
+Wer längst dabei ist, muss kein Gespräch nachholen. Der Prüfer öffnet die
+Akte, tippt auf **„🪪 Jetzt verifizieren"** und trägt ein, was er gesehen hat:
+Name laut Ausweis, Ausweisart, Nummer, Geburtsdatum – dazu die **Grundlage**
+(im Videogespräch gesehen · Original vor Ort · aus der Audition-Akte
+übernommen · Ausweisbild in der Akte geprüft) und eine Erklärung, die er
+abhaken muss:
+
+> Ich habe den Ausweis gesehen, das Gesicht stimmt überein und das
+> Geburtsdatum belegt mindestens 18 Jahre.
+
+Ohne Ausweisart und Grundlage nimmt **der Server** es nicht an – das ist keine
+Höflichkeitsabfrage im Browser. Wer bestanden hat, trägt danach den blauen
+Haken ✓ auf der Ordner-Karte und ganz oben in der Akte, mit Datum, Prüfer und
+Grundlage im Tooltip.
+
+- **Nichts wird überschrieben:** jede Prüfung bleibt im Verlauf stehen, auch
+  die abgelehnten. Man kann später nachlesen, was wann geprüft wurde.
+- **Abgelehnt hebt den Haken auf** – ein abgelaufener Ausweis darf nicht
+  weiter als „geprüft" dastehen.
+- **Filter „ohne ✓"** in der Ordner-Übersicht zeigt, wer noch fehlt.
+- Die **Suche** findet „verifiziert" / „nicht verifiziert", den prüfenden
+  Namen und die Ausweisnummer aus der Verifikation.
+- Der Haken selbst ist kein Geheimnis: er sagt nur, **dass** geprüft wurde.
+  Die Ausweisdaten dahinter liegen hinter der Grundangabe wie alles andere in
+  der Akte.
+
+## Am Handy
+
+`mcp.` ist zum Abarbeiten unterwegs gebaut, nicht bloß verkleinert:
+
+- Das Menü sitzt als **Leiste am unteren Rand**, wo der Daumen liegt – Zeichen
+  oben, Kurzname darunter, immer sichtbar. Passt nicht alles hinein, schiebt
+  man die Leiste seitlich.
+- Kein Kasten wird breiter als das Gerät. Feste Mindestbreiten sind aufgehoben,
+  damit der Browser die Seite nicht herauszoomt und die Schrift unlesbar wird.
+- Alles Antippbare ist mindestens 44 px hoch.
+
 ## Adminbereich (`acp.`)
 
 Kantenmenü links nach Aufgaben gruppiert, Arbeitsfläche in der Mitte, rechts

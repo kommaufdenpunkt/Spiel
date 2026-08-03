@@ -33,6 +33,19 @@
   function sysMsg(text) { const d = document.createElement('div'); d.className = 'msg sys'; d.textContent = text; chatLog.appendChild(d); chatLog.scrollTop = chatLog.scrollHeight; }
   function esc(s) { return String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
   const pad = (n) => String(n).padStart(2, '0');
+  /**
+   * Beschriftung eines Menüknopfs ändern, ohne ihn zu zerlegen.
+   * Jeder Knopf im Menü besteht aus drei Teilen: Zeichen, langer Name, kurzer
+   * Name. Am Rechner steht der lange da, auf dem Handy in der unteren Leiste
+   * der kurze. Wer einfach textContent setzt, wirft alle drei weg – dann ist
+   * das Zeichen fort und die Leiste sieht kaputt aus.
+   */
+  function setzeBeschriftung(el, lang, kurz) {
+    if (!el) return;
+    const l = el.querySelector('.lb'); const k = el.querySelector('.kz');
+    if (l) l.textContent = lang; else el.textContent = lang;
+    if (k) k.textContent = kurz || lang;
+  }
 
   // ---- API ----
   async function api(method, path, body) {
@@ -398,7 +411,7 @@
     const zurueck = $('blockeZurueck');
     if (zurueck) {
       zurueck.style.display = zu.length ? '' : 'none';
-      zurueck.textContent = '↩︎ Ausgeblendetes zeigen (' + zu.length + ')';
+      setzeBeschriftung(zurueck, 'Ausgeblendetes zeigen (' + zu.length + ')', 'Zeigen (' + zu.length + ')');
     }
   }
   document.querySelectorAll('.block-zu').forEach((k) => {
@@ -593,6 +606,14 @@
     pruef('Status', STATUSWORT[s.status] || s.status);
     if ((s.art || 'streamer') === 'familie') pruef('Art', 'Familie');
     if (s.herkunft === 'pkboard') pruef('Herkunft', 'aus dem PK-Board übernommen');
+    pruef('Verifikation', s.verifiziert
+      ? 'verifiziert – Alter und Ausweis geprüft von ' + s.verifiziert.von
+      : 'nicht verifiziert – Alter noch nicht geprüft');
+    (s.verifikationen || []).forEach((v) => {
+      pruef('Verifikation von', v.geprueftVon);
+      pruef('Verifikation Ausweis', v.ausweisnummer);
+      pruef('Verifikation Notiz', v.notiz);
+    });
     (s.eintraege || []).forEach((e) => {
       pruef('Vermerk', e.text);
       pruef('Vermerk von', e.author);
@@ -705,15 +726,94 @@
     return box;
   }
 
+  // ---- Altersverifikation: der blaue Haken ---------------------------------
+  // Kein Gespraech, kein Teleprompter. Ausweis ansehen, mit dem Gesicht
+  // vergleichen, abhaken - fertig. Bleibt dauerhaft in der Akte stehen.
+  const GRUNDLAGEN = ['im Videogespräch gesehen', 'Original vor Ort gesehen',
+    'aus der Audition-Akte übernommen', 'Ausweisbild in der Akte geprüft'];
+  function verifikationBlock(s) {
+    const box = document.createElement('div');
+    box.className = 'verif' + (s.verifiziert ? ' hat' : '');
+    const liste = (s.verifikationen || []).slice(0, 8);
+    box.innerHTML = '<div class="verif-kopf">'
+      + (s.verifiziert
+          ? '<span class="haken gross">✓</span><div><b>Verifiziert</b>'
+            + '<span class="muted">Alter und Ausweis geprüft am '
+            + esc(new Date(s.verifiziert.am).toLocaleDateString('de-DE'))
+            + ' von ' + esc(s.verifiziert.von)
+            + (s.verifiziert.grundlage ? ' · ' + esc(s.verifiziert.grundlage) : '') + '</span></div>'
+          : '<span class="haken leer">–</span><div><b>Noch nicht verifiziert</b>'
+            + '<span class="muted">Alter und Ausweis sind nicht geprüft. Keine Audition nötig – '
+            + 'Ausweis ansehen, vergleichen, eintragen.</span></div>')
+      + '<button class="primary" data-verif>' + (s.verifiziert ? '↺ Erneut prüfen' : '🪪 Jetzt verifizieren') + '</button></div>'
+      + (liste.length ? '<details class="verif-verlauf"><summary>Verlauf (' + (s.verifikationen || []).length + ')</summary>'
+          + liste.map((v) => '<div class="vf">'
+            + (v.ergebnis === 'bestanden' ? '<span class="vf-ok">✓ bestanden</span>' : '<span class="vf-no">✖ abgelehnt</span>')
+            + '<span class="vf-zeit">' + esc(new Date(v.am).toLocaleString('de-DE')) + '</span>'
+            + '<div class="vf-meta">' + esc(v.geprueftVon)
+            + (v.grundlage ? ' · ' + esc(v.grundlage) : '')
+            + (v.ausweisart ? ' · ' + esc(v.ausweisart) : '')
+            + (v.ausweisnummer ? ' Nr. ' + esc(v.ausweisnummer) : '')
+            + (v.notiz ? '<br>' + esc(v.notiz) : '') + '</div></div>').join('')
+          + '</details>' : '');
+    const b = box.querySelector('[data-verif]');
+    if (b) b.addEventListener('click', () => verifFormular(s, box));
+    return box;
+  }
+  function verifFormular(s, box) {
+    if (box.querySelector('.verif-form')) return;
+    const f = document.createElement('div');
+    f.className = 'verif-form';
+    f.innerHTML = '<div class="vfz"><input id="vfName" placeholder="Name laut Ausweis" value="' + esc(s.name || '') + '">'
+      + '<input id="vfGeb" placeholder="Geburtsdatum (TT.MM.JJJJ)"></div>'
+      + '<div class="vfz"><select id="vfArt"><option value="">Ausweisart …</option>'
+      + ['Personalausweis', 'Reisepass', 'Aufenthaltstitel', 'Führerschein'].map((a) => '<option>' + a + '</option>').join('')
+      + '</select><input id="vfNr" placeholder="Ausweis-Nummer"></div>'
+      + '<select id="vfGrundlage"><option value="">Woran hast du geprüft? …</option>'
+      + GRUNDLAGEN.map((g) => '<option>' + esc(g) + '</option>').join('') + '</select>'
+      + '<label class="vf-erkl"><input type="checkbox" id="vfHaken"> Ich habe den Ausweis gesehen, '
+      + 'das <b>Gesicht stimmt überein</b> und das <b>Geburtsdatum belegt mindestens 18 Jahre</b>. '
+      + 'Der Ausweis wirkte echt und unverändert.</label>'
+      + '<input id="vfNotiz" placeholder="Notiz (optional)">'
+      + '<div class="vf-akt"><button id="vfOk" class="good">✓ Verifikation bestätigen</button>'
+      + '<button id="vfNein" class="danger">✖ Nicht bestanden</button>'
+      + '<button id="vfAb">Abbrechen</button></div><div class="err" id="vfErr"></div>';
+    box.appendChild(f);
+    const w = (id) => (f.querySelector('#' + id) ? f.querySelector('#' + id).value.trim() : '');
+    const senden = async (ergebnis) => {
+      if (ergebnis === 'bestanden') {
+        if (!w('vfArt')) { f.querySelector('#vfErr').textContent = 'Bitte die Ausweisart angeben.'; return; }
+        if (!w('vfGrundlage')) { f.querySelector('#vfErr').textContent = 'Bitte angeben, woran du geprüft hast.'; return; }
+        if (!f.querySelector('#vfHaken').checked) {
+          f.querySelector('#vfErr').textContent = 'Bitte die Erklärung bestätigen – sie ist der Kern der Prüfung.'; return;
+        }
+      }
+      const r = await api('POST', '/api/streamer-verifizieren', {
+        id: s.id, ergebnis, nameLautAusweis: w('vfName'), geburtsdatum: w('vfGeb'),
+        ausweisart: w('vfArt'), ausweisnummer: w('vfNr'), grundlage: w('vfGrundlage'), notiz: w('vfNotiz'),
+      });
+      if (r.status !== 200) { f.querySelector('#vfErr').textContent = 'Konnte nicht gespeichert werden.'; return; }
+      const i = (state.ordner || []).findIndex((x) => x.id === s.id);
+      if (i >= 0) state.ordner[i] = r.body.ordner;
+      toast(ergebnis === 'bestanden' ? 'Verifiziert ✓ – blauer Haken gesetzt.' : 'Als nicht bestanden festgehalten.');
+      zeichneOrdner();
+    };
+    f.querySelector('#vfOk').addEventListener('click', () => senden('bestanden'));
+    f.querySelector('#vfNein').addEventListener('click', () => senden('abgelehnt'));
+    f.querySelector('#vfAb').addEventListener('click', () => f.remove());
+  }
+
   function zeichneOrdner() {
     const host = $('ordnerInhalt'); if (!host) return;
     if (state.offenerOrdner) { zeichneEinenOrdner(state.offenerOrdner); return; }
     const q = ($('ordnerSuche').value || '').trim().toLowerCase();
     const f = state.artFilter || 'alle';
     const liste = (state.ordner || [])
-      .filter((s) => f === 'alle' || (f === 'still'
-        ? (['aktiv', 'neu'].includes(s.status) && stilleTage(s) >= STILL_AB)
-        : (s.art || 'streamer') === f))
+      .filter((s) => f === 'alle'
+        ? true
+        : f === 'still' ? (['aktiv', 'neu'].includes(s.status) && stilleTage(s) >= STILL_AB)
+        : f === 'unverifiziert' ? !s.verifiziert
+        : (s.art || 'streamer') === f)
       .map((s) => ({ s, treffer: q ? trefferIn(s, q) : [] }))
       .filter((x) => !q || x.treffer.length)
       .map((x) => { x.s._treffer = x.treffer; return x.s; });
@@ -730,7 +830,10 @@
       const fam = (s.art || 'streamer') === 'familie';
       const d = document.createElement('div'); d.className = 'ord-card' + (fam ? ' familie' : '');
       const n = (s.auditions || []).length;
-      d.innerHTML = '<div class="oid">' + esc(s.bigoId) + (fam ? ' <span class="fam-pill">Familie</span>' : '') + '</div>'
+      d.innerHTML = '<div class="oid">' + esc(s.bigoId) + (fam ? ' <span class="fam-pill">Familie</span>' : '')
+        + (s.verifiziert ? ' <span class="haken" title="Alter und Ausweis geprüft am '
+            + esc(new Date(s.verifiziert.am).toLocaleDateString('de-DE')) + ' von ' + esc(s.verifiziert.von) + '">✓</span>' : '')
+        + '</div>'
         + '<div class="onm">' + esc(s.name || 'Name unbekannt') + (s.alter ? ' · ' + esc(s.alter) + ' J.' : '') + '</div>'
         + '<div class="orow">' + ordPill(s.status)
         + (n === 0 && s.herkunft === 'pkboard'
@@ -871,6 +974,7 @@
     host.appendChild(kopf);
 
     host.appendChild(vermerkeBlock(s));
+    host.appendChild(verifikationBlock(s));
     host.appendChild(zugriffeBlock(s));
 
     (s.auditions || []).forEach((a) => {
@@ -1081,7 +1185,11 @@
     $('statWaiting').textContent = queue.length;
     $('statRunning').textContent = running.length;
     $('takeNextBtn').disabled = queue.length === 0;
-    $('takeNextBtn').textContent = queue.length ? '▶ Nächsten annehmen (' + queue.length + ')' : '▶ Niemand wartet';
+    // Nur die Beschriftung austauschen, nicht den ganzen Knopf: das Zeichen und
+    // der Kurzname für die Handy-Leiste sollen stehen bleiben.
+    setzeBeschriftung($('takeNextBtn'),
+      queue.length ? 'Nächsten annehmen (' + queue.length + ')' : 'Niemand wartet',
+      queue.length ? 'Nächster (' + queue.length + ')' : 'Niemand');
 
     // --- Warteschlange (Mitte) ---
     const el = $('waitingList'); el.innerHTML = '';
