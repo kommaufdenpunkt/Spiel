@@ -1,0 +1,15 @@
+# Startet das Backup täglich um 03:30 Uhr.
+# Nach /etc/systemd/system/ginoco-backup.timer kopieren, dann aktivieren:
+#   systemctl daemon-reload
+#   systemctl enable --now ginoco-backup.timer
+# Prüfen:  systemctl list-timers ginoco-backup
+
+[Unit]
+Description=Ginoco – tägliches Datenbank-Backup
+
+[Timer]
+OnCalendar=*-*-* 03:30:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

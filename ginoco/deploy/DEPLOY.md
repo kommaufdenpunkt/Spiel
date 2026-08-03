@@ -178,14 +178,39 @@ Deine Daten (fahrschule.db) bleiben dabei erhalten — sie liegen getrennt vom C
 ## Backups (wichtig!)
 
 Deine ganze Fahrschule steckt in **einer Datei**: `fahrschule.db`.
-Sichere sie regelmäßig auf deinen Mac (auf dem Mac ausführen):
+
+### Automatisches tägliches Backup (empfohlen)
+
+Auf dem Server einmalig einrichten (Pfade ggf. an deine Installation anpassen):
 
 ```bash
-scp ginoco@DEINE-IP:/home/ginoco/app/Spiel/ginoco/fahrschule.db ~/ginoco-backup-$(date +%F).db
+# Unit-Dateien kopieren (aus dem Projektordner)
+sudo cp deploy/ginoco-backup.service /etc/systemd/system/
+sudo cp deploy/ginoco-backup.timer   /etc/systemd/system/
+# WorkingDirectory in der .service ggf. anpassen (dort, wo git pull läuft)
+sudo systemctl daemon-reload
+sudo systemctl enable --now ginoco-backup.timer
 ```
 
-Tipp: das einmal pro Woche machen — oder ich richte dir ein automatisches
-tägliches Backup auf dem Server ein, sag einfach Bescheid.
+Das legt jede Nacht um 03:30 einen **konsistenten Snapshot** unter
+`fahrschule.db`-Ordner → `backups/` an (die letzten 14 Tage werden behalten,
+ältere automatisch gelöscht). Sofort testen:
+
+```bash
+sudo systemctl start ginoco-backup.service   # jetzt ein Backup ziehen
+systemctl list-timers ginoco-backup          # nächsten Lauf sehen
+ls -la backups/                              # die Backups anschauen
+```
+
+Der Snapshot ist sicher, auch während die App läuft (SQLite `VACUUM INTO`).
+
+### Zusätzlich: Kopie auf deinen Mac (Off-Server-Backup)
+
+Damit ein Backup auch außerhalb des Servers liegt (auf dem Mac ausführen):
+
+```bash
+scp ginoco@DEINE-IP:/home/ginoco/spiel/ginoco/backups/*.db ~/ginoco-backups/
+```
 
 ---
 
