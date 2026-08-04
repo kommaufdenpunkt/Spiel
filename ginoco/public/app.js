@@ -405,8 +405,13 @@ function openTour() {
 window.__openTour = openTour;
 
 // ---------- Was ist neu? (Changelog) ----------
-const CHANGELOG_VER = '3.47';
+const CHANGELOG_VER = '3.48';
 const CHANGELOG = [
+  { v: '3.48', d: '26.07.2026', title: 'Karte aufgewertet & runder Look', items: [
+    '🗺️ Live-Karte zeigt jetzt die echte Fahrzeit über die Straße (statt grober Schätzung).',
+    '🎯 „Zentrieren“-Knopf – schaust du auf der Karte herum, bleibt die Ansicht stehen, bis du zurücktippst.',
+    '🎉 Klarer Hinweis „Dein Fahrlehrer ist da!“, wenn er ganz nah ist.',
+    '🛞 Drehender Reifen als Lade-Symbol, wenn der Server kurz braucht – plus runderer, weicherer Look.'] },
   { v: '3.47', d: '26.07.2026', title: 'Privatmodus', items: [
     '🔒 Ginoco läuft jetzt im Privatmodus: neue Anmeldungen sind geschlossen – nur du (und bestehende Zugänge) nutzen die App.',
     '⚙️ Jederzeit umschaltbar unter Einstellungen → „Privatmodus & Registrierung“, falls du später Fahrschüler einladen willst.'] },
@@ -477,16 +482,40 @@ function openWhatsNew() {
 window.__openWhatsNew = openWhatsNew;
 
 // ---------- API ----------
+// Reifen-Ladeanzeige: erscheint nur, wenn der Server kurz braucht (> 400 ms).
+let _apiInflight = 0, _apiTimer = null;
+function _ensureLoader() {
+  let el = document.getElementById('app-loader');
+  if (!el) {
+    el = document.createElement('div'); el.id = 'app-loader';
+    el.innerHTML = '<span class="tire" aria-hidden="true">🛞</span><span class="al-tx">Einen Moment …</span>';
+    el.setAttribute('role', 'status'); el.setAttribute('aria-label', 'Lädt');
+    document.body.appendChild(el);
+  }
+  return el;
+}
+function _apiLoading(on) {
+  if (on) {
+    _apiInflight++;
+    if (_apiInflight === 1 && !_apiTimer) _apiTimer = setTimeout(() => { _ensureLoader().classList.add('show'); }, 400);
+  } else {
+    _apiInflight = Math.max(0, _apiInflight - 1);
+    if (_apiInflight === 0) { clearTimeout(_apiTimer); _apiTimer = null; document.getElementById('app-loader')?.classList.remove('show'); }
+  }
+}
 async function api(path, opts = {}) {
-  const res = await fetch(path, {
-    method: opts.method || 'GET',
-    headers: opts.body ? { 'Content-Type': 'application/json' } : {},
-    body: opts.body ? JSON.stringify(opts.body) : undefined,
-  });
-  let data = {};
-  try { data = await res.json(); } catch {}
-  if (!res.ok) throw new Error(data.error || 'Fehler');
-  return data;
+  _apiLoading(true);
+  try {
+    const res = await fetch(path, {
+      method: opts.method || 'GET',
+      headers: opts.body ? { 'Content-Type': 'application/json' } : {},
+      body: opts.body ? JSON.stringify(opts.body) : undefined,
+    });
+    let data = {};
+    try { data = await res.json(); } catch {}
+    if (!res.ok) throw new Error(data.error || 'Fehler');
+    return data;
+  } finally { _apiLoading(false); }
 }
 
 // ---------- Datum (durchgehend LOKALE Zeit, nie toISOString -> sonst TZ-Versatz) ----------
@@ -1230,30 +1259,62 @@ function ensureLeaflet() {
   });
   return _leafletPromise;
 }
-const _liveMaps = {}; // id -> { map, car, meet, route, routeKey, fitted }
+const _liveMaps = {}; // id -> Karten-Objekt (map, marker, route, zustand)
 function _carIcon() { return L.divIcon({ className: 'lm-car', html: '🚗', iconSize: [36, 36], iconAnchor: [18, 18] }); }
 function _meetIcon() { return L.divIcon({ className: 'lm-pin', html: '📍', iconSize: [30, 34], iconAnchor: [15, 30] }); }
 function _youIcon() { return L.divIcon({ className: 'lm-you', html: '🧍', iconSize: [30, 34], iconAnchor: [15, 30] }); }
+// Ansicht so einstellen, dass beide Punkte sichtbar sind (programmatisch, ohne „userMoved" zu setzen)
+function _fitLive(m) {
+  if (!m || !m.pts) return;
+  m._prog = true;
+  if (m.pts.length > 1) m.map.fitBounds(m.pts, { padding: [42, 42], maxZoom: 16, animate: m.fitted });
+  else m.map.setView(m.pts[0], 15);
+  m.map.once('moveend', () => { m._prog = false; });
+}
 async function initLiveMap(id) {
   await ensureLeaflet();
   const el = document.getElementById(id);
   if (!el || !window.L) return null;
   destroyLiveMap(id);
   const map = L.map(el, { zoomControl: true, attributionControl: true, scrollWheelZoom: false });
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+  const tl = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
     { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(map);
-  _liveMaps[id] = { map, car: null, meet: null, route: null, routeKey: '', fitted: false };
+  const m = { map, tl, car: null, meet: null, route: null, routeKey: '', fitted: false,
+    userMoved: false, _prog: false, pts: null, routeInfo: null, onRoute: null };
+  _liveMaps[id] = m;
+  // Schaut der Nutzer selbst herum, wird die Ansicht nicht mehr automatisch verschoben.
+  map.on('dragstart', () => { m.userMoved = true; });
+  map.on('zoomstart', () => { if (!m._prog) m.userMoved = true; });
+  // „Zentrieren"-Knopf – holt die Ansicht auf beide Punkte zurück.
+  const Rc = L.Control.extend({ options: { position: 'topright' }, onAdd() {
+    const b = L.DomUtil.create('button', 'lm-recenter');
+    b.type = 'button'; b.title = 'Ansicht zentrieren'; b.setAttribute('aria-label', 'Ansicht zentrieren'); b.textContent = '◎';
+    L.DomEvent.disableClickPropagation(b);
+    L.DomEvent.on(b, 'click', () => { m.userMoved = false; _fitLive(m); });
+    return b;
+  } });
+  map.addControl(new Rc());
+  const dropLoader = () => { const l = el.querySelector('.lm-loading'); if (l) l.remove(); };
+  // Falls die Kacheln nicht laden (kein Internet): kurzer Hinweis.
+  let okT = 0, errT = 0;
+  tl.on('tileload', () => { okT++; dropLoader(); });
+  tl.on('tileerror', () => { errT++; if (okT === 0 && errT >= 3 && !m._hinted) {
+    m._hinted = true; dropLoader(); const h = L.DomUtil.create('div', 'lm-hint', el);
+    h.textContent = '🛰️ Karte lädt gerade nicht – Internetverbindung?'; } });
+  setTimeout(dropLoader, 4000); // Notausstieg, damit der Reifen nicht ewig dreht
   setTimeout(() => { try { map.invalidateSize(); } catch {} }, 60);
-  return _liveMaps[id];
+  return m;
 }
 function destroyLiveMap(id) {
   const m = _liveMaps[id];
   if (m) { try { m.map.remove(); } catch {} delete _liveMaps[id]; }
 }
 // aPos/bPos = [lat,lng]. aIcon = Icon für den beweglichen Punkt (Auto oder Schüler).
-async function updateLiveMap(id, aPos, aIcon, bPos, bLabel, bIcon) {
+// onRoute(info|null) wird aufgerufen, sobald die echte Straßen-Route (Entfernung+Fahrzeit) da ist.
+async function updateLiveMap(id, aPos, aIcon, bPos, bLabel, bIcon, onRoute) {
   const m = _liveMaps[id];
   if (!m || !window.L) return;
+  m.onRoute = onRoute || null;
   if (!m.car) m.car = L.marker(aPos, { icon: aIcon }).addTo(m.map);
   else m.car.setLatLng(aPos);
   const pts = [aPos];
@@ -1264,9 +1325,8 @@ async function updateLiveMap(id, aPos, aIcon, bPos, bLabel, bIcon) {
     const key = aPos.map((x) => x.toFixed(3)).join(',') + '|' + bPos.map((x) => x.toFixed(4)).join(',');
     if (key !== m.routeKey) { m.routeKey = key; _drawRoute(id, aPos, bPos); }
   }
-  if (pts.length > 1) m.map.fitBounds(pts, { padding: [42, 42], maxZoom: 16, animate: m.fitted });
-  else if (!m.fitted) m.map.setView(aPos, 15);
-  else m.map.panTo(aPos, { animate: true });
+  m.pts = pts;
+  if (!m.userMoved) _fitLive(m); // nur solange der Nutzer nicht selbst herumschiebt
   m.fitted = true;
 }
 async function _drawRoute(id, a, b) {
@@ -1275,26 +1335,31 @@ async function _drawRoute(id, a, b) {
     if (!_liveMaps[id]) return;
     if (m.route) m.map.removeLayer(m.route);
     m.route = L.polyline([a, b], { color: '#4d8dff', weight: 4, dashArray: '6,8', opacity: .7 }).addTo(m.map);
+    m.routeInfo = null; if (m.onRoute) m.onRoute(null);
   };
   try {
     const url = `https://router.project-osrm.org/route/v1/driving/${a[1]},${a[0]};${b[1]},${b[0]}?overview=full&geometries=geojson`;
     const r = await fetch(url); const j = await r.json();
-    const co = j.routes && j.routes[0] && j.routes[0].geometry && j.routes[0].geometry.coordinates;
+    const rt = j.routes && j.routes[0];
+    const co = rt && rt.geometry && rt.geometry.coordinates;
     if (co && _liveMaps[id]) {
       const ll = co.map((c) => [c[1], c[0]]);
       if (m.route) m.map.removeLayer(m.route);
       m.route = L.polyline(ll, { color: '#4d8dff', weight: 5, opacity: .85 }).addTo(m.map);
+      // Echte Straßen-Werte: Entfernung (km) + Fahrzeit (Min)
+      m.routeInfo = { km: rt.distance / 1000, min: Math.max(1, Math.round(rt.duration / 60)) };
+      if (m.onRoute) m.onRoute(m.routeInfo);
     } else straight();
   } catch { straight(); }
 }
 
 // Karte für den Fahrlehrer-Standort: stellt sicher, dass Leaflet + Karte bereit sind,
 // bevor Icons (die L brauchen) erzeugt werden – dann Position aktualisieren.
-async function renderCarMap(id, carPos, meetPos, label) {
+async function renderCarMap(id, carPos, meetPos, label, onRoute) {
   try {
     await ensureLeaflet();
     if (!_liveMaps[id]) { if (!(await initLiveMap(id))) return; }
-    await updateLiveMap(id, carPos, _carIcon(), meetPos, label, _meetIcon());
+    await updateLiveMap(id, carPos, _carIcon(), meetPos, label, _meetIcon(), onRoute);
   } catch {}
 }
 
@@ -1359,36 +1424,44 @@ async function refreshStudentLive() {
   } else {
     const loc = d.location;
     const upd = new Date(loc.updated_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
-    // "Wann rausgehen?" – Ansage des Fahrlehrers hat Vorrang, sonst GPS-Schätzung
-    const etaShown = d.announce ? d.announce.remaining : d.etaMin;
-    const goNow = etaShown != null && etaShown <= 2;
-    const hero = goNow
-      ? `<div class="live-hero go"><span class="lh-ic">🚶</span><div><div class="lh-big">Jetzt rausgehen!</div><div class="lh-sub">Dein Fahrlehrer ist gleich da</div></div></div>`
-      : `<div class="live-hero"><span class="lh-ic">🚗</span><div><div class="lh-big">${etaShown != null ? `Fahrlehrer in ~${etaShown} Min da` : 'Fahrlehrer unterwegs'}</div><div class="lh-sub">Dein Fahrlehrer ist auf dem Weg zu dir – wir sagen Bescheid, wann du raus musst.</div></div></div>`;
-    const distPill = d.distanceKm != null ? `<span class="pill">${d.distanceKm < 1 ? Math.round(d.distanceKm * 1000) + ' m' : d.distanceKm.toFixed(1) + ' km'} entfernt</span>` : '';
     const meetPill = d.meet?.label ? `<div class="inline" style="margin-top:.5rem"><span class="pill">📍 Treffpunkt: ${esc(d.meet.label)}</span></div>` : '';
+    const setEl = (id, html) => { const e = document.getElementById(id); if (e) e.innerHTML = html; };
+    // Hero + Kacheln aus den besten verfügbaren Werten bauen.
+    // Priorität: Fahrlehrer-Ansage > echte Straßen-Fahrzeit (Route) > grobe Luftlinien-Schätzung.
+    const applyEta = (info) => {
+      const etaMin = d.announce ? d.announce.remaining : (info ? info.min : d.etaMin);
+      const km = info ? info.km : d.distanceKm;
+      const arrived = (km != null && km < 0.12) || (etaMin != null && etaMin <= 0);
+      const goNow = !arrived && etaMin != null && etaMin <= 2;
+      const hero = arrived
+        ? `<div class="live-hero go"><span class="lh-ic">🎉</span><div><div class="lh-big">Dein Fahrlehrer ist da!</div><div class="lh-sub">Geh zum Treffpunkt – er wartet auf dich.</div></div></div>`
+        : goNow
+          ? `<div class="live-hero go"><span class="lh-ic">🚶</span><div><div class="lh-big">Jetzt rausgehen!</div><div class="lh-sub">Dein Fahrlehrer ist gleich da.</div></div></div>`
+          : `<div class="live-hero"><span class="lh-ic">🚗</span><div><div class="lh-big">${etaMin != null ? `Fahrlehrer in ~${etaMin} Min da` : 'Fahrlehrer unterwegs'}</div><div class="lh-sub">${info ? 'Echte Fahrzeit über die Straße.' : 'Er ist auf dem Weg zu dir – wir sagen Bescheid, wann du raus musst.'}</div></div></div>`;
+      const distStr = km != null ? (km < 1 ? Math.round(km * 1000) + ' m' : km.toFixed(1) + ' km') : null;
+      const distPill = distStr ? `<span class="pill">🚗 ${distStr}${info ? ' Fahrweg' : ' Luftlinie'}</span>` : '';
+      setEl('live-hero', hero);
+      setEl('live-pills', `${distPill}<span class="pill">aktualisiert ${upd}</span>`);
+    };
     // Karte NUR EINMAL aufbauen und danach live aktualisieren (sonst würde der Punkt „springen")
     if (card.dataset.mode !== 'live' || !$('#live-map')) {
       card.dataset.mode = 'live';
       card.innerHTML = `<h2>🛰️ Dein Fahrlehrer ist unterwegs</h2>
         <div id="live-hero"></div>
         <div class="inline" id="live-pills" style="margin-bottom:.6rem"></div>
-        <div id="live-map" class="live-map"></div>
+        <div id="live-map" class="live-map"><div class="lm-loading"><span class="tire">🛞</span><span>Karte lädt …</span></div></div>
         <div id="live-meet"></div>
         <div id="live-pickup"></div>
         <p class="hint" style="margin-top:.4rem">🛰️ Die Karte aktualisiert sich automatisch – du siehst live, wo dein Fahrlehrer ist und wann du rausgehen musst.</p>
         <div id="live-contact"></div>`;
     }
-    // dynamische Teile bei jedem Durchlauf frisch setzen
-    const setEl = (id, html) => { const e = document.getElementById(id); if (e) e.innerHTML = html; };
-    setEl('live-hero', hero);
-    setEl('live-pills', `${distPill}<span class="pill">aktualisiert ${upd}</span>`);
+    applyEta(null);                 // sofort mit der Schätzung anzeigen
     setEl('live-meet', meetPill);
     setEl('live-pickup', pickupControls);
     setEl('live-contact', contact);
     const carPos = [loc.lat, loc.lng];
     const meetPos = d.meet?.lat != null ? [d.meet.lat, d.meet.lng] : null;
-    renderCarMap('live-map', carPos, meetPos, d.meet?.label ? esc(d.meet.label) : null);
+    renderCarMap('live-map', carPos, meetPos, d.meet?.label ? esc(d.meet.label) : null, applyEta); // echte Werte, sobald die Route da ist
   }
   const pe = $('#pk-edit'); if (pe) pe.onclick = () => openPickupModal(d.meet?.label);
   const ms = $('#my-share'); if (ms) ms.onclick = () => startMyShare();
@@ -1746,7 +1819,7 @@ async function renderLiveInstr() {
       const route = `https://www.google.com/maps/dir/?api=1&destination=${sl.lat},${sl.lng}`;
       const upd = new Date(sl.updated_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
       studentBox += `<div class="inline" style="margin:.45rem 0"><span class="pill" style="background:var(--good-bg);color:var(--good)">📍 ${vn} teilt Standort · ${upd}</span></div>
-        <div id="instr-live-map" class="live-map" style="height:220px"></div>
+        <div id="instr-live-map" class="live-map" style="height:220px"><div class="lm-loading"><span class="tire">🛞</span><span>Karte lädt …</span></div></div>
         <a class="pill" href="${route}" target="_blank" rel="noopener" style="text-decoration:none;background:var(--brand);color:#fff;margin-top:.5rem;display:inline-block">🧭 Route zu ${vn} (Navi öffnen)</a>`;
       // Karte nach dem Rendern initialisieren (Schüler-Punkt + Treffpunkt)
       setTimeout(() => {
