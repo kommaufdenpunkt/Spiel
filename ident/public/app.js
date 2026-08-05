@@ -994,6 +994,9 @@
         + '<div class="ometa">Prüfer: ' + esc(a.pruefer || '—') + ' · Nummer: ' + esc(a.zugangsnummer || '—')
         + '<br>' + esc(a.ausweisart || 'Ausweis unbekannt') + ' · Nr.: ' + esc(a.ausweisnummer || '—')
         + (a.ablehnungsgrund ? '<br>Grund: ' + esc(a.ablehnungsgrund) : '') + '</div>'
+        // Was der Prüfer während des Gesprächs notiert hat. Das lag bisher in
+        // der Akte, ohne dass man es lesen konnte – gespeichert, aber unsichtbar.
+        + (a.notiz ? '<div class="ord-notiz"><b>Notiz des Prüfers</b>' + esc(a.notiz) + '</div>' : '')
         + '<div style="margin-top:.45rem">' + aufTxt + '</div>'
         + (auf ? '<video controls preload="metadata" src="/api/recording?id=' + encodeURIComponent(auf.id)
             + '&token=' + encodeURIComponent(state.token) + '"></video>' : '')
@@ -1612,8 +1615,18 @@
       let m; try { m = JSON.parse(e.data); } catch { return; }
       const key = peerId + ':' + m.id;
       if (m.kind === 'chat') addChat(m.text, false);
-      else if (m.kind === 'doc-start') incoming[key] = { label: m.label, n: m.n, parts: [] };
-      else if (m.kind === 'doc-part') { const it = incoming[key]; if (!it) return; it.parts[m.i] = m.part; if (it.parts.filter(Boolean).length === it.n) { onDocReceived(it.label, it.parts.join('')); delete incoming[key]; } }
+      // Angekündigte Bilder mit 0 Teilen gibt es nicht – die würden nur ewig
+      // im Wartezustand hängen.
+      else if (m.kind === 'doc-start') { if (m.n >= 1) incoming[key] = { label: m.label, n: m.n, parts: [], da: 0 }; }
+      // Gezählt wird, wie viele Teile eingetroffen sind – nicht, wie viele
+      // davon nicht leer sind. Ein leerer Teil hätte das Bild sonst für immer
+      // blockiert, und zwar lautlos.
+      else if (m.kind === 'doc-part') {
+        const it = incoming[key]; if (!it) return;
+        if (it.parts[m.i] === undefined) it.da++;
+        it.parts[m.i] = m.part;
+        if (it.da === it.n) { onDocReceived(it.label, it.parts.join('')); delete incoming[key]; }
+      }
       else if (m.kind === 'result') onResult(m.result);
       else if (m.kind === 'profile') {
         // Der Bewerber hat im Warteraum schon eingetragen, was im Ausweis
@@ -1652,7 +1665,17 @@
   }
   function dcSendTo(dc, obj) { if (dc && dc.readyState === 'open') { dc.send(JSON.stringify(obj)); return true; } return false; }
   function dcBroadcast(obj) { let any = false; if (state.peers) state.peers.forEach((P) => { if (dcSendTo(P.dc, obj)) any = true; }); return any; }
-  function sendDocTo(dc, label, dataUrl) { const id = Math.random().toString(36).slice(2); const size = 15000; const n = Math.ceil(dataUrl.length / size); if (!dcSendTo(dc, { kind: 'doc-start', id, label, n })) return; for (let i = 0; i < n; i++) dcSendTo(dc, { kind: 'doc-part', id, i, part: dataUrl.slice(i * size, (i + 1) * size) }); }
+  // Ein leeres Bild wird nicht verschickt. Sonst kündigt der Bewerber ein Bild
+  // mit 0 Teilen an, der Prüfer wartet für immer darauf und sieht nur die Lücke
+  // nicht. Lieber gar nichts senden und es beim Absender melden.
+  function sendDocTo(dc, label, dataUrl) {
+    if (!dataUrl) return false;
+    const id = Math.random().toString(36).slice(2); const size = 15000;
+    const n = Math.ceil(dataUrl.length / size);
+    if (n < 1 || !dcSendTo(dc, { kind: 'doc-start', id, label, n })) return false;
+    for (let i = 0; i < n; i++) dcSendTo(dc, { kind: 'doc-part', id, i, part: dataUrl.slice(i * size, (i + 1) * size) });
+    return true;
+  }
   function sendDocAll(label, dataUrl) { if (state.peers) state.peers.forEach((P) => { if (P.dc && P.dc.readyState === 'open') sendDocTo(P.dc, label, dataUrl); }); }
 
   // ================= BEWERBER: Bilder hochladen =================
@@ -1663,6 +1686,18 @@
   $('fileInput').addEventListener('change', async (e) => {
     const f = e.target.files && e.target.files[0]; if (!f) return;
     const dataUrl = await resizeImage(f, 1600, 0.85);
+    // Konnte der Browser die Datei nicht als Bild lesen (HEIC auf einem alten
+    // Handy, ein PDF aus Versehen, eine kaputte Datei), dann darf hier NICHTS
+    // weiterlaufen. Vorher stand beim Bewerber „alle Bilder hochgeladen", und
+    // beim Prüfer kam nie etwas an – niemand hat es gemerkt. Das ist genau der
+    // Fall, in dem eine Audition ohne Ausweisbild durchgeht.
+    if (!dataUrl) {
+      $('guideStatus').className = 'status bad';
+      $('guideStatus').textContent = 'Dieses Bild konnte nicht gelesen werden. Bitte ein anderes '
+        + 'wählen – am besten ein Foto als JPG oder PNG, direkt aus der Kamera.';
+      toast('Bild nicht lesbar – bitte ein anderes wählen.');
+      return;
+    }
     addShot('guestShots', state.uploadTarget, dataUrl);
     if (state._gstep) $(state._gstep).classList.add('done');
     state.myUploads = state.myUploads || []; state.myUploads.push({ label: state.uploadTarget, dataUrl });

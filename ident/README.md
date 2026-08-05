@@ -139,6 +139,12 @@ etwas ansteht, und in ihren Bereich führen.
   Anmeldeversuche.
 - **Löschen** ist nur über `acp.<domain>` möglich – serverseitig erzwungen,
   nicht bloß ausgeblendet.
+- **Der einzige Weg in eine Akte** ist `POST /api/streamer-oeffnen` mit
+  genanntem Grund. Es gibt keine zweite Tür: `GET /api/streamer` antwortet 410.
+  Auch eine Altersverifikation schreibt sich ins Einsichtsprotokoll der Akte –
+  sonst wäre sie ein stiller Weg an der Grundangabe vorbei.
+- **Kein Durchprobieren:** `/api/person-suche` verlangt eine Anmeldung. Die
+  Antwort nennt Name, Alter und Status; offen abfragbar wäre sie eine Kartei.
 - **Aufbewahrung:** automatische Löschung nach `RETENTION_DAYS` (Vorgabe 90).
 
 ## Betrieb
@@ -161,6 +167,23 @@ Der ganze Pfad heisst `4ever1-ident` (mit Bindestrich), nicht `4ever1/ident`.
 Das Skript holt den Quellcode, baut das Abbild, tauscht den Container und
 prüft, ob er antwortet – sonst stellt es die vorige Fassung wieder her. Daten
 und Zugangsdaten liegen ausserhalb des Containers und bleiben unberührt.
+
+**Wenn man nicht mehr hineinkommt** (acp. oder mcp.):
+
+```bash
+ssh <server> '/opt/4ever1-ident/src/ident/notzugang.sh'            # nachsehen, woran es liegt
+ssh <server> '/opt/4ever1-ident/src/ident/notzugang.sh --sperre-weg'
+```
+
+Das Skript zeigt zuerst nur die Lage: läuft der Dienst, ist die Gerätebindung
+an, ist 2FA an, welche Geräte sind freigegeben, und die letzten Anmeldeversuche
+mit Grund. Erst mit einem Schalter greift es ein – `--sperre-weg` (Neustart,
+löst Fehlversuch- und IP-Sperren), `--geraete-auf`, `--zweifach-aus`,
+`--alles-auf`. Nichts davon löscht Daten.
+
+Ein Zugang über Facebook, Google o. ä. ist bewusst **nicht** eingebaut: damit
+hinge die Akte an einem fremden Konto, das gesperrt oder übernommen werden
+kann. Wer den Server hat, schliesst sich selbst auf.
 
 **Lokal starten:**
 
@@ -189,6 +212,9 @@ ident/
 ├── mcp.js         Übergabe der fertigen Akte in den Streamer-Ordner
 ├── textpolish.js  räumt Vermerke und Protokoll-Einträge auf (regelbasiert)
 ├── deploy.sh      Quellcode holen, bauen, tauschen, im Fehlerfall zurück
+├── notzugang.sh   wieder hineinkommen, wenn Sperre, Gerätebindung oder 2FA zu ist
+├── sicherung.sh   nächtliche Sicherung (--einrichten legt den Zeitplan an)
+├── pkboard-import.sh  Mitglieder aus dem PK-Board als Akten übernehmen
 ├── umzug.sh       einmaliger Serverumzug (liest Schlüssel und Daten mit)
 ├── public/
 │   ├── home.html · home.js         öffentliche Startseite

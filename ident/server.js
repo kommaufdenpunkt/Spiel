@@ -628,6 +628,15 @@ async function handleApi(req, res, urlPath, ip) {
       sendJson(res, 400, { reason: 'angaben-fehlen' }); return true;
     }
     const rec = store.verifikationEintragen(s.id, { ...body, geprueftVon: reqName(req, ip) || 'Prüfer' });
+    // Eine Verifikation ist ein Griff in die Akte – also steht sie auch im
+    // Einsichtsprotokoll der Akte, nicht nur im Sicherheitsprotokoll. Sonst
+    // wäre das hier ein stiller Weg an der Grundangabe vorbei: einmal
+    // „abgelehnt" schicken und die ganze Akte zurückbekommen, ohne Spur.
+    store.protokolliereZugriff(s.id, {
+      wer: reqName(req, ip) || 'Unbekannt',
+      rolle: isAdmin(req, ip) ? 'admin' : 'pruefer',
+      grund: 'Altersverifikation eingetragen (' + rec.ergebnis + ')', ip,
+    });
     sec.recordEvent('audit', ip, 'Verifikation ' + rec.ergebnis + ' (' + rec.geprueftVon + '): ' + s.bigoId);
     sendJson(res, 200, { verifikation: rec, ordner: store.getStreamer(s.id) });
     return true;
@@ -638,6 +647,10 @@ async function handleApi(req, res, urlPath, ip) {
   // ob die Audition an einen bestehenden Ordner angehängt wird oder ob ein
   // neuer entsteht – vor der Freigabe, nicht danach.
   if (urlPath === '/api/person-suche' && req.method === 'POST') {
+    // Nur für Angemeldete. Die Antwort nennt Name, Alter, Status und wie viele
+    // Vermerke es gibt – wer sie offen abfragen kann, kann BIGO-IDs
+    // durchprobieren und sich so eine halbe Kartei zusammensuchen.
+    if (!authed(req, ip)) { sendJson(res, 401, { reason: 'auth' }); return true; }
     let body; try { body = await readJson(req, 8 * 1024); } catch { body = {}; }
     const t = store.suchePerson({
       bigoId: body.bigoId, docNumber: body.docNumber, name: body.name, age: body.age,
@@ -756,11 +769,13 @@ async function handleApi(req, res, urlPath, ip) {
     sendJson(res, 200, { ordner: store.getStreamer(s.id) });
     return true;
   }
+  // Die alte Abkürzung `GET /api/streamer?id=…` gibt es nicht mehr. Sie gab
+  // die komplette Akte an jeden angemeldeten Prüfer heraus – ohne Grund, ohne
+  // Protokoll. Damit war die Grundangabe nur noch Zierde: man musste sie im
+  // Browser nicht umgehen, man musste sie nur nicht benutzen. Der einzige Weg
+  // in eine Akte ist jetzt /api/streamer-oeffnen.
   if (urlPath === '/api/streamer' && req.method === 'GET') {
-    if (!authed(req, ip)) { sendJson(res, 401, { reason: 'auth' }); return true; }
-    const s = store.getStreamer(new URL(req.url, 'http://x').searchParams.get('id') || '');
-    if (!s) { sendJson(res, 404, { reason: 'gone' }); return true; }
-    sendJson(res, 200, { streamer: s }); return true;
+    sendJson(res, 410, { reason: 'nur-ueber-oeffnen' }); return true;
   }
   if (urlPath === '/api/streamer' && req.method === 'POST') {
     if (!adminOnly()) return true;
