@@ -34,6 +34,25 @@
   function esc(s) { return String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
   const pad = (n) => String(n).padStart(2, '0');
   /**
+   * Welche Fassung laeuft hier im Browser?
+   *
+   * Zweimal hat uns die Frage einen Abend gekostet: der Server war neu, der
+   * Browser lief mit alten Dateien weiter, und man konnte es nirgends sehen.
+   * Jetzt steht es unten im Menue - und wenn Server und Browser
+   * auseinanderlaufen, faellt es sofort auf.
+   */
+  async function zeigeFassung() {
+    const el = $('fassung'); if (!el) return;
+    let serverStand = '?';
+    try {
+      const t = await (await fetch('/healthz', { cache: 'no-store' })).text();
+      serverStand = (t.match(/ok\s+(\S+)/) || [])[1] || '?';
+    } catch {}
+    el.textContent = 'Stand ' + serverStand;
+    el.title = 'Fassung, die der Server meldet. Stimmt sie nicht mit dem, was ihr erwartet, '
+      + 'einmal hart neu laden (Cmd/Strg + Umschalt + R).';
+  }
+  /**
    * Beschriftung eines Menüknopfs ändern, ohne ihn zu zerlegen.
    * Jeder Knopf im Menü besteht aus drei Teilen: Zeichen, langer Name, kurzer
    * Name. Am Rechner steht der lange da, auf dem Handy in der unteren Leiste
@@ -1582,6 +1601,7 @@
   }
   if ($('passkeyLoginBtn')) $('passkeyLoginBtn').addEventListener('click', loginWithPasskey);
   if ($('setupPasskeyBtn')) $('setupPasskeyBtn').addEventListener('click', registerPasskey);
+  zeigeFassung();
 
   // ================= TELEPROMPTER (Bewerber liest den Audition-Text ab) =================
   // Bewerber bestimmt das Tempo selbst – flüssiges Scrollen per requestAnimationFrame.
@@ -1641,19 +1661,45 @@
    * hilft niemandem: es ist eine Erklaerung, die sie hoeren sollen, keine
    * Pruefung, die man bestehen muss.
    */
+  /**
+   * Ein Pruefer ist da: sie bekommt den KNOPF, nicht gleich den Text.
+   *
+   * Sie entscheidet, wann es losgeht. Wer mitten in der Begruessung ploetzlich
+   * eine Textwand vor sich hat, faengt an zu lesen, waehrend noch jemand redet.
+   * Ein Tippen von ihr ist ein klares Signal fuer beide Seiten: jetzt.
+   */
   function textFreigeben() {
-    if (state.role !== 'guest' || state.textFrei) return;
+    if (state.role !== 'guest' || state.textFrei || state.textAngeboten) return;
+    state.textAngeboten = true;
+    const s2 = $('prompterStart'); if (s2) s2.style.display = '';
+    if ($('guideStatus')) {
+      $('guideStatus').className = 'status ok';
+      $('guideStatus').textContent = 'Die Prüfer sind da. Lade die Ausweisbilder hoch – und wenn du '
+        + 'soweit bist, blende den Text ein.';
+    }
+    toast('Die Prüfer sind da. 📖 Text einblenden, wenn du soweit bist.');
+  }
+
+  /** Sie tippt: Text einblenden. Das ist der Startschuss. */
+  function textJetzt() {
+    if (state.textFrei) return;
     state.textFrei = true;
+    const s2 = $('prompterStart'); if (s2) s2.style.display = 'none';
     const deckel = $('prompterDeckel'); if (deckel) deckel.style.display = 'none';
     const box = $('prompterBox'); if (box) box.style.display = '';
     const ctrl = $('prompterCtrl'); if (ctrl) ctrl.style.display = '';
     if ($('guideStatus')) {
       $('guideStatus').className = 'status ok';
-      $('guideStatus').textContent = 'Die Pruefer sind da. Lade die Ausweisbilder hoch und lies '
-        + 'anschliessend den Text in die Kamera - dein Tempo bestimmst du selbst.';
+      $('guideStatus').textContent = 'Lies den Text in die Kamera – ▶ Start lässt ihn mitlaufen, '
+        + 'das Tempo stellst du mit dem Regler ein. Pausieren jederzeit.';
     }
-    toast('\u{1F4D6} Der Text ist da - lies ihn den Pruefern vor.');
+    // Den Prüfern sagen, dass es losgeht - sonst reden sie weiter, während sie
+    // schon liest.
+    dcBroadcast({ kind: 'liestlos' });
+    if (box) box.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    toast('📖 Der Text ist da – lies ihn den Prüfern vor.');
   }
+  if ($('textJetztBtn')) $('textJetztBtn').addEventListener('click', textJetzt);
 
   // ---- Was liest er gerade? Das gehört in die Aufnahme ---------------------
   // Der Vorlese-Text ist die Einwilligung, die der Bewerber in die Kamera
@@ -2231,7 +2277,11 @@
       if (state.role === 'guest') {
         if (state.profile) dcSendTo(dc, vorabPaket());
         (state.myUploads || []).forEach((d) => sendDocTo(dc, d.label, d.dataUrl)); // auch später dazugekommene Prüfer bekommen die Bilder
-        $('guideStatus').textContent = 'Verbunden mit dem Prüfer. Bitte lade die Bilder hoch.';
+        // Nicht ueberschreiben, was textFreigeben() schon gesagt hat - sonst
+        // steht wieder "lade die Bilder hoch", obwohl der Text-Knopf da ist.
+        if (!state.textAngeboten && !state.textFrei) {
+          $('guideStatus').textContent = 'Verbunden mit dem Prüfer. Bitte lade die Bilder hoch.';
+        }
       }
       // Wer neu dazukommt, soll sofort wissen, ob meine Kamera gerade aus ist
       // und ob aufgezeichnet wird – sonst sieht er ein schwarzes Bild ohne Grund.
@@ -2289,6 +2339,18 @@
       else if (m.kind === 'rec') zeigeRec(!!m.on);
       // Die Zeile, die der Bewerber gerade vorliest – wird unten in die
       // Aufnahme geschrieben, damit man später mitlesen kann.
+      // Sie hat den Text eingeblendet – es geht los.
+      else if (m.kind === 'liestlos') {
+        const p2 = $('reviewStatus');
+        if (p2) { p2.className = 'status ok'; p2.textContent = '📖 Sie hat den Text eingeblendet – sie liest jetzt vor.'; }
+        let b2 = document.querySelector('.liestlos');
+        if (!b2 && $('zusicherung')) {
+          b2 = document.createElement('div'); b2.className = 'liestlos';
+          $('zusicherung').parentNode.insertBefore(b2, $('zusicherung'));
+        }
+        if (b2) b2.textContent = '📖 Sie liest jetzt den Text vor – bitte zuhören und nicht reinreden.';
+        toast('📖 Sie liest jetzt vor.');
+      }
       else if (m.kind === 'vorlese') {
         state.vorleseZeile = String(m.text || '').slice(0, 200);
         const box = $('liestGerade');
@@ -2942,6 +3004,9 @@
     // Der Abgleich gehoert zum vorigen Bewerber - fuer den naechsten von vorn.
     letzteSuche = ''; const tk = $('personTreffer'); if (tk) { tk.className = 'treffer'; tk.innerHTML = ''; }
     state.vorab = null; state.vorleseZeile = ''; zeigeVorab();
+    state.textFrei = false; state.textAngeboten = false;
+    document.querySelectorAll('.liestlos').forEach((e) => e.remove());
+    if ($('prompterStart')) $('prompterStart').style.display = 'none';
     const lg = $('liestGerade'); if (lg) lg.style.display = 'none';
     document.querySelectorAll('.micoff, .camoff').forEach((e) => e.remove());
     $('reviewStatus').className = 'status pending'; $('reviewStatus').textContent = 'Warte auf die Bilder des Bewerbers …';

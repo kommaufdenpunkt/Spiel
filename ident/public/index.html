@@ -532,7 +532,22 @@
   /* Zustand in der Warteschlange: fertig oder fuellt noch aus */
   .fertig-pill{color:#5fe0a0;font-weight:700}
   .fuellt-pill{color:var(--warm,#ffc98a)}
+  .fassung{margin-top:.5rem;font-size:.66rem;color:var(--dim);opacity:.7;text-align:center;
+    letter-spacing:.04em;font-variant-numeric:tabular-nums}
   .weg-pill{color:var(--dim);font-size:.76rem}
+  /* Sie bekommt den Text auf Zuruf: ein Knopf, nicht von selbst. */
+  .prompter-start{display:flex;flex-direction:column;gap:.4rem;align-items:center;text-align:center;
+    padding:1rem .85rem;border-radius:12px;border:1px solid #3ec77b66;
+    background:linear-gradient(180deg,#163024,#111d18);animation:startRein .35s ease}
+  @keyframes startRein{from{opacity:0;transform:scale(.97)}to{opacity:1;transform:none}}
+  .prompter-start .ps-ic{font-size:1.6rem}
+  .prompter-start b{font-size:.95rem;color:#bfe9d2}
+  .prompter-start span{font-size:.8rem;color:var(--dim);line-height:1.55}
+  .prompter-start button{width:100%;margin-top:.35rem;padding:.7rem;font-size:.92rem}
+  .prompter-start small{font-size:.75rem;color:var(--dim);opacity:.85}
+  /* Beim Pruefer: sie hat den Text und liest jetzt vor */
+  .liestlos{margin:.5rem 0 .2rem;padding:.5rem .7rem;border-radius:10px;font-size:.85rem;font-weight:600;
+    border:1px solid #3ec77b66;background:#163024;color:#bfe9d2;animation:startRein .3s ease}
   /* Deckel ueber dem Vorlese-Text, solange niemand da ist */
   .prompter-deckel{display:flex;flex-direction:column;gap:.3rem;padding:1rem .85rem;border-radius:12px;
     border:1px dashed var(--line2);background:#0f1728;text-align:center;align-items:center}
@@ -1159,12 +1174,23 @@
       <!-- Der Text kommt erst im Gespraech. Vorher steht hier nur, was noch zu
            tun ist: Vorlesen passiert in Anwesenheit der Pruefer, nicht vorher
            allein im Warteraum. -->
+      <!-- Zwei Zustaende. Vorher: verschlossen. Sobald ein Pruefer da ist:
+           ein Knopf. SIE tippt drauf - und damit geht es los. Nicht wir blenden
+           ihr etwas ein, sie sagt "ich bin soweit". -->
       <div class="prompter-deckel" id="prompterDeckel">
         <span class="pd-ic">🔒</span>
         <b>Den Text bekommst du im Gespräch</b>
         <span>Du musst nichts vorbereiten und nichts auswendig lernen. Er erscheint hier,
           sobald die Prüfer da sind – dann liest du ihn ihnen in die Kamera vor.</span>
         <small>Erledige bis dahin die drei Schritte unten: Aufklärung, Ausweisdaten, Selfie.</small>
+      </div>
+      <div class="prompter-start" id="prompterStart" style="display:none">
+        <span class="ps-ic">📖</span>
+        <b>Der Text ist bereit</b>
+        <span>Wenn du magst, blende ihn ein – dann liest du ihn den Prüfern in die
+          Kamera vor. Das Tempo bestimmst du selbst, und du kannst jederzeit pausieren.</span>
+        <button id="textJetztBtn" class="primary">📖 Text einblenden – dann lese ich vor</button>
+        <small>Nimm dir Zeit. Es ist kein Test, den man bestehen muss.</small>
       </div>
       <div class="prompter" id="prompterBox" style="display:none"><div id="prompterText"></div></div>
       <div class="prompter-ctrl" id="prompterCtrl" style="display:none">
@@ -1289,6 +1315,8 @@
       <div class="nav-gruppe">Konto</div>
       <button class="deck-item" id="setupPasskeyBtn" type="button" style="display:none"><span class="ic">🔐</span><span class="lb">Face ID einrichten</span><span class="kz">Face ID</span></button>
       <button class="deck-item danger" id="waitLogout"><span class="ic">🚪</span><span class="lb">Abmelden</span><span class="kz">Abmelden</span></button>
+      <!-- Welche Fassung laeuft? Damit "ist das schon drauf?" nie wieder offen bleibt. -->
+      <div class="fassung" id="fassung"></div>
     </aside>
 
     <!-- MITTE: Übersicht mit Kacheln -->

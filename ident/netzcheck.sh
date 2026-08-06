@@ -70,7 +70,8 @@ else
     fi
     # Und: stehen die Zeilen im Block, der / bedient?
     if command -v awk >/dev/null; then
-      IM_ROOT=$(awk '/location[[:space:]]*\/[[:space:]]*\{/,/^\s*}/' "$f" 2>/dev/null | grep -ci 'proxy_set_header[[:space:]]\+Upgrade' || echo 0)
+      IM_ROOT=$(awk '/location[[:space:]]*\/[[:space:]]*\{/,/^[[:space:]]*}/' "$f" 2>/dev/null | grep -ci 'proxy_set_header[[:space:]]\+Upgrade' | head -1)
+      IM_ROOT=${IM_ROOT:-0}
       [ "$IM_ROOT" -gt 0 ] && gut "Die Upgrade-Zeilen stehen im Block für /" \
         || { bad "Im Block für / stehen sie NICHT – dort werden sie aber gebraucht"; merke; }
     fi
