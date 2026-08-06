@@ -1495,11 +1495,22 @@ const wss = new WebSocketServer({ server });
 //
 // Alle 25 Sekunden ein Ping. Wer zwei Pings nicht beantwortet, ist wirklich weg.
 const WS_PING_MS = 25000;
+// Grosszuegig zaehlen. Es gibt Zwischenstationen, die Pong-Antworten nicht
+// weiterreichen - wer da nach zwei Pings abschaltet, killt gesunde Verbindungen
+// im Minutentakt und macht es schlimmer als vorher. Vier Runden ohne jedes
+// Lebenszeichen sind knapp zwei Minuten; wer dann noch schweigt, ist wirklich
+// weg. Und JEDE eingehende Nachricht zaehlt als Lebenszeichen, nicht nur ein
+// Pong.
+const WS_STILL_MAX = 4;
 const wsPing = setInterval(() => {
   wss.clients.forEach((ws) => {
-    if (ws.fehlendePongs === undefined) ws.fehlendePongs = 0;
-    if (ws.fehlendePongs >= 2) { try { ws.terminate(); } catch {} return; }
-    ws.fehlendePongs++;
+    if (ws.stilleRunden === undefined) ws.stilleRunden = 0;
+    if (ws.stilleRunden >= WS_STILL_MAX) {
+      console.log('[ws] beendet nach ' + ws.stilleRunden + ' stillen Runden (' + (ws.ip || '?') + ')');
+      try { ws.terminate(); } catch {}
+      return;
+    }
+    ws.stilleRunden++;
     try { ws.ping(); } catch { try { ws.terminate(); } catch {} }
   });
 }, WS_PING_MS);
@@ -1540,8 +1551,16 @@ function send(ws, obj) { if (ws && ws.readyState === ws.OPEN) ws.send(JSON.strin
 
 wss.on('connection', (ws, req) => {
   ws.ip = sec.clientIp(req);
-  ws.fehlendePongs = 0;
-  ws.on('pong', () => { ws.fehlendePongs = 0; });
+  ws.stilleRunden = 0;
+  ws.on('pong', () => { ws.stilleRunden = 0; });
+  // Auch normale Nachrichten sind ein Lebenszeichen.
+  ws.on('message', () => { ws.stilleRunden = 0; });
+  // Warum ist die Verbindung weggegangen? Ohne diese Zeile raet man nur.
+  ws.on('close', (nr, grund) => {
+    console.log('[ws] zu: ' + nr + ' ' + (grund ? String(grund).slice(0, 60) : '')
+      + ' rolle=' + (ws.role || '?') + ' nummer=' + (ws.roomCode || '-') + ' ' + (ws.ip || '?'));
+  });
+  ws.on('error', (e) => { console.log('[ws] Fehler: ' + (e && e.message) + ' ' + (ws.ip || '?')); });
   if (sec.isBlocked(ws.ip)) { try { ws.close(); } catch {} return; }
   ws.peerId = crypto.randomUUID();
 
