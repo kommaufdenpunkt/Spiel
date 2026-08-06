@@ -41,20 +41,41 @@ if [ -n "$HZ" ]; then gut "Antwortet: $HZ"; else bad "Antwortet nicht auf Port $
 
 # ---- 2. nginx und WebSockets ---------------------------------------------
 sage "2. Lässt nginx WebSockets durch?"
-KONFIG="$(grep -rl "mcp\.\|ident\." /etc/nginx/sites-enabled/ /etc/nginx/conf.d/ 2>/dev/null | head -5)"
+KONFIG="$(grep -rl "server_name" /etc/nginx/sites-enabled/ /etc/nginx/conf.d/ 2>/dev/null | head -10)"
 if [ -z "$KONFIG" ]; then
-  warn "Keine passende nginx-Datei gefunden – läuft hier überhaupt nginx?"
+  warn "Keine nginx-Datei gefunden – läuft hier überhaupt nginx?"
 else
+  echo "  Eingerichtete Namen:"
+  grep -rhoP 'server_name\s+\K[^;]+' /etc/nginx/sites-enabled/ /etc/nginx/conf.d/ 2>/dev/null \
+    | tr ' ' '\n' | grep -v '^$' | sort -u | sed 's/^/    /'
   for f in $KONFIG; do
+    grep -q 'proxy_pass' "$f" 2>/dev/null || continue
     echo "  Datei: $f"
     HAT_UP=$(grep -ci 'proxy_set_header[[:space:]]\+Upgrade' "$f" 2>/dev/null || echo 0)
     HAT_CONN=$(grep -ci 'proxy_set_header[[:space:]]\+Connection' "$f" 2>/dev/null || echo 0)
     HAT_11=$(grep -ci 'proxy_http_version[[:space:]]\+1\.1' "$f" 2>/dev/null || echo 0)
-    HAT_TO=$(grep -ci 'proxy_read_timeout' "$f" 2>/dev/null || echo 0)
-    [ "$HAT_11" -gt 0 ]   && gut "proxy_http_version 1.1 vorhanden" || { bad "proxy_http_version 1.1 FEHLT"; merke; }
-    [ "$HAT_UP" -gt 0 ]   && gut "Upgrade-Kopfzeile vorhanden"      || { bad "proxy_set_header Upgrade FEHLT"; merke; }
-    [ "$HAT_CONN" -gt 0 ] && gut "Connection-Kopfzeile vorhanden"   || { bad "proxy_set_header Connection FEHLT"; merke; }
-    [ "$HAT_TO" -gt 0 ]   && gut "proxy_read_timeout gesetzt"       || warn "proxy_read_timeout nicht gesetzt (Vorgabe 60s – mit Lebenszeichen okay)"
+    [ "$HAT_11" -gt 0 ]   && gut "proxy_http_version 1.1 steht in der Datei" || { bad "proxy_http_version 1.1 FEHLT"; merke; }
+    [ "$HAT_UP" -gt 0 ]   && gut "Upgrade-Kopfzeile steht in der Datei"      || { bad "proxy_set_header Upgrade FEHLT"; merke; }
+    [ "$HAT_CONN" -gt 0 ] && gut "Connection-Kopfzeile steht in der Datei"   || { bad "proxy_set_header Connection FEHLT"; merke; }
+    # Die haeufigste Falle: Connection $connection_upgrade, aber die dazu
+    # gehoerende map fehlt. Dann ist die Variable leer, nginx laesst nicht
+    # upgraden und antwortet 200 statt 101 - genau unser Fall.
+    if grep -qi 'Connection[[:space:]]\+\$connection_upgrade' "$f" 2>/dev/null; then
+      if grep -rqi 'map[[:space:]]\+\$http_upgrade[[:space:]]\+\$connection_upgrade' \
+           /etc/nginx/nginx.conf /etc/nginx/conf.d/ /etc/nginx/sites-enabled/ 2>/dev/null; then
+        gut "\$connection_upgrade ist per map definiert"
+      else
+        bad "\$connection_upgrade wird benutzt, aber die map FEHLT -> leere Kopfzeile -> 200 statt 101"; merke
+      fi
+    fi
+    # Und: stehen die Zeilen im Block, der / bedient?
+    if command -v awk >/dev/null; then
+      IM_ROOT=$(awk '/location[[:space:]]*\/[[:space:]]*\{/,/^\s*}/' "$f" 2>/dev/null | grep -ci 'proxy_set_header[[:space:]]\+Upgrade' || echo 0)
+      [ "$IM_ROOT" -gt 0 ] && gut "Die Upgrade-Zeilen stehen im Block für /" \
+        || { bad "Im Block für / stehen sie NICHT – dort werden sie aber gebraucht"; merke; }
+    fi
+    echo "  --- die proxy-Zeilen dieser Datei ---"
+    grep -nE 'location|proxy_pass|proxy_http_version|proxy_set_header|proxy_read_timeout' "$f" 2>/dev/null | sed 's/^/    /'
   done
 fi
 
@@ -63,7 +84,7 @@ sage "3. WebSocket direkt beim Dienst (ohne nginx)"
 ANTWORT="$(curl -s -i --max-time 5 \
   -H 'Connection: Upgrade' -H 'Upgrade: websocket' \
   -H 'Sec-WebSocket-Version: 13' -H 'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==' \
-  "http://127.0.0.1:$PORT/" 2>/dev/null | head -1)"
+  "http://127.0.0.1:$PORT/" 2>/dev/null | head -1 | tr -d '\r')"
 case "$ANTWORT" in
   *101*) gut "Der Dienst spricht WebSocket (101). Hier ist alles in Ordnung." ;;
   '')    bad "Keine Antwort vom Dienst."; merke ;;
@@ -72,7 +93,7 @@ esac
 
 # ---- 4. WebSocket durch nginx ------------------------------------------
 sage "4. WebSocket durch nginx hindurch"
-DOMAIN="$(grep -rhoP 'server_name\s+\K(mcp|ident)\.[^; ]+' /etc/nginx/sites-enabled/ 2>/dev/null | head -1)"
+DOMAIN="$(grep -rhoP 'server_name\s+\K(mcp|ident)\.[^; ]+' /etc/nginx/sites-enabled/ /etc/nginx/conf.d/ 2>/dev/null | head -1)"
 if [ -z "$DOMAIN" ]; then
   warn "Konnte den Namen (mcp....) nicht aus nginx lesen – Schritt übersprungen."
 else
@@ -80,11 +101,11 @@ else
   A2="$(curl -s -i --max-time 6 -k --resolve "$DOMAIN:443:127.0.0.1" \
     -H 'Connection: Upgrade' -H 'Upgrade: websocket' \
     -H 'Sec-WebSocket-Version: 13' -H 'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==' \
-    "https://$DOMAIN/" 2>/dev/null | head -1)"
+    "https://$DOMAIN/" 2>/dev/null | head -1 | tr -d '\r')"
   case "$A2" in
     *101*) gut "nginx lässt WebSockets durch (101). Die Verbindung ist NICHT das Problem." ;;
     '')    bad "Keine Antwort über nginx."; merke ;;
-    *)     bad "nginx antwortet mit: $A2 (erwartet 101) – DAS ist die Ursache."; merke ;;
+    *)     bad "nginx antwortet mit >>$A2<< statt 101 – DAS ist die Ursache."; merke ;;
   esac
 fi
 
