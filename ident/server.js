@@ -27,6 +27,9 @@ const pdf = require('./pdf.js');
 
 const PORT = process.env.PORT || 8080;
 const STARTZEIT = new Date().toISOString();
+// Wer hat welche Aufnahme wann zuletzt angesehen? Nur, damit derselbe Abruf
+// nicht dutzendfach in der Akte landet (siehe /api/recording).
+const videoNotiert = new Map();
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '';
@@ -453,7 +456,11 @@ async function handleApi(req, res, urlPath, ip) {
     if (!gut) sec.recordEvent('info', ip, 'Zugangsnummer abgelehnt: ' + nummer.slice(0, 12));
     sendJson(res, 200, { ok: gut }); return true;
   }
-  if (urlPath === '/api/script' && req.method === 'GET') { sendJson(res, 200, { script: store.getScript() }); return true; }
+  // `vorschlag` liefert unseren eigenen Text mit – damit man im acp mit einem
+  // Klick dorthin zurück kann, wenn man sich verschrieben hat.
+  if (urlPath === '/api/script' && req.method === 'GET') {
+    sendJson(res, 200, { script: store.getScript(), vorschlag: store.scriptVorschlag() }); return true;
+  }
   if (urlPath === '/api/intro' && req.method === 'GET') { sendJson(res, 200, { intro: store.getIntro() }); return true; }
   // Startseite: liegt ein echtes Team-Foto im Ordner public? (öffentlich)
   if (urlPath === '/api/site' && req.method === 'GET') {
@@ -593,6 +600,7 @@ async function handleApi(req, res, urlPath, ip) {
         bereit: !!w.bereit, bereitSeit: w.bereitSeit || 0,
         weg: !!w.wegSeit, wegSek: w.wegSeit ? Math.round((Date.now() - w.wegSeit) / 1000) : 0,
         claimedBy: busy ? w.claimedBy : null,
+        eingeladenVon: w.eingeladenVon || '',
         hosts, live: hosts.length > 0,
         waitingSec: Math.max(0, Math.round((Date.now() - w.joinedAt) / 1000)),
       };
@@ -609,10 +617,23 @@ async function handleApi(req, res, urlPath, ip) {
     const name = reqName(req, ip) || 'Prüfer';
     // „Nächsten annehmen" nimmt nur, wer fertig ist. Wer noch ausfüllt, wird
     // übersprungen – nicht unterbrochen.
-    const next = Array.from(waiting.values())
+    const frei = Array.from(waiting.values())
       .filter((w) => !waitingBusy(w) && w.bereit)
-      .sort((a, b) => (a.bereitSeit || a.joinedAt) - (b.bereitSeit || b.joinedAt))[0];
+      .sort((a, b) => (a.bereitSeit || a.joinedAt) - (b.bereitSeit || b.joinedAt));
+    // Wer eingeladen hat, führt durch. „Nächsten annehmen" nimmt deshalb erst
+    // die eigenen Einladungen, dann die ohne Absender (ältere Codes). Fremde
+    // Termine bleiben liegen – die holt man bewusst über die Karte ab, damit
+    // niemand versehentlich in das Gespräch einer Kollegin platzt.
+    const eigen = frei.filter((w) => (w.eingeladenVon || '') === name);
+    const ohne = frei.filter((w) => !w.eingeladenVon);
+    const next = eigen[0] || ohne[0];
     if (!next) {
+      const fremde = frei.filter((w) => w.eingeladenVon && w.eingeladenVon !== name);
+      if (fremde.length) {
+        sendJson(res, 404, { reason: 'fremde-einladung', von: fremde[0].eingeladenVon,
+          code: fremde[0].code, anzahl: fremde.length });
+        return true;
+      }
       const fuellenNoch = Array.from(waiting.values()).filter((w) => !waitingBusy(w) && !w.bereit).length;
       sendJson(res, 404, { reason: fuellenNoch ? 'noch-nicht-fertig' : 'none-waiting', fuellenNoch });
       return true;
@@ -653,8 +674,14 @@ async function handleApi(req, res, urlPath, ip) {
       }
       sec.recordEvent('audit', ip, 'Bewerber trotz „noch nicht fertig" geholt (' + wer + '): ' + code);
     }
+    // Fremder Termin: erlaubt, aber es wird festgehalten. Wer für eine
+    // Kollegin einspringt, soll das können – nachvollziehbar bleibt es
+    // trotzdem.
+    if (entry.eingeladenVon && entry.eingeladenVon !== wer) {
+      sec.recordEvent('audit', ip, 'Einladung von ' + entry.eingeladenVon + ' übernommen (' + wer + '): ' + code);
+    }
     entry.claimedBy = wer; entry.claimedAt = Date.now();
-    sendJson(res, 200, { ok: true }); return true;
+    sendJson(res, 200, { ok: true, eingeladenVon: entry.eingeladenVon || '' }); return true;
   }
 
   if (urlPath === '/api/waiting/release' && req.method === 'POST') {
@@ -714,6 +741,62 @@ async function handleApi(req, res, urlPath, ip) {
     sec.recordEvent('audit', ip, 'Verifikation ' + rec.ergebnis + ' (' + rec.geprueftVon + '): ' + s.bigoId);
     sendJson(res, 200, { verifikation: rec, ordner: store.getStreamer(s.id) });
     return true;
+  }
+
+  // ---- Doppelte Akten ------------------------------------------------------
+  // Anzeigen darf jeder Prüfer (er sieht nur Hüllen: Kennung und Zahlen).
+  // Zusammenführen darf nur der Admin – dabei verschwindet eine Akte, und das
+  // gehört wie jedes Löschen ausschliesslich auf acp.
+  if (urlPath === '/api/akten-doppelt' && req.method === 'GET') {
+    if (!authed(req, ip)) { sendJson(res, 401, { reason: 'auth' }); return true; }
+    sendJson(res, 200, { gruppen: store.doppelteAkten() }); return true;
+  }
+  if (urlPath === '/api/akten-zusammenfuehren' && req.method === 'POST') {
+    if (!adminOnly()) return true;
+    let body; try { body = await readJson(req, 16 * 1024); } catch { body = {}; }
+    const wer = reqName(req, ip) || 'Admin';
+    const r = store.aktenZusammenfuehren(String(body.behalten || ''), String(body.weg || ''), { wer });
+    if (!r.ok) { sendJson(res, 400, { reason: r.grund }); return true; }
+    store.protokolliereZugriff(r.ordner.id, { wer, rolle: 'admin',
+      grund: 'Doppelte Akte zusammengeführt (' + (r.geloescht.bigoId || '?') + ')', ip });
+    sec.recordEvent('audit', ip, 'Akten zusammengeführt (' + wer + '): ' + r.geloescht.bigoId
+      + ' -> ' + r.ordner.bigoId + ' [' + r.uebernommen.join(', ') + ']');
+    sendJson(res, 200, r); return true;
+  }
+
+  // ---- Stammdaten der Akte pflegen ----------------------------------------
+  // Prüfer dürfen das: sie sind die, die den Ausweis in der Hand hatten und
+  // Tippfehler und Großschreibung sehen. Jede Änderung steht mit altem und
+  // neuem Wert in der Akte, und der Zugriff wird protokolliert wie sonst auch.
+  if (urlPath === '/api/streamer-stamm' && req.method === 'POST') {
+    if (!authed(req, ip)) { sendJson(res, 401, { reason: 'auth' }); return true; }
+    let body; try { body = await readJson(req, 32 * 1024); } catch { body = {}; }
+    const wer = reqName(req, ip) || 'Prüfer';
+    const r = store.stammPflegen(String(body.id || ''), body.stamm || {}, { wer });
+    if (!r) { sendJson(res, 404, { reason: 'nicht-gefunden' }); return true; }
+    if (r.geaendert.length) {
+      store.protokolliereZugriff(String(body.id || ''), {
+        wer, rolle: isAdmin(req, ip) ? 'admin' : 'pruefer',
+        grund: 'Stammdaten gepflegt (' + r.geaendert.length + ' Feld(er))', ip,
+      });
+      sec.recordEvent('audit', ip, 'Stammdaten gepflegt (' + wer + '): ' + r.ordner.bigoId);
+    }
+    sendJson(res, 200, { ordner: r.ordner, geaendert: r.geaendert }); return true;
+  }
+  // Aus dem, was schon geprüft wurde, in die Stammdaten übernehmen.
+  if (urlPath === '/api/streamer-stamm-uebernehmen' && req.method === 'POST') {
+    if (!authed(req, ip)) { sendJson(res, 401, { reason: 'auth' }); return true; }
+    let body; try { body = await readJson(req, 16 * 1024); } catch { body = {}; }
+    const wer = reqName(req, ip) || 'Prüfer';
+    const r = store.stammAusAkte(String(body.id || ''), { wer, ueberschreiben: !!body.ueberschreiben });
+    if (!r) { sendJson(res, 404, { reason: 'nicht-gefunden' }); return true; }
+    if (r.uebernommen.length) {
+      store.protokolliereZugriff(String(body.id || ''), {
+        wer, rolle: isAdmin(req, ip) ? 'admin' : 'pruefer',
+        grund: 'Ausweisdaten in die Stammdaten übernommen', ip,
+      });
+    }
+    sendJson(res, 200, { ordner: r.ordner, uebernommen: r.uebernommen }); return true;
   }
 
   // ---- Lose Aufnahmen einer Akte zuordnen ---------------------------------
@@ -833,6 +916,10 @@ async function handleApi(req, res, urlPath, ip) {
     });
     if (!kopf) { sendJson(res, 500, { reason: 'kein-lauf' }); return true; }
     sec.recordEvent('audit', ip, 'Aufnahme begonnen (' + kopf.agentName + ') zu ' + (kopf.code || '—'));
+    // Im Log mitschreiben. Sonst sieht man von aussen nicht, ob überhaupt
+    // eine Aufnahme angekommen ist – und rät dann herum.
+    console.log('[rec] begonnen ' + kopf.sitzung + ' nummer=' + (kopf.code || '-')
+      + ' von=' + kopf.agentName + ' art=' + (kopf.ext || '?'));
     sendJson(res, 200, { sitzung: kopf.sitzung }); return true;
   }
   if (urlPath === '/api/rec/chunk' && req.method === 'POST') {
@@ -840,6 +927,9 @@ async function handleApi(req, res, urlPath, ip) {
     let buf; try { buf = await readRaw(req, 40 * 1024 * 1024); } catch { sendJson(res, 413, { reason: 'too-large' }); return true; }
     const r = store.appendRecordingChunk(q.get('sitzung'), q.get('i'), buf);
     if (!r) { sendJson(res, 404, { reason: 'lauf-unbekannt' }); return true; }
+    // Jedes zehnte Stück melden – genug, um zu sehen, dass es läuft, ohne das
+    // Log zuzuschütten.
+    if ((r.teile || 0) % 10 === 1) console.log('[rec] Stück ' + r.teile + ' angekommen (' + q.get('sitzung') + ')');
     sendJson(res, 200, r); return true;
   }
   if (urlPath === '/api/rec/finish' && req.method === 'POST') {
@@ -848,6 +938,9 @@ async function handleApi(req, res, urlPath, ip) {
     if (!rec) { sendJson(res, 404, { reason: 'nichts-angekommen' }); return true; }
     sec.recordEvent('audit', ip, 'Aufnahme abgeschlossen: ' + rec.id + ' (' + rec.bytes + ' Bytes, '
       + (rec.teile || 0) + ' Stücke' + (rec.unvollstaendig ? ', unvollständig' : '') + ')');
+    console.log('[rec] fertig ' + rec.id + ' nummer=' + (rec.code || '-') + ' '
+      + Math.round((rec.bytes || 0) / 1024) + ' kB ' + (rec.durationSec || 0) + 's'
+      + (rec.unvollstaendig ? ' UNVOLLSTÄNDIG' : ''));
     sendJson(res, 200, { id: rec.id, bytes: rec.bytes, durationSec: rec.durationSec,
       teile: rec.teile || 0, unvollstaendig: !!rec.unvollstaendig }); return true;
   }
@@ -867,6 +960,8 @@ async function handleApi(req, res, urlPath, ip) {
     const rec = store.saveRecording({ buffer: buf, mime: (req.headers['content-type'] || 'video/webm').split(';')[0].trim(), ext: q.get('ext') || 'webm', durationSec: q.get('dur'), code: q.get('code') || '', agentName: reqName(req, ip) });
     if (!rec) { sendJson(res, 400, { reason: 'bad-recording' }); return true; }
     sec.recordEvent('audit', ip, 'Aufnahme gespeichert: ' + rec.id);
+    console.log('[rec] am Stück ' + rec.id + ' nummer=' + (rec.code || '-') + ' '
+      + Math.round((rec.bytes || 0) / 1024) + ' kB');
     sendJson(res, 200, { id: rec.id, bytes: rec.bytes, durationSec: rec.durationSec }); return true;
   }
 
@@ -1317,8 +1412,36 @@ async function handleApi(req, res, urlPath, ip) {
     const recId = q0.get('id');
     const meta = store.getRecording(recId || '');
     const eigene = meta && authed(req, ip) && meta.agentName && meta.agentName === (reqName(req, ip) || '');
-    if (!isAdmin(req, ip) && !eigene) { res.writeHead(403); res.end('Forbidden'); return true; }
-    const data = store.readRecording(recId);
+    // Liegt die Aufnahme in einer Akte, darf sie jeder Prüfer sehen. In die
+    // Akte kommt er nur mit genanntem Grund, und dieser Abruf wird dort
+    // festgehalten. Vorher bekam eine Kollegin, die das Gespräch nicht selbst
+    // geführt hat, in der Akte ein Videofeld, das schwarz blieb - obwohl ihr
+    // alles andere aus derselben Akte gezeigt wurde.
+    const akte = meta && authed(req, ip) ? store.aufnahmeAkte(recId) : null;
+    if (!isAdmin(req, ip) && !eigene && !akte) { res.writeHead(403); res.end('Forbidden'); return true; }
+    if (!isAdmin(req, ip) && !eigene && akte) {
+      // Nur einmal je Stunde eintragen: ein Videoplayer fragt beim Spulen
+      // dutzende Male nach Teilstücken - das würde die Akte zumüllen.
+      const wer = reqName(req, ip) || 'Prüfer';
+      const merk = recId + '|' + wer;
+      if (!videoNotiert.has(merk) || Date.now() - videoNotiert.get(merk) > 60 * 60 * 1000) {
+        videoNotiert.set(merk, Date.now());
+        store.protokolliereZugriff(akte, { wer, rolle: 'pruefer',
+          grund: 'Aufnahme der Audition angesehen', ip });
+      }
+    }
+    // `mp4=1`: bitte in einem Format, das jedes Telefon versteht. Kommt der
+    // Server nicht dazu (kein ffmpeg), liefert er das Original – lieber die
+    // Datei im falschen Format als gar keine.
+    let umgewandelt = false;
+    let data = null;
+    if (q0.get('mp4')) {
+      const m = store.mp4Fassung(recId);
+      if (m && m.buffer) { data = m; umgewandelt = true; }
+      else if (m && m.fehlt) res.setHeader('X-Umwandlung', 'ffmpeg-fehlt');
+      else if (m && m.fehler) res.setHeader('X-Umwandlung', 'fehlgeschlagen');
+    }
+    if (!data) data = store.readRecording(recId);
     if (!data) { res.writeHead(404); res.end('not found'); return true; }
     // Herunterladen mit ordentlichem Namen. Vorher ging es nur ueber das
     // versteckte Menue im Videofeld, und die Datei hiess dann "recording" -
@@ -1326,7 +1449,7 @@ async function handleApi(req, res, urlPath, ip) {
     if (q0.get('dl')) {
       const datum = String(meta.createdAt || '').slice(0, 10);
       const wer = String(meta.code || 'audition').replace(/[^\w-]/g, '');
-      const name = 'Audition-' + wer + '-' + datum + '.' + (meta.ext || 'webm');
+      const name = 'Audition-' + wer + '-' + datum + '.' + (umgewandelt ? 'mp4' : (meta.ext || 'webm'));
       sec.recordEvent('audit', ip, 'Aufnahme heruntergeladen (' + (reqName(req, ip) || '?') + '): ' + recId);
       res.writeHead(200, { 'Content-Type': data.mime, 'Content-Length': data.buffer.length,
         'Cache-Control': 'no-store', 'Content-Disposition': 'attachment; filename="' + name + '"' });
@@ -1667,6 +1790,10 @@ wss.on('connection', (ws, req) => {
           wegSeit: 0,                       // sie ist ja wieder da
           bereit: vorhanden ? !!vorhanden.bereit : false,
           bereitSeit: vorhanden ? (vorhanden.bereitSeit || 0) : 0,
+          // Wer den Einladungslink verschickt hat, führt die Audition auch
+          // durch. Der Name steht im Zugangscode; hier kommt er in die
+          // Schlange, damit alle sehen, wessen Termin das ist.
+          eingeladenVon: (note && note.createdBy) || (vorhanden ? vorhanden.eingeladenVon : '') || '',
         });
       } else {
         const w = waiting.get(code); if (w) { w.claimedBy = ws.pname; w.claimedAt = Date.now(); }

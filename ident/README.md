@@ -109,24 +109,59 @@ es getan hat. Der Grund für die Akteneinsicht wurde ja beim Öffnen schon genan
 
 ## Herunterladen und weitergeben
 
-- **⬇ Video herunterladen** – neben jeder Aufnahme. Die Datei heisst dann
-  `Audition-<Nummer>-<Datum>.webm`, nicht „recording": damit kann jemand etwas
-  anfangen, der sie weitergeben soll. Vorher ging das nur über das versteckte
-  Menü im Videofeld. Jeder Abruf steht im Protokoll.
+- **⬇ Video herunterladen** – neben jeder Aufnahme. Die Datei heisst
+  `Audition-<Nummer>-<Datum>.mp4`, nicht „recording": damit kann jemand etwas
+  anfangen, der sie weitergeben soll. Jeder Abruf steht im Protokoll.
+- **📱 Aufs Handy speichern** – der Weg für iPhone und Android. **Zwei Tipper,
+  und das mit Absicht:** der erste holt das Video (und wandelt es um, falls
+  nötig), der zweite öffnet den Teilen-Dialog des Systems – Fotos, Dateien,
+  WhatsApp, Mail. Safari erlaubt das Teilen nur direkt aus einem Fingertipp
+  heraus; würde man erst laden und dann teilen, lehnt das iPhone ab.
+  Kann das Gerät keine Dateien teilen (Rechner), wird schlicht heruntergeladen.
 - **📄 Ausweisblatt (PDF)** – im Unterordner *Ausweise*, je Audition eines.
 
 Beides enthält Ausweisdaten und Gesichter. Es gehört zum BIGO-Support und
 nirgendwo anders hin.
 
+### Das Format: MP4, damit die Datei etwas wert ist
+
+Browser nehmen unterschiedlich auf. Chrome am Rechner liefert meist **WEBM** –
+das kann ein iPhone nicht in „Fotos" legen, WhatsApp schickt es nicht weiter,
+und der BIGO-Support kann damit nichts anfangen. Die Aufnahme wäre da, aber
+nicht verwendbar.
+
+Deshalb wandelt der Server um (`ffmpeg`, H.264 + AAC, `+faststart`):
+
+- **Einmal** je Aufnahme. Danach liegt das MP4 verschlüsselt neben dem Original
+  und wird von dort ausgeliefert – der zweite Abruf kommt in Millisekunden.
+- Das Original bleibt unangetastet. Gelöscht wird dabei nichts.
+- Fehlt `ffmpeg`, kommt das Original – lieber die Datei im falschen Format als
+  gar keine. Der Browser sagt dann, was das bedeutet (`X-Umwandlung`).
+- Der **Videoplayer in der Akte** hat zwei Quellen: zuerst das Original (kein
+  Umwandeln nötig), und wenn der Browser das nicht kann – ein iPhone spielt kein
+  WEBM – nimmt er von selbst die MP4-Fassung. `preload="none"`: erst beim
+  Antippen, sonst würde jedes Öffnen der Akte eine Umwandlung auslösen.
+
 ## Die Akte in Unterordnern
 
-Eine Akte mit allem untereinander liest niemand. Also fünf Unterordner mit Zahl
+Eine Akte mit allem untereinander liest niemand. Also sechs Unterordner mit Zahl
 daran, die man einzeln aufklappt:
 
+- **📋 Stammdaten** – was dauerhaft zur Person gehört: Name laut Ausweis,
+  Geburtsdatum, Ausweisart und -nummer, Anschrift, Erreichbarkeit. Die Zahl am
+  Ordner zeigt `3/4`: wie viele der vier wichtigen Felder gefüllt sind.
+  **Füllt sich von selbst** aus jeder Audition und jeder Verifikation – aber nur
+  die leeren Felder, was gepflegt wurde bleibt stehen. Jede Änderung steht mit
+  altem und neuem Wert in den Vermerken. `Aa Schreibweise richten` macht aus
+  „tabea tauch" ein „Tabea Tauch" und aus der Ausweisnummer Grossbuchstaben.
 - **🪪 Ausweise & Dokumente** – die Bilder und je Audition ein **Ausweisblatt als
   PDF**: Deckblatt mit allen Angaben, danach jede Aufnahme in Originalgröße.
   Gebaut ohne fremde Bibliothek (`pdf.js`), JPEG wandert unverändert hinein.
-- **✓ Altersverifikation** – der Verlauf
+- **✓ Altersverifikation** – der Verlauf. Das Formular ist **vorausgefüllt** aus
+  Stammdaten und der jüngsten Audition, inklusive „woran hast du geprüft".
+  Oben steht, woher die Angaben stammen. Zu tun bleibt: mit dem Ausweisbild
+  vergleichen, Erklärung anhaken, bestätigen. Die Erklärung bleibt bewusst ein
+  eigener Handgriff – sie ist der Kern der Prüfung, nicht Beiwerk.
 - **🎬 Auditions** – Gespräche, Aufnahmen, abgehakte Fragen, Wortlaut
 - **📝 Vermerke**
 - **🔒 Akteneinsicht** – wer wann mit welchem Grund
@@ -152,6 +187,24 @@ Das prüft ident von selbst – zweimal:
 Gibt es keinen Treffer, steht da „Neu bei uns – mit der Freigabe wird ein
 neuer Ordner angelegt." Es entsteht also nie versehentlich ein zweiter Ordner
 für dieselbe Person.
+
+### Und wenn doch zwei Akten dastehen
+
+Passiert, wenn eine Akte erst nur unter der Nummer lag und der Spitzname später
+nachgetragen wurde – unter dem gab es dann schon eine. Im **acp → 📁
+Streamer-Akten** steht das oben:
+
+> ⚠ Dieselbe Person liegt 2-mal in den Akten
+
+Vorgeschlagen zum Behalten wird die Akte mit der Arbeit darin (Auditionen zählen
+am meisten). **Zusammenführen wirft nichts weg:** Auditionen, Verifikationen,
+Vermerke, Einsichten und Aufnahmen wandern in die eine Akte, der frühere Name
+bleibt als Alias erhalten – die Person wird also weiter unter beiden Kennungen
+gefunden. Der blaue Haken bleibt, wenn eine der beiden ihn hatte. Erst danach
+verschwindet die leere Hülle, und das steht als Vermerk in der Akte.
+
+Löschen gibt es weiterhin auch – aber bei einer Doppelung ist Zusammenführen der
+richtige Weg, denn dabei geht nichts verloren.
 
 ## Streamer-Ordner
 
@@ -194,6 +247,41 @@ unten in die Aufnahme ein. Damit zeigt die Aufnahme nicht nur, *dass* jemand
 geredet hat, sondern *was er in dem Moment vor sich hatte* – der Unterschied
 zwischen einem Video und einem Nachweis der Einwilligung.
 
+## Der Vorlese-Text: geschrieben, wie man spricht
+
+Wer ablesen und dabei in die Kamera schauen soll, braucht grosse Schrift und
+kurze Sätze. Also:
+
+- **Standardgrösse 1,6 rem**, einstellbar über `A−` / `A+` neben dem
+  Ablese-Tempo. Die Einstellung bleibt für das nächste Mal gemerkt.
+- **Ein Satz pro Zeile**, jeder in einem Atemzug sprechbar. Leere Zeilen sind
+  Pausen.
+- **Abkürzungen ausgeschrieben.** Wer „bzw." oder „V-System" vor sich hat,
+  stolpert oder liest es falsch vor – im Text steht „Vau-System", und „4EVER1"
+  steht als „Forever One" da, so heisst es gesprochen. Der geschriebene Name
+  gehört in die Akte und in den Vertrag, nicht in den Vorlese-Text.
+- Im Video wird die Zeile mit 27 px eingebrannt statt mit 20 – die Aufnahme wird
+  weitergegeben und dort auf einem Telefon gelesen, nicht am grossen Bildschirm.
+
+## Wer einlädt, führt durch
+
+Dennis und Lisa sollen Auditionen allein durchführen können, ohne auf jemanden
+zu warten. Der Zugangscode merkt sich, **wer ihn erzeugt hat**:
+
+- Beim Erzeugen gibt es **„📤 Einladung verschicken"** – Systemdialog mit
+  fertigem Text und Link (WhatsApp, Signal, Mail), am Rechner in die Ablage.
+- In der Warteschlange steht bei eigenen Terminen **„✉ von dir eingeladen"**,
+  bei fremden **„✉ Einladung von Lisa"**.
+- **„Nächsten annehmen"** nimmt nur eigene Einladungen und solche ohne Absender.
+  Wartet nur ein fremder Termin, sagt es das statt ihn wegzuschnappen.
+- Übernehmen kann man ihn trotzdem – der Knopf heisst dann „📞 Für Lisa
+  übernehmen", fragt einmal nach und schreibt es ins Protokoll. Einspringen soll
+  möglich sein, nur nicht aus Versehen.
+- Die Aufnahme darf **jeder Prüfer** sehen und speichern, dem die Akte offensteht
+  – nicht nur der, der das Gespräch geführt hat. Sonst blieb in ihrer Akte ein
+  schwarzes Videofeld, obwohl alles andere daraus gezeigt wurde. Der Abruf steht
+  in der Akte (einmal je Stunde, sonst würde Spulen das Protokoll zumüllen).
+
 ## Der blaue Haken (Altersverifikation ohne Audition)
 
 Wer längst dabei ist, muss kein Gespräch nachholen. Der Prüfer öffnet die
@@ -205,6 +293,13 @@ abhaken muss:
 
 > Ich habe den Ausweis gesehen, das Gesicht stimmt überein und das
 > Geburtsdatum belegt mindestens 18 Jahre.
+
+**Vorausgefüllt ist alles, was schon in der Akte steht** – Name, Geburtsdatum,
+Ausweisart und -nummer aus den Stammdaten und der jüngsten Audition, dazu die
+passende Grundlage. Oben steht, woher es kommt („✅ Schon ausgefüllt aus:
+Audition vom …"). Es abzutippen wäre nicht nur Arbeit, sondern eine zweite
+Fehlerquelle. Zu tun bleibt: mit dem Ausweisbild darüber vergleichen, anhaken,
+bestätigen.
 
 Ohne Ausweisart und Grundlage nimmt **der Server** es nicht an – das ist keine
 Höflichkeitsabfrage im Browser. Wer bestanden hat, trägt danach den blauen
@@ -239,6 +334,20 @@ Kantenmenü links nach Aufgaben gruppiert, Arbeitsfläche in der Mitte, rechts
 eine Spalte, die den Bereich erklärt, in dem man gerade steht – ausblendbar,
 der Browser merkt es sich. Die Übersicht zeigt Kacheln, die selbst sagen, ob
 etwas ansteht, und in ihren Bereich führen.
+
+**📁 Streamer-Akten** ist der Bereich, in dem die Akte aufgebaut wird:
+
+- oben die **doppelten Akten** mit einem Knopf zum Zusammenführen
+- darunter jede Akte mit Kennung, Ausweisdaten, Zahl der Auditionen und
+  Verifikationen, früheren Namen und dem blauen Haken
+- die **Stammdaten direkt zum Bearbeiten**, dazu `🪪 Aus der Akte übernehmen`
+  (holt, was Auditionen und Verifikationen schon hergeben) und `🗑 Akte löschen`
+- fehlt etwas, steht es als Satz dabei: „Es fehlen noch: Geburtsdatum."
+- Suche über BIGO-ID, Name, frühere Namen und Ausweisnummer
+
+**📖 Audition-Texte** hat jetzt `↺ Unseren Vorschlag einsetzen`: setzt den Text
+in das Feld, gespeichert wird erst mit dem Knopf daneben – versehentlich
+überschreiben kann man also nichts.
 
 ## Sicherheit
 
@@ -288,6 +397,20 @@ Das Skript holt den Quellcode, baut das Abbild, tauscht den Container und
 prüft, ob er antwortet – sonst stellt es die vorige Fassung wieder her. Daten
 und Zugangsdaten liegen ausserhalb des Containers und bleiben unberührt.
 
+Im Abbild steckt **`ffmpeg`** (für MP4, siehe oben). Der erste Bau danach dauert
+etwas länger und das Abbild wächst um rund 30 MB – dafür ist jede Aufnahme
+weitergabefähig. Fehlt `ffmpeg`, läuft alles weiter, nur bleibt die Datei im
+Originalformat; im Log steht dann eine Zeile `[rec] ffmpeg ist nicht installiert`.
+
+**Was im Log über Aufnahmen steht** (`docker logs 4ever1-ident | grep '\[rec\]'`):
+
+```
+[rec] begonnen <sitzung> nummer=ABC12345 von=dennis art=webm
+[rec] Stück 1 angekommen (<sitzung>)          # dann jedes zehnte
+[rec] fertig <id> nummer=ABC12345 812 kB 47s
+[rec] MP4 erzeugt <id> 640 kB
+```
+
 **Wenn man nicht mehr hineinkommt** (acp. oder mcp.):
 
 ```bash
@@ -330,6 +453,7 @@ ident/
 ├── security.js    Verschlüsselung, Login, 2FA, Missbrauchsschutz, Header
 ├── store.js       verschlüsselte Ablage (Codes, Konten, Akten, Aufnahmen, Ordner)
 ├── mcp.js         Übergabe der fertigen Akte in den Streamer-Ordner
+├── pdf.js         Ausweisblatt als PDF, ohne fremde Bibliothek
 ├── textpolish.js  räumt Vermerke und Protokoll-Einträge auf (regelbasiert)
 ├── deploy.sh      Quellcode holen, bauen, tauschen, im Fehlerfall zurück
 ├── notzugang.sh   wieder hineinkommen, wenn Sperre, Gerätebindung oder 2FA zu ist

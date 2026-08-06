@@ -869,6 +869,90 @@
   // vergleichen, abhaken - fertig. Bleibt dauerhaft in der Akte stehen.
   const GRUNDLAGEN = ['im Videogespräch gesehen', 'Original vor Ort gesehen',
     'aus der Audition-Akte übernommen', 'Ausweisbild in der Akte geprüft'];
+  /* ---- Unterordner „Stammdaten": die Akte selbst pflegen -----------------
+   * Was dauerhaft zur Person gehört, stand bisher nur je Audition da – also
+   * einmal pro Gespräch, verstreut. Hier steht es an einer Stelle, wird aus den
+   * geprüften Ausweisdaten vorbefüllt und kann von Hand nachgezogen werden.
+   * Jede Änderung landet mit altem und neuem Wert in den Vermerken.
+   */
+  const STAMM = [
+    ['nameLautAusweis', 'Name laut Ausweis', 'Vor- und Nachname, genau wie im Ausweis'],
+    ['geburtsdatum', 'Geburtsdatum', 'TT.MM.JJJJ'],
+    ['ausweisart', 'Ausweisart', 'Personalausweis, Reisepass …'],
+    ['ausweisnummer', 'Ausweis-Nummer', 'genau abtippen, Groß-/Kleinschreibung beachten'],
+    ['anschrift', 'Anschrift', 'Straße, PLZ, Ort (optional)'],
+    ['telefon', 'Telefon', 'optional'],
+    ['email', 'E-Mail', 'optional'],
+    ['hinweis', 'Hinweis', 'was man zu dieser Person wissen sollte'],
+  ];
+  function stammBlock(s) {
+    const box = document.createElement('div');
+    box.className = 'stamm';
+    const st = s.stamm || {};
+    box.innerHTML = '<div class="stamm-hinweis">Diese Angaben gehören zur Person, nicht zu einem einzelnen '
+      + 'Gespräch. Nach einer Audition oder Verifikation füllen sie sich <b>von selbst</b> – '
+      + 'aber nur die leeren Felder. Was hier steht, bleibt stehen.</div>'
+      + '<div class="stamm-felder">'
+      + STAMM.map(([k, titel, hilfe]) => '<label class="stamm-f"><span>' + esc(titel) + '</span>'
+        + '<input data-stamm="' + k + '" value="' + esc(st[k] || '') + '" placeholder="' + esc(hilfe) + '">'
+        + '</label>').join('')
+      + '</div>'
+      + '<div class="stamm-akt">'
+      + '<button class="good" data-stamm-save>💾 Stammdaten speichern</button>'
+      + '<button data-stamm-holen>🪪 Aus Audition/Verifikation übernehmen</button>'
+      + '<button data-stamm-gross>Aa Schreibweise richten</button>'
+      + '<span class="stamm-msg"></span></div>'
+      + (st.gepflegtVon ? '<div class="stamm-fuss">Zuletzt gepflegt von ' + esc(st.gepflegtVon)
+        + ' am ' + esc(new Date(st.gepflegtAm).toLocaleString('de-DE')) + '</div>' : '');
+    const msg = box.querySelector('.stamm-msg');
+    const felder = () => {
+      const d = {};
+      box.querySelectorAll('[data-stamm]').forEach((i) => { d[i.dataset.stamm] = i.value; });
+      return d;
+    };
+    // In dasselbe Objekt hineinschreiben, nicht ersetzen: die anderen Blöcke der
+    // geöffneten Akte – etwa das Verifikations-Formular – halten genau diese
+    // Akte in der Hand. Ersetzt man sie, arbeiten sie mit dem Stand von vorher
+    // und ein gerade eingetragenes Geburtsdatum fehlt dort wieder.
+    const frisch = (ordner) => {
+      Object.assign(s, ordner);
+      const i = (state.ordner || []).findIndex((x) => x.id === s.id);
+      if (i >= 0) state.ordner[i] = s;
+    };
+    box.querySelector('[data-stamm-save]').addEventListener('click', async (e) => {
+      e.target.disabled = true; msg.textContent = 'speichert …';
+      const r = await api('POST', '/api/streamer-stamm', { id: s.id, stamm: felder() });
+      e.target.disabled = false;
+      if (r.status !== 200) { msg.textContent = 'Hat nicht geklappt.'; return; }
+      frisch(r.body.ordner);
+      msg.textContent = r.body.geaendert.length
+        ? 'Gespeichert ✓ (' + r.body.geaendert.length + ' geändert)' : 'Nichts zu ändern.';
+      if (r.body.geaendert.length) toast('Stammdaten gespeichert – steht als Vermerk in der Akte.');
+    });
+    box.querySelector('[data-stamm-holen]').addEventListener('click', async (e) => {
+      e.target.disabled = true; msg.textContent = 'sucht …';
+      const r = await api('POST', '/api/streamer-stamm-uebernehmen', { id: s.id });
+      e.target.disabled = false;
+      if (r.status !== 200) { msg.textContent = 'Hat nicht geklappt.'; return; }
+      frisch(r.body.ordner);
+      const st2 = r.body.ordner.stamm || {};
+      box.querySelectorAll('[data-stamm]').forEach((i) => { i.value = st2[i.dataset.stamm] || ''; });
+      msg.textContent = r.body.uebernommen.length
+        ? r.body.uebernommen.length + ' Feld(er) übernommen ✓'
+        : 'Es gibt nichts zu übernehmen – oder alles ist schon gefüllt.';
+    });
+    // Großschreibung: „mara beispiel" wird zu „Mara Beispiel", die Nummer groß.
+    box.querySelector('[data-stamm-gross]').addEventListener('click', () => {
+      box.querySelectorAll('[data-stamm]').forEach((i) => {
+        if (!i.value.trim()) return;
+        if (i.dataset.stamm === 'ausweisnummer') i.value = i.value.toUpperCase();
+        else if (['nameLautAusweis', 'ausweisart', 'anschrift'].includes(i.dataset.stamm)) i.value = grossName(i.value);
+      });
+      msg.textContent = 'Gerichtet – bitte mit dem Ausweis vergleichen, dann speichern.';
+    });
+    return box;
+  }
+
   function verifikationBlock(s) {
     const box = document.createElement('div');
     box.className = 'verif' + (s.verifiziert ? ' hat' : '');
@@ -902,13 +986,45 @@
     if (box.querySelector('.verif-form')) return;
     const f = document.createElement('div');
     f.className = 'verif-form';
-    f.innerHTML = '<div class="vfz"><input id="vfName" placeholder="Name laut Ausweis" value="' + esc(s.name || '') + '">'
-      + '<input id="vfGeb" placeholder="Geburtsdatum (TT.MM.JJJJ)"></div>'
+    // ---- Alles vorausfüllen, was schon in der Akte steht ------------------
+    // Die Ausweisdaten hat die Bewerberin in der Audition selbst eingetippt und
+    // der Prüfer hat sie mit dem Bild verglichen. Sie noch einmal abzutippen
+    // wäre nicht nur Arbeit, sondern eine zweite Fehlerquelle. Also: eintragen,
+    // sichtbar machen, woher es kommt – bestätigen muss man trotzdem selbst.
+    const st = s.stamm || {};
+    const letzte = (s.auditions || []).slice()
+      .sort((a, b) => String(b.erstelltAm || '').localeCompare(String(a.erstelltAm || '')))[0] || {};
+    const bilderDa = ((letzte.dateien || []).filter((d) => d.art === 'ausweis' && d.dateiname).length) > 0;
+    const vor = {
+      name: st.nameLautAusweis || s.name || '',
+      geb: st.geburtsdatum || '',
+      art: st.ausweisart || letzte.ausweisart || '',
+      nr: st.ausweisnummer || letzte.ausweisnummer || '',
+      grundlage: bilderDa ? 'Ausweisbild in der Akte geprüft'
+        : (letzte.auditionId ? 'aus der Audition-Akte übernommen' : ''),
+    };
+    const woher = [];
+    if (letzte.erstelltAm && (vor.art || vor.nr)) {
+      woher.push('Audition vom ' + new Date(letzte.erstelltAm).toLocaleDateString('de-DE'));
+    }
+    if (st.gepflegtVon) woher.push('Stammdaten (' + st.gepflegtVon + ')');
+    const ARTEN = ['Personalausweis', 'Reisepass', 'Aufenthaltstitel', 'Führerschein'];
+    f.innerHTML = (woher.length
+      ? '<div class="vf-vorab">✅ <b>Schon ausgefüllt</b> aus: ' + esc(woher.join(' · '))
+        + '<br><span>Bitte mit dem Ausweisbild darüber vergleichen. Stimmt alles, nur noch die Erklärung '
+        + 'anhaken und bestätigen.</span></div>'
+      : '')
+      + '<div class="vfz"><input id="vfName" placeholder="Name laut Ausweis" value="' + esc(vor.name) + '">'
+      + '<input id="vfGeb" placeholder="Geburtsdatum (TT.MM.JJJJ)" value="' + esc(vor.geb) + '"></div>'
       + '<div class="vfz"><select id="vfArt"><option value="">Ausweisart …</option>'
-      + ['Personalausweis', 'Reisepass', 'Aufenthaltstitel', 'Führerschein'].map((a) => '<option>' + a + '</option>').join('')
-      + '</select><input id="vfNr" placeholder="Ausweis-Nummer"></div>'
+      + ARTEN.map((a) => '<option' + (a === vor.art ? ' selected' : '') + '>' + a + '</option>').join('')
+      // Eine Ausweisart aus der Audition, die nicht in der Liste steht, darf
+      // nicht verschwinden – sonst stünde da plötzlich nichts.
+      + (vor.art && !ARTEN.includes(vor.art) ? '<option selected>' + esc(vor.art) + '</option>' : '')
+      + '</select><input id="vfNr" placeholder="Ausweis-Nummer" value="' + esc(vor.nr) + '"></div>'
       + '<select id="vfGrundlage"><option value="">Woran hast du geprüft? …</option>'
-      + GRUNDLAGEN.map((g) => '<option>' + esc(g) + '</option>').join('') + '</select>'
+      + GRUNDLAGEN.map((g) => '<option' + (g === vor.grundlage ? ' selected' : '') + '>' + esc(g) + '</option>').join('')
+      + '</select>'
       + '<label class="vf-erkl"><input type="checkbox" id="vfHaken"> Ich habe den Ausweis gesehen, '
       + 'das <b>Gesicht stimmt überein</b> und das <b>Geburtsdatum belegt mindestens 18 Jahre</b>. '
       + 'Der Ausweis wirkte echt und unverändert.</label>'
@@ -1130,6 +1246,14 @@
     // Blick, wo etwas drin ist, und öffnet nur das, was man braucht.
     const auds = s.auditions || [];
     const bilderZahl = auds.reduce((n, a) => n + (a.dateien || []).filter((d) => d.art === 'ausweis' && d.dateiname).length, 0);
+    // Stammdaten zuerst: das ist die Akte selbst. Fehlt etwas, steht die Zahl
+    // auf der Lücke – dann sieht man auf einen Blick, dass zu pflegen ist.
+    const st = s.stamm || {};
+    const gepflegt = ['nameLautAusweis', 'geburtsdatum', 'ausweisart', 'ausweisnummer']
+      .filter((k) => String(st[k] || '').trim()).length;
+    host.appendChild(unterordner('📋', 'Stammdaten', gepflegt + '/4',
+      gepflegt === 4 ? 'Name, Geburtsdatum und Ausweis sind hinterlegt'
+        : 'Ausweisdaten übernehmen oder eintragen', () => stammBlock(s), gepflegt < 4));
     host.appendChild(unterordner('🪪', 'Ausweise & Dokumente', bilderZahl,
       'Ausweisbilder und das Ausweisblatt als PDF', () => ausweisOrdner(s), bilderZahl > 0));
     host.appendChild(unterordner('✓', 'Altersverifikation', (s.verifikationen || []).length,
@@ -1235,9 +1359,107 @@
         if (i >= 0) state.ordner[i] = rr.body.ordner;
         zeichneOrdner();
       });
-      z.appendChild(b); k.appendChild(z);
+      z.appendChild(b);
+      // Auch hier schon speichern können. Manchmal will man das Video sofort
+      // haben, ohne es vorher irgendwo einzusortieren.
+      const sp = document.createElement('button');
+      sp.className = 'dl-knopf teil-knopf'; sp.dataset.rec = a.id;
+      sp.textContent = '📱 Aufs Handy speichern';
+      z.appendChild(sp); handyKnoepfe(z);
+      k.appendChild(z);
     });
     host.appendChild(k);
+  }
+
+  /* ---- Video aufs Handy holen -------------------------------------------
+   * Der Herunterladen-Link allein reicht am Telefon nicht. Android legt die
+   * Datei irgendwo in „Downloads" ab, und das iPhone kennt bei einem Link nur
+   * „In Dateien speichern" – in die Fotos oder direkt zu WhatsApp kommt sie so
+   * nicht. Deshalb der Weg über die Teilen-Funktion des Systems: dort wählt man
+   * selbst, wohin. Auf dem Rechner gibt es diese Funktion nicht, dort wird
+   * einfach heruntergeladen.
+   *
+   * Zwei Tipper, und das mit Absicht: Safari erlaubt das Teilen nur direkt aus
+   * einem Fingertipp heraus. Würden wir erst das Video laden (das dauert) und
+   * danach teilen, gilt der Tipp als verbraucht und das iPhone lehnt ab. Also:
+   * erst „vorbereiten", dann „teilen".
+   */
+  const videoBereit = new Map(); // Aufnahme-Nummer -> fertige Datei
+  function kannTeilen(datei) {
+    try { return !!(navigator.canShare && navigator.canShare({ files: [datei] })); } catch { return false; }
+  }
+  async function videoVorbereiten(recId, knopf) {
+    const vorher = knopf.textContent;
+    knopf.disabled = true; knopf.textContent = '⏳ Video wird vorbereitet …';
+    // Beim ersten Mal wird umgewandelt; das dauert bei langen Gesprächen. Nach
+    // ein paar Sekunden sagen wir, dass es weiterläuft – sonst denkt man, es
+    // hängt, und tippt noch einmal.
+    const gedulden = setTimeout(() => {
+      if (knopf.disabled) knopf.textContent = '⏳ wird ins Handy-Format gebracht …';
+    }, 4000);
+    try {
+      // mp4=1: der Server wandelt um, wenn das Original ein Format ist, das
+      // Telefone nicht mögen. Das kann beim ersten Mal etwas dauern – danach
+      // liegt es fertig da.
+      const res = await fetch('/api/recording?dl=1&mp4=1&id=' + encodeURIComponent(recId)
+        + '&token=' + encodeURIComponent(state.token), { cache: 'no-store' });
+      if (!res.ok) throw new Error('Status ' + res.status);
+      const blob = await res.blob();
+      const typ = blob.type || 'video/mp4';
+      const endung = typ.indexOf('webm') >= 0 ? 'webm' : typ.indexOf('quicktime') >= 0 ? 'mov' : 'mp4';
+      // Den Namen gibt der Server vor („Audition-NUMMER-DATUM"). Genau der soll
+      // auch beim Teilen erscheinen, damit man die Datei später wiedererkennt.
+      const kopf = res.headers.get('content-disposition') || '';
+      const gef = /filename="([^"]+)"/.exec(kopf);
+      const name = gef ? gef[1] : 'Audition-' + String(recId).slice(0, 8) + '.' + endung;
+      const datei = new File([blob], name, { type: typ });
+      videoBereit.set(recId, datei);
+      knopf.disabled = false;
+      knopf.dataset.fertig = '1';
+      knopf.textContent = (kannTeilen(datei) ? '📤 Jetzt teilen · ' : '⬇ Jetzt speichern · ')
+        + (blob.size / (1024 * 1024)).toFixed(1) + ' MB · ' + endung.toUpperCase();
+      if (endung === 'webm') {
+        // Konnte nicht umgewandelt werden. Dann ehrlich sagen, was das heißt.
+        const g = res.headers.get('x-umwandlung') || '';
+        toast(g === 'ffmpeg-fehlt'
+          ? 'Der Server kann noch nicht in MP4 umwandeln – die Datei kommt als WEBM. Am iPhone landet sie in „Dateien".'
+          : 'Format WEBM – das iPhone legt es in „Dateien" ab, nicht in „Fotos".');
+      }
+    } catch (e) {
+      knopf.disabled = false; knopf.textContent = vorher;
+      toast('Video ließ sich nicht laden. Noch einmal versuchen.');
+    } finally {
+      clearTimeout(gedulden);
+    }
+  }
+  function videoTeilen(recId) {
+    const datei = videoBereit.get(recId);
+    if (!datei) return;
+    if (kannTeilen(datei)) {
+      // Systemdialog: Fotos, Dateien, WhatsApp, Mail – der Nutzer entscheidet.
+      navigator.share({ files: [datei], title: 'Audition' })
+        .then(() => toast('Weitergegeben ✓'))
+        .catch((e) => { if (!e || e.name !== 'AbortError') videoSichern(datei); });
+      return;
+    }
+    videoSichern(datei);
+  }
+  function videoSichern(datei) {
+    const url = URL.createObjectURL(datei);
+    const a = document.createElement('a');
+    a.href = url; a.download = datei.name; a.rel = 'noopener';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+    toast('Gespeichert – liegt in deinen Downloads.');
+  }
+  /** Die Handy-Knöpfe in einem gerade gebauten Stück Akte scharf machen. */
+  function handyKnoepfe(wurzel) {
+    wurzel.querySelectorAll('.teil-knopf').forEach((b) => {
+      b.addEventListener('click', () => {
+        if (b.dataset.fertig) videoTeilen(b.dataset.rec);
+        else videoVorbereiten(b.dataset.rec, b);
+      });
+    });
   }
 
   /** Unterordner „Auditions": die Gespräche mit allem, was dazugehört. */
@@ -1269,14 +1491,31 @@
         // der Akte, ohne dass man es lesen konnte – gespeichert, aber unsichtbar.
         + (a.notiz ? '<div class="ord-notiz"><b>Notiz des Prüfers</b>' + esc(a.notiz) + '</div>' : '')
         + '<div style="margin-top:.45rem">' + aufTxt + '</div>'
-        + (auf ? '<video controls preload="metadata" src="/api/recording?id=' + encodeURIComponent(auf.id)
-            + '&token=' + encodeURIComponent(state.token) + '"></video>'
+        // Zwei Quellen, und die Reihenfolge ist Absicht: zuerst das Original,
+        // das kommt ohne Umwandlung. Kann der Browser es nicht – ein iPhone
+        // spielt kein WEBM – nimmt er von selbst die zweite und der Server
+        // wandelt nach MP4 um. preload="none", damit das erst beim Antippen
+        // passiert und nicht bei jedem Öffnen der Akte.
+        + (auf ? '<video controls preload="none">'
+            + '<source src="/api/recording?id=' + encodeURIComponent(auf.id)
+              + '&token=' + encodeURIComponent(state.token) + '" type="video/'
+              + ((auf.ext || 'webm') === 'mp4' ? 'mp4' : 'webm') + '">'
+            + ((auf.ext || 'webm') === 'mp4' ? ''
+              : '<source src="/api/recording?mp4=1&id=' + encodeURIComponent(auf.id)
+                + '&token=' + encodeURIComponent(state.token) + '" type="video/mp4">')
+            + '</video>'
             // Herunterladen und Weitergeben: ein Knopf, keine versteckte Menuefunktion.
             + '<div class="dl-reihe">'
-            + '<a class="dl-knopf" download href="/api/recording?dl=1&id=' + encodeURIComponent(auf.id)
+            + '<a class="dl-knopf" download href="/api/recording?dl=1&mp4=1&id=' + encodeURIComponent(auf.id)
               + '&token=' + encodeURIComponent(state.token) + '">⬇ Video herunterladen</a>'
+            // Am Telefon der bessere Weg: erst laden, dann über den
+            // Systemdialog in Fotos, Dateien oder WhatsApp legen.
+            + '<button class="dl-knopf teil-knopf" data-rec="' + esc(auf.id) + '">'
+              + '📱 Aufs Handy speichern</button>'
             + '<span class="dl-hinweis">Zum Weitergeben an den BIGO-Support. '
-              + 'Enthält Bild und Ton des Gesprächs – bitte nur dorthin, wo es hingehört.</span>'
+              + 'Enthält Bild und Ton des Gesprächs – bitte nur dorthin, wo es hingehört.<br>'
+              + '<b>Am Handy:</b> „Aufs Handy speichern" antippen, warten, dann noch einmal antippen – '
+              + 'dann kommt die Auswahl von iPhone bzw. Android. Das Video bleibt dabei in der Akte.</span>'
             + '</div>' : '')
         + ausweisBilder(a)
         + hakenListe(a)
@@ -1285,6 +1524,9 @@
             + a.protokoll.map((e) => '<div style="padding:.3rem 0">' + esc(e.text)
               + '<small>' + esc(e.autor || '') + ' · ' + esc(new Date(e.am).toLocaleString('de-DE')) + '</small></div>').join('')
             + '</div>' : '');
+      // Der Handy-Knopf braucht einen echten Klick-Zuhörer, ein Link genügt
+      // dafür nicht.
+      handyKnoepfe(d);
       k.appendChild(d);
     });
     return k;
@@ -1498,14 +1740,33 @@
           + (w.bigoId ? ' · BIGO-ID ' + esc(w.bigoId) : '')
           + (w.bigoNick ? ' · ' + esc(w.bigoNick) : '')
           + (w.note ? ' · ' + esc(w.note) : '')
+          // Wer den Link verschickt hat, führt die Audition durch. Bei eigenen
+          // Terminen steht „von dir", bei fremden der Name der Kollegin – dann
+          // wartet die Bewerberin auf sie, nicht auf einen selbst.
+          + (w.eingeladenVon
+            ? (w.eingeladenVon === state.name
+              ? ' · <b class="ein-pill eigen">✉ von dir eingeladen</b>'
+              : ' · <b class="ein-pill">✉ Einladung von ' + esc(w.eingeladenVon) + '</b>')
+            : '')
           + bekanntZeile(w) + '</div></div>';
         const acts = document.createElement('div'); acts.className = 'acts';
         const b = document.createElement('button');
         // Erst abholen, wenn sie selbst Bescheid gegeben hat. Wer noch ausfüllt,
         // wird nicht unterbrochen – man sieht es am Knopf und an der Zeile.
         if (w.bereit) {
-          b.className = 'primary'; b.textContent = '📞 Abholen';
-          b.addEventListener('click', () => joinRoom(w.code, false));
+          const fremd = w.eingeladenVon && w.eingeladenVon !== state.name;
+          b.className = fremd ? 'warn' : 'primary';
+          b.textContent = fremd ? '📞 Für ' + w.eingeladenVon + ' übernehmen' : '📞 Abholen';
+          if (fremd) b.title = w.eingeladenVon + ' hat den Link verschickt und wollte das Gespräch führen. '
+            + 'Du kannst einspringen – das wird im Protokoll festgehalten.';
+          b.addEventListener('click', () => {
+            // Bei einem fremden Termin einmal nachfragen. Nicht als Sperre,
+            // sondern damit man nicht versehentlich in das Gespräch einer
+            // Kollegin platzt.
+            if (fremd && !confirm(w.eingeladenVon + ' hat diese Bewerberin eingeladen.\n\n'
+              + 'Trotzdem selbst übernehmen? Es wird protokolliert.')) return;
+            joinRoom(w.code, false);
+          });
         } else {
           b.className = ''; b.disabled = true; b.textContent = '✍ füllt noch aus';
           b.title = 'Sie liest die Aufklärung und trägt ihre Ausweisdaten ein. '
@@ -1559,7 +1820,17 @@
     const r = await api('POST', '/api/waiting/next', {});
     if (r.status === 200 && r.body.code) { joinRoom(r.body.code, false); return; }
     b.disabled = false;
-    toast(r.status === 404 ? 'Gerade wartet niemand.' : 'Konnte niemanden übernehmen.');
+    const g = (r.body && r.body.reason) || '';
+    // „Nächsten annehmen" greift nur nach eigenen Einladungen. Wartet nur der
+    // Termin einer Kollegin, sagen wir das – übernehmen kann man ihn über die
+    // Karte, ein Klick weiter.
+    if (g === 'fremde-einladung') {
+      toast('Es wartet nur die Einladung von ' + (r.body.von || 'einer Kollegin')
+        + '. Wenn du einspringen willst, nimm sie unten in der Liste.');
+    } else if (g === 'noch-nicht-fertig') {
+      toast((r.body.fuellenNoch || 1) === 1 ? 'Sie füllt noch aus – gleich wird der Knopf frei.'
+        : r.body.fuellenNoch + ' füllen noch aus.');
+    } else toast(r.status === 404 ? 'Gerade wartet niemand.' : 'Konnte niemanden übernehmen.');
     refreshWaiting();
   });
 
@@ -1603,7 +1874,21 @@
       const link = applicantLink(r.body.code);
       let copied = false;
       try { await navigator.clipboard.writeText(link); copied = true; } catch {}
-      $('newCodeResult').innerHTML = `Nummer: <b>${esc(r.body.code)}</b>${copied ? ' · Link kopiert ✓' : ''}<br><a href="${esc(link)}" target="_blank" rel="noopener" style="word-break:break-all;color:var(--accent)">${esc(link)}</a>`;
+      $('newCodeResult').innerHTML = `Nummer: <b>${esc(r.body.code)}</b>${copied ? ' · Link kopiert ✓' : ''}`
+        + `<br><a href="${esc(link)}" target="_blank" rel="noopener" style="word-break:break-all;color:var(--accent)">${esc(link)}</a>`
+        + '<div class="dl-reihe"><button class="dl-knopf" id="linkTeilen">📤 Einladung verschicken</button>'
+        + '<span class="dl-hinweis">Du hast eingeladen – also führst <b>du</b> die Audition durch. '
+        + 'Sie erscheint bei dir im Warteraum mit dem Vermerk „von dir eingeladen".</span></div>';
+      // Verschicken über WhatsApp, Signal, Mail – was das Gerät anbietet.
+      const lt = $('linkTeilen');
+      if (lt) lt.addEventListener('click', async () => {
+        const text = 'Hallo! Hier ist dein Link für die Audition bei 4EVER1:\n' + link
+          + '\n\nHalte bitte deinen Ausweis und deine BIGO-ID bereit.';
+        try {
+          if (navigator.share) { await navigator.share({ title: 'Audition bei 4EVER1', text }); return; }
+          await navigator.clipboard.writeText(text); toast('Einladung kopiert – jetzt einfügen.');
+        } catch (e) { if (!e || e.name !== 'AbortError') toast('Konnte nicht geteilt werden.'); }
+      });
     } else $('newCodeResult').textContent = 'Konnte keine Nummer erzeugen.';
   });
   $('waitLogout').addEventListener('click', () => { clearInterval(state.waitingTimer); state.token = ''; state.name = ''; state.isAdmin = false; $('waitingView').style.display = 'none'; $('lobby').style.display = ''; $('passInput').value = ''; $('totpInput').value = ''; });
@@ -1689,6 +1974,29 @@
     showSpeed();
     $('prompterSpeed').addEventListener('input', () => { showSpeed(); try { localStorage.setItem('ident.prompterSpeed', $('prompterSpeed').value); } catch {} });
   }
+  // ---- Schriftgröße des Vorlese-Textes -----------------------------------
+  // Sie war zu klein: wer ablesen und dabei in die Kamera schauen soll, beugt
+  // sich sonst vor. Standard ist jetzt groß, und jeder kann es selbst
+  // nachstellen – die Einstellung bleibt für das nächste Mal gemerkt.
+  const VORLESE_MIN = 1.1, VORLESE_MAX = 3.0, VORLESE_STD = 1.6;
+  function vorleseGroesse() {
+    let v = VORLESE_STD;
+    try { const g = parseFloat(localStorage.getItem('ident.vorleseGroesse')); if (g >= VORLESE_MIN && g <= VORLESE_MAX) v = g; } catch {}
+    return v;
+  }
+  function setzeVorleseGroesse(v) {
+    const g = Math.min(VORLESE_MAX, Math.max(VORLESE_MIN, Math.round(v * 20) / 20));
+    document.documentElement.style.setProperty('--vorlese', g + 'rem');
+    try { localStorage.setItem('ident.vorleseGroesse', String(g)); } catch {}
+    return g;
+  }
+  setzeVorleseGroesse(vorleseGroesse());
+  if ($('schriftGross')) $('schriftGross').addEventListener('click', () => {
+    setzeVorleseGroesse(vorleseGroesse() + 0.15); promptPos = $('prompterBox') ? $('prompterBox').scrollTop : promptPos;
+  });
+  if ($('schriftKlein')) $('schriftKlein').addEventListener('click', () => {
+    setzeVorleseGroesse(vorleseGroesse() - 0.15); promptPos = $('prompterBox') ? $('prompterBox').scrollTop : promptPos;
+  });
   // Manuelles Scrollen mit dem Auto-Scroll synchronisieren (Bewerber darf jederzeit
   // selbst scrollen; Auto-Scroll macht dann von dort weiter).
   if ($('prompterBox')) $('prompterBox').addEventListener('scroll', () => {
@@ -2869,13 +3177,15 @@
    */
   function vorleseBand(ctx, W, H, text) {
     const t = String(text || '').trim(); if (!t) return;
-    ctx.font = '600 20px -apple-system,Segoe UI,Roboto,sans-serif';
+    // Groß genug, um es später auf einem Telefon noch lesen zu können – das
+    // Video wird weitergegeben und nicht am großen Bildschirm geprüft.
+    ctx.font = '700 27px -apple-system,Segoe UI,Roboto,sans-serif';
     const zeilen = umbrechen(ctx, t, W - 60, 2);
-    const zh = 26, hoehe = zeilen.length * zh + 18;
+    const zh = 34, hoehe = zeilen.length * zh + 20;
     ctx.fillStyle = 'rgba(6,10,20,.78)';
     ctx.fillRect(0, H - hoehe, W, hoehe);
     ctx.fillStyle = '#eaf0ff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    zeilen.forEach((z, i) => ctx.fillText(z, W / 2, H - hoehe + 9 + zh * i + zh / 2));
+    zeilen.forEach((z, i) => ctx.fillText(z, W / 2, H - hoehe + 10 + zh * i + zh / 2));
     ctx.textAlign = 'start'; ctx.textBaseline = 'alphabetic';
   }
   /** Text auf höchstens `max` Zeilen umbrechen; der Rest bekommt ein Auslassungszeichen. */

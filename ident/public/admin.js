@@ -175,8 +175,16 @@
     document.querySelector('.nav').addEventListener('click', (e) => { const b = e.target.closest('button[data-sec]'); if (b) show(b.dataset.sec); });
     bindeKante();
     if ($('scriptSave')) $('scriptSave').addEventListener('click', saveScript);
+    // Zurück zu unserem Text – gespeichert wird erst mit dem Knopf daneben,
+    // versehentlich überschreiben kann man also nichts.
+    if ($('scriptVorschlag')) $('scriptVorschlag').addEventListener('click', () => {
+      if (!scriptVorschlagText) return;
+      $('scriptText').value = scriptVorschlagText;
+      $('scriptMsg').textContent = 'Eingesetzt – noch nicht gespeichert.';
+    });
     if ($('introSave')) $('introSave').addEventListener('click', saveIntro);
     if ($('caseSearch')) $('caseSearch').addEventListener('input', (e) => renderCases(e.target.value));
+    if ($('aktenSuche')) $('aktenSuche').addEventListener('input', (e) => zeichneAkten(e.target.value));
     if ($('addAgent')) $('addAgent').addEventListener('click', addAgent);
     if ($('loginLogClear')) $('loginLogClear').addEventListener('click', async () => {
       if (!confirm('Anmelde-Protokoll wirklich leeren? Die Einträge sind danach weg.')) return;
@@ -194,7 +202,7 @@
     document.querySelectorAll('.nav button[data-sec]').forEach((b) => b.classList.toggle('sel', b.dataset.sec === sec));
     document.querySelectorAll('.section').forEach((s) => s.classList.toggle('on', s.dataset.pane === sec));
     zeigeKante(sec);
-    ({ overview: loadOverview, cases: loadCases, rec: loadRec, agents: loadAgents, script: loadScriptEditor, adminsec: loadA2fa, security: loadSecurity }[sec] || (() => {}))();
+    ({ overview: loadOverview, cases: loadCases, akten: loadAkten, rec: loadRec, agents: loadAgents, script: loadScriptEditor, adminsec: loadA2fa, security: loadSecurity }[sec] || (() => {}))();
   }
 
   // ---- Rechte Kante --------------------------------------------------------
@@ -324,8 +332,10 @@
       else $('a2faMsg').textContent = 'Code falsch – bitte erneut versuchen.';
     });
   }
+  let scriptVorschlagText = '';
   async function loadScriptEditor() {
-    const s = await api('GET', '/api/script'); if (s.status === 200) $('scriptText').value = s.body.script || '';
+    const s = await api('GET', '/api/script');
+    if (s.status === 200) { $('scriptText').value = s.body.script || ''; scriptVorschlagText = s.body.vorschlag || ''; }
     const i = await api('GET', '/api/intro'); if (i.status === 200) $('introTextEdit').value = i.body.intro || '';
   }
   async function saveScript() {
@@ -418,6 +428,130 @@
   // ---- Fälle ----
   let allCases = [];
   let mcpAn = false;
+  // ================= Streamer-Akten =========================================
+  // Die Akte selbst: wer es ist, welcher Ausweis dazugehört. Alles, was schon
+  // geprüft wurde, steht vorausgefüllt da – man sieht nach und bestätigt.
+  // Doppelte Akten (dieselbe Person zweimal) lassen sich hier zusammenführen;
+  // dabei geht nichts verloren, nur die leere Hülle verschwindet.
+  const AKTEN_FELDER = [
+    ['nameLautAusweis', 'Name laut Ausweis'], ['geburtsdatum', 'Geburtsdatum (TT.MM.JJJJ)'],
+    ['ausweisart', 'Ausweisart'], ['ausweisnummer', 'Ausweis-Nummer'],
+    ['anschrift', 'Anschrift'], ['telefon', 'Telefon'], ['email', 'E-Mail'], ['hinweis', 'Hinweis'],
+  ];
+  let alleAkten = [];
+  async function loadAkten() {
+    const [r, d] = await Promise.all([api('GET', '/api/streamers'), api('GET', '/api/akten-doppelt')]);
+    alleAkten = (r.body && r.body.streamers) || [];
+    zeichneDoppelt((d.body && d.body.gruppen) || []);
+    zeichneAkten($('aktenSuche') ? $('aktenSuche').value : '');
+  }
+  function zeichneDoppelt(gruppen) {
+    const el = $('doppeltBox'); if (!el) return;
+    if (!gruppen.length) { el.innerHTML = '<div class="note">✓ Keine doppelten Akten gefunden.</div>'; return; }
+    el.innerHTML = '';
+    gruppen.forEach((gr) => {
+      const box = document.createElement('div'); box.className = 'note warnbox';
+      const beste = gr.akten.find((a) => a.id === gr.behalten) || gr.akten[0];
+      box.innerHTML = '<b>⚠ Dieselbe Person liegt ' + gr.akten.length + '-mal in den Akten</b>'
+        + '<div class="muted" style="margin:.35rem 0 .5rem">Zusammenführen holt Auditionen, Verifikationen, '
+        + 'Vermerke und Aufnahmen in <b>eine</b> Akte. Der frühere Name bleibt als Alias erhalten, '
+        + 'damit man die Person weiter darunter findet. Erst danach verschwindet die doppelte Hülle.</div>'
+        + gr.akten.map((a) => '<div class="dopz' + (a.id === gr.behalten ? ' behalt' : '') + '">'
+          + '<div><b>' + esc(a.bigoId || '—') + '</b>' + (a.bigoName ? ' · ' + esc(a.bigoName) : '')
+          + (a.name ? ' · ' + esc(a.name) : '')
+          + '<div class="muted">' + a.auditions + ' Audition(en) · ' + a.verifikationen + ' Verifikation(en) · '
+          + a.eintraege + ' Vermerk(e)'
+          + (a.angelegtAm ? ' · angelegt ' + new Date(a.angelegtAm).toLocaleDateString('de-DE') : '')
+          + (a.herkunft ? ' · ' + esc(a.herkunft) : '') + '</div></div>'
+          + (a.id === gr.behalten ? '<span class="pill ok">behalten</span>' : '<span class="pill warn">doppelt</span>')
+          + '</div>').join('');
+      const akt = document.createElement('div');
+      akt.style.cssText = 'display:flex;gap:.4rem;flex-wrap:wrap;margin-top:.6rem';
+      gr.akten.filter((a) => a.id !== gr.behalten).forEach((a) => {
+        akt.appendChild(btn('🔗 „' + (a.bigoId || '?') + '" in „' + (beste.bigoId || '?') + '" zusammenführen', 'primary',
+          async (e) => {
+            if (!confirm('„' + (a.bigoId || '?') + '" wird in „' + (beste.bigoId || '?') + '" übernommen.\n\n'
+              + 'Auditionen, Verifikationen, Vermerke und Aufnahmen wandern mit. '
+              + 'Die doppelte Akte verschwindet danach. Fortfahren?')) return;
+            e.target.disabled = true;
+            const rr = await api('POST', '/api/akten-zusammenfuehren', { behalten: gr.behalten, weg: a.id });
+            if (rr.status !== 200) { e.target.disabled = false; alert('Hat nicht geklappt (' + ((rr.body && rr.body.reason) || rr.status) + ').'); return; }
+            alert('Zusammengeführt ✓\nÜbernommen: ' + ((rr.body.uebernommen || []).join(', ') || 'nichts (war leer)'));
+            loadAkten();
+          }));
+      });
+      box.appendChild(akt);
+      el.appendChild(box);
+    });
+  }
+  function zeichneAkten(term) {
+    const el = $('aktenListe'); if (!el) return;
+    const q = String(term || '').trim().toLowerCase();
+    const treffer = !q ? alleAkten : alleAkten.filter((s) => [s.bigoId, s.bigoName, s.name,
+      (s.aliasse || []).join(' '), (s.stamm || {}).ausweisnummer, (s.stamm || {}).nameLautAusweis]
+      .join(' ').toLowerCase().includes(q));
+    if (!alleAkten.length) { el.innerHTML = '<div class="empty">Noch keine Akten.</div>'; return; }
+    if (!treffer.length) { el.innerHTML = '<div class="empty">Keine Treffer für „' + esc(term) + '".</div>'; return; }
+    el.innerHTML = '';
+    treffer.forEach((s) => {
+      const st = s.stamm || {};
+      const fehlt = ['nameLautAusweis', 'geburtsdatum', 'ausweisart', 'ausweisnummer']
+        .filter((k) => !String(st[k] || '').trim());
+      const div = document.createElement('div'); div.className = 'acc';
+      div.innerHTML = '<div class="top"><div><div class="nm">' + esc(s.bigoId || '—')
+        + (s.bigoName && s.bigoName !== s.bigoId ? ' <span class="muted">· ' + esc(s.bigoName) + '</span>' : '') + '</div>'
+        + '<div class="meta">' + (st.nameLautAusweis || s.name ? esc(st.nameLautAusweis || s.name) : 'Name fehlt')
+        + (st.geburtsdatum ? ' · geb. ' + esc(st.geburtsdatum) : '')
+        + '<br>' + esc(st.ausweisart || '—') + ' · Nr.: ' + esc(st.ausweisnummer || '—')
+        + '<br>' + (s.auditions || []).length + ' Audition(en) · ' + (s.verifikationen || []).length
+        + ' Verifikation(en) · ' + (s.eintraege || []).length + ' Vermerk(e)'
+        + ((s.aliasse || []).length ? '<br>früher: ' + esc((s.aliasse || []).join(', ')) : '')
+        + '</div></div>'
+        + (s.verifiziert ? '<span class="pill ok">✓ verifiziert</span>'
+          : '<span class="pill warn">nicht verifiziert</span>') + '</div>'
+        + (fehlt.length ? '<div class="note" style="margin-top:.5rem">Es fehlen noch: <b>'
+          + fehlt.map((k) => (AKTEN_FELDER.find((x) => x[0] === k) || [k, k])[1]).join(', ')
+          + '</b>. „Aus der Akte übernehmen" holt, was schon geprüft wurde.</div>' : '');
+      const form = document.createElement('div');
+      form.className = 'aktenform';
+      form.innerHTML = AKTEN_FELDER.map(([k, titel]) => '<label><span>' + esc(titel) + '</span>'
+        + '<input data-f="' + k + '" value="' + esc(st[k] || '') + '"></label>').join('');
+      div.appendChild(form);
+      const akt = document.createElement('div');
+      akt.style.cssText = 'display:flex;gap:.4rem;flex-wrap:wrap;margin-top:.6rem;align-items:center';
+      const msg = document.createElement('span'); msg.className = 'muted';
+      akt.appendChild(btn('💾 Speichern', 'primary', async (e) => {
+        const d = {}; form.querySelectorAll('[data-f]').forEach((i) => { d[i.dataset.f] = i.value; });
+        e.target.disabled = true; msg.textContent = 'speichert …';
+        const rr = await api('POST', '/api/streamer-stamm', { id: s.id, stamm: d });
+        e.target.disabled = false;
+        msg.textContent = rr.status === 200
+          ? (rr.body.geaendert.length ? 'Gespeichert ✓' : 'Nichts zu ändern.') : 'Fehler.';
+        if (rr.status === 200 && rr.body.geaendert.length) loadAkten();
+      }));
+      akt.appendChild(btn('🪪 Aus der Akte übernehmen', '', async (e) => {
+        e.target.disabled = true; msg.textContent = 'sucht …';
+        const rr = await api('POST', '/api/streamer-stamm-uebernehmen', { id: s.id });
+        e.target.disabled = false;
+        if (rr.status !== 200) { msg.textContent = 'Fehler.'; return; }
+        msg.textContent = (rr.body.uebernommen || []).length
+          ? (rr.body.uebernommen.length + ' Feld(er) übernommen ✓') : 'Nichts zu übernehmen.';
+        if ((rr.body.uebernommen || []).length) loadAkten();
+      }));
+      akt.appendChild(btn('🗑 Akte löschen', 'danger', async () => {
+        if (!confirm('Akte „' + (s.bigoId || '?') + '" endgültig löschen?\n\n'
+          + 'Auditionen und Verifikationen darin sind dann weg. '
+          + 'Bei einer doppelten Akte lieber oben zusammenführen – dann bleibt alles erhalten.')) return;
+        const rr = await api('POST', '/api/streamer-delete', { id: s.id });
+        if (rr.status !== 200) { alert('Hat nicht geklappt.'); return; }
+        loadAkten();
+      }));
+      akt.appendChild(msg);
+      div.appendChild(akt);
+      el.appendChild(div);
+    });
+  }
+
   async function loadCases() {
     const [r, m] = await Promise.all([api('GET', '/api/cases'), api('GET', '/api/mcp-status')]);
     allCases = r.body.cases || [];

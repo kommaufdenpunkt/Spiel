@@ -8,6 +8,7 @@
     <div class="nav-gruppe" data-gruppe="betrieb">Tagesgeschäft</div>
     <button class="deck-item sel" data-sec="overview">🏠 Übersicht</button>
     <button class="deck-item" data-sec="cases">🗂 Fälle / Akten</button>
+    <button class="deck-item" data-sec="akten">📁 Streamer-Akten</button>
     <button class="deck-item" data-sec="rec">🎬 Aufnahmen</button>
 
     <div class="nav-gruppe" data-gruppe="einrichten">Einrichten</div>
@@ -37,6 +38,16 @@
       <div class="deck-head"><h2>Fälle / Akten</h2><span class="muted">verschlüsselt gespeichert</span></div>
       <input id="caseSearch" placeholder="🔎 Suchen: BIGO-ID, Name, Nummer, Prüfer, Status …" style="margin-bottom:1rem">
       <div id="caseList"></div>
+    </div>
+
+    <div class="section" data-pane="akten">
+      <div class="deck-head"><h2>Streamer-Akten</h2><span class="muted">eine Akte je Person</span></div>
+      <p class="sub">Hier steht die Akte selbst: wer es ist, welcher Ausweis dazugehört, was schon geprüft wurde.
+        Die Ausweisdaten kommen <b>von selbst aus der Audition</b> – nachsehen, gegebenenfalls richten, speichern.
+        Führen wir jemanden doppelt, steht das oben und lässt sich in einem Schritt zusammenführen.</p>
+      <div id="doppeltBox"></div>
+      <input id="aktenSuche" placeholder="🔎 Suchen: BIGO-ID, Name, Ausweisnummer …" style="margin:1rem 0">
+      <div id="aktenListe"></div>
     </div>
 
     <div class="section" data-pane="rec">
@@ -73,8 +84,9 @@
       <hr>
       <h3 class="uh">Vorlese-Text (Teleprompter)</h3>
       <p class="sub">Diesen Text liest der Bewerber in die Kamera; das Tempo bestimmt er selbst. Platzhalter wie <b>[dein Name]</b> ruhig stehen lassen.</p>
+      <p class="sub"><b>Schreib, wie man spricht:</b> kurze Sätze, einer pro Zeile, jeder in einem Atemzug. Abkürzungen ausschreiben – wer <b>bzw.</b> oder <b>V-System</b> vor sich hat, stolpert beim Vorlesen. Leere Zeilen sind Pausen.</p>
       <textarea id="scriptText" class="gross" style="min-height:280px"></textarea>
-      <div class="speicherzeile"><button id="scriptSave" class="primary">Vorlese-Text speichern</button><span id="scriptMsg" class="muted"></span></div>
+      <div class="speicherzeile"><button id="scriptSave" class="primary">Vorlese-Text speichern</button><button id="scriptVorschlag" type="button">↺ Unseren Vorschlag einsetzen</button><span id="scriptMsg" class="muted"></span></div>
     </div>
 
     <div class="section" data-pane="adminsec">

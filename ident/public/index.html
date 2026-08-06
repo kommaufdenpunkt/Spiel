@@ -227,7 +227,28 @@
     text-decoration:none;padding:.4rem .7rem;border-radius:10px;color:var(--ink);
     background:#1b2740;border:1px solid var(--line2);transition:transform .18s,border-color .18s}
   .dl-knopf:hover{transform:translateY(-1px);border-color:var(--accent)}
+  /* Derselbe Knopf, aber als Schaltflaeche - Browser wuerden ihn sonst grau
+     und in einer anderen Schrift zeichnen. */
+  button.dl-knopf{appearance:none;-webkit-appearance:none;cursor:pointer;font-family:inherit;line-height:1.25}
+  button.dl-knopf:disabled{opacity:.6;cursor:default;transform:none}
+  .teil-knopf{background:#172b3f;border-color:var(--accent)}
   .dl-hinweis{flex:1;min-width:140px;font-size:.74rem;color:var(--dim);line-height:1.45}
+  /* „Schon ausgefuellt" - woher die Angaben kommen und was noch zu tun ist */
+  .vf-vorab{font-size:.8rem;line-height:1.5;color:#bfe9d2;background:#12261d;
+    border:1px solid #1f4634;border-radius:10px;padding:.55rem .7rem;margin-bottom:.6rem}
+  .vf-vorab span{color:var(--dim)}
+  /* Stammdaten: die Akte selbst pflegen */
+  .stamm{display:flex;flex-direction:column;gap:.7rem}
+  .stamm-hinweis{font-size:.78rem;color:var(--dim);line-height:1.5;background:#111c2e;
+    border:1px solid var(--line);border-radius:10px;padding:.55rem .7rem}
+  .stamm-felder{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:.55rem}
+  .stamm-f{display:flex;flex-direction:column;gap:.2rem;min-width:0}
+  .stamm-f>span{font-size:.72rem;color:var(--dim);font-weight:600;letter-spacing:.02em}
+  .stamm-f input{width:100%;font-size:.9rem}
+  .stamm-akt{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap}
+  .stamm-akt button{font-size:.82rem}
+  .stamm-msg{font-size:.78rem;color:var(--dim)}
+  .stamm-fuss{font-size:.72rem;color:var(--dim);opacity:.85}
   /* Ausweis-Satz je Audition */
   .ausw-satz{padding:.6rem 0;border-top:1px solid var(--line)}
   .ausw-satz:first-child{border-top:0}
@@ -547,6 +568,10 @@
   .vorab-erklaerung b{color:var(--ink)}
   /* Zustand in der Warteschlange: fertig oder fuellt noch aus */
   .fertig-pill{color:#5fe0a0;font-weight:700}
+  /* Wer eingeladen hat, fuehrt die Audition durch - eigene Termine gruen,
+     fremde gelb, damit man niemandem dazwischenfunkt. */
+  .ein-pill{color:#ffd479;font-weight:700}
+  .ein-pill.eigen{color:#8fd0ff}
   .fuellt-pill{color:var(--warm,#ffc98a)}
   .fassung{margin-top:.5rem;font-size:.66rem;color:var(--dim);opacity:.7;text-align:center;
     letter-spacing:.04em;font-variant-numeric:tabular-nums}
@@ -731,11 +756,16 @@
   .shot .cap{font-size:.66rem;color:var(--dim);text-align:center;margin-top:.15rem}
   /* Feste, nicht zusammenschrumpfbare Höhe: der Vorlese-Text darf nie
      abgeschnitten werden, egal wie eng der Bildschirm ist. */
-  .prompter{height:clamp(160px,26vh,270px);flex:none;overflow-y:auto;-webkit-overflow-scrolling:touch;touch-action:pan-y;overscroll-behavior:contain;border:1px solid var(--line);border-radius:12px;background:#0b1220;padding:1rem 1.1rem;position:relative;scroll-behavior:auto}
-  .prompter #prompterText{font-size:1.25rem;line-height:1.9;color:#eef3ff;white-space:pre-wrap;font-weight:500}
+  .prompter{height:clamp(210px,34vh,340px);flex:none;overflow-y:auto;-webkit-overflow-scrolling:touch;touch-action:pan-y;overscroll-behavior:contain;border:1px solid var(--line);border-radius:12px;background:#0b1220;padding:1rem 1.1rem;position:relative;scroll-behavior:auto}
+  /* Vorlesen heisst: vom Bildschirm ablesen, waehrend man in die Kamera schaut.
+     Zu klein und man beugt sich vor. Die Groesse ist deshalb einstellbar und
+     bleibt gemerkt - der Standard ist bewusst gross. */
+  .prompter #prompterText{font-size:var(--vorlese,1.6rem);line-height:1.7;color:#eef3ff;white-space:pre-wrap;font-weight:600;letter-spacing:.01em}
   .prompter::after{content:"";position:absolute;left:0;right:0;bottom:0;height:40px;background:linear-gradient(transparent,#0b1220);pointer-events:none}
   .prompter-ctrl{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;margin-top:.5rem;font-size:.82rem;color:var(--dim)}
   .prompter-ctrl input[type=range]{width:120px}
+  .schriftgroesse{display:inline-flex;align-items:center;gap:.3rem}
+  .schriftgroesse button{padding:.25rem .5rem;font-size:.85rem;font-weight:700;min-width:2.2rem}
   .checklist{display:flex;flex-direction:column;gap:.5rem}
   /* Der Text steht in EINEM span. Ohne das wird jedes <b> ein eigenes Flex-Kind
      und die Frage steht in zerrissenen Spalten nebeneinander - unlesbar. */
@@ -1213,6 +1243,10 @@
         <button id="prompterToggle" class="primary">▶ Start</button>
         <button id="prompterReset" title="Von vorn">↺</button>
         <label>🏃 Ablese-Tempo <input type="range" id="prompterSpeed" min="1" max="12" value="4"><b id="prompterSpeedVal" style="min-width:1.6em;text-align:center;color:var(--ink)">4</b></label>
+        <span class="schriftgroesse">🔠 Schrift
+          <button id="schriftKlein" type="button" title="kleiner">A−</button>
+          <button id="schriftGross" type="button" title="größer">A+</button>
+        </span>
         <span style="opacity:.7">– du bestimmst selbst, auch während du liest.</span>
       </div>
 

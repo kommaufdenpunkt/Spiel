@@ -110,6 +110,9 @@ function baueNutzlast(fall, aufnahme) {
     },
     aufnahme: aufnahme ? {
       id: aufnahme.id, sekunden: aufnahme.durationSec || 0, bytes: aufnahme.bytes || 0,
+      // Das Format gehört mit in die Akte: der Videoplayer muss wissen, was er
+      // vor sich hat, sonst rät er – und bleibt im Zweifel schwarz.
+      ext: aufnahme.ext || 'webm', mime: aufnahme.mime || '',
       auswertung: aufnahme.quality || '', begruendung: aufnahme.reviewNote || '',
       geprueftVon: aufnahme.reviewedBy || '', geprueftAm: aufnahme.reviewedAt || '',
     } : null,

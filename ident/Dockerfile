@@ -2,7 +2,10 @@
 FROM node:22-alpine
 
 # su-exec: um im Entrypoint nach dem Rechte-Fix von root auf "node" zu wechseln
-RUN apk add --no-cache su-exec
+# ffmpeg: wandelt Aufnahmen in MP4 um. Ohne das kommt aus Chrome am Rechner
+#         eine WEBM-Datei heraus, die weder das iPhone noch WhatsApp mag - die
+#         Aufnahme ist dann da, aber nicht weiterverwendbar.
+RUN apk add --no-cache su-exec ffmpeg
 
 WORKDIR /app
 

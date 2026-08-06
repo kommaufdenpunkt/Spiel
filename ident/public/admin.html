@@ -104,6 +104,17 @@
   .addbar{display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1rem;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:.7rem}
   .addbar input{flex:1;min-width:140px}.note{font-size:.82rem;color:var(--dim);margin-top:.5rem;line-height:1.5}
   .note code{background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:.05rem .35rem}
+  /* Streamer-Akten: Stammdaten-Formular und doppelte Akten */
+  .aktenform{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,210px),1fr));gap:.5rem;margin-top:.7rem;
+    padding-top:.7rem;border-top:1px solid var(--line)}
+  .aktenform label{display:flex;flex-direction:column;gap:.2rem;min-width:0}
+  .aktenform label>span{font-size:.7rem;color:var(--dim);font-weight:600}
+  .aktenform input{width:100%;font-size:.88rem}
+  .warnbox{border-color:#5a4520;background:#221a0d}
+  .dopz{display:flex;justify-content:space-between;align-items:flex-start;gap:.6rem;padding:.45rem 0;
+    border-top:1px solid var(--line);font-size:.84rem}
+  .dopz .muted{font-size:.75rem;margin-top:.15rem}
+  .dopz.behalt{color:#bfe9d2}
   .acc{border:1px solid var(--line);border-radius:14px;padding:1rem;background:var(--panel2);margin-bottom:.7rem}
   .acc .top{display:flex;justify-content:space-between;gap:.6rem;align-items:flex-start}.acc .nm{font-size:1rem;font-weight:650}.acc .meta{font-size:.78rem;color:var(--dim);margin-top:.25rem;line-height:1.5}
   .thumbs{display:flex;gap:.6rem;flex-wrap:wrap;margin-top:.7rem}.thumbs figure{margin:0;display:flex;flex-direction:column;gap:.25rem;align-items:center;width:104px}

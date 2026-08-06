@@ -15,7 +15,9 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 const crypto = require('crypto');
+const { spawnSync } = require('child_process');
 const sec = require('./security.js');
 
 let DATA_DIR = path.join(__dirname, 'data');
@@ -29,17 +31,39 @@ let recordings = [];
 let streamers = [];   // Ordner je Streamer (mcp.4ever1.tv)
 let settings = {};
 
+// Der Text, den die Bewerberin in die Kamera liest.
+//
+// Geschrieben, wie man es auch sagt: kurze Sätze, einer pro Zeile, jeder in
+// einem Atemzug sprechbar. Abkürzungen sind ausgeschrieben – wer „bzw." oder
+// „V-System" vor sich hat, stolpert oder liest es falsch vor. „4EVER1" steht
+// deshalb als „Forever One" da, so heißt es ausgesprochen; der geschriebene
+// Name steht in der Akte und im Vertrag, nicht im Vorlese-Text.
 const DEFAULT_SCRIPT = [
-  'Hallo, mein Name ist [dein Name].',
-  'Meine BIGO-ID ist [deine BIGO-ID] und ich bin [dein Alter] Jahre alt.',
-  'Mit diesem Video bewerbe ich mich bei der Agentur 4EVER1 als Streamerin bzw. Streamer auf BIGO Live.',
-  'Ich möchte dem V-System der Agentur 4EVER1 beitreten und kenne die dazugehörigen Regeln.',
-  'Mir ist bewusst, dass ich mich in meinen Streams zeigen muss und die allgemeinen BIGO-Regeln einhalte:',
-  'keine verbotenen Inhalte, kein Parallelstreaming und kein Streaming auf Konkurrenz-Apps.',
-  'Ich wurde über die Transferregeln, also Freigabe und Freikauf, informiert.',
-  'Ich bin damit einverstanden, dass meine Angaben und diese Aufnahme gespeichert und zur Bearbeitung meiner Bewerbung an den BIGO-Support weitergeleitet werden.',
-  'Hiermit erkläre ich ausdrücklich meinen Wunsch, der Agentur 4EVER1 beizutreten.',
-  'Vielen Dank.',
+  'Hallo! Mein Name ist [dein Name].',
+  'Ich bin [dein Alter] Jahre alt.',
+  'Meine Bigo-ID lautet [deine BIGO-ID].',
+  '',
+  'Mit diesem Video bewerbe ich mich bei der Agentur Forever One.',
+  'Ich möchte auf Bigo Live streamen.',
+  '',
+  'Ich möchte dem Vau-System der Agentur beitreten.',
+  'Die Regeln dazu kenne ich.',
+  '',
+  'Mir ist klar, dass ich mich in meinen Streams zeigen muss.',
+  'Ich halte mich an die Regeln von Bigo.',
+  'Das heißt: keine verbotenen Inhalte.',
+  'Kein Parallel-Streaming.',
+  'Und kein Streamen auf anderen Apps.',
+  '',
+  'Über die Transfer-Regeln wurde ich informiert.',
+  'Also über Freigabe und Freikauf.',
+  '',
+  'Ich bin einverstanden, dass meine Angaben und dieses Video gespeichert werden.',
+  'Und dass beides an den Bigo-Support weitergegeben wird.',
+  '',
+  'Ich sage hiermit ausdrücklich: Ich möchte zur Agentur Forever One.',
+  '',
+  'Vielen Dank!',
 ].join('\n');
 
 const DEFAULT_INTRO = [
@@ -424,6 +448,67 @@ function readRecording(id) {
   if (rec.enc) { if (!sec.hasKey()) return null; try { buf = sec.decrypt(buf); } catch { return null; } }
   return { buffer: buf, mime: rec.mime || 'video/webm' };
 }
+/**
+ * Die Aufnahme als MP4 – damit man die Datei überall wiederverwenden kann.
+ *
+ * Warum das nötig ist: Browser nehmen unterschiedlich auf. Chrome am Rechner
+ * liefert meist WEBM. Ein iPhone kann WEBM nicht in „Fotos" legen, WhatsApp
+ * schickt es nicht weiter, und der BIGO-Support kann damit auch nichts anfangen.
+ * MP4 versteht jedes Gerät.
+ *
+ * Umgewandelt wird einmal, danach liegt das MP4 neben dem Original (auch
+ * verschlüsselt) und wird von dort ausgeliefert. Das Original bleibt
+ * unangetastet – gelöscht wird hier nichts.
+ *
+ * Ist ffmpeg auf dem Server nicht vorhanden, kommt `{ fehlt: true }` zurück;
+ * der Aufrufer liefert dann eben das Original aus.
+ */
+function mp4Fassung(id) {
+  const rec = getRecording(id); if (!rec) return null;
+  if (rec.ext === 'mp4') return readRecording(id);       // schon fertig
+  const zielName = `${rec.id}.mp4${rec.enc ? '.enc' : ''}`;
+  const ziel = recPath(zielName);
+  if (!ziel) return null;
+  if (fs.existsSync(ziel)) {
+    let buf = fs.readFileSync(ziel);
+    if (rec.enc) { if (!sec.hasKey()) return null; try { buf = sec.decrypt(buf); } catch { return null; } }
+    return { buffer: buf, mime: 'video/mp4' };
+  }
+  if (!ffmpegDa()) return { fehlt: true };
+  const original = readRecording(id); if (!original) return null;
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ident-mp4-'));
+  const ein = path.join(tmp, 'ein.' + (rec.ext || 'webm'));
+  const aus = path.join(tmp, 'aus.mp4');
+  try {
+    fs.writeFileSync(ein, original.buffer);
+    // -movflags +faststart: das Video startet auf dem Telefon sofort, ohne die
+    // ganze Datei zu laden. yuv420p, weil ältere Geräte nur das können.
+    const r = spawnSync('ffmpeg', ['-y', '-hide_banner', '-loglevel', 'error', '-i', ein,
+      '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '26', '-pix_fmt', 'yuv420p',
+      '-c:a', 'aac', '-b:a', '96k', '-movflags', '+faststart', aus],
+    { timeout: 15 * 60 * 1000, maxBuffer: 4 * 1024 * 1024 });
+    if (r.status !== 0 || !fs.existsSync(aus)) {
+      console.log('[rec] MP4-Umwandlung fehlgeschlagen: ' + String((r.stderr || '')).slice(0, 200));
+      return { fehler: true };
+    }
+    const buf = fs.readFileSync(aus);
+    fs.writeFileSync(ziel, rec.enc ? sec.encrypt(buf) : buf);
+    rec.mp4Bytes = buf.length; save('recordings.json', recordings);
+    console.log('[rec] MP4 erzeugt ' + rec.id + ' ' + Math.round(buf.length / 1024) + ' kB');
+    return { buffer: buf, mime: 'video/mp4' };
+  } finally {
+    try { fs.rmSync(tmp, { recursive: true, force: true }); } catch {}
+  }
+}
+let ffmpegGeprueft = null;
+function ffmpegDa() {
+  if (ffmpegGeprueft !== null) return ffmpegGeprueft;
+  const r = spawnSync('ffmpeg', ['-version'], { timeout: 8000 });
+  ffmpegGeprueft = r.status === 0;
+  if (!ffmpegGeprueft) console.log('[rec] ffmpeg ist nicht installiert – es wird nur das Originalformat ausgeliefert.');
+  return ffmpegGeprueft;
+}
+
 // ---- Streamer-Ordner (mcp.4ever1.tv) ---------------------------------------
 // Jeder Streamer hat genau einen Ordner, zugeordnet über die BIGO-ID. Dort
 // sammelt sich alles: die Audition, spätere Einträge, Notizen.
@@ -779,7 +864,9 @@ function ablegen(paket) {
       vorlese: String((paket.texte && paket.texte.vorlese) || '').slice(0, 20000),
       begruessung: String((paket.texte && paket.texte.begruessung) || '').slice(0, 20000),
     },
-    aufnahme: paket.aufnahme || null,
+    // Format mitschreiben, falls es der Absender kennt – ältere Einträge haben
+    // es nicht, dort fällt der Player auf „ausprobieren" zurück.
+    aufnahme: paket.aufnahme ? { ext: 'webm', ...paket.aufnahme } : null,
     protokoll: Array.isArray(paket.protokoll) ? paket.protokoll.slice(0, 200) : [],
     dateien: Array.isArray(paket.dateien) ? paket.dateien.slice(0, 20).map((d) => ({
       art: String(d.art || '').slice(0, 20), bezeichnung: String(d.bezeichnung || '').slice(0, 80),
@@ -790,6 +877,21 @@ function ablegen(paket) {
   const i = ordner.auditions.findIndex((x) => x.auditionId && x.auditionId === eintrag.auditionId);
   if (i >= 0) ordner.auditions[i] = eintrag; else ordner.auditions.unshift(eintrag);
 
+  // Ausweisdaten in die Stammdaten der Akte übernehmen. Nur Lücken – was das
+  // Team dort gepflegt hat, bleibt stehen. So muss niemand dasselbe zweimal
+  // eintippen, und die Akte ist nach der Audition schon gepflegt.
+  const rein = stammErgaenzen(ordner, {
+    nameLautAusweis: (paket.streamer && paket.streamer.name) || '',
+    ausweisart: eintrag.ausweisart, ausweisnummer: eintrag.ausweisnummer,
+  });
+  if (rein.length) {
+    if (!Array.isArray(ordner.eintraege)) ordner.eintraege = [];
+    ordner.eintraege.unshift({
+      id: crypto.randomUUID(), text: 'Aus der Audition in die Stammdaten übernommen: ' + rein.join('; '),
+      author: 'System', kind: 'stamm', am: jetzt,
+    });
+  }
+
   // Ordner-Status ergibt sich aus der jüngsten Audition
   if (eintrag.ergebnis === 'approved') ordner.status = 'aktiv';
   else if (eintrag.ergebnis === 'rejected' && ordner.status === 'neu') ordner.status = 'abgelehnt';
@@ -797,6 +899,234 @@ function ablegen(paket) {
   save('streamers.json', streamers);
   return ordner;
 }
+// ---- Stammdaten der Akte ---------------------------------------------------
+// Was dauerhaft zu einer Person gehört: der Name aus dem Ausweis, Geburtsdatum,
+// Ausweisart und -nummer, Erreichbarkeit. Bisher stand das nur je Audition da –
+// also einmal pro Gespräch, verstreut. Wer die Akte pflegt, will es an einer
+// Stelle haben, und es soll sich aus dem füllen, was schon geprüft wurde.
+const STAMM_FELDER = {
+  nameLautAusweis: 120, geburtsdatum: 20, ausweisart: 40, ausweisnummer: 60,
+  anschrift: 200, telefon: 40, email: 120, hinweis: 500,
+};
+function leererStamm() {
+  const s = {}; Object.keys(STAMM_FELDER).forEach((k) => { s[k] = ''; });
+  s.gepflegtVon = ''; s.gepflegtAm = '';
+  return s;
+}
+function stammVon(ordner) {
+  if (!ordner.stamm || typeof ordner.stamm !== 'object') ordner.stamm = leererStamm();
+  Object.keys(STAMM_FELDER).forEach((k) => { if (typeof ordner.stamm[k] !== 'string') ordner.stamm[k] = ''; });
+  return ordner.stamm;
+}
+/**
+ * Lücken in den Stammdaten aus geprüften Angaben füllen. Überschrieben wird
+ * nichts: was das Team eingetragen hat, gilt. Zurück kommt die Liste dessen,
+ * was übernommen wurde – daraus wird der Vermerk in der Akte.
+ */
+function stammErgaenzen(ordner, quelle) {
+  const st = stammVon(ordner); const rein = [];
+  const dazu = (feld, wert, klar) => {
+    const w = String(wert || '').trim(); if (!w || st[feld]) return;
+    st[feld] = w.slice(0, STAMM_FELDER[feld]); rein.push(klar + ' ' + st[feld]);
+  };
+  dazu('nameLautAusweis', quelle.nameLautAusweis, 'Name laut Ausweis:');
+  dazu('geburtsdatum', quelle.geburtsdatum, 'Geburtsdatum:');
+  dazu('ausweisart', quelle.ausweisart, 'Ausweisart:');
+  dazu('ausweisnummer', quelle.ausweisnummer, 'Ausweisnummer:');
+  return rein;
+}
+/**
+ * Stammdaten von Hand pflegen. Jede Änderung steht danach als Vermerk in der
+ * Akte – mit altem und neuem Wert, damit nachvollziehbar bleibt, wer was
+ * korrigiert hat (etwa die Großschreibung eines Namens).
+ */
+function stammPflegen(id, felder, { wer } = {}) {
+  const s = getStreamer(id); if (!s) return null;
+  const st = stammVon(s); const geaendert = [];
+  Object.keys(STAMM_FELDER).forEach((k) => {
+    if (!(k in (felder || {}))) return;
+    const neu = String(felder[k] == null ? '' : felder[k]).trim().slice(0, STAMM_FELDER[k]);
+    if (neu === st[k]) return;
+    geaendert.push(k + ': „' + (st[k] || '—') + '" → „' + (neu || '—') + '"');
+    st[k] = neu;
+  });
+  if (!geaendert.length) return { ordner: s, geaendert: [] };
+  const jetzt = new Date().toISOString();
+  st.gepflegtVon = String(wer || 'Unbekannt').slice(0, 60); st.gepflegtAm = jetzt;
+  if (!Array.isArray(s.eintraege)) s.eintraege = [];
+  s.eintraege.unshift({
+    id: crypto.randomUUID(), text: 'Stammdaten gepflegt – ' + geaendert.join('; '),
+    author: String(wer || 'Unbekannt').slice(0, 60), kind: 'stamm', am: jetzt,
+  });
+  // Der Name der Akte folgt dem Ausweis, solange dort nichts Eigenes steht.
+  if (st.nameLautAusweis && !s.name) s.name = st.nameLautAusweis.slice(0, 120);
+  s.letzteAktivitaet = jetzt;
+  save('streamers.json', streamers);
+  return { ordner: s, geaendert };
+}
+/**
+ * Alles übernehmen, was in dieser Akte schon geprüft wurde: die jüngste
+ * Verifikation zuerst, danach die jüngste Audition. Für Akten, die es schon
+ * gab, bevor es die Stammdaten gab.
+ */
+function stammAusAkte(id, { wer, ueberschreiben } = {}) {
+  const s = getStreamer(id); if (!s) return null;
+  const st = stammVon(s);
+  const quellen = [];
+  (s.verifikationen || []).forEach((v) => quellen.push({
+    nameLautAusweis: v.nameLautAusweis, geburtsdatum: v.geburtsdatum,
+    ausweisart: v.ausweisart, ausweisnummer: v.ausweisnummer, am: v.geprueftAm || v.am || '',
+  }));
+  (s.auditions || []).forEach((a) => quellen.push({
+    nameLautAusweis: '', geburtsdatum: '',
+    ausweisart: a.ausweisart, ausweisnummer: a.ausweisnummer, am: a.erstelltAm || '',
+  }));
+  quellen.sort((a, b) => String(b.am).localeCompare(String(a.am)));
+  // Der Name aus der Akte selbst ist oft der Ausweisname – als letzte Quelle.
+  quellen.push({ nameLautAusweis: s.name || '', am: '' });
+  if (ueberschreiben) Object.keys(STAMM_FELDER).forEach((k) => { if (k !== 'hinweis') st[k] = ''; });
+  const rein = [];
+  quellen.forEach((q) => { stammErgaenzen(s, q).forEach((x) => rein.push(x)); });
+  if (!rein.length) return { ordner: s, uebernommen: [] };
+  const jetzt = new Date().toISOString();
+  st.gepflegtVon = String(wer || 'Unbekannt').slice(0, 60); st.gepflegtAm = jetzt;
+  if (!Array.isArray(s.eintraege)) s.eintraege = [];
+  s.eintraege.unshift({
+    id: crypto.randomUUID(), text: 'Stammdaten aus der Akte übernommen – ' + rein.join('; '),
+    author: String(wer || 'Unbekannt').slice(0, 60), kind: 'stamm', am: jetzt,
+  });
+  s.letzteAktivitaet = jetzt;
+  save('streamers.json', streamers);
+  return { ordner: s, uebernommen: rein };
+}
+
+// ---- Doppelte Akten finden und zusammenführen ------------------------------
+/**
+ * Wo führen wir dieselbe Person zweimal?
+ *
+ * Passiert, wenn jemand einmal unter der BIGO-Nummer und einmal unter dem Namen
+ * angelegt wurde – etwa „Tauchküken" aus dem PK-Board und „901234567" aus einer
+ * Audition. Verglichen wird über dieselben Kennungen, mit denen auch die
+ * Zuordnung arbeitet: Zahlen, Namen ohne Umlaute, und ohne ein führendes „ey".
+ */
+function doppelteAkten() {
+  const gruppen = [];
+  const erledigt = new Set();
+  streamers.forEach((a) => {
+    if (erledigt.has(a.id)) return;
+    const ka = ordnerKennungen(a);
+    const passt = streamers.filter((b) => {
+      if (b.id === a.id || erledigt.has(b.id)) return false;
+      const kb = ordnerKennungen(b);
+      for (const z of ka.zahlen) if (kb.zahlen.has(z)) return true;
+      for (const n of ka.namen) if (kb.namen.has(n)) return true;
+      return false;
+    });
+    if (!passt.length) return;
+    [a, ...passt].forEach((x) => erledigt.add(x.id));
+    // Der reichste Ordner ist der Kandidat zum Behalten: dort steckt die Arbeit.
+    const gewicht = (x) => (x.auditions || []).length * 10 + (x.verifikationen || []).length * 5
+      + (x.eintraege || []).length + (x.stamm && x.stamm.nameLautAusweis ? 3 : 0);
+    const sortiert = [a, ...passt].sort((x, y) => gewicht(y) - gewicht(x));
+    gruppen.push({
+      behalten: sortiert[0].id,
+      akten: sortiert.map((x) => ({
+        id: x.id, bigoId: x.bigoId, bigoName: x.bigoName || '', name: x.name || '',
+        auditions: (x.auditions || []).length, verifikationen: (x.verifikationen || []).length,
+        eintraege: (x.eintraege || []).length, angelegtAm: x.angelegtAm || '',
+        herkunft: x.herkunft || '', gewicht: gewicht(x),
+      })),
+    });
+  });
+  return gruppen;
+}
+/**
+ * Zwei Akten zu einer machen. Es wird nichts weggeworfen: Auditionen,
+ * Verifikationen, Vermerke, Einsichten und Aufnahmen wandern in die Akte, die
+ * bleibt. Der frühere Name bleibt als Alias stehen, damit die Person auch
+ * darüber weiter gefunden wird. Erst danach verschwindet die doppelte Hülle.
+ */
+function aktenZusammenfuehren(behaltenId, wegId, { wer } = {}) {
+  if (!behaltenId || !wegId || behaltenId === wegId) return { ok: false, grund: 'gleiche-akte' };
+  const bleibt = getStreamer(behaltenId), weg = getStreamer(wegId);
+  if (!bleibt || !weg) return { ok: false, grund: 'nicht-gefunden' };
+  const jetzt = new Date().toISOString();
+  const bericht = [];
+
+  if (!Array.isArray(bleibt.auditions)) bleibt.auditions = [];
+  const bekannt = new Set(bleibt.auditions.map((x) => x.auditionId).filter(Boolean));
+  let auds = 0;
+  (weg.auditions || []).forEach((a) => {
+    if (a.auditionId && bekannt.has(a.auditionId)) return;
+    bleibt.auditions.push(a); auds++;
+  });
+  bleibt.auditions.sort((x, y) => String(y.erstelltAm || '').localeCompare(String(x.erstelltAm || '')));
+  if (auds) bericht.push(auds + ' Audition(en)');
+
+  if (!Array.isArray(bleibt.verifikationen)) bleibt.verifikationen = [];
+  const vIds = new Set(bleibt.verifikationen.map((x) => x.id));
+  let vers = 0;
+  (weg.verifikationen || []).forEach((v) => { if (!vIds.has(v.id)) { bleibt.verifikationen.push(v); vers++; } });
+  bleibt.verifikationen.sort((x, y) => String(y.am || '').localeCompare(String(x.am || '')));
+  if (vers) bericht.push(vers + ' Verifikation(en)');
+  // Der blaue Haken gilt, wenn eine der beiden Akten ihn hatte – die jüngere
+  // bestandene Prüfung zählt.
+  const besteh = bleibt.verifikationen.filter((v) => v.ergebnis === 'bestanden')
+    .sort((x, y) => String(y.am || '').localeCompare(String(x.am || '')))[0];
+  bleibt.verifiziert = besteh ? { am: besteh.am, von: besteh.geprueftVon, grundlage: besteh.grundlage } : bleibt.verifiziert || null;
+
+  if (!Array.isArray(bleibt.eintraege)) bleibt.eintraege = [];
+  let verm = 0;
+  (weg.eintraege || []).forEach((e) => { bleibt.eintraege.push(e); verm++; });
+  bleibt.eintraege.sort((x, y) => String(y.am || '').localeCompare(String(x.am || '')));
+  if (verm) bericht.push(verm + ' Vermerk(e)');
+
+  if (!Array.isArray(bleibt.zugriffe)) bleibt.zugriffe = [];
+  (weg.zugriffe || []).forEach((z) => bleibt.zugriffe.push(z));
+  bleibt.zugriffe.sort((x, y) => String(y.am || '').localeCompare(String(x.am || '')));
+  if (bleibt.zugriffe.length > 200) bleibt.zugriffe.length = 200;
+
+  // Kennungen der aufgelösten Akte behalten – sonst findet man sie nie wieder.
+  const zu = ordnerZuordnen(bleibt, { bigoId: weg.bigoId, bigoName: weg.bigoName });
+  if (zu.length) bericht.push('Kennung: ' + zu.join(', '));
+  if (!Array.isArray(bleibt.aliasse)) bleibt.aliasse = [];
+  [weg.bigoId, weg.bigoName, weg.bigoIdText].forEach((x) => {
+    const w = String(x || '').trim(); if (!w) return;
+    if (namSchluessel(w) === namSchluessel(bleibt.bigoId)) return;
+    if (namSchluessel(w) === namSchluessel(bleibt.bigoName)) return;
+    if (!bleibt.aliasse.some((y) => namSchluessel(y) === namSchluessel(w))) bleibt.aliasse.push(w.slice(0, 60));
+  });
+
+  // Stammdaten und Kopfangaben: Lücken füllen, nichts überschreiben.
+  const rein = stammErgaenzen(bleibt, weg.stamm || {});
+  if (rein.length) bericht.push('Stammdaten: ' + rein.join(', '));
+  if (!bleibt.name && weg.name) bleibt.name = weg.name;
+  if (!bleibt.alter && weg.alter) bleibt.alter = weg.alter;
+  if (!bleibt.notiz && weg.notiz) bleibt.notiz = weg.notiz;
+  if (String(weg.angelegtAm || '') && String(weg.angelegtAm) < String(bleibt.angelegtAm || '9')) {
+    bleibt.angelegtAm = weg.angelegtAm;   // die Akte ist so alt wie die älteste
+  }
+
+  // Aufnahmen, die auf die alte Akte zeigten, zeigen jetzt hierher.
+  let recs = 0;
+  recordings.forEach((r) => { if (r.ordnerId === weg.id) { r.ordnerId = bleibt.id; recs++; } });
+  if (recs) { save('recordings.json', recordings); bericht.push(recs + ' Aufnahme(n)'); }
+
+  bleibt.eintraege.unshift({
+    id: crypto.randomUUID(),
+    text: 'Doppelte Akte zusammengeführt: „' + (weg.bigoId || weg.bigoName || '?') + '"'
+      + (weg.bigoName && weg.bigoName !== weg.bigoId ? ' (' + weg.bigoName + ')' : '')
+      + ' – übernommen: ' + (bericht.length ? bericht.join(', ') : 'nichts (war leer)') + '.',
+    author: String(wer || 'Unbekannt').slice(0, 60), kind: 'zusammenfuehrung', am: jetzt,
+  });
+  bleibt.letzteAktivitaet = jetzt;
+
+  const i = streamers.findIndex((x) => x.id === weg.id);
+  if (i >= 0) streamers.splice(i, 1);
+  save('streamers.json', streamers);
+  return { ok: true, ordner: bleibt, uebernommen: bericht, geloescht: { id: weg.id, bigoId: weg.bigoId } };
+}
+
 /**
  * Altersverifikation eintragen – ohne Audition.
  *
@@ -836,6 +1166,16 @@ function verifikationEintragen(id, { geprueftVon, nameLautAusweis, ausweisart, a
     // Abgelehnt hebt einen früheren Haken auf – sonst stimmt die Anzeige nicht.
     s.verifiziert = null;
   }
+  // Die geprüften Ausweisdaten gehören in die Stammdaten – hier steht sogar das
+  // Geburtsdatum, das eine Audition nicht abfragt.
+  const rein = stammErgaenzen(s, rec);
+  if (rein.length) {
+    if (!Array.isArray(s.eintraege)) s.eintraege = [];
+    s.eintraege.unshift({
+      id: crypto.randomUUID(), text: 'Aus der Verifikation in die Stammdaten übernommen: ' + rein.join('; '),
+      author: 'System', kind: 'stamm', am: jetzt,
+    });
+  }
   s.letzteAktivitaet = jetzt;
   save('streamers.json', streamers);
   return rec;
@@ -872,6 +1212,7 @@ function aufnahmeZuordnen(streamerId, recId, { wer, notiz } = {}) {
     checkliste: [], texte: { vorlese: '', begruessung: '' },
     aufnahme: {
       id: rec.id, sekunden: rec.durationSec || 0, bytes: rec.bytes || 0,
+      ext: rec.ext || 'webm', mime: rec.mime || '',
       auswertung: rec.quality || '', begruendung: rec.reviewNote || '',
       abgebrochen: !!rec.abgebrochen, unvollstaendig: !!rec.unvollstaendig,
     },
@@ -901,6 +1242,23 @@ function offeneAufnahmenOhneAkte() {
       durationSec: r.durationSec || 0, agentName: r.agentName || '',
       quality: r.quality || '', abgebrochen: !!r.abgebrochen, unvollstaendig: !!r.unvollstaendig,
     }));
+}
+
+/**
+ * Zu welcher Akte gehört diese Aufnahme? Gibt die Ordner-Nummer zurück oder
+ * null, wenn sie noch lose herumliegt.
+ *
+ * Gebraucht wird das beim Abspielen: eine Aufnahme, die in einer Akte liegt,
+ * darf jeder Prüfer sehen, der die Akte mit Grund geöffnet hat – sonst stünde
+ * in seiner Akte ein Videofeld, das nur schwarz bleibt. Jeder Abruf wird
+ * protokolliert, so wie der Rest der Akte.
+ */
+function aufnahmeAkte(recId) {
+  const id = String(recId || ''); if (!id) return null;
+  const rec = recordings.find((r) => r.id === id);
+  if (rec && rec.ordnerId) return rec.ordnerId;
+  const s = streamers.find((x) => (x.auditions || []).some((a) => a.aufnahme && a.aufnahme.id === id));
+  return s ? s.id : null;
 }
 
 // ---- Vermerke im Streamer-Ordner ------------------------------------------
@@ -991,6 +1349,8 @@ function purgeOlderThan(days) {
 }
 
 function getScript() { return typeof settings.script === 'string' ? settings.script : DEFAULT_SCRIPT; }
+/** Der Vorschlag von uns – damit man im acp jederzeit dorthin zurück kann. */
+function scriptVorschlag() { return DEFAULT_SCRIPT; }
 function setScript(text) { settings.script = String(text || '').slice(0, 8000); save('settings.json', settings); return true; }
 function getIntro() { return typeof settings.intro === 'string' ? settings.intro : DEFAULT_INTRO; }
 function setIntro(text) { settings.intro = String(text || '').slice(0, 8000); save('settings.json', settings); return true; }
@@ -1150,7 +1510,7 @@ function getFigureScript() { return typeof settings.figureScript === 'string' ? 
 function setFigureScript(text) { settings.figureScript = (typeof text === 'string') ? text.slice(0, 8000) : null; save('settings.json', settings); return true; }
 
 module.exports = {
-  init, getScript, setScript, getIntro, setIntro, getAdminTotp, setAdminTotp,
+  init, getScript, setScript, scriptVorschlag, getIntro, setIntro, getAdminTotp, setAdminTotp,
   addCaseEntry, updateCaseEntry, deleteCaseEntry,
   addLoginEvent, listLoginEvents, loginFailCount, clearLoginLog,
   getDeviceLock, setDeviceLock,
@@ -1164,10 +1524,12 @@ module.exports = {
   addPasskey, getAgentByPasskeyId, setPasskeyCounter, agentPasskeys,
   createCode, getCode, isCodeUsable, consumeCode, revokeCode, listCodes,
   suchePerson, ordnerAnlegen, ordnerFinden, ordnerZuordnen, idSchluessel, namSchluessel, listStreamersKurz, protokolliereZugriff, verifikationEintragen,
+  stammPflegen, stammAusAkte, doppelteAkten, aktenZusammenfuehren,
   saveCase, listCases, getCase, deleteCase, readDoc, purgeOlderThan,
-  saveRecording, listRecordings, getRecording, readRecording, reviewRecording, deleteRecording,
+  saveRecording, listRecordings, getRecording, readRecording, mp4Fassung, ffmpegDa,
+  reviewRecording, deleteRecording,
   beginRecording, appendRecordingChunk, finishRecording, offeneAufnahmen, aufnahmenRetten,
-  aufnahmeZuordnen, offeneAufnahmenOhneAkte,
+  aufnahmeZuordnen, offeneAufnahmenOhneAkte, aufnahmeAkte,
   setCaseMcp, getRecordingByCode,
   ablegen, listStreamers, getStreamer, setStreamer, deleteStreamer, streamerCount,
   addStreamerEintrag, updateStreamerEintrag, deleteStreamerEintrag,
