@@ -143,8 +143,14 @@ etwas ansteht, und in ihren Bereich führen.
   genanntem Grund. Es gibt keine zweite Tür: `GET /api/streamer` antwortet 410.
   Auch eine Altersverifikation schreibt sich ins Einsichtsprotokoll der Akte –
   sonst wäre sie ein stiller Weg an der Grundangabe vorbei.
-- **Kein Durchprobieren:** `/api/person-suche` verlangt eine Anmeldung. Die
-  Antwort nennt Name, Alter und Status; offen abfragbar wäre sie eine Kartei.
+- **Alles ab `/api/change-password`** liegt hinter einer gemeinsamen Sperre im
+  Server (`ab hier: gültiges Login nötig`). Ohne gültiges Login kommt von dort
+  nichts heraus – auch kein 410 und keine Fehlermeldung, die etwas verrät.
+  Wer die Wirkung einer einzelnen Route prüft, muss sich also anmelden;
+  ein nackter `curl` bekommt überall 401 und beweist damit nichts.
+- **Kein Durchprobieren:** `/api/person-suche` prüft die Anmeldung zusätzlich
+  selbst. Die Antwort nennt Name, Alter und Status – die Stelle ist es wert,
+  nicht allein auf die Sperre weiter oben zu vertrauen.
 - **Aufbewahrung:** automatische Löschung nach `RETENTION_DAYS` (Vorgabe 90).
 
 ## Betrieb

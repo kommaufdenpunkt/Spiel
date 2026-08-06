@@ -647,9 +647,12 @@ async function handleApi(req, res, urlPath, ip) {
   // ob die Audition an einen bestehenden Ordner angehängt wird oder ob ein
   // neuer entsteht – vor der Freigabe, nicht danach.
   if (urlPath === '/api/person-suche' && req.method === 'POST') {
-    // Nur für Angemeldete. Die Antwort nennt Name, Alter, Status und wie viele
-    // Vermerke es gibt – wer sie offen abfragen kann, kann BIGO-IDs
-    // durchprobieren und sich so eine halbe Kartei zusammensuchen.
+    // Zweiter Riegel. Die Anmeldepflicht kommt schon von der Sperre weiter
+    // oben ("ab hier: gültiges Login nötig") – dieser Aufruf hier hängt aber
+    // an der Antwort mit Name, Alter, Status und Zahl der Vermerke. Würde die
+    // Sperre oben jemals verrutschen, wäre das eine abfragbare Kartei: BIGO-IDs
+    // sind neunstellige Zahlen. Deshalb steht die Prüfung hier ausdrücklich
+    // noch einmal, direkt an der Stelle, die sie schützt.
     if (!authed(req, ip)) { sendJson(res, 401, { reason: 'auth' }); return true; }
     let body; try { body = await readJson(req, 8 * 1024); } catch { body = {}; }
     const t = store.suchePerson({
