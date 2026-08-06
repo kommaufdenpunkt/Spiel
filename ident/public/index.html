@@ -532,6 +532,15 @@
   /* Zustand in der Warteschlange: fertig oder fuellt noch aus */
   .fertig-pill{color:#5fe0a0;font-weight:700}
   .fuellt-pill{color:var(--warm,#ffc98a)}
+  /* Deckel ueber dem Vorlese-Text, solange niemand da ist */
+  .prompter-deckel{display:flex;flex-direction:column;gap:.3rem;padding:1rem .85rem;border-radius:12px;
+    border:1px dashed var(--line2);background:#0f1728;text-align:center;align-items:center}
+  .prompter-deckel .pd-ic{font-size:1.5rem;opacity:.8}
+  .prompter-deckel b{font-size:.9rem}
+  .prompter-deckel span{font-size:.8rem;color:var(--dim);line-height:1.55}
+  .prompter-deckel small{font-size:.75rem;color:var(--dim);margin-top:.3rem;opacity:.85}
+  .prompter{animation:textRein .4s ease}
+  @keyframes textRein{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
   /* Aufklaerung: je Frage ein kleiner Kasten zum Aufklappen. */
   .aufklaerung{margin-top:.9rem;padding:.8rem .85rem;border-radius:14px;
     border:1px solid #2a3a60;background:linear-gradient(180deg,#131f38,#101a2e)}
@@ -696,7 +705,10 @@
   .prompter-ctrl{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;margin-top:.5rem;font-size:.82rem;color:var(--dim)}
   .prompter-ctrl input[type=range]{width:120px}
   .checklist{display:flex;flex-direction:column;gap:.5rem}
-  .checklist label{display:flex;gap:.55rem;align-items:flex-start;font-size:.85rem;line-height:1.35;cursor:pointer}
+  /* Der Text steht in EINEM span. Ohne das wird jedes <b> ein eigenes Flex-Kind
+     und die Frage steht in zerrissenen Spalten nebeneinander - unlesbar. */
+  .checklist label{display:flex;gap:.55rem;align-items:flex-start;font-size:.85rem;line-height:1.4;cursor:pointer}
+  .checklist label>span{min-width:0}
   .checklist input{margin-top:.15rem}
   .snap-btns{display:flex;gap:.5rem;flex-wrap:wrap}
   .snap-btns button{flex:1;min-width:130px}
@@ -1125,7 +1137,7 @@
       <span class="recinfo" id="recInfo"><i></i> Dieses Gespräch wird aufgezeichnet</span>
       <span class="spacer"></span>
       <button id="recBtn" class="primary" style="display:none">⏺ Aufnahme starten</button>
-      <button id="stopRecBtn" class="danger" style="display:none" disabled>⏹ Aufnahme stoppen</button>
+      <button id="stopRecBtn" class="danger" style="display:none" disabled title="Aufnahme beenden, speichern und den Fall abschließen">⏹ Stoppen &amp; abschließen</button>
     </div>
 
   </section>
@@ -1141,8 +1153,18 @@
       <div class="status pending" id="guideStatus">Bitte lade nacheinander die Bilder hoch.</div>
 
       <div class="sect">📖 Text vorlesen (in die Kamera)</div>
-      <div class="prompter" id="prompterBox"><div id="prompterText"></div></div>
-      <div class="prompter-ctrl">
+      <!-- Der Text kommt erst im Gespraech. Vorher steht hier nur, was noch zu
+           tun ist: Vorlesen passiert in Anwesenheit der Pruefer, nicht vorher
+           allein im Warteraum. -->
+      <div class="prompter-deckel" id="prompterDeckel">
+        <span class="pd-ic">🔒</span>
+        <b>Den Text bekommst du im Gespräch</b>
+        <span>Du musst nichts vorbereiten und nichts auswendig lernen. Er erscheint hier,
+          sobald die Prüfer da sind – dann liest du ihn ihnen in die Kamera vor.</span>
+        <small>Erledige bis dahin die drei Schritte unten: Aufklärung, Ausweisdaten, Selfie.</small>
+      </div>
+      <div class="prompter" id="prompterBox" style="display:none"><div id="prompterText"></div></div>
+      <div class="prompter-ctrl" id="prompterCtrl" style="display:none">
         <button id="prompterToggle" class="primary">▶ Start</button>
         <button id="prompterReset" title="Von vorn">↺</button>
         <label>🏃 Ablese-Tempo <input type="range" id="prompterSpeed" min="1" max="12" value="4"><b id="prompterSpeedVal" style="min-width:1.6em;text-align:center;color:var(--ink)">4</b></label>
@@ -1174,14 +1196,14 @@
       <div class="sect">🎤 Fragen (Audition) <span class="qhint">nur für dich sichtbar – nicht im Video</span></div>
       <div class="qintro">Vorab vorlesen: „Bist du damit einverstanden, dass wir deine Daten speichern und zur Bearbeitung an den <b>BIGO-Support</b> weiterleiten dürfen? Unser 4ever1-Support nimmt deine Daten selbstverständlich sehr ernst." <br><small>Antwort des Bewerbers abwarten – sie wird im Video mit aufgezeichnet.</small></div>
       <div class="checklist" id="questions">
-        <label><input type="checkbox"> Sag mir bitte deine <b>BIGO-ID</b>.</label>
-        <label><input type="checkbox"> Wie <b>alt</b> bist du?</label>
-        <label><input type="checkbox"> Ist dir bewusst, dass du dieses Video als <b>Audition</b> für die Bewerbung bei der Agentur 4EVER1 auf BIGO Live aufnimmst?</label>
-        <label><input type="checkbox"> Möchtest du dem <b>V-System</b> beitreten und kennst du die dazugehörigen Regeln?</label>
-        <label><input type="checkbox"> Ist dir bewusst, dass du dich in deinen Streams zeigen und die allgemeinen <b>BIGO-Regeln</b> einhalten musst – keine verbotenen Inhalte, kein Parallelstreaming und kein Streaming auf Konkurrenz-Apps?</label>
-        <label><input type="checkbox"> Wurdest du über die <b>Transferregeln</b> (Freigabe und Freikauf) informiert?</label>
-        <label><input type="checkbox"> Erklärst du mit diesem Video deinen <b>Wunsch, der Agentur 4EVER1 beizutreten</b>?</label>
-        <label><input type="checkbox"> Für welche <b>Agentur</b> möchtest du Streamer:in werden?</label>
+        <label><input type="checkbox"><span>Sag mir bitte deine <b>BIGO-ID</b>.</span></label>
+        <label><input type="checkbox"><span>Wie <b>alt</b> bist du?</span></label>
+        <label><input type="checkbox"><span>Ist dir bewusst, dass du dieses Video als <b>Audition</b> für die Bewerbung bei der Agentur 4EVER1 auf BIGO Live aufnimmst?</span></label>
+        <label><input type="checkbox"><span>Möchtest du dem <b>V-System</b> beitreten und kennst du die dazugehörigen Regeln?</span></label>
+        <label><input type="checkbox"><span>Ist dir bewusst, dass du dich in deinen Streams zeigen und die allgemeinen <b>BIGO-Regeln</b> einhalten musst – keine verbotenen Inhalte, kein Parallelstreaming und kein Streaming auf Konkurrenz-Apps?</span></label>
+        <label><input type="checkbox"><span>Wurdest du über die <b>Transferregeln</b> (Freigabe und Freikauf) informiert?</span></label>
+        <label><input type="checkbox"><span>Erklärst du mit diesem Video deinen <b>Wunsch, der Agentur 4EVER1 beizutreten</b>?</span></label>
+        <label><input type="checkbox"><span>Für welche <b>Agentur</b> möchtest du Streamer:in werden?</span></label>
       </div>
 
       <div class="sect">Vom Bewerber erhalten</div>
@@ -1210,11 +1232,11 @@
       <textarea id="vNote" class="grow" rows="2" placeholder="Notiz (optional) – Zeilenumbrüche erlaubt"></textarea>
       <div class="sect">Prüf-Checkliste</div>
       <div class="checklist" id="checklist">
-        <label><input type="checkbox" data-chk> Ausweis-Vorder- & Rückseite gesehen</label>
-        <label><input type="checkbox" data-chk> Ausweis gut lesbar & unverändert</label>
-        <label><input type="checkbox" data-chk> Gesicht stimmt mit dem Ausweis überein</label>
-        <label><input type="checkbox" data-chk> Ausweis wirkt echt (Hologramm/kein Foto vom Foto)</label>
-        <label><input type="checkbox" data-chk> <b>Mindestens 18 Jahre</b> – Geburtsdatum im Ausweis geprüft</label>
+        <label><input type="checkbox" data-chk><span>Ausweis-Vorder- & Rückseite gesehen</span></label>
+        <label><input type="checkbox" data-chk><span>Ausweis gut lesbar & unverändert</span></label>
+        <label><input type="checkbox" data-chk><span>Gesicht stimmt mit dem Ausweis überein</span></label>
+        <label><input type="checkbox" data-chk><span>Ausweis wirkt echt (Hologramm/kein Foto vom Foto)</span></label>
+        <label><input type="checkbox" data-chk><span><b>Mindestens 18 Jahre</b> – Geburtsdatum im Ausweis geprüft</span></label>
       </div>
       <button id="approveBtn" class="good" disabled>✅ Freigeben &amp; Akte anlegen</button>
       <button id="rejectBtn" class="danger">✖ Ablehnen</button>

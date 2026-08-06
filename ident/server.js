@@ -1439,6 +1439,30 @@ const server = http.createServer(async (req, res) => {
 
 // ---- WebSocket-Signalisierung (WebRTC-Mesh: 1 Bewerber + bis zu 4 Prüfer) --
 const wss = new WebSocketServer({ server });
+
+// ---- Lebenszeichen für die WebSocket --------------------------------------
+//
+// Sobald das Video steht, läuft es direkt zwischen den beiden – über diese
+// Verbindung geht dann minutenlang nichts mehr. Ein Reverse-Proxy hält das für
+// eine vergessene Verbindung und kappt sie (nginx nach 60 Sekunden), Mobilfunk
+// oft noch früher.
+//
+// Der Browser merkte davon nur: „Verbindung unterbrochen – neuer Versuch". Und
+// weil beim Neuaufbau die bestehenden Verbindungen weggeworfen wurden, riss das
+// Gespräch jede Minute ab. Ohne dieses Lebenszeichen ist keine Audition über
+// eine echte Leitung durchzuhalten.
+//
+// Alle 25 Sekunden ein Ping. Wer zwei Pings nicht beantwortet, ist wirklich weg.
+const WS_PING_MS = 25000;
+const wsPing = setInterval(() => {
+  wss.clients.forEach((ws) => {
+    if (ws.fehlendePongs === undefined) ws.fehlendePongs = 0;
+    if (ws.fehlendePongs >= 2) { try { ws.terminate(); } catch {} return; }
+    ws.fehlendePongs++;
+    try { ws.ping(); } catch { try { ws.terminate(); } catch {} }
+  });
+}, WS_PING_MS);
+wsPing.unref && wsPing.unref();
 /** rooms: Map<code, Map<peerId, ws>> */
 const rooms = new Map();
 /** waiting: Map<code, {code, note, joinedAt, claimedBy, claimedAt}> */
@@ -1456,6 +1480,8 @@ function send(ws, obj) { if (ws && ws.readyState === ws.OPEN) ws.send(JSON.strin
 
 wss.on('connection', (ws, req) => {
   ws.ip = sec.clientIp(req);
+  ws.fehlendePongs = 0;
+  ws.on('pong', () => { ws.fehlendePongs = 0; });
   if (sec.isBlocked(ws.ip)) { try { ws.close(); } catch {} return; }
   ws.peerId = crypto.randomUUID();
 

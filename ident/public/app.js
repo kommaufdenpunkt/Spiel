@@ -1617,6 +1617,27 @@
     grund.parentNode.insertBefore(k, grund);
   });
 
+  /**
+   * Den Vorlese-Text freigeben - erst wenn ein Pruefer da ist.
+   *
+   * Vorgelesen wird in ihrer Anwesenheit. Vorher allein im Warteraum zu ueben
+   * hilft niemandem: es ist eine Erklaerung, die sie hoeren sollen, keine
+   * Pruefung, die man bestehen muss.
+   */
+  function textFreigeben() {
+    if (state.role !== 'guest' || state.textFrei) return;
+    state.textFrei = true;
+    const deckel = $('prompterDeckel'); if (deckel) deckel.style.display = 'none';
+    const box = $('prompterBox'); if (box) box.style.display = '';
+    const ctrl = $('prompterCtrl'); if (ctrl) ctrl.style.display = '';
+    if ($('guideStatus')) {
+      $('guideStatus').className = 'status ok';
+      $('guideStatus').textContent = 'Die Pruefer sind da. Lade die Ausweisbilder hoch und lies '
+        + 'anschliessend den Text in die Kamera - dein Tempo bestimmst du selbst.';
+    }
+    toast('\u{1F4D6} Der Text ist da - lies ihn den Pruefern vor.');
+  }
+
   // ---- Was liest er gerade? Das gehört in die Aufnahme ---------------------
   // Der Vorlese-Text ist die Einwilligung, die der Bewerber in die Kamera
   // spricht. Bisher stand er nur im Ordner - man sah auf der Aufnahme jemanden
@@ -1914,8 +1935,31 @@
     remoteWaiting.textContent = host ? 'Warte auf das Video des Bewerbers …' : 'Warte auf den Prüfer …';
   }
 
-  function connectSignaling() {
-    closeAllPeers(); state.myUploads = state.myUploads || []; state.leaving = false;
+  /**
+   * Verbindung zum Signal-Server aufbauen.
+   *
+   * @param {boolean} neuAufbauen  true = alles verwerfen und von vorn (erster
+   *   Aufbau). false = wir hatten nur einen Aussetzer; ein Gespräch, das noch
+   *   läuft, bleibt bestehen.
+   *
+   * Vorher wurden beim Wiederverbinden IMMER alle Verbindungen geschlossen.
+   * Kappt der Proxy die Leitung – und das tat er, weil es kein Lebenszeichen
+   * gab –, riss dadurch das laufende Gespräch mit ab. Video und Ton mussten neu
+   * verhandelt werden, jede Minute. Das Bild blieb dann oft ganz aus.
+   *
+   * Das Video läuft direkt zwischen den beiden. Es geht den Signal-Server nichts
+   * an, wenn der kurz weg war.
+   */
+  function connectSignaling(neuAufbauen) {
+    if (neuAufbauen !== false) closeAllPeers();
+    else {
+      // Nur die aufräumen, die wirklich hin sind. Was steht, bleibt stehen.
+      if (state.peers) state.peers.forEach((P, id) => {
+        const z = P.pc && P.pc.connectionState;
+        if (z === 'failed' || z === 'closed') { try { P.pc.close(); } catch {} state.peers.delete(id); }
+      });
+    }
+    state.myUploads = state.myUploads || []; state.leaving = false;
     const proto = location.protocol === 'https:' ? 'wss' : 'ws';
     const ws = new WebSocket(`${proto}://${location.host}`); state.ws = ws;
     // BIGO-ID und Alter gehen gleich mit: Der Server schaut damit nach, ob es
@@ -1932,10 +1976,15 @@
         case 'joined':
           state.role = m.role; state.selfId = m.peerId; setupRoleUI();
           setzeCheck('wcNet', 'ok', 'Verbindung steht');
+          state.wiederholung = 0;
           (m.peers || []).forEach((p) => ensurePeer(p.peerId, p.role, p.name, false));
+          if ((m.peers || []).some((p) => p.role === 'host')) textFreigeben();
           if ((m.peers || []).length) $('bannerText').textContent = 'Verbunden.';
           break;
-        case 'peer-joined': $('bannerText').textContent = 'Verbunden.'; ensurePeer(m.peerId, m.role, m.name, true); break;
+        case 'peer-joined':
+          $('bannerText').textContent = 'Verbunden.'; ensurePeer(m.peerId, m.role, m.name, true);
+          if (m.role === 'host') textFreigeben();
+          break;
         case 'signal': await handleSignal(m.from, m.data); break;
         case 'peer-left': removePeer(m.peerId); break;
         case 'error':
@@ -1947,9 +1996,25 @@
     };
     ws.onclose = () => {
       if (state.leaving || !$('room').classList.contains('active')) { sysMsg('Verbindung zum Server getrennt.'); return; }
-      sysMsg('Verbindung unterbrochen – neuer Versuch …'); $('bannerText').textContent = 'Verbindung wird wiederhergestellt …';
-      setzeCheck('wcNet', 'warn', 'kurz unterbrochen – wir versuchen es erneut');
-      clearTimeout(state.reconnectT); state.reconnectT = setTimeout(() => { if (!state.leaving && $('room').classList.contains('active')) connectSignaling(); }, 2500);
+      // Läuft das Bild noch? Dann ist nur der Signalweg weg – das sagen wir
+      // ruhig und ohne Schreck. Sonst steht da „unterbrochen", während man sich
+      // bestens sieht und hört.
+      const laeuft = state.peers && [...state.peers.values()].some((P) => P.pc
+        && (P.pc.connectionState === 'connected' || P.pc.connectionState === 'completed'));
+      if (laeuft) {
+        setzeCheck('wcNet', 'warn', 'Signalweg kurz weg – das Gespräch läuft weiter');
+      } else {
+        sysMsg('Verbindung unterbrochen – neuer Versuch …');
+        $('bannerText').textContent = 'Verbindung wird wiederhergestellt …';
+        setzeCheck('wcNet', 'warn', 'kurz unterbrochen – wir versuchen es erneut');
+      }
+      clearTimeout(state.reconnectT);
+      // Schnell wieder dran, aber nicht im Sekundentakt hämmern.
+      state.wiederholung = Math.min(6, (state.wiederholung || 0) + 1);
+      const wartenMs = Math.min(8000, 800 * state.wiederholung);
+      state.reconnectT = setTimeout(() => {
+        if (!state.leaving && $('room').classList.contains('active')) connectSignaling(false);
+      }, wartenMs);
     };
   }
   function sig(to, data) { if (state.ws && state.ws.readyState === WebSocket.OPEN) state.ws.send(JSON.stringify({ type: 'signal', to, data })); }
@@ -2276,6 +2341,11 @@
       $('reviewStatus').className = 'status ' + (result === 'approved' ? 'ok' : 'bad');
       $('reviewStatus').textContent = result === 'approved' ? '✓ Freigegeben – Akte angelegt.' : '✖ Abgelehnt – Akte angelegt.';
       toast(result === 'approved' ? 'Freigegeben ✓' : 'Abgelehnt');
+      // Danach ist das Gespräch zu Ende. Kein zusätzlicher Klick mehr: stoppen,
+      // speichern, entscheiden – fertig. Fünf Sekunden bleiben, um sich zu
+      // verabschieden, dann geht es von selbst zurück in den Warteraum.
+      // Wer noch etwas nachtragen will, kann den Rücklauf abbrechen.
+      abschlussRuecklauf();
     } else if (r.body && r.body.reason === 'bad-code') {
       state.caseDone = true; // ein anderer Prüfer war schneller
       $('reviewStatus').className = 'status ok'; $('reviewStatus').textContent = '✓ Wurde bereits von einem anderen Prüfer abgeschlossen.';
@@ -2284,6 +2354,41 @@
       toast('Speichern fehlgeschlagen. Bitte erneut versuchen.');
     }
   }
+  /**
+   * Rücklauf nach der Entscheidung.
+   *
+   * Vorher musste der Prüfer nach dem Freigeben noch einmal „Verlassen"
+   * drücken – ein Klick, der nichts entscheidet und leicht vergessen wird. Dann
+   * hängt das Gespräch offen und der Nächste wartet.
+   */
+  function abschlussRuecklauf() {
+    let rest = 5;
+    const b = $('leaveBtn');
+    const alt = b ? b.textContent : '';
+    let abgebrochen = false;
+    const abbrechen = () => {
+      abgebrochen = true; clearInterval(state.ruecklaufT);
+      if (b) { b.textContent = alt; b.classList.remove('warn'); }
+      sysMsg('Rücklauf abgebrochen – du kannst das Gespräch selbst beenden.');
+    };
+    if (b) {
+      b.classList.add('warn');
+      b.textContent = '⤺ Beenden (' + rest + ')';
+      b.addEventListener('click', abbrechen, { once: true });
+    }
+    clearInterval(state.ruecklaufT);
+    state.ruecklaufT = setInterval(() => {
+      if (abgebrochen) return;
+      rest--;
+      if (b) b.textContent = '⤺ Beenden (' + rest + ')';
+      if (rest <= 0) {
+        clearInterval(state.ruecklaufT);
+        if (b) { b.textContent = alt; b.classList.remove('warn'); }
+        leaveRoom();
+      }
+    }, 1000);
+  }
+
   function onResult(result) {
     if (state.role === 'host') { // anderer Prüfer hat den Fall abgeschlossen
       state.caseDone = true; $('approveBtn').disabled = true; $('rejectBtn').disabled = true;
