@@ -1193,10 +1193,61 @@
     return k;
   }
 
+  /**
+   * Lose Aufnahmen anbieten.
+   *
+   * Bricht eine Audition ab, liegt die Aufnahme da und gehoert zu niemandem.
+   * Hier - in der geoeffneten Akte, den Grund hast du also schon genannt - kann
+   * man sie einsortieren. Das Gespraech hat stattgefunden, das Video ist da; es
+   * fehlte nur der Weg, es der richtigen Person zuzuordnen.
+   */
+  async function loseAufnahmen(s, host) {
+    const r = await api('GET', '/api/aufnahmen-offen');
+    const liste = (r.body && r.body.aufnahmen) || [];
+    if (!liste.length) return;
+    const k = document.createElement('div');
+    k.className = 'lose';
+    k.innerHTML = '<b>🎬 Aufnahmen ohne Akte (' + liste.length + ')</b>'
+      + '<small>Diese Gespräche wurden nicht abgeschlossen – die Aufnahme liegt lose da. '
+      + 'Gehört eine davon zu <b>' + esc(s.bigoId) + '</b>, hol sie hier herein.</small>';
+    liste.forEach((a) => {
+      const min = Math.floor((a.durationSec || 0) / 60), sek = (a.durationSec || 0) % 60;
+      const z = document.createElement('div'); z.className = 'lose-z';
+      z.innerHTML = '<div><b>' + esc(a.code || 'ohne Nummer') + '</b>'
+        + (a.abgebrochen ? ' <span class="wait-pill warn">abgebrochen</span>' : '')
+        + (a.unvollstaendig ? ' <span class="wait-pill no">unvollständig</span>' : '')
+        + '<div class="ometa">' + esc(new Date(a.createdAt).toLocaleString('de-DE'))
+        + ' · ' + min + ':' + pad(sek) + ' · ' + (a.bytes / (1024 * 1024)).toFixed(1) + ' MB'
+        + (a.agentName ? ' · ' + esc(a.agentName) : '') + '</div></div>';
+      const b = document.createElement('button');
+      b.className = 'good'; b.textContent = '📥 In diese Akte';
+      b.addEventListener('click', async () => {
+        b.disabled = true;
+        const rr = await api('POST', '/api/aufnahme-zuordnen', { id: s.id, aufnahme: a.id });
+        b.disabled = false;
+        if (rr.status !== 200) {
+          toast(rr.body && rr.body.reason === 'schon-zugeordnet'
+            ? 'Diese Aufnahme liegt schon in einer Akte.' : 'Hat nicht geklappt.');
+          return;
+        }
+        toast('Aufnahme in die Akte gelegt ✓');
+        const i = (state.ordner || []).findIndex((x) => x.id === s.id);
+        if (i >= 0) state.ordner[i] = rr.body.ordner;
+        zeichneOrdner();
+      });
+      z.appendChild(b); k.appendChild(z);
+    });
+    host.appendChild(k);
+  }
+
   /** Unterordner „Auditions": die Gespräche mit allem, was dazugehört. */
   function auditionOrdner(s) {
     const k = document.createElement('div');
-    if (!(s.auditions || []).length) { k.innerHTML = '<div class="deck-empty">Noch keine Audition.</div>'; return k; }
+    // Lose Aufnahmen erst anbieten, dann die Auditions selbst.
+    loseAufnahmen(s, k);
+    if (!(s.auditions || []).length) {
+      k.insertAdjacentHTML('beforeend', '<div class="deck-empty">Noch keine Audition.</div>'); return k;
+    }
     (s.auditions || []).forEach((a) => {
       const auf = a.aufnahme;
       const erg = a.ergebnis === 'approved' ? '<span class="wait-pill ok">✓ freigegeben</span>'
@@ -1219,7 +1270,14 @@
         + (a.notiz ? '<div class="ord-notiz"><b>Notiz des Prüfers</b>' + esc(a.notiz) + '</div>' : '')
         + '<div style="margin-top:.45rem">' + aufTxt + '</div>'
         + (auf ? '<video controls preload="metadata" src="/api/recording?id=' + encodeURIComponent(auf.id)
-            + '&token=' + encodeURIComponent(state.token) + '"></video>' : '')
+            + '&token=' + encodeURIComponent(state.token) + '"></video>'
+            // Herunterladen und Weitergeben: ein Knopf, keine versteckte Menuefunktion.
+            + '<div class="dl-reihe">'
+            + '<a class="dl-knopf" download href="/api/recording?dl=1&id=' + encodeURIComponent(auf.id)
+              + '&token=' + encodeURIComponent(state.token) + '">⬇ Video herunterladen</a>'
+            + '<span class="dl-hinweis">Zum Weitergeben an den BIGO-Support. '
+              + 'Enthält Bild und Ton des Gesprächs – bitte nur dorthin, wo es hingehört.</span>'
+            + '</div>' : '')
         + ausweisBilder(a)
         + hakenListe(a)
         + wortlaut(a)

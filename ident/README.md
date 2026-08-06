@@ -94,6 +94,30 @@ ausgegraut. „Nächsten annehmen" überspringt sie. Nach drei Minuten erscheint
 zusätzlich „⚠ Trotzdem holen", damit niemand festhängt, der nicht weiterkommt;
 dieser Griff wird protokolliert.
 
+## Abgebrochene Auditions – die Aufnahme geht nicht verloren
+
+Bricht ein Gespräch ab – Leitung weg, Browser zu, niemand klickt auf
+„Freigeben" –, dann **liegt die Aufnahme lose da** und gehört zu keiner Akte.
+Das Gespräch hat stattgefunden, das Video ist da, aber die Akte weiss nichts
+davon.
+
+Im Unterordner **🎬 Auditions** einer geöffneten Akte stehen deshalb oben die
+**„Aufnahmen ohne Akte"** mit Nummer, Datum, Länge und Größe. Ein Tippen auf
+**„📥 In diese Akte"** sortiert sie ein – als Audition mit dem Ergebnis
+**offen**, gekennzeichnet als nachträglich zugeordnet, und mit einem Vermerk, wer
+es getan hat. Der Grund für die Akteneinsicht wurde ja beim Öffnen schon genannt.
+
+## Herunterladen und weitergeben
+
+- **⬇ Video herunterladen** – neben jeder Aufnahme. Die Datei heisst dann
+  `Audition-<Nummer>-<Datum>.webm`, nicht „recording": damit kann jemand etwas
+  anfangen, der sie weitergeben soll. Vorher ging das nur über das versteckte
+  Menü im Videofeld. Jeder Abruf steht im Protokoll.
+- **📄 Ausweisblatt (PDF)** – im Unterordner *Ausweise*, je Audition eines.
+
+Beides enthält Ausweisdaten und Gesichter. Es gehört zum BIGO-Support und
+nirgendwo anders hin.
+
 ## Die Akte in Unterordnern
 
 Eine Akte mit allem untereinander liest niemand. Also fünf Unterordner mit Zahl

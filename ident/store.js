@@ -841,6 +841,68 @@ function verifikationEintragen(id, { geprueftVon, nameLautAusweis, ausweisart, a
   return rec;
 }
 
+/**
+ * Eine lose Aufnahme nachträglich in eine Akte legen.
+ *
+ * Bricht eine Audition ab - Leitung weg, Browser zu, jemand klickt nicht auf
+ * „Freigeben" -, dann liegt die Aufnahme da und gehört zu niemandem. Vorher gab
+ * es keinen Weg, sie noch einzusortieren: das Gespräch hat stattgefunden, das
+ * Video ist da, aber die Akte wusste nichts davon.
+ *
+ * Jetzt wird sie als Audition mit dem Ergebnis „offen" eingetragen. Offen heisst:
+ * es wurde noch nicht entschieden. Wer sie zuordnet, steht dabei, und die
+ * Aufnahme merkt sich, in welche Akte sie gehört - damit sie nicht zweimal
+ * einsortiert wird.
+ */
+function aufnahmeZuordnen(streamerId, recId, { wer, notiz } = {}) {
+  const s = getStreamer(streamerId); if (!s) return { ok: false, grund: 'akte-fehlt' };
+  const rec = getRecording(recId); if (!rec) return { ok: false, grund: 'aufnahme-fehlt' };
+  if (rec.ordnerId) return { ok: false, grund: 'schon-zugeordnet' };
+  const jetzt = new Date().toISOString();
+  if (!Array.isArray(s.auditions)) s.auditions = [];
+  s.auditions.unshift({
+    auditionId: '',                       // kein Fall dahinter - nur die Aufnahme
+    zugangsnummer: rec.code || '',
+    ergebnis: 'open',
+    ablehnungsgrund: '',
+    pruefer: String(wer || '').slice(0, 60),
+    ausweisart: '', ausweisnummer: '',
+    notiz: String(notiz || 'Aufnahme nachträglich zugeordnet – die Audition wurde nicht abgeschlossen.').slice(0, 500),
+    erstelltAm: rec.createdAt || jetzt,
+    checkliste: [], texte: { vorlese: '', begruessung: '' },
+    aufnahme: {
+      id: rec.id, sekunden: rec.durationSec || 0, bytes: rec.bytes || 0,
+      auswertung: rec.quality || '', begruendung: rec.reviewNote || '',
+      abgebrochen: !!rec.abgebrochen, unvollstaendig: !!rec.unvollstaendig,
+    },
+    protokoll: [{ text: 'Von ' + String(wer || '?') + ' dieser Akte zugeordnet.', autor: String(wer || '?'), am: jetzt }],
+    dateien: [],
+    nachtraeglich: true,
+  });
+  rec.ordnerId = s.id;
+  s.letzteAktivitaet = jetzt;
+  save('streamers.json', streamers);
+  save('recordings.json', recordings);
+  return { ok: true, ordner: getStreamer(s.id) };
+}
+
+/**
+ * Aufnahmen, die zu keiner Akte gehören. Nur die Angaben darüber, nicht das
+ * Video selbst - man soll sehen, DASS etwas herumliegt, ohne es abzuspielen.
+ */
+function offeneAufnahmenOhneAkte() {
+  const inAkte = new Set();
+  streamers.forEach((s) => (s.auditions || []).forEach((a) => { if (a.aufnahme && a.aufnahme.id) inAkte.add(a.aufnahme.id); }));
+  return recordings
+    .filter((r) => !r.ordnerId && !inAkte.has(r.id))
+    .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))
+    .map((r) => ({
+      id: r.id, code: r.code || '', createdAt: r.createdAt, bytes: r.bytes || 0,
+      durationSec: r.durationSec || 0, agentName: r.agentName || '',
+      quality: r.quality || '', abgebrochen: !!r.abgebrochen, unvollstaendig: !!r.unvollstaendig,
+    }));
+}
+
 // ---- Vermerke im Streamer-Ordner ------------------------------------------
 // Alles, was im Laufe der Zeit dazukommt: Anrufe, Absprachen, Auffälligkeiten.
 function streamerEintraege(s) { if (!Array.isArray(s.eintraege)) s.eintraege = []; return s.eintraege; }
@@ -1105,6 +1167,7 @@ module.exports = {
   saveCase, listCases, getCase, deleteCase, readDoc, purgeOlderThan,
   saveRecording, listRecordings, getRecording, readRecording, reviewRecording, deleteRecording,
   beginRecording, appendRecordingChunk, finishRecording, offeneAufnahmen, aufnahmenRetten,
+  aufnahmeZuordnen, offeneAufnahmenOhneAkte,
   setCaseMcp, getRecordingByCode,
   ablegen, listStreamers, getStreamer, setStreamer, deleteStreamer, streamerCount,
   addStreamerEintrag, updateStreamerEintrag, deleteStreamerEintrag,

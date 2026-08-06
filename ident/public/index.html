@@ -212,6 +212,22 @@
   .uo-inhalt{overflow:hidden;max-height:0;transition:max-height .3s ease,opacity .25s ease;opacity:0;
     padding:0 .8rem}
   .unterordner.auf .uo-inhalt{opacity:1;padding-bottom:.8rem}
+  /* Lose Aufnahmen, die noch zu keiner Akte gehoeren */
+  .lose{margin-bottom:.7rem;padding:.65rem .75rem;border-radius:12px;
+    border:1px solid var(--warn,#7a5a24);background:#22200f}
+  .lose>b{display:block;font-size:.88rem;color:#f0dca8}
+  .lose>small{display:block;font-size:.76rem;color:var(--dim);line-height:1.5;margin:.25rem 0 .5rem}
+  .lose-z{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;padding:.45rem 0;
+    border-top:1px solid #3a3418}
+  .lose-z>div{flex:1;min-width:150px}
+  .lose-z .ometa{font-size:.75rem;color:var(--dim);margin-top:.1rem}
+  /* Herunterladen: sichtbarer Knopf statt verstecktem Browser-Menue */
+  .dl-reihe{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;margin-top:.5rem}
+  .dl-knopf{display:inline-flex;align-items:center;gap:.3rem;font-size:.8rem;font-weight:600;
+    text-decoration:none;padding:.4rem .7rem;border-radius:10px;color:var(--ink);
+    background:#1b2740;border:1px solid var(--line2);transition:transform .18s,border-color .18s}
+  .dl-knopf:hover{transform:translateY(-1px);border-color:var(--accent)}
+  .dl-hinweis{flex:1;min-width:140px;font-size:.74rem;color:var(--dim);line-height:1.45}
   /* Ausweis-Satz je Audition */
   .ausw-satz{padding:.6rem 0;border-top:1px solid var(--line)}
   .ausw-satz:first-child{border-top:0}

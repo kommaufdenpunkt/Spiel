@@ -716,6 +716,27 @@ async function handleApi(req, res, urlPath, ip) {
     return true;
   }
 
+  // ---- Lose Aufnahmen einer Akte zuordnen ---------------------------------
+  // Bricht eine Audition ab, liegt die Aufnahme da und gehoert zu niemandem.
+  // Hier wird sie eingesortiert - der Zugriff steht wie immer in der Akte.
+  if (urlPath === '/api/aufnahmen-offen' && req.method === 'GET') {
+    if (!authed(req, ip)) { sendJson(res, 401, { reason: 'auth' }); return true; }
+    sendJson(res, 200, { aufnahmen: store.offeneAufnahmenOhneAkte() }); return true;
+  }
+  if (urlPath === '/api/aufnahme-zuordnen' && req.method === 'POST') {
+    if (!authed(req, ip)) { sendJson(res, 401, { reason: 'auth' }); return true; }
+    let body; try { body = await readJson(req, 16 * 1024); } catch { body = {}; }
+    const wer = reqName(req, ip) || 'Prüfer';
+    const r = store.aufnahmeZuordnen(String(body.id || ''), String(body.aufnahme || ''), { wer, notiz: body.notiz });
+    if (!r.ok) { sendJson(res, 400, { reason: r.grund }); return true; }
+    store.protokolliereZugriff(String(body.id || ''), {
+      wer, rolle: isAdmin(req, ip) ? 'admin' : 'pruefer',
+      grund: 'Aufnahme nachträglich zugeordnet', ip,
+    });
+    sec.recordEvent('audit', ip, 'Aufnahme zugeordnet (' + wer + '): ' + body.aufnahme + ' -> ' + body.id);
+    sendJson(res, 200, { ordner: r.ordner }); return true;
+  }
+
   // ---- Kennen wir die Person schon? ----
   // Wird beim Eintippen der Ausweisdaten gefragt. Der Prüfer soll wissen,
   // ob die Audition an einen bestehenden Ordner angehängt wird oder ob ein
@@ -1292,12 +1313,25 @@ async function handleApi(req, res, urlPath, ip) {
   if (urlPath === '/api/recording' && req.method === 'GET') {
     // Admins sehen alles. Ein Prüfer darf die Aufnahme ansehen, die er selbst
     // gemacht hat – sonst könnte er nicht beurteilen, ob sie etwas geworden ist.
-    const recId = new URL(req.url, 'http://x').searchParams.get('id');
+    const q0 = new URL(req.url, 'http://x').searchParams;
+    const recId = q0.get('id');
     const meta = store.getRecording(recId || '');
     const eigene = meta && authed(req, ip) && meta.agentName && meta.agentName === (reqName(req, ip) || '');
     if (!isAdmin(req, ip) && !eigene) { res.writeHead(403); res.end('Forbidden'); return true; }
     const data = store.readRecording(recId);
     if (!data) { res.writeHead(404); res.end('not found'); return true; }
+    // Herunterladen mit ordentlichem Namen. Vorher ging es nur ueber das
+    // versteckte Menue im Videofeld, und die Datei hiess dann "recording" -
+    // damit kann niemand etwas anfangen, der sie weitergeben soll.
+    if (q0.get('dl')) {
+      const datum = String(meta.createdAt || '').slice(0, 10);
+      const wer = String(meta.code || 'audition').replace(/[^\w-]/g, '');
+      const name = 'Audition-' + wer + '-' + datum + '.' + (meta.ext || 'webm');
+      sec.recordEvent('audit', ip, 'Aufnahme heruntergeladen (' + (reqName(req, ip) || '?') + '): ' + recId);
+      res.writeHead(200, { 'Content-Type': data.mime, 'Content-Length': data.buffer.length,
+        'Cache-Control': 'no-store', 'Content-Disposition': 'attachment; filename="' + name + '"' });
+      res.end(data.buffer); return true;
+    }
     const total = data.buffer.length; const range = req.headers['range'];
     const m = range && /^bytes=(\d*)-(\d*)$/.exec(range);
     if (m) {
