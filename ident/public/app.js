@@ -157,7 +157,13 @@
 
     // Bewerber -> erst Willkommen/Ablauf zeigen; Kamera startet erst bei "Bereit".
     state.role = 'guest'; state.code = code; state.name = 'Bewerber';
-    state.profile = { bigoName: $('bigoInput').value.trim().slice(0, 80), age: $('ageInput').value.trim().slice(0, 10) };
+    // Zahl UND Name. Beides geht mit, damit wir die Person wiederfinden – auch
+    // wenn sie nur eines von beiden richtig weiss.
+    state.profile = {
+      bigoId: $('bigoInput').value.trim().slice(0, 40),
+      bigoName: ($('bigoNickInput') ? $('bigoNickInput').value.trim().slice(0, 80) : ''),
+      age: $('ageInput').value.trim().slice(0, 10),
+    };
     resetEnter();
     $('lobby').style.display = 'none';
     loadIntro();
@@ -1061,10 +1067,24 @@
 
     const fam = (s.art || 'streamer') === 'familie';
     const kopf = document.createElement('div'); kopf.className = 'ord-aud' + (fam ? ' familie' : '');
-    kopf.innerHTML = '<b style="font-size:1.1rem">' + esc(s.bigoId) + '</b> '
-      + (fam ? '<span class="fam-pill">Familie</span> ' : '') + ordPill(s.status)
+    // Der Kopf sagt sofort alles Wichtige: Kennung, Name auf BIGO, frühere
+    // Namen, Status und ob geprüft wurde. Der blaue Haken darf nicht in einem
+    // zugeklappten Unterordner verschwinden – das ist die Frage, die man als
+    // erste hat.
+    kopf.innerHTML = '<div class="ord-titel"><b>' + esc(s.bigoId) + '</b>'
+      + (s.verifiziert ? '<span class="haken gross" title="Alter und Ausweis geprüft am '
+          + esc(new Date(s.verifiziert.am).toLocaleDateString('de-DE')) + ' von ' + esc(s.verifiziert.von) + '">✓</span>' : '')
+      + (fam ? '<span class="fam-pill">Familie</span>' : '') + ordPill(s.status) + '</div>'
+      + (s.bigoName ? '<div class="ord-nick">🏷 ' + esc(s.bigoName) + '</div>' : '')
+      + ((s.aliasse || []).length ? '<div class="ord-alias">früher: ' + esc((s.aliasse || []).join(', ')) + '</div>' : '')
       + '<div class="ometa">' + esc(s.name || 'Name unbekannt') + (s.alter ? ' · ' + esc(s.alter) + ' Jahre' : '')
-      + (s.notiz ? '<br>Notiz: ' + esc(s.notiz) : '') + '</div>';
+      + (s.notiz ? '<br>Notiz: ' + esc(s.notiz) : '') + '</div>'
+      + '<div class="ord-verif-kurz ' + (s.verifiziert ? 'ja' : 'nein') + '">'
+      + (s.verifiziert
+        ? '✓ <b>Verifiziert</b> – Alter und Ausweis geprüft am '
+          + esc(new Date(s.verifiziert.am).toLocaleDateString('de-DE')) + ' von ' + esc(s.verifiziert.von)
+        : '○ <b>Noch nicht verifiziert</b> – Alter und Ausweis wurden nicht bestätigt')
+      + '</div>';
     // Nur Admins entscheiden, wer zur Familie gehört.
     if (state.isAdmin) {
       const zeile = document.createElement('div');
@@ -1086,10 +1106,78 @@
     }
     host.appendChild(kopf);
 
-    host.appendChild(vermerkeBlock(s));
-    host.appendChild(verifikationBlock(s));
-    host.appendChild(zugriffeBlock(s));
+    // ---- Unterordner. Eine Akte mit allem untereinander liest niemand ----
+    // Jeder Bereich ist ein eigener Ordner mit Zahl daran: man sieht auf einen
+    // Blick, wo etwas drin ist, und öffnet nur das, was man braucht.
+    const auds = s.auditions || [];
+    const bilderZahl = auds.reduce((n, a) => n + (a.dateien || []).filter((d) => d.art === 'ausweis' && d.dateiname).length, 0);
+    host.appendChild(unterordner('🪪', 'Ausweise & Dokumente', bilderZahl,
+      'Ausweisbilder und das Ausweisblatt als PDF', () => ausweisOrdner(s), bilderZahl > 0));
+    host.appendChild(unterordner('✓', 'Altersverifikation', (s.verifikationen || []).length,
+      s.verifiziert ? 'geprüft – blauer Haken gesetzt' : 'noch nicht geprüft',
+      () => verifikationBlock(s), !s.verifiziert));
+    host.appendChild(unterordner('🎬', 'Auditions', auds.length,
+      auds.length ? 'Gespräche, Aufnahmen, abgehakte Fragen' : 'noch keine Audition', () => auditionOrdner(s), false));
+    host.appendChild(unterordner('📝', 'Vermerke', (s.eintraege || []).length,
+      'Anrufe, Absprachen, Auffälligkeiten', () => vermerkeBlock(s), false));
+    host.appendChild(unterordner('🔒', 'Akteneinsicht', (s.zugriffe || []).length,
+      'wer wann mit welchem Grund hineingesehen hat', () => zugriffeBlock(s), false));
+  }
 
+  /**
+   * Ein Unterordner: Deckel mit Zeichen, Name und Zahl. Erst beim Öffnen wird
+   * der Inhalt gebaut – das hält die Akte auch bei vielen Auditionen flott.
+   */
+  function unterordner(zeichen, titel, zahl, unterzeile, bauen, offenStart) {
+    const k = document.createElement('div');
+    k.className = 'unterordner' + (offenStart ? ' auf' : '') + (zahl ? '' : ' leer');
+    k.innerHTML = '<button class="uo-kopf" type="button">'
+      + '<span class="uo-ic">' + zeichen + '</span>'
+      + '<span class="uo-txt"><b>' + esc(titel) + '</b><small>' + esc(unterzeile) + '</small></span>'
+      + '<span class="uo-zahl">' + zahl + '</span>'
+      + '<span class="uo-pfeil">▾</span></button>'
+      + '<div class="uo-inhalt"></div>';
+    const inhalt = k.querySelector('.uo-inhalt');
+    let gebaut = false;
+    const auf = () => {
+      if (!gebaut) { gebaut = true; const el = bauen(); if (el) inhalt.appendChild(el); }
+      k.classList.add('auf');
+      inhalt.style.maxHeight = inhalt.scrollHeight + 40 + 'px';
+      setTimeout(() => { if (k.classList.contains('auf')) inhalt.style.maxHeight = 'none'; }, 320);
+    };
+    const zu = () => {
+      inhalt.style.maxHeight = inhalt.scrollHeight + 'px';
+      requestAnimationFrame(() => { k.classList.remove('auf'); inhalt.style.maxHeight = '0px'; });
+    };
+    k.querySelector('.uo-kopf').addEventListener('click', () => (k.classList.contains('auf') ? zu() : auf()));
+    if (offenStart) setTimeout(auf, 30); else inhalt.style.maxHeight = '0px';
+    return k;
+  }
+
+  /** Unterordner „Ausweise": PDF je Audition und die Bilder darunter. */
+  function ausweisOrdner(s) {
+    const k = document.createElement('div');
+    const auds = (s.auditions || []).filter((a) => a.auditionId);
+    if (!auds.length) { k.innerHTML = '<div class="deck-empty">Noch keine Ausweisunterlagen.</div>'; return k; }
+    k.innerHTML = auds.map((a) => {
+      const bilder = (a.dateien || []).filter((d) => d.art === 'ausweis' && d.dateiname);
+      const url = '/api/akte-pdf?id=' + encodeURIComponent(s.id) + '&audition=' + encodeURIComponent(a.auditionId)
+        + '&token=' + encodeURIComponent(state.token);
+      return '<div class="ausw-satz">'
+        + '<div class="ausw-kopf"><b>' + esc(new Date(a.erstelltAm).toLocaleDateString('de-DE')) + '</b>'
+        + '<span class="muted">' + esc(a.ausweisart || 'Ausweis') + ' · ' + esc(a.ausweisnummer || '—') + '</span>'
+        + '<a class="pdf-knopf" href="' + url + '" target="_blank" rel="noopener">📄 Ausweisblatt (PDF)</a></div>'
+        + ausweisBilder(a)
+        + (bilder.length ? '' : '<div class="muted" style="font-size:.8rem">Keine Bilder zu dieser Audition.</div>')
+        + '</div>';
+    }).join('');
+    return k;
+  }
+
+  /** Unterordner „Auditions": die Gespräche mit allem, was dazugehört. */
+  function auditionOrdner(s) {
+    const k = document.createElement('div');
+    if (!(s.auditions || []).length) { k.innerHTML = '<div class="deck-empty">Noch keine Audition.</div>'; return k; }
     (s.auditions || []).forEach((a) => {
       const auf = a.aufnahme;
       const erg = a.ergebnis === 'approved' ? '<span class="wait-pill ok">✓ freigegeben</span>'
@@ -1120,8 +1208,9 @@
             + a.protokoll.map((e) => '<div style="padding:.3rem 0">' + esc(e.text)
               + '<small>' + esc(e.autor || '') + ' · ' + esc(new Date(e.am).toLocaleString('de-DE')) + '</small></div>').join('')
             + '</div>' : '');
-      host.appendChild(d);
+      k.appendChild(d);
     });
+    return k;
   }
   // ---- Was in einer Audition steckt, gehört auch in den Ordner ------------
   // Ausweisbilder, abgehakte Fragen und der Wortlaut, der an dem Tag galt.
@@ -1180,7 +1269,8 @@
     const w = (id) => { const e = $(id); return e ? e.value.trim() : ''; };
     return {
       kind: 'profile',
-      bigoName: (state.profile && state.profile.bigoName) || '',
+      bigoName: (state.profile && state.profile.bigoId) || (state.profile && state.profile.bigoName) || '',
+      bigoNick: (state.profile && state.profile.bigoName) || '',
       age: (state.profile && state.profile.age) || '',
       ausweisName: w('vaName'), ausweisArt: w('vaArt'), ausweisNr: w('vaNr'),
       // Selbstauskunft des Bewerbers: volljaehrig und echter Ausweis. Ersetzt
@@ -1194,6 +1284,7 @@
     const p = vorabPaket();
     const fertig = !!(p.ausweisName && p.ausweisArt && p.ausweisNr && p.echtBestaetigt);
     box.classList.toggle('fertig', fertig);
+    zeigeFertig();
     const st = $('vaStatus');
     if (st) st.textContent = fertig
       ? '✓ Alles da – der Prüfer bekommt es beim Gespräch automatisch.'
@@ -1276,6 +1367,7 @@
     sendDocAll(label, url);              // Prüfer im Raum bekommt es sofort
     $('selfieOk').style.display = 'none';
     $('selfieStatus').textContent = '✓ Gespeichert. Der Prüfer bekommt es beim Gespräch.';
+    state.selfieFertig = true; zeigeFertig();
     $('selfieStatus').classList.add('ok');
     vorabStand();
   }
@@ -1318,15 +1410,45 @@
         div.className = 'deck-card' + (i === 0 ? ' next' : '');
         const pill = '<span class="wait-pill' + (secs > 180 ? ' long' : '') + '">⏱ ' + sinceText(secs) + '</span>';
         div.innerHTML = '<div class="who"><b>' + esc(w.code) + '</b> ' + pill + bekanntPille(w)
-          + '<div class="meta">' + (i === 0 ? 'Als Nächster dran' : 'Platz ' + (i + 1) + ' in der Schlange')
+          + '<div class="meta">'
+          + (w.bereit ? '<b class="fertig-pill">✓ fertig – wartet auf dich</b>'
+            : '<span class="fuellt-pill">✍ füllt noch aus</span>') + ' · '
+          + (i === 0 ? 'Als Nächster dran' : 'Platz ' + (i + 1) + ' in der Schlange')
           + (w.bigoId ? ' · BIGO-ID ' + esc(w.bigoId) : '')
+          + (w.bigoNick ? ' · ' + esc(w.bigoNick) : '')
           + (w.note ? ' · ' + esc(w.note) : '')
           + bekanntZeile(w) + '</div></div>';
         const acts = document.createElement('div'); acts.className = 'acts';
         const b = document.createElement('button');
-        b.className = 'primary'; b.textContent = '📞 Abholen';
-        b.addEventListener('click', () => joinRoom(w.code, false));
-        acts.appendChild(b); div.appendChild(acts); el.appendChild(div);
+        // Erst abholen, wenn sie selbst Bescheid gegeben hat. Wer noch ausfüllt,
+        // wird nicht unterbrochen – man sieht es am Knopf und an der Zeile.
+        if (w.bereit) {
+          b.className = 'primary'; b.textContent = '📞 Abholen';
+          b.addEventListener('click', () => joinRoom(w.code, false));
+        } else {
+          b.className = ''; b.disabled = true; b.textContent = '✍ füllt noch aus';
+          b.title = 'Sie liest die Aufklärung und trägt ihre Ausweisdaten ein. '
+            + 'Sobald sie „Ich bin fertig" tippt, wird der Knopf frei.';
+        }
+        acts.appendChild(b);
+        // Nach drei Minuten kommt der ausdrückliche Weg dazu – damit niemand
+        // festhängt, der nicht weiterkommt. Der Griff wird protokolliert.
+        const wartetSek = Math.round((Date.now() - (w.joinedAt || Date.now())) / 1000);
+        if (!w.bereit && wartetSek >= 180) {
+          const t = document.createElement('button');
+          t.className = 'warn'; t.textContent = '⚠ Trotzdem holen';
+          t.title = 'Sie ist seit über 3 Minuten nicht fertig geworden – vielleicht kommt sie nicht weiter. '
+            + 'Dieser Griff wird protokolliert.';
+          t.addEventListener('click', async () => {
+            t.disabled = true;
+            const r = await api('POST', '/api/waiting/claim', { code: w.code, trotzdem: true });
+            t.disabled = false;
+            if (r.status !== 200) { toast('Geht noch nicht.'); return; }
+            joinRoom(w.code, false);
+          });
+          acts.appendChild(t);
+        }
+        div.appendChild(acts); el.appendChild(div);
       });
     }
 
@@ -1481,6 +1603,20 @@
   }, { passive: true });
   loadScript();
 
+  // ---- "Warum?" an jeder Sprechblase --------------------------------------
+  // Die Begruendungen sind wichtig, aber alle auf einmal sind eine Wand. Also
+  // steht je Blase ein kleiner Knopf, und wer wissen will warum, tippt drauf.
+  document.querySelectorAll('.bubbles .bub').forEach((b) => {
+    const grund = b.querySelector('em'); if (!grund) return;
+    const k = document.createElement('button');
+    k.type = 'button'; k.className = 'warum-btn'; k.textContent = 'Warum? \u25be';
+    k.addEventListener('click', () => {
+      const auf = b.classList.toggle('offen');
+      k.textContent = auf ? 'Warum? \u25b4' : 'Warum? \u25be';
+    });
+    grund.parentNode.insertBefore(k, grund);
+  });
+
   // ---- Was liest er gerade? Das gehört in die Aufnahme ---------------------
   // Der Vorlese-Text ist die Einwilligung, die der Bewerber in die Kamera
   // spricht. Bisher stand er nur im Ordner - man sah auf der Aufnahme jemanden
@@ -1551,6 +1687,8 @@
     // „Bereit" war ein Tippen – der Browser lässt Ton also zu. Wer die Musik
     // einmal ausgemacht hat, bekommt sie nicht wieder aufgedrängt.
     if (musikGewollt()) musikAn(); else musikKnopf(false);
+    state.bereitGemeldet = false; state.akGelesen = false; state.selfieFertig = false;
+    zeigeFertig();
   }
   function wroomAus() {
     const box = $('wroom'); if (box) box.style.display = 'none';
@@ -1559,6 +1697,62 @@
     if (wroomAudio) { try { wroomAudio.ctx.close(); } catch {} wroomAudio = null; }
     musikAus();
   }
+
+  // ---- „Ich bin fertig" ----------------------------------------------------
+  //
+  // Der Prüfer holt sie erst ab, wenn sie selbst Bescheid gibt. Vorher konnte er
+  // sofort zugreifen – mitten hinein, während sie noch die Aufklärung liest oder
+  // ihre Ausweisnummer sucht. Das ist unhöflich, und die Daten sind dann noch
+  // nicht da.
+  //
+  // Der Knopf geht erst auf, wenn die drei Dinge erledigt sind, die der Prüfer
+  // braucht. Nichts davon ist Schikane: fehlt eines, dauert das Gespräch länger.
+  function fertigSchritte() {
+    const vorab = document.querySelector('.vorab');
+    return [
+      { was: 'Aufklärung gelesen', ok: !!state.akGelesen,
+        hilfe: 'Öffne oben mindestens einen der Kästen – damit du weißt, worauf du dich einlässt.' },
+      { was: 'Ausweisdaten eingetragen', ok: !!(vorab && vorab.classList.contains('fertig')),
+        hilfe: 'Name, Ausweisart, Nummer – und die Erklärung abhaken.' },
+      { was: 'Selfie mit Ausweis aufgenommen', ok: !!state.selfieFertig,
+        hilfe: 'Ausweis neben das Gesicht halten und auf „Aufnahme starten" tippen.' },
+    ];
+  }
+  function zeigeFertig() {
+    const box = $('fertigBox'); if (!box) return;
+    if (state.bereitGemeldet) return;             // gemeldet ist gemeldet
+    const schritte = fertigSchritte();
+    const alleOk = schritte.every((x) => x.ok);
+    const liste = $('fbSchritte');
+    if (liste) {
+      liste.innerHTML = schritte.map((x) => '<div class="fb-s' + (x.ok ? ' ok' : '') + '">'
+        + '<i>' + (x.ok ? '✓' : '○') + '</i><span>' + esc(x.was) + '</span></div>').join('');
+    }
+    box.classList.toggle('bereit', alleOk);
+    $('fertigBtn').disabled = !alleOk;
+    const offen = schritte.filter((x) => !x.ok);
+    $('fbHinweis').innerHTML = alleOk
+      ? 'Alles da. Tippe auf den Knopf – dann weiß das Team, dass es losgehen kann.'
+      : esc(offen[0].hilfe);
+  }
+  async function fertigMelden() {
+    const box = $('fertigBox');
+    $('fertigBtn').disabled = true;
+    const r = await api('POST', '/api/waiting/bereit', { code: state.code, bereit: true });
+    if (r.status !== 200) { $('fertigBtn').disabled = false; toast('Konnte nicht gemeldet werden – bitte noch einmal.'); return; }
+    state.bereitGemeldet = true;
+    box.classList.add('gemeldet');
+    $('fertigBtn').textContent = '✓ Gemeldet – wir kommen zu dir';
+    $('fbHinweis').innerHTML = '<b>Das Team weiß Bescheid.</b> Bleib einfach hier, jemand holt dich gleich ins '
+      + 'Gespräch. Ausweis bereithalten.';
+    if ($('wroomSub')) $('wroomSub').textContent = 'Du hast Bescheid gegeben – wir holen dich gleich.';
+    toast('Bescheid gegeben ✓');
+  }
+  if ($('fertigBtn')) $('fertigBtn').addEventListener('click', fertigMelden);
+  // Aufklärung: einmal aufgeklappt zählt als gelesen.
+  document.querySelectorAll('.akbox').forEach((d) => d.addEventListener('toggle', () => {
+    if (d.open) { state.akGelesen = true; zeigeFertig(); }
+  }));
 
   // ---- Wartemusik ----------------------------------------------------------
   //
@@ -1729,7 +1923,8 @@
     // bevor er das Gespräch annimmt, nicht erst danach.
     ws.onopen = () => ws.send(JSON.stringify({
       type: 'join', room: state.code, role: state.role, token: state.token || '', name: state.name,
-      bigo: (state.profile && state.profile.bigoName) || '', alter: (state.profile && state.profile.age) || '',
+      bigo: (state.profile && state.profile.bigoId) || (state.profile && state.profile.bigoName) || '',
+      bigoNick: (state.profile && state.profile.bigoName) || '', alter: (state.profile && state.profile.age) || '',
     }));
     ws.onmessage = async (ev) => {
       let m; try { m = JSON.parse(ev.data); } catch { return; }
@@ -1870,12 +2065,13 @@
         // noch, statt im Gespraech zu tippen.
         const setz = (id, wert) => { if (wert && !$(id).value) $(id).value = wert; };
         setz('vBigoName', m.bigoName);
+        setz('vBigoNick', m.bigoNick);
         setz('vAge', m.age);
         setz('vName', m.ausweisName);
         setz('vDocType', m.ausweisArt);
         setz('vDocNumber', m.ausweisNr);
         // Was der Bewerber selbst getippt hat, bleibt als Vergleich stehen.
-        state.vorab = { vBigoName: m.bigoName || '', vAge: m.age || '', vName: m.ausweisName || '',
+        state.vorab = { vBigoName: m.bigoName || '', vBigoNick: m.bigoNick || '', vAge: m.age || '', vName: m.ausweisName || '',
           vDocType: m.ausweisArt || '', vDocNumber: m.ausweisNr || '' };
         zeigeVorab();
         if (m.ausweisName || m.ausweisNr) {
@@ -2014,6 +2210,7 @@
   async function personSuchen() {
     const daten = {
       bigoId: $('vBigoName').value.trim(),
+      bigoName: $('vBigoNick') ? $('vBigoNick').value.trim() : '',
       docNumber: $('vDocNumber').value.trim(),
       name: $('vName').value.trim(),
       age: $('vAge').value.trim(),
@@ -2062,7 +2259,8 @@
   });
   async function saveCase(result, rejectReason) {
     const body = {
-      code: state.code, bigoName: $('vBigoName').value, age: $('vAge').value,
+      code: state.code, bigoName: $('vBigoName').value,
+      bigoNick: $('vBigoNick') ? $('vBigoNick').value : '', age: $('vAge').value,
       verifiedName: $('vName').value, docNumber: $('vDocNumber').value, docType: $('vDocType').value,
       note: $('vNote').value,
       result, rejectReason: rejectReason || '', agentName: state.name,
@@ -2199,7 +2397,7 @@
   // Werte nebeneinander: unten, was der Bewerber geschrieben hat, oben im Feld,
   // was gilt. Ändern darf der Prüfer jederzeit; man sieht dann, dass er es
   // getan hat. Nichts wird still überschrieben.
-  const VFELDER = ['vBigoName', 'vAge', 'vName', 'vDocType', 'vDocNumber'];
+  const VFELDER = ['vBigoName', 'vBigoNick', 'vAge', 'vName', 'vDocType', 'vDocNumber'];
   function zeigeVorab() {
     const v = state.vorab || {};
     VFELDER.forEach((id) => {

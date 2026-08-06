@@ -87,6 +87,7 @@ function baueNutzlast(fall, aufnahme) {
     // sich nicht, anders als der angezeigte Name.
     streamer: {
       bigoId: fall.bigoName || '',
+      bigoName: fall.bigoNick || '',
       name: fall.verifiedName || '',
       alter: fall.age || '',
     },

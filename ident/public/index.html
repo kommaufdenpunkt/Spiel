@@ -178,6 +178,49 @@
   .ord-wortlaut{white-space:pre-wrap;font-size:.82rem;line-height:1.65;color:var(--ink);background:#0f1728;
     border:1px solid var(--line);border-radius:10px;padding:.65rem .8rem;margin-top:.4rem;max-height:18rem;overflow:auto}
   .ord-prot{margin-top:.6rem;padding-top:.5rem;border-top:1px solid var(--line);font-size:.84rem}
+  /* Kopf der Akte: alles Wichtige auf einen Blick */
+  .ord-titel{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap}
+  .ord-titel b{font-size:1.15rem;letter-spacing:.03em}
+  .ord-nick{font-size:.92rem;color:var(--ink);margin-top:.25rem;font-weight:600}
+  .ord-alias{font-size:.75rem;color:var(--dim);margin-top:.1rem}
+  .ord-verif-kurz{margin-top:.6rem;padding:.45rem .65rem;border-radius:10px;font-size:.82rem;line-height:1.45;
+    border:1px solid var(--line)}
+  .ord-verif-kurz.ja{border-color:#2f6b4a;background:#163024;color:#bfe9d2}
+  .ord-verif-kurz.nein{color:var(--dim);background:var(--panel2)}
+  /* ---- Unterordner in der Akte ----------------------------------------
+     Eine Akte mit allem untereinander liest niemand. Jeder Bereich ist ein
+     Ordner mit Zahl daran; beim Antippen faehrt er auf. */
+  .unterordner{margin-top:.7rem;border:1px solid var(--line);border-radius:14px;background:var(--panel2);
+    overflow:hidden;transition:border-color .25s,box-shadow .25s}
+  .unterordner.auf{border-color:var(--line2);box-shadow:0 6px 22px #0006}
+  .uo-kopf{display:flex;align-items:center;gap:.7rem;width:100%;text-align:left;border:0;background:transparent;
+    padding:.7rem .8rem;box-shadow:none;border-radius:0;cursor:pointer}
+  .uo-kopf:hover:not(:disabled){background:#16203608;transform:none;box-shadow:none}
+  .unterordner.auf .uo-kopf{background:linear-gradient(180deg,#3b6ef01f,transparent)}
+  .uo-ic{flex:none;width:34px;height:34px;border-radius:11px;display:grid;place-items:center;font-size:1.05rem;
+    background:#1b2740;border:1px solid var(--line2);transition:transform .3s cubic-bezier(.2,1.4,.4,1)}
+  .unterordner.auf .uo-ic{transform:scale(1.08) rotate(-4deg);border-color:var(--accent)}
+  .uo-txt{flex:1;min-width:0}
+  .uo-txt b{display:block;font-size:.92rem}
+  .uo-txt small{display:block;font-size:.75rem;color:var(--dim);margin-top:.05rem;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .uo-zahl{flex:none;min-width:26px;text-align:center;font-size:.78rem;font-weight:700;padding:.15rem .45rem;
+    border-radius:999px;background:#1b2740;color:var(--ink);border:1px solid var(--line2)}
+  .unterordner.leer .uo-zahl{color:var(--dim);background:transparent}
+  .uo-pfeil{flex:none;color:var(--dim);font-size:.8rem;transition:transform .3s ease}
+  .unterordner.auf .uo-pfeil{transform:rotate(180deg);color:var(--accent)}
+  .uo-inhalt{overflow:hidden;max-height:0;transition:max-height .3s ease,opacity .25s ease;opacity:0;
+    padding:0 .8rem}
+  .unterordner.auf .uo-inhalt{opacity:1;padding-bottom:.8rem}
+  /* Ausweis-Satz je Audition */
+  .ausw-satz{padding:.6rem 0;border-top:1px solid var(--line)}
+  .ausw-satz:first-child{border-top:0}
+  .ausw-kopf{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;margin-bottom:.4rem}
+  .ausw-kopf .muted{font-size:.78rem;color:var(--dim);flex:1;min-width:100px}
+  .pdf-knopf{display:inline-flex;align-items:center;gap:.3rem;font-size:.8rem;font-weight:600;text-decoration:none;
+    padding:.38rem .7rem;border-radius:10px;color:#fff;background:linear-gradient(135deg,#e0574f,#c3352d);
+    border:1px solid #e0574f66;box-shadow:0 3px 12px #c3352d44;transition:transform .18s,box-shadow .18s}
+  .pdf-knopf:hover{transform:translateY(-1px);box-shadow:0 6px 18px #c3352d66}
   /* Die Notiz, die der Prüfer im Gespräch geschrieben hat. Bewusst hervorgehoben:
      das ist der einzige Teil der Akte, der aus seinem Kopf kommt. */
   .ord-notiz{margin-top:.5rem;padding:.55rem .7rem;font-size:.85rem;line-height:1.6;
@@ -328,6 +371,7 @@
   .step .st b{display:block;font-size:.9rem}
   .step .st span{font-size:.78rem;color:var(--dim);line-height:1.3}
   .field{margin-bottom:1rem}
+  .feldhilfe{display:block;font-size:.72rem;color:var(--dim);margin-top:.25rem}
   .field label{display:block;font-size:.74rem;color:var(--dim);margin-bottom:.35rem;text-transform:uppercase;letter-spacing:.09em;font-weight:500}
   .actions{display:flex;flex-direction:column;gap:.7rem;margin-top:.4rem}
   .actions #enterBtn{padding:.95rem 1.1rem;font-size:1.05rem;font-weight:650;border-radius:12px}
@@ -433,6 +477,23 @@
   .ablauf ol{margin:.5rem 0 .6rem;padding-left:1.2rem;line-height:1.7;color:var(--ink)}
   .ablauf li{margin-bottom:.15rem}
   .ablauf .muted{color:var(--dim);font-size:.8rem;line-height:1.55;display:block}
+  /* Was man bereithalten sollte – kleine Kaesten, schnell zu lesen. */
+  .bereit{margin:.2rem 0 1.1rem;padding:.75rem .85rem;border-radius:14px;
+    border:1px solid #2a3a60;background:linear-gradient(180deg,#131f38,#101a2e)}
+  .bereit>b{display:block;font-size:.88rem;margin-bottom:.5rem}
+  .bereit small{display:block;margin-top:.55rem;font-size:.76rem;color:var(--dim);line-height:1.5}
+  .bereit-liste{display:flex;flex-wrap:wrap;gap:.35rem}
+  .bpill{font-size:.78rem;line-height:1.35;padding:.35rem .6rem;border-radius:10px;
+    background:#0f1728;border:1px solid var(--line);color:var(--dim)}
+  .bpill b{color:var(--ink);font-weight:600}
+  /* "Warum?" als kleiner Knopf – die Begruendung erscheint erst auf Wunsch.
+     Alles auf einmal ist eine Wand, die niemand liest. */
+  .warum-btn{margin-top:.4rem;padding:.24rem .55rem;font-size:.72rem;font-weight:600;border-radius:999px;
+    background:#1b2740;border:1px solid var(--line2);color:var(--dim);box-shadow:none}
+  .warum-btn:hover:not(:disabled){color:var(--ink);border-color:var(--accent);transform:none;box-shadow:none}
+  .bub .btxt em{display:none}
+  .bub.offen .btxt em{display:block;animation:warumRein .25s ease}
+  @keyframes warumRein{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
   /* Sprechblasen: ein Schritt je Blase, das „warum" gleich darunter. */
   .bubbles{display:flex;flex-direction:column;gap:.5rem;margin:.6rem 0 .7rem}
   .bub{display:flex;gap:.55rem;align-items:flex-start}
@@ -441,7 +502,9 @@
   .bub .btxt{position:relative;flex:1;min-width:0;background:#131d33;border:1px solid var(--line);
     border-radius:4px 13px 13px 13px;padding:.5rem .7rem;font-size:.82rem;line-height:1.55;color:var(--ink)}
   .bub .btxt b{display:block;font-size:.85rem;margin-bottom:.1rem}
-  .bub .btxt em{display:block;margin-top:.3rem;font-style:normal;font-size:.77rem;line-height:1.5;
+  /* display steht bewusst nicht hier: das regelt der „Warum?"-Knopf weiter oben.
+     Stand es hier, ueberschrieb diese spaetere Zeile das Zuklappen. */
+  .bub .btxt em{margin-top:.3rem;font-style:normal;font-size:.77rem;line-height:1.5;
     color:var(--dim);padding-left:.55rem;border-left:2px solid var(--accent)}
   /* Wartemusik statt Stille */
   .wmusik{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;margin-top:.9rem;
@@ -466,6 +529,55 @@
     line-height:1.55;margin:.2rem 0 .7rem;cursor:pointer}
   .vorab-erklaerung input{width:auto;margin:.15rem 0 0;flex:none}
   .vorab-erklaerung b{color:var(--ink)}
+  /* Zustand in der Warteschlange: fertig oder fuellt noch aus */
+  .fertig-pill{color:#5fe0a0;font-weight:700}
+  .fuellt-pill{color:var(--warm,#ffc98a)}
+  /* Aufklaerung: je Frage ein kleiner Kasten zum Aufklappen. */
+  .aufklaerung{margin-top:.9rem;padding:.8rem .85rem;border-radius:14px;
+    border:1px solid #2a3a60;background:linear-gradient(180deg,#131f38,#101a2e)}
+  .aufklaerung>b{display:block;font-size:.88rem;margin-bottom:.55rem}
+  .ak-liste{display:flex;flex-direction:column;gap:.35rem}
+  .akbox{border:1px solid var(--line);border-radius:10px;background:#0f1728;overflow:hidden}
+  .akbox>summary{cursor:pointer;list-style:none;padding:.5rem .65rem;font-size:.82rem;font-weight:600;
+    display:flex;align-items:center;gap:.4rem}
+  .akbox>summary::-webkit-details-marker{display:none}
+  .akbox>summary::after{content:"▾";margin-left:auto;color:var(--dim);font-size:.75rem;transition:transform .25s}
+  .akbox[open]>summary::after{transform:rotate(180deg);color:var(--accent)}
+  .akbox[open]>summary{border-bottom:1px solid var(--line);background:#3b6ef014}
+  .akbox p{margin:.5rem .65rem;font-size:.8rem;line-height:1.6;color:var(--dim);animation:warumRein .25s ease}
+  .akbox p b{color:var(--ink)}
+  /* „Ich bin fertig" – der Prüfer holt erst danach ab. */
+  .fertigbox{margin-top:.9rem;padding:.85rem;border-radius:14px;border:1px solid var(--line2);
+    background:linear-gradient(180deg,#16233c,#101a2e)}
+  .fb-schritte{display:flex;flex-direction:column;gap:.3rem;margin-bottom:.7rem}
+  .fb-s{display:flex;align-items:center;gap:.5rem;font-size:.82rem;color:var(--dim)}
+  .fb-s i{flex:none;width:20px;height:20px;border-radius:50%;display:grid;place-items:center;font-size:.7rem;
+    font-style:normal;background:#1b2740;border:1px solid var(--line2);color:var(--dim);transition:all .3s}
+  .fb-s.ok{color:var(--ink)}
+  .fb-s.ok i{background:#1f7a4d;border-color:#3ec77b;color:#fff;transform:scale(1.05)}
+  #fertigBtn{width:100%;font-size:.95rem;padding:.75rem}
+  #fertigBtn:disabled{opacity:.5}
+  .fertigbox.bereit{border-color:#3ec77b;box-shadow:0 0 0 3px #3ec77b22}
+  .fertigbox.bereit #fertigBtn{background:linear-gradient(135deg,#2ea86a,#1f7a4d);border-color:#3ec77b66}
+  .fb-hinweis{margin-top:.55rem;font-size:.77rem;color:var(--dim);line-height:1.5}
+  .fertigbox.gemeldet{border-color:#3ec77b;background:linear-gradient(180deg,#163024,#111d18)}
+  .fertigbox.gemeldet .fb-schritte{display:none}
+  /* Beispielausweis: zeigt, welches Feld wo steht  /* Beispielausweis: zeigt, welches Feld wo steht. Zugeklappt, damit es nicht
+     im Weg ist - wer es braucht, tippt drauf. */
+  .musterbox{margin:.2rem 0 .7rem;border:1px solid var(--line);border-radius:12px;background:#0f1728;overflow:hidden}
+  .musterbox>summary{cursor:pointer;list-style:none;padding:.55rem .7rem;font-size:.82rem;font-weight:600;
+    display:flex;align-items:center;gap:.5rem}
+  .musterbox>summary::-webkit-details-marker{display:none}
+  .musterbox>summary span{font-size:.74rem;font-weight:500;color:var(--dim);margin-left:auto}
+  .musterbox[open]>summary{border-bottom:1px solid var(--line);background:#3b6ef014}
+  .muster-inhalt{padding:.7rem}
+  .muster{width:100%;height:auto;display:block;border-radius:8px;
+    box-shadow:0 6px 18px #0007;animation:musterRein .35s ease}
+  @keyframes musterRein{from{opacity:0;transform:translateY(6px) scale(.98)}to{opacity:1;transform:none}}
+  .muster-liste{margin:.7rem 0 .4rem;padding-left:1.1rem;font-size:.8rem;line-height:1.6;color:var(--dim)}
+  .muster-liste li{margin-bottom:.3rem}
+  .muster-liste b{color:var(--ink)}
+  .muster-inhalt small{display:block;font-size:.75rem;color:var(--dim);line-height:1.5}
   /* Selfie mit Ausweis - direkt aus der Kamera, damit nichts montiert wird. */
   .selfie{margin-top:.9rem;padding:.85rem .9rem;border:1px solid var(--accent);border-radius:14px;
     background:linear-gradient(180deg,#16233d,var(--panel2))}
@@ -657,9 +769,32 @@
         <label for="codeInput">Zugangsnummer</label>
         <input id="codeInput" placeholder="z. B. ABC123XY" autocapitalize="characters">
       </div>
+      <!-- Was man bereithalten sollte. Steht bewusst VOR den Feldern: wer erst
+           im Warteraum merkt, dass der Ausweis in der Schublade liegt, muss
+           aufstehen, und die Kamera laeuft dann schon. -->
+      <div class="bereit">
+        <b>Das brauchst du gleich</b>
+        <div class="bereit-liste">
+          <span class="bpill">🪪 <b>Deinen Ausweis</b> – echt und gültig, zum Zeigen in die Kamera</span>
+          <span class="bpill">🔢 <b>Deine BIGO-ID</b> – die Zahl aus deinem Profil</span>
+          <span class="bpill">🏷 <b>Deinen BIGO-Namen</b></span>
+          <span class="bpill">💡 <b>Licht von vorne</b> und einen ruhigen Platz</span>
+        </div>
+        <small>Du musst <b>mindestens 18</b> sein. Der Ausweis wird im Gespräch angesehen
+          und mit deinem Gesicht verglichen – hol ihn dir jetzt, nicht später.</small>
+      </div>
       <div class="field">
         <label for="bigoInput">BIGO-ID</label>
-        <input id="bigoInput" placeholder="deine BIGO-ID" autocomplete="off">
+        <input id="bigoInput" placeholder="z. B. 901234567" inputmode="numeric" autocomplete="off">
+        <small class="feldhilfe">Die Zahl aus deinem BIGO-Profil.</small>
+      </div>
+      <!-- Zweites Feld für den Namen. Beides zusammen ist der Schlüssel: viele
+           kennen ihre Zahl nicht auswendig, aber ihren Namen immer. Und wenn wir
+           die Person schon führen, finden wir sie über beides wieder. -->
+      <div class="field">
+        <label for="bigoNickInput">Dein Name auf BIGO</label>
+        <input id="bigoNickInput" placeholder="z. B. Tauchküken" autocomplete="off" maxlength="80">
+        <small class="feldhilfe">So, wie du auf BIGO angezeigt wirst.</small>
       </div>
       <div class="field">
         <label for="ageInput">Alter</label>
@@ -767,6 +902,45 @@
         <span id="musikText">Leise Wartemusik. Sie endet von selbst, wenn der Prüfer dazukommt.</span>
       </div>
 
+      <!-- Aufklaerung. Viele wissen nicht, was BIGO eigentlich ist und was mit
+           ihren Bohnen passiert - und tippen dann Ausweisdaten in etwas ein,
+           das sie nicht verstehen. Kleine Kaesten, jeder eine Frage, zum
+           Aufklappen. -->
+      <div class="aufklaerung">
+        <b>Kurz erklärt – damit du weißt, worauf du dich einlässt</b>
+        <div class="ak-liste">
+          <details class="akbox"><summary>📺 Was ist BIGO Live?</summary>
+            <p>Eine App zum Live-Streamen. Du gehst mit deinem Handy live, Leute schauen zu,
+              schreiben mit dir und schicken dir <b>Geschenke</b>. Es ist keine Sendung mit
+              Drehbuch – du redest, singst, spielst, machst was du magst.</p></details>
+          <details class="akbox"><summary>🫘 Was sind Bohnen – und was passiert damit?</summary>
+            <p>Geschenke deiner Zuschauer werden in <b>Bohnen</b> umgerechnet. Bohnen sind der
+              Wert, den du verdient hast. Sie sammeln sich in deinem BIGO-Konto und werden dort
+              <b>ausgezahlt</b> – über BIGO selbst, nicht über uns. Wir sehen deine Bohnen nicht
+              und fassen sie nicht an.</p>
+            <p>Wie viel eine Bohne wert ist und wie ausgezahlt wird, legt BIGO fest. Frag uns
+              gern – wir erklären dir die aktuellen Stufen, versprechen dir aber keine Summen.</p></details>
+          <details class="akbox"><summary>🎯 Was musst du tun?</summary>
+            <p>Regelmäßig live gehen und dich dabei <b>zeigen</b> – Gesicht in die Kamera. Wie oft
+              und wie lange, besprechen wir mit dir; es gibt Stufen mit Zielen.</p>
+            <p>Nicht erlaubt: verbotene Inhalte, gleichzeitig auf einer anderen App streamen
+              (Parallelstreaming) und Streamen auf Konkurrenz-Apps.</p></details>
+          <details class="akbox"><summary>🤝 Was macht die Agentur für dich?</summary>
+            <p>Wir sind dein Ansprechpartner: Aufbau, Reichweite, PKs, Probleme mit dem Support,
+              Erklärungen zu Regeln und Stufen. Du streamst – wir kümmern uns um den Rest
+              drumherum.</p></details>
+          <details class="akbox"><summary>🔒 Und meine Ausweisdaten?</summary>
+            <p>Die brauchen wir aus einem Grund: <b>du musst mindestens 18 sein</b>, und BIGO
+              verlangt einen echten Nachweis. Deine Daten liegen verschlüsselt in deiner Akte.
+              Nur ein sehr kleiner Kreis kommt daran, und <b>jeder Zugriff wird mit Name, Uhrzeit
+              und Grund festgehalten</b> – nachlesbar.</p>
+            <p>Freiwillig, und du kannst es jederzeit für die Zukunft widerrufen.</p></details>
+          <details class="akbox"><summary>🚪 Kann ich wieder gehen?</summary>
+            <p>Ja. Es gibt Transferregeln – Freigabe und Freikauf –, die BIGO vorgibt. Wir
+              erklären sie dir vorher, damit du weißt, worauf du dich einlässt.</p></details>
+        </div>
+      </div>
+
       <!-- Der Ablauf in Sprechblasen: was passiert, und warum wir es so machen.
            Das „warum" steht dabei, weil Leute Ausweisdaten nur dann gerne
            eingeben, wenn sie den Grund kennen. -->
@@ -833,6 +1007,56 @@
            statt im Gespräch zu tippen, während der Bewerber wartet. -->
       <div class="vorab">
         <div class="vorab-kopf">🪪 <b>Deine Ausweisdaten</b> <span class="muted">jetzt schon eintragen – spart Zeit</span></div>
+
+        <!-- Beispielausweis. Die meisten wissen nicht, was mit "Ausweisnummer"
+             gemeint ist und suchen die falsche Zahl. Also zeigen wir es: ein
+             gezeichneter Muster-Ausweis mit Pfeilen auf die drei Felder. Es ist
+             KEIN echter Ausweis - reine Zeichnung, damit klar ist, wo man
+             hinschauen muss. -->
+        <details class="musterbox">
+          <summary>❓ Wo finde ich das im Ausweis? <span>Beispiel zeigen</span></summary>
+          <div class="muster-inhalt">
+            <svg class="muster" viewBox="0 0 420 265" role="img"
+                 aria-label="Gezeichneter Beispiel-Ausweis mit Hinweisen auf Name, Ausweisnummer und Geburtsdatum">
+              <rect x="4" y="4" width="412" height="257" rx="14" fill="#eef1f7" stroke="#b9c2d4"/>
+              <rect x="4" y="4" width="412" height="34" rx="14" fill="#2b3a63"/>
+              <text x="18" y="27" font-size="13" font-weight="700" fill="#fff">MUSTER · BUNDESREPUBLIK DEUTSCHLAND</text>
+              <text x="18" y="55" font-size="9" fill="#7c88a0">PERSONALAUSWEIS / IDENTITY CARD</text>
+              <rect x="18" y="66" width="88" height="112" rx="6" fill="#cfd6e4" stroke="#aab4c8"/>
+              <circle cx="62" cy="104" r="20" fill="#aab4c8"/>
+              <path d="M32 168c6-22 18-32 30-32s24 10 30 32z" fill="#aab4c8"/>
+              <text x="62" y="192" font-size="8" fill="#8a94aa" text-anchor="middle">dein Foto</text>
+
+              <text x="122" y="80" font-size="8" fill="#7c88a0">NAME / SURNAME</text>
+              <text x="122" y="95" font-size="15" font-weight="700" fill="#1a2238">MUSTERMANN</text>
+              <text x="122" y="116" font-size="8" fill="#7c88a0">VORNAMEN / GIVEN NAMES</text>
+              <text x="122" y="131" font-size="15" font-weight="700" fill="#1a2238">ERIKA</text>
+              <text x="122" y="152" font-size="8" fill="#7c88a0">GEBURTSTAG / DATE OF BIRTH</text>
+              <text x="122" y="167" font-size="14" font-weight="700" fill="#1a2238">12.08.1994</text>
+              <text x="290" y="80" font-size="8" fill="#7c88a0">AUSWEISNR. / NO.</text>
+              <text x="290" y="95" font-size="14" font-weight="700" fill="#1a2238">L01X00T471</text>
+
+              <!-- Hinweisnummern -->
+              <circle cx="112" cy="90" r="11" fill="#3b6ef0"/><text x="112" y="94" font-size="12" font-weight="700" fill="#fff" text-anchor="middle">1</text>
+              <circle cx="280" cy="90" r="11" fill="#3b6ef0"/><text x="280" y="94" font-size="12" font-weight="700" fill="#fff" text-anchor="middle">2</text>
+              <circle cx="112" cy="162" r="11" fill="#3b6ef0"/><text x="112" y="166" font-size="12" font-weight="700" fill="#fff" text-anchor="middle">3</text>
+
+              <rect x="18" y="196" width="384" height="24" rx="4" fill="#dfe4ee"/>
+              <text x="24" y="212" font-size="10" font-family="monospace" fill="#8a94aa">IDD&lt;&lt;L01X00T4715&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;</text>
+              <text x="24" y="238" font-size="9" fill="#a2abbe">Zeichnung als Beispiel – kein echter Ausweis</text>
+            </svg>
+            <ol class="muster-liste">
+              <li><b>1 · Name</b> Vorname und Nachname zusammen eintragen, genau in dieser
+                Schreibweise – hier also <i>Erika Mustermann</i>.</li>
+              <li><b>2 · Ausweisnummer</b> Steht oben rechts, meist neun oder zehn Zeichen aus
+                Buchstaben und Zahlen. <b>Nicht</b> die lange Zeile unten am Rand.</li>
+              <li><b>3 · Geburtstag</b> Braucht der Prüfer, um zu sehen, dass du über 18 bist.</li>
+            </ol>
+            <small>Beim <b>Reisepass</b> heißt Feld 2 „Passnummer" und steht ebenfalls oben rechts.
+              Beim <b>Führerschein</b> ist es die Nummer unter Punkt 5.</small>
+          </div>
+        </details>
+
         <input id="vaName" placeholder="Name, genau wie er im Ausweis steht" autocomplete="name">
         <div class="vorab-zeile">
           <select id="vaArt">
@@ -886,6 +1110,13 @@
         </div>
         <div class="selfie-status muted" id="selfieStatus">Noch kein Bild aufgenommen.</div>
       </div>
+      <!-- „Ich bin fertig". Der Pruefer holt sie erst danach ab - nicht mitten
+           hinein, waehrend sie noch liest oder ihre Ausweisnummer sucht. -->
+      <div class="fertigbox" id="fertigBox">
+        <div class="fb-schritte" id="fbSchritte"></div>
+        <button id="fertigBtn" class="primary" disabled>✓ Ich bin fertig – ihr könnt mich holen</button>
+        <div class="fb-hinweis" id="fbHinweis">Die drei Schritte oben noch erledigen, dann kannst du Bescheid geben.</div>
+      </div>
     </div>
     <div class="controls">
       <button id="micBtn">🎤 Mikro an</button>
@@ -896,6 +1127,7 @@
       <button id="recBtn" class="primary" style="display:none">⏺ Aufnahme starten</button>
       <button id="stopRecBtn" class="danger" style="display:none" disabled>⏹ Aufnahme stoppen</button>
     </div>
+
   </section>
 
   <aside class="side">
@@ -965,7 +1197,8 @@
            Prüfer vergleicht mit dem Ausweis im Bild und trägt ein, was
            tatsächlich dort steht. Weicht es ab, wird es angezeigt – nichts
            wird still überschrieben. -->
-      <div class="vfeld"><input id="vBigoName" placeholder="BIGO-ID"><small class="vorab-wert" data-fuer="vBigoName"></small></div>
+      <div class="vfeld"><input id="vBigoName" placeholder="BIGO-ID (Zahl)"><small class="vorab-wert" data-fuer="vBigoName"></small></div>
+      <div class="vfeld"><input id="vBigoNick" placeholder="Name auf BIGO (z. B. Tauchküken)"><small class="vorab-wert" data-fuer="vBigoNick"></small></div>
       <div class="vfeld"><input id="vAge" inputmode="numeric" placeholder="Alter (Jahre)"><small class="vorab-wert" data-fuer="vAge"></small></div>
       <div class="vfeld"><input id="vName" placeholder="Name laut Ausweis"><small class="vorab-wert" data-fuer="vName"></small></div>
       <div class="vfeld"><input id="vDocNumber" placeholder="Ausweis-Nr. (Altersnachweis)"><small class="vorab-wert" data-fuer="vDocNumber"></small></div>

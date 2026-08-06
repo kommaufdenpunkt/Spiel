@@ -47,6 +47,69 @@ Suchmaschinen sehen nur die Startseite; alle Arbeitsbereiche antworten mit
 8. **Freigeben oder Ablehnen** → die Akte wird verschlüsselt gespeichert und
    wandert in den **Ordner des Streamers**, zugeordnet über die BIGO-ID.
 
+## Wer ist das? Zahl und Name
+
+Ein Streamer hat **zwei** Kennungen, und die Leute verwechseln sie ständig:
+die **BIGO-ID** (eine Zahl, `901234567`) und den **Namen** (`Tauchküken`).
+Früher hing der Ordner an genau einem Feld – wer den Namen eintippte, während der
+Ordner unter der Zahl lag, bekam einen zweiten Ordner. Dieselbe Person, zweimal
+geführt, und die Audition landete im leeren neuen Ordner.
+
+Jetzt hat jeder Ordner **beides** plus frühere Namen, und gesucht wird über alle
+Wege gleichzeitig. Als dieselbe Person erkannt werden:
+
+| Eingetippt | erkannt, weil |
+|---|---|
+| `Tauchküken` · `tauchkueken` · `TAUCHKÜKEN` | ü → ue, klein/groß egal |
+| `Tauch Küken` · `Tauchküken_` | Leer- und Sonderzeichen zählen nicht |
+| `eyTauchküken` | das Agentur-Kürzel **ey** davor bedeutet dasselbe |
+| `901 234 567` · `901234567` | bei Zahlen zählen nur die Ziffern |
+
+Was fehlt, wird beim Treffer **nachgetragen**: wer unter „Tauchküken" geführt
+wurde und seine Zahl mitbringt, hat danach beides im Ordner. Ein alter Name wird
+nicht gelöscht, sondern als **früherer Name** behalten – Leute benennen sich auf
+BIGO um, und dann muss man sie unter dem alten Namen weiter finden. Jede
+Zuordnung steht als Vermerk in der Akte.
+
+Der ungekürzte Name bleibt trotzdem eine eigene Kennung: sonst würde aus einer
+echten „Eyleen" eine „leen". Beide Wege gelten, keiner ersetzt den anderen.
+
+## Der Ablauf: erst fertig, dann abholen
+
+Die Bewerberin bestimmt, wann es losgeht:
+
+1. **Zugangsnummer** – wird sofort geprüft, nicht erst im Warteraum.
+2. **Aufklärung** – kleine Kästen zum Aufklappen: Was ist BIGO Live? Was sind
+   Bohnen und was passiert damit? Was musst du tun? Was macht die Agentur? Und
+   was passiert mit deinen Ausweisdaten?
+3. **Eintragen** – Ausweisdaten und Selfie mit Ausweis. Dazu ein gezeichneter
+   **Beispielausweis**, der zeigt, welches Feld wo steht – die meisten suchen bei
+   „Ausweisnummer" die falsche Zahl.
+4. **„Ich bin fertig – ihr könnt mich holen"** – der Knopf geht erst auf, wenn
+   die drei Schritte erledigt sind.
+
+**Erst danach** kann der Prüfer abholen. Vorher steht in der Schlange
+„✍ füllt noch aus" und der Knopf ist gesperrt – auch serverseitig, nicht bloß
+ausgegraut. „Nächsten annehmen" überspringt sie. Nach drei Minuten erscheint
+zusätzlich „⚠ Trotzdem holen", damit niemand festhängt, der nicht weiterkommt;
+dieser Griff wird protokolliert.
+
+## Die Akte in Unterordnern
+
+Eine Akte mit allem untereinander liest niemand. Also fünf Unterordner mit Zahl
+daran, die man einzeln aufklappt:
+
+- **🪪 Ausweise & Dokumente** – die Bilder und je Audition ein **Ausweisblatt als
+  PDF**: Deckblatt mit allen Angaben, danach jede Aufnahme in Originalgröße.
+  Gebaut ohne fremde Bibliothek (`pdf.js`), JPEG wandert unverändert hinein.
+- **✓ Altersverifikation** – der Verlauf
+- **🎬 Auditions** – Gespräche, Aufnahmen, abgehakte Fragen, Wortlaut
+- **📝 Vermerke**
+- **🔒 Akteneinsicht** – wer wann mit welchem Grund
+
+Der Kopf zeigt ohne Aufklappen: Kennung, Name auf BIGO, frühere Namen, Status
+und den blauen Haken. Das ist die Frage, die man als erste hat.
+
 ## Wird die Person schon geführt?
 
 Das prüft ident von selbst – zweimal:

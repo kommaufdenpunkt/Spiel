@@ -91,7 +91,28 @@ function init({ dir } = {}) {
   recordings = load('recordings.json', []);
   streamers = load('streamers.json', []);
   settings = load('settings.json', {});
+  ordnerNachziehen();
   return { DATA_DIR };
+}
+
+/**
+ * Alte Ordner auf die neue Zuordnung heben.
+ *
+ * Früher gab es nur ein Feld für „BIGO-ID", und dort stand bei manchen die Zahl
+ * und bei anderen der Name – „Tauchküken" zum Beispiel. Damit war die Person
+ * nur unter genau der einen Schreibweise zu finden.
+ *
+ * Hier wird beides sauber getrennt: steht in der Kennung keine Zahl, dann war
+ * es ein Name, und der wandert ins Namensfeld. Nichts wird gelöscht, die
+ * Kennung bleibt wie sie war – gefunden wird ab jetzt über beides.
+ */
+function ordnerNachziehen() {
+  let geaendert = false;
+  streamers.forEach((s) => {
+    if (!Array.isArray(s.aliasse)) { s.aliasse = []; geaendert = true; }
+    if (!s.bigoName && s.bigoId && !idSchluessel(s.bigoId)) { s.bigoName = String(s.bigoId).slice(0, 80); geaendert = true; }
+  });
+  if (geaendert) { try { save('streamers.json', streamers); } catch { /* nur lesend geöffnet */ } }
 }
 
 // ---- Mitarbeiter-Konten (Prüfer + Admin) -----------------------------------
@@ -235,6 +256,8 @@ function saveCase(data) {
   const rec = {
     id, code: String(data.code || '').toUpperCase(),
     bigoName: String(data.bigoName || '').slice(0, 80),
+    // Der Anzeigename auf BIGO (z. B. Tauchküken) - der zweite Weg zur Person.
+    bigoNick: String(data.bigoNick || '').slice(0, 80),
     age: String(data.age || '').slice(0, 10),
     verifiedName: String(data.verifiedName || '').slice(0, 120),
     docType: String(data.docType || '').slice(0, 40),
@@ -405,6 +428,115 @@ function readRecording(id) {
 // Jeder Streamer hat genau einen Ordner, zugeordnet über die BIGO-ID. Dort
 // sammelt sich alles: die Audition, spätere Einträge, Notizen.
 function ordnerSchluessel(bigoId) { return String(bigoId || '').trim().toLowerCase(); }
+
+// ---- Wer ist das? Die Zuordnung ------------------------------------------
+//
+// Ein Streamer hat zwei Kennungen, und die Leute verwechseln sie ständig:
+//   die BIGO-ID   – eine Zahl, z. B. 901234567
+//   den Namen     – z. B. „Tauchküken"
+//
+// Bisher hing der Ordner an genau einem Feld. Wer „Tauchküken" eintippte,
+// während der Ordner unter der Zahl lag, bekam einen zweiten Ordner – dieselbe
+// Person, zweimal geführt, und die Audition landete im leeren neuen Ordner.
+// Genau das darf nicht passieren.
+//
+// Jetzt hat jeder Ordner beides und dazu frühere Namen. Gesucht wird über alle
+// Wege gleichzeitig. Und was fehlt, wird beim Treffer nachgetragen.
+
+/** Zahlen-Kennung: nur Ziffern. „901 234 567" und „901234567" sind dasselbe. */
+function idSchluessel(x) { const s = String(x || '').replace(/\D+/g, ''); return s.length >= 4 ? s : ''; }
+/**
+ * Namens-Kennung: klein, ohne Zeichen, Umlaute aufgelöst.
+ * „Tauchküken", „tauchkueken", „Tauch Küken" und „TAUCHKÜKEN_" sind dieselbe
+ * Person. Wer das nicht auflöst, führt sie viermal.
+ */
+function namSchluessel(x) {
+  return String(x || '').toLowerCase()
+    .replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss')
+    .normalize('NFD').replace(/\p{Diacritic}/gu, '')
+    .replace(/[^a-z0-9]+/g, '');
+}
+/**
+ * Das Agentur-Kuerzel „ey" davor bedeutet dasselbe.
+ *
+ * Bei 4EVER1 setzen sich die Streamer ein „ey" vor den Namen, sobald sie dabei
+ * sind: aus „Tauchkueken" wird „eyTauchkueken". Das ist dieselbe Person, und die
+ * Akte darf sich davon nicht zweiteilen.
+ *
+ * Der ungekuerzte Name bleibt trotzdem eine Kennung – sonst wuerde aus einer
+ * echten „Eyleen" eine „leen", und die waere ploetzlich mit jemand anderem
+ * verwechselbar. Beide Wege gelten, keiner ersetzt den anderen.
+ */
+function ohneEy(n) {
+  return /^ey.{3,}$/.test(n) ? n.slice(2) : '';
+}
+/** Alle Kennungen, unter denen dieser Ordner zu finden ist. */
+function ordnerKennungen(s) {
+  const zahlen = new Set(), namen = new Set();
+  const dazu = (w) => {
+    const z = idSchluessel(w); if (z) zahlen.add(z);
+    const n = namSchluessel(w);
+    if (n.length >= 3) { namen.add(n); const k = ohneEy(n); if (k) namen.add(k); }
+  };
+  dazu(s.bigoId); dazu(s.bigoName);
+  (s.aliasse || []).forEach(dazu);
+  return { zahlen, namen };
+}
+/**
+ * Den Ordner zu einer Person finden – über die Zahl ODER den Namen.
+ * Gibt zusätzlich zurück, worüber der Treffer kam: das will der Prüfer wissen.
+ */
+function ordnerFinden({ bigoId, bigoName } = {}) {
+  const zahl = idSchluessel(bigoId) || idSchluessel(bigoName);
+  const name = namSchluessel(bigoName) || namSchluessel(bigoId);
+  if (!zahl && name.length < 3) return null;
+  // Die Zahl ist der sichere Weg und hat Vorrang.
+  if (zahl) {
+    const o = streamers.find((s) => ordnerKennungen(s).zahlen.has(zahl));
+    if (o) return { ordner: o, weg: 'zahl', sicher: true };
+  }
+  if (name.length >= 3) {
+    // Auch hier beide Formen suchen: wer „eyTauchkueken" eintippt, findet den
+    // Ordner „Tauchkueken" – und umgekehrt.
+    const kurz = ohneEy(name);
+    const o = streamers.find((s) => {
+      const k = ordnerKennungen(s).namen;
+      return k.has(name) || (kurz && k.has(kurz));
+    });
+    if (o) return { ordner: o, weg: 'name', sicher: true };
+  }
+  return null;
+}
+/**
+ * Was fehlt, nachtragen. Wer unter „Tauchküken" geführt wurde und jetzt seine
+ * Zahl mitbringt, hat danach beides im Ordner – und wird beim nächsten Mal über
+ * beide Wege gefunden. Ein alter Name wird nicht gelöscht, sondern als früherer
+ * Name behalten: Leute benennen sich auf BIGO um, und dann muss man sie unter
+ * dem alten Namen weiter finden können.
+ */
+function ordnerZuordnen(ordner, { bigoId, bigoName } = {}) {
+  const ergaenzt = [];
+  const zahl = idSchluessel(bigoId) || idSchluessel(bigoName);
+  const neuName = String(bigoName || '').trim().slice(0, 80);
+  if (zahl && !idSchluessel(ordner.bigoId)) {
+    // Der Ordner lag unter einem Namen. Der Name wandert ins Namensfeld, die
+    // Zahl wird die Kennung – so heisst der Ordner künftig wie überall sonst.
+    if (!ordner.bigoName && ordner.bigoId) ordner.bigoName = String(ordner.bigoId).slice(0, 80);
+    ordner.bigoId = zahl; ergaenzt.push('BIGO-ID ' + zahl);
+  }
+  if (neuName && namSchluessel(neuName) !== namSchluessel(ordner.bigoName)) {
+    if (ordner.bigoName && namSchluessel(ordner.bigoName).length >= 3) {
+      if (!Array.isArray(ordner.aliasse)) ordner.aliasse = [];
+      if (!ordner.aliasse.some((a) => namSchluessel(a) === namSchluessel(ordner.bigoName))) {
+        ordner.aliasse.unshift(ordner.bigoName);
+        ordner.aliasse = ordner.aliasse.slice(0, 10);
+        ergaenzt.push('früherer Name ' + ordner.bigoName);
+      }
+    }
+    ordner.bigoName = neuName; ergaenzt.push('Name ' + neuName);
+  }
+  return ergaenzt;
+}
 function listStreamers() {
   streamers.forEach((s) => { if (!s.art) s.art = 'streamer'; if (!Array.isArray(s.eintraege)) s.eintraege = []; });
   return streamers.slice().sort((a, b) => String(b.letzteAktivitaet || b.angelegtAm).localeCompare(String(a.letzteAktivitaet || a.angelegtAm)));
@@ -463,15 +595,18 @@ function getStreamer(id) {
  *   3. derselbe Name + Alter     (schwacher Hinweis, nur zum Nachschauen)
  * Zurück kommt, was der Prüfer wissen muss – nicht die ganze Akte.
  */
-function suchePerson({ bigoId, docNumber, name, age }) {
+function suchePerson({ bigoId, bigoName, docNumber, name, age }) {
   const norm = (x) => String(x || '').trim().toLowerCase();
   const nurZiffern = (x) => String(x || '').replace(/[^a-z0-9]/gi, '').toLowerCase();
   const bId = norm(bigoId), dNr = nurZiffern(docNumber), nm = norm(name), alt = norm(age);
-  if (!bId && !dNr && !nm) return null;
+  const nick = String(bigoName || '').trim();
+  if (!bId && !nick && !dNr && !nm) return null;
 
   const treffer = (ordner, grund, sicher) => ({
     grund, sicher,
-    ordnerId: ordner.id, bigoId: ordner.bigoId, name: ordner.name || '', alter: ordner.alter || '',
+    ordnerId: ordner.id, bigoId: ordner.bigoId, bigoName: ordner.bigoName || '',
+    aliasse: ordner.aliasse || [],
+    name: ordner.name || '', alter: ordner.alter || '',
     status: ordner.status || 'neu', art: ordner.art || 'streamer',
     auditionen: (ordner.auditions || []).length,
     letzteAudition: (ordner.auditions || []).map((a) => a.erstelltAm).sort().pop() || '',
@@ -480,24 +615,25 @@ function suchePerson({ bigoId, docNumber, name, age }) {
     notiz: ordner.notiz || '',
   });
 
-  if (bId) {
-    const o = streamers.find((s) => ordnerSchluessel(s.bigoId) === bId);
-    if (o) return treffer(o, 'bigo', true);
-  }
+  // Zahl oder Name – beides führt zum Ordner. Der Weg wird mitgesagt, damit der
+  // Prüfer weiss, worauf der Treffer beruht.
+  const fund = ordnerFinden({ bigoId: bigoId, bigoName: bigoName || bigoId });
+  if (fund) return treffer(fund.ordner, fund.weg === 'zahl' ? 'bigo' : 'bigoname', true);
   if (dNr) {
     // Die Ausweisnummer steht in den Akten, nicht im Ordner – über sie führt
     // der Weg zur BIGO-ID und damit zum Ordner.
     const f = cases.find((c) => nurZiffern(c.docNumber) && nurZiffern(c.docNumber) === dNr);
     if (f) {
-      const o = streamers.find((s) => ordnerSchluessel(s.bigoId) === norm(f.bigoName));
-      if (o) return { ...treffer(o, 'ausweis', true), andereBigoId: norm(f.bigoName) !== bId ? f.bigoName : '' };
+      const t = ordnerFinden({ bigoId: f.bigoName, bigoName: f.bigoName });
+      if (t) return { ...treffer(t.ordner, 'ausweis', true),
+        andereBigoId: namSchluessel(f.bigoName) !== namSchluessel(bigoId || bigoName) ? f.bigoName : '' };
     }
   }
   if (nm) {
     const f = cases.find((c) => norm(c.verifiedName) === nm && (!alt || norm(c.age) === alt));
     if (f) {
-      const o = streamers.find((s) => ordnerSchluessel(s.bigoId) === norm(f.bigoName));
-      if (o) return treffer(o, 'name', false);
+      const t = ordnerFinden({ bigoId: f.bigoName, bigoName: f.bigoName });
+      if (t) return treffer(t.ordner, 'name', false);
     }
   }
   return null;
@@ -513,24 +649,31 @@ function suchePerson({ bigoId, docNumber, name, age }) {
  * Gibt es den Ordner schon, wird NICHTS überschrieben – nur ergänzt, was
  * bisher leer war. Das Skript darf also jederzeit erneut laufen.
  */
-function ordnerAnlegen({ bigoId, name, alter, art, notiz, herkunft, status }) {
+function ordnerAnlegen({ bigoId, bigoName, name, alter, art, notiz, herkunft, status }) {
   const id = String(bigoId || '').trim();
-  const schluessel = ordnerSchluessel(id);
-  if (!schluessel) return { angelegt: false, grund: 'keine-bigo-id' };
+  const nick = String(bigoName || '').trim();
+  if (!id && !nick) return { angelegt: false, grund: 'keine-bigo-id' };
   const jetzt = new Date().toISOString();
 
-  const vorhanden = streamers.find((s) => ordnerSchluessel(s.bigoId) === schluessel);
+  // Suchen über Zahl UND Namen – nicht nur über das eine Feld.
+  const fund = ordnerFinden({ bigoId: id, bigoName: nick });
+  const vorhanden = fund && fund.ordner;
   if (vorhanden) {
     // Nur Lücken füllen. Was das Team hier gepflegt hat, bleibt unangetastet.
     let geaendert = false;
     if (!vorhanden.name && name) { vorhanden.name = String(name).slice(0, 120); geaendert = true; }
     if (!vorhanden.alter && alter) { vorhanden.alter = String(alter).slice(0, 10); geaendert = true; }
+    const zu = ordnerZuordnen(vorhanden, { bigoId: id, bigoName: nick });
+    if (zu.length) geaendert = true;
     if (geaendert) save('streamers.json', streamers);
-    return { angelegt: false, ergaenzt: geaendert, ordner: vorhanden };
+    return { angelegt: false, ergaenzt: geaendert, zugeordnet: zu, weg: fund.weg, ordner: vorhanden };
   }
 
   const ordner = {
-    id: crypto.randomUUID(), bigoId: id,
+    id: crypto.randomUUID(),
+    bigoId: idSchluessel(id) || idSchluessel(nick) || id || nick,
+    bigoName: nick || (idSchluessel(id) ? '' : id),
+    aliasse: [],
     name: String(name || '').slice(0, 120),
     alter: String(alter || '').slice(0, 10),
     status: ['neu', 'aktiv', 'pausiert', 'abgelehnt', 'raus'].includes(status) ? status : 'aktiv',
@@ -553,15 +696,25 @@ function ordnerAnlegen({ bigoId, name, alter, art, notiz, herkunft, status }) {
  * Nachschicken), wird der vorhandene Eintrag aktualisiert statt verdoppelt.
  */
 function ablegen(paket) {
-  const bigoId = String((paket.streamer && paket.streamer.bigoId) || '').trim();
-  const schluessel = ordnerSchluessel(bigoId);
-  if (!schluessel) return null;
+  const roh = String((paket.streamer && paket.streamer.bigoId) || '').trim();
+  const rohName = String((paket.streamer && paket.streamer.bigoName) || '').trim();
+  if (!roh && !rohName) return null;
   const jetzt = new Date().toISOString();
 
-  let ordner = streamers.find((s) => ordnerSchluessel(s.bigoId) === schluessel);
+  // Erst suchen – über Zahl UND Namen. Sonst entsteht ein zweiter Ordner für
+  // jemanden, den wir längst führen.
+  const fund = ordnerFinden({ bigoId: roh, bigoName: rohName });
+  let ordner = fund && fund.ordner;
+  let zugeordnet = [];
+  if (ordner) {
+    zugeordnet = ordnerZuordnen(ordner, { bigoId: roh, bigoName: rohName });
+  }
+  const bigoId = idSchluessel(roh) || idSchluessel(rohName) || roh || rohName;
   if (!ordner) {
     ordner = {
       id: crypto.randomUUID(), bigoId,
+      bigoName: rohName || (idSchluessel(roh) ? '' : roh),
+      aliasse: [],
       name: String((paket.streamer && paket.streamer.name) || '').slice(0, 120),
       alter: String((paket.streamer && paket.streamer.alter) || '').slice(0, 10),
       status: 'neu', notiz: '',
@@ -576,6 +729,15 @@ function ablegen(paket) {
   // Name und Alter nachziehen, falls sie beim ersten Mal fehlten
   if (!ordner.name && paket.streamer && paket.streamer.name) ordner.name = String(paket.streamer.name).slice(0, 120);
   if (!ordner.alter && paket.streamer && paket.streamer.alter) ordner.alter = String(paket.streamer.alter).slice(0, 10);
+  // Wurde etwas zugeordnet, steht das als Vermerk in der Akte. Sonst wundert
+  // sich später jemand, warum die Kennung anders lautet als früher.
+  if (zugeordnet.length) {
+    if (!Array.isArray(ordner.eintraege)) ordner.eintraege = [];
+    ordner.eintraege.unshift({
+      id: crypto.randomUUID(), text: 'Zugeordnet über die Audition: ' + zugeordnet.join(', ') + '.',
+      author: 'System', kind: 'zuordnung', am: jetzt,
+    });
+  }
 
   const a = paket.audition || {};
   const eintrag = {
@@ -922,7 +1084,7 @@ module.exports = {
   setAgentPassword, changeOwnPassword, lockAgent, unlockAgent, deleteAgent, agentCount,
   addPasskey, getAgentByPasskeyId, setPasskeyCounter, agentPasskeys,
   createCode, getCode, isCodeUsable, consumeCode, revokeCode, listCodes,
-  suchePerson, ordnerAnlegen, listStreamersKurz, protokolliereZugriff, verifikationEintragen,
+  suchePerson, ordnerAnlegen, ordnerFinden, ordnerZuordnen, idSchluessel, namSchluessel, listStreamersKurz, protokolliereZugriff, verifikationEintragen,
   saveCase, listCases, getCase, deleteCase, readDoc, purgeOlderThan,
   saveRecording, listRecordings, getRecording, readRecording, reviewRecording, deleteRecording,
   beginRecording, appendRecordingChunk, finishRecording, offeneAufnahmen, aufnahmenRetten,

@@ -23,6 +23,7 @@ const sec = require('./security.js');
 const store = require('./store.js');
 const mcp = require('./mcp.js');
 const textpolish = require('./textpolish.js');
+const pdf = require('./pdf.js');
 
 const PORT = process.env.PORT || 8080;
 const PUBLIC_DIR = path.join(__dirname, 'public');
@@ -508,6 +509,19 @@ async function handleApi(req, res, urlPath, ip) {
     res.end(data.buffer); return true;
   }
 
+  // ---- „Ich bin fertig" ----------------------------------------------------
+  // Die Bewerberin selbst sagt Bescheid. Ohne Anmeldung, aber nur mit gültiger
+  // Zugangsnummer – es ist ihre eigene.
+  if (urlPath === '/api/waiting/bereit' && req.method === 'POST') {
+    let body; try { body = await readJson(req, 4 * 1024); } catch { body = {}; }
+    const code = String(body.code || '').trim().toUpperCase();
+    const entry = waiting.get(code);
+    if (!entry) { sendJson(res, 404, { reason: 'gone' }); return true; }
+    entry.bereit = body.bereit !== false;
+    entry.bereitSeit = entry.bereit ? Date.now() : 0;
+    sendJson(res, 200, { ok: true, bereit: entry.bereit }); return true;
+  }
+
   // ---- ab hier: gültiges Login nötig ----
   if (!authed(req, ip)) { sendJson(res, 401, { reason: 'auth' }); return true; }
 
@@ -574,7 +588,8 @@ async function handleApi(req, res, urlPath, ip) {
       if (room) for (const ws of room.values()) if (ws.role === 'host' && ws.pname) hosts.push(ws.pname);
       return {
         code: w.code, note: w.note, joinedAt: w.joinedAt, busy,
-        bigoId: w.bigoId || '', bekannt: w.bekannt || null,
+        bigoId: w.bigoId || '', bigoNick: w.bigoNick || '', bekannt: w.bekannt || null,
+        bereit: !!w.bereit, bereitSeit: w.bereitSeit || 0,
         claimedBy: busy ? w.claimedBy : null,
         hosts, live: hosts.length > 0,
         waitingSec: Math.max(0, Math.round((Date.now() - w.joinedAt) / 1000)),
@@ -590,10 +605,16 @@ async function handleApi(req, res, urlPath, ip) {
   if (urlPath === '/api/waiting/next' && req.method === 'POST') {
     if (!authed(req, ip)) { sendJson(res, 401, { reason: 'auth' }); return true; }
     const name = reqName(req, ip) || 'Prüfer';
+    // „Nächsten annehmen" nimmt nur, wer fertig ist. Wer noch ausfüllt, wird
+    // übersprungen – nicht unterbrochen.
     const next = Array.from(waiting.values())
-      .filter((w) => !waitingBusy(w))
-      .sort((a, b) => a.joinedAt - b.joinedAt)[0];
-    if (!next) { sendJson(res, 404, { reason: 'none-waiting' }); return true; }
+      .filter((w) => !waitingBusy(w) && w.bereit)
+      .sort((a, b) => (a.bereitSeit || a.joinedAt) - (b.bereitSeit || b.joinedAt))[0];
+    if (!next) {
+      const fuellenNoch = Array.from(waiting.values()).filter((w) => !waitingBusy(w) && !w.bereit).length;
+      sendJson(res, 404, { reason: fuellenNoch ? 'noch-nicht-fertig' : 'none-waiting', fuellenNoch });
+      return true;
+    }
     next.claimedBy = name; next.claimedAt = Date.now();
     sendJson(res, 200, { code: next.code }); return true;
   }
@@ -608,9 +629,32 @@ async function handleApi(req, res, urlPath, ip) {
     // Prüfer mit dem eigenen Klick.
     const fremd = waitingBusy(entry) && entry.claimedBy !== wer;
     if (fremd) { sendJson(res, 409, { reason: 'busy', by: entry.claimedBy || '' }); return true; }
+    // Erst abholen, wenn sie fertig ist.
+    //
+    // Vorher konnte der Prüfer sofort zugreifen – mitten hinein, während sie
+    // noch die Aufklärung liest oder ihre Ausweisnummer sucht. Das ist unhöflich
+    // und kostet Zeit: die Daten sind dann noch nicht da und man tippt sie im
+    // Gespräch. Sie sagt selbst, wann es losgehen kann.
+    //
+    // Damit niemand hängen bleibt, der nicht weiterkommt, gibt es nach ein paar
+    // Minuten den ausdrücklichen Weg mit `trotzdem`. Der wird protokolliert.
+    const WARTE_BIS_TROTZDEM = 3 * 60 * 1000;
+    if (!entry.bereit && !body.trotzdem) {
+      sendJson(res, 409, { reason: 'nicht-bereit',
+        wartetSeit: Math.round((Date.now() - (entry.joinedAt || Date.now())) / 1000),
+        trotzdemAb: Math.max(0, Math.round((WARTE_BIS_TROTZDEM - (Date.now() - (entry.joinedAt || Date.now()))) / 1000)) });
+      return true;
+    }
+    if (!entry.bereit && body.trotzdem) {
+      if (Date.now() - (entry.joinedAt || Date.now()) < WARTE_BIS_TROTZDEM) {
+        sendJson(res, 409, { reason: 'zu-frueh' }); return true;
+      }
+      sec.recordEvent('audit', ip, 'Bewerber trotz „noch nicht fertig" geholt (' + wer + '): ' + code);
+    }
     entry.claimedBy = wer; entry.claimedAt = Date.now();
     sendJson(res, 200, { ok: true }); return true;
   }
+
   if (urlPath === '/api/waiting/release' && req.method === 'POST') {
     let body; try { body = await readJson(req, 16 * 1024); } catch { body = {}; }
     const code = String(body.code || '').trim().toUpperCase();
@@ -632,7 +676,7 @@ async function handleApi(req, res, urlPath, ip) {
     const angelegt = [];
     for (const p of leute) {
       const r = store.ordnerAnlegen({
-        bigoId: p.bigoId, name: p.name, alter: p.alter, art: p.art,
+        bigoId: p.bigoId, bigoName: p.bigoName || p.nick || '', name: p.name, alter: p.alter, art: p.art,
         notiz: p.notiz, status: p.status, herkunft: p.herkunft || 'pkboard',
       });
       if (r.grund === 'keine-bigo-id') { ohneId++; continue; }
@@ -684,7 +728,7 @@ async function handleApi(req, res, urlPath, ip) {
     if (!authed(req, ip)) { sendJson(res, 401, { reason: 'auth' }); return true; }
     let body; try { body = await readJson(req, 8 * 1024); } catch { body = {}; }
     const t = store.suchePerson({
-      bigoId: body.bigoId, docNumber: body.docNumber, name: body.name, age: body.age,
+      bigoId: body.bigoId, bigoName: body.bigoName, docNumber: body.docNumber, name: body.name, age: body.age,
     });
     sendJson(res, 200, { treffer: t }); return true;
   }
@@ -1128,14 +1172,68 @@ async function handleApi(req, res, urlPath, ip) {
       }),
     }); return true;
   }
+  // Ausweisbilder. Prüfer dürfen sie sehen – sie sind die, die den Ausweis
+  // beurteilen. Vorher kamen nur Admins daran, damit standen in der Akte für
+  // Dennis und Lisa leere Rahmen. Jeder Abruf wird protokolliert.
   if (urlPath === '/api/doc' && req.method === 'GET') {
-    if (!isAdmin(req, ip)) { res.writeHead(403); res.end('Forbidden'); return true; }
+    if (!authed(req, ip)) { res.writeHead(401); res.end('Anmeldung nötig'); return true; }
     const q = new URL(req.url, 'http://x').searchParams;
     const c = store.getCase(q.get('id'));
     const docRec = c && c.docs.find((d) => d.file === q.get('file'));
     const data = docRec && store.readDoc(c.id, docRec);
     if (!data) { res.writeHead(404); res.end('not found'); return true; }
+    if (!isAdmin(req, ip)) sec.recordEvent('audit', ip, 'Ausweisbild angesehen (' + (reqName(req, ip) || '?') + '): ' + (c.bigoName || c.id));
     res.writeHead(200, { 'Content-Type': data.mime, 'Cache-Control': 'no-store' }); res.end(data.buffer); return true;
+  }
+
+  // ---- Ausweisblatt als PDF ------------------------------------------------
+  // Ein Blatt je Audition: Deckblatt mit allen Angaben, danach die Bilder in
+  // Originalgröße. Damit hat man die Unterlagen in der Hand – zum Ablegen, zum
+  // Weitergeben an den BIGO-Support, zum Ausdrucken.
+  if (urlPath === '/api/akte-pdf' && req.method === 'GET') {
+    if (!authed(req, ip)) { res.writeHead(401); res.end('Anmeldung nötig'); return true; }
+    const q = new URL(req.url, 'http://x').searchParams;
+    const s2 = store.getStreamer(q.get('id'));
+    if (!s2) { res.writeHead(404); res.end('nicht gefunden'); return true; }
+    const aud = (s2.auditions || []).find((a) => a.auditionId === q.get('audition'))
+      || (s2.auditions || [])[0];
+    if (!aud) { res.writeHead(404); res.end('keine Audition'); return true; }
+    const fall = store.getCase(aud.auditionId);
+    const bilder = [];
+    if (fall) {
+      (fall.docs || []).forEach((d) => {
+        const data = store.readDoc(fall.id, d);
+        if (data) bilder.push({ label: d.label, buffer: data.buffer, mime: data.mime });
+      });
+    }
+    const zeit = (x) => { try { return new Date(x).toLocaleString('de-DE'); } catch { return String(x || ''); } };
+    let buf;
+    try {
+      buf = pdf.ausweisblatt({
+        bigoId: s2.bigoId, bigoName: s2.bigoName || '', aliasse: (s2.aliasse || []).join(', '),
+        name: aud.nameLautAusweis || s2.name || (fall && fall.verifiedName) || '',
+        alter: s2.alter || (fall && fall.age) || '',
+        ausweisart: aud.ausweisart || '', ausweisnummer: aud.ausweisnummer || '',
+        geburtsdatum: (fall && fall.geburtsdatum) || '',
+        pruefer: aud.pruefer || '', datum: zeit(aud.erstelltAm),
+        grundlage: 'Audition per Video, Ausweis live gesehen',
+        ergebnis: aud.ergebnis === 'approved' ? 'freigegeben' : (aud.ergebnis === 'rejected' ? 'abgelehnt' : 'offen'),
+        notiz: aud.notiz || '', erzeugtAm: zeit(new Date().toISOString()),
+        erklaerung: (aud.texte && aud.texte.vorlese) || '',
+      }, bilder);
+    } catch (e) {
+      sec.recordEvent('audit', ip, 'PDF fehlgeschlagen: ' + e.message);
+      res.writeHead(500); res.end('PDF konnte nicht gebaut werden'); return true;
+    }
+    store.protokolliereZugriff(s2.id, {
+      wer: reqName(req, ip) || 'Unbekannt', rolle: isAdmin(req, ip) ? 'admin' : 'pruefer',
+      grund: 'Ausweisblatt als PDF geholt', ip,
+    });
+    sec.recordEvent('audit', ip, 'Ausweisblatt PDF (' + (reqName(req, ip) || '?') + '): ' + s2.bigoId);
+    const name = 'Ausweis-' + String(s2.bigoId || 'akte').replace(/[^\w-]/g, '') + '.pdf';
+    res.writeHead(200, { 'Content-Type': 'application/pdf', 'Cache-Control': 'no-store',
+      'Content-Disposition': 'inline; filename="' + name + '"' });
+    res.end(buf); return true;
   }
   if (urlPath === '/api/case-export' && req.method === 'GET') {
     if (!isAdmin(req, ip)) { res.writeHead(403); res.end('Forbidden'); return true; }
@@ -1392,11 +1490,15 @@ wss.on('connection', (ws, req) => {
         // Gleich nachsehen, ob wir die Person kennen. Steht damit in der
         // Warteschlange, noch bevor jemand das Gespräch annimmt.
         const bigo = String(msg.bigo || '').trim().slice(0, 80);
+        const nick = String(msg.bigoNick || '').trim().slice(0, 80);
         let bekannt = null;
-        try { bekannt = store.suchePerson({ bigoId: bigo, age: msg.alter }); } catch { bekannt = null; }
+        // Zahl UND Name in die Suche: wer nur den Namen weiss, wird trotzdem
+        // erkannt. Der Prüfer sieht in der Schlange dann schon, dass es kein
+        // Neuling ist – bevor er das Gespräch annimmt.
+        try { bekannt = store.suchePerson({ bigoId: bigo, bigoName: nick, age: msg.alter }); } catch { bekannt = null; }
         waiting.set(code, {
           code, note: note ? note.note : '', joinedAt: Date.now(), claimedBy: null, claimedAt: 0,
-          bigoId: bigo, bekannt,
+          bigoId: bigo, bigoNick: nick, bekannt, bereit: false, bereitSeit: 0,
         });
       } else {
         const w = waiting.get(code); if (w) { w.claimedBy = ws.pname; w.claimedAt = Date.now(); }
