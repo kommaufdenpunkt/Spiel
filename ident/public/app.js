@@ -123,6 +123,21 @@
     }
     $('enterBtn').disabled = true;
 
+    // Die Nummer gleich prüfen, bevor der Bewerber weitergeht. Vorher fiel es
+    // erst beim Betreten des Raums auf: Einleitung gelesen, zugestimmt, Kamera
+    // gestartet – und dann zurück an den Anfang. Ein Tippfehler kostete alles.
+    if (mode === 'guest') {
+      $('enterBtn').textContent = 'Nummer wird geprüft …';
+      const c = await api('POST', '/api/code-check', { code });
+      if (c.status !== 200 || !c.body || !c.body.ok) {
+        resetEnter();
+        $('lobbyErr').textContent = 'Diese Zugangsnummer stimmt nicht oder wurde schon benutzt. '
+          + 'Bitte prüfe sie noch einmal – oder frag im Chat nach einer neuen.';
+        $('codeInput').focus(); $('codeInput').select();
+        return;
+      }
+    }
+
     if (mode === 'host') {
       $('enterBtn').textContent = 'Anmeldung …';
       const nutzer = $('userInput').value.trim(), pw = $('passInput').value;
@@ -219,6 +234,16 @@
     if (x === 'device-not-approved') return 'Dieses Gerät ist nicht freigegeben. Melde dich bei der Teamleitung – dein Gerät muss einmal freigeschaltet werden.';
     if (x === 'ip-blocked') return 'Login von diesem Standort nicht erlaubt.';
     if (r.status === 503) return 'Admin/Login ist auf dem Server nicht konfiguriert.';
+    // 429 heisst NICHT „falsches Passwort". Wer das verwechselt, tippt sein
+    // richtiges Passwort immer wieder ein und glaubt am Ende, sein Konto sei
+    // kaputt. Das ist zwei Kollegen im selben Büro schon passiert.
+    if (r.status === 429) {
+      const s = (r.body && r.body.retryAfterSec) || 0;
+      return x === 'locked'
+        ? 'Zu viele Fehlversuche. Bitte ' + (s ? 'etwa ' + s + ' Sekunden' : 'kurz') + ' warten und dann erneut versuchen.'
+        : 'Der Server hat gerade sehr viele Anfragen von dieser Leitung. '
+          + 'Dein Passwort ist nicht das Problem – bitte eine Minute warten und noch einmal versuchen.';
+    }
     return 'Anmeldung fehlgeschlagen.';
   }
 
@@ -603,12 +628,14 @@
         const an = ctx.createAnalyser(); an.fftSize = 512;
         ctx.createMediaStreamSource(s).connect(an);
         const buf = new Uint8Array(an.fftSize);
-        dkAudio = { ctx, gehoert: false, bis: Date.now() + 12000 };
+        dkAudio = { ctx, gehoert: false, bis: Date.now() + 12000, pegel: 0 };
         const tick = () => {
           if (!dkAudio) return;
           an.getByteTimeDomainData(buf);
           let max = 0; for (let i = 0; i < buf.length; i++) { const d = Math.abs(buf[i] - 128); if (d > max) max = d; }
-          if ($('dkMicBar')) $('dkMicBar').style.width = Math.min(100, Math.round(max / 40 * 100)) + '%';
+          // Spitze halten und abfallen lassen – sonst flackert der Balken.
+          dkAudio.pegel = Math.max(Math.min(100, Math.round(max / 40 * 100)), dkAudio.pegel * 0.9);
+          if ($('dkMicBar')) $('dkMicBar').style.width = Math.round(dkAudio.pegel) + '%';
           if (max > 7 && !dkAudio.gehoert) { dkAudio.gehoert = true; setzeCheck('dkMic', 'ok', 'Ton kommt an – alles gut'); }
           if (Date.now() > dkAudio.bis) {
             if (!dkAudio.gehoert) setzeCheck('dkMic', 'warn', 'kein Ton gehört – Mikro prüfen');
@@ -1507,6 +1534,9 @@
   function wroomAn() {
     const box = $('wroom'); if (!box || state.role !== 'guest') return;
     box.style.display = '';
+    // Solange niemand da ist, braucht das Videofeld nicht die halbe Anzeige –
+    // da ist nur Schwarz. Der Warteraum ist das, was jetzt zählt.
+    if ($('room')) $('room').classList.add('wartet');
     wroomStart = Date.now();
     clearInterval(wroomT);
     wroomT = setInterval(() => {
@@ -1518,12 +1548,96 @@
     pruefeMikro();
     pruefeLicht();
     selfieKameraAn();
+    // „Bereit" war ein Tippen – der Browser lässt Ton also zu. Wer die Musik
+    // einmal ausgemacht hat, bekommt sie nicht wieder aufgedrängt.
+    if (musikGewollt()) musikAn(); else musikKnopf(false);
   }
   function wroomAus() {
     const box = $('wroom'); if (box) box.style.display = 'none';
+    if ($('room')) $('room').classList.remove('wartet');
     clearInterval(wroomT); wroomT = null;
     if (wroomAudio) { try { wroomAudio.ctx.close(); } catch {} wroomAudio = null; }
+    musikAus();
   }
+
+  // ---- Wartemusik ----------------------------------------------------------
+  //
+  // Still in eine Kamera starren und warten macht nervös, und nervös liest sich
+  // ein Text schlecht vor. Also läuft leise etwas.
+  //
+  // Der Ton wird hier im Browser erzeugt – ein paar Sinustöne über einer
+  // Pentatonik. Keine Datei, kein fremder Dienst, keine Lizenzfrage, und die
+  // Seite bleibt so streng wie sie ist. Er geht nur an die Lautsprecher, nie in
+  // die Aufnahme, und er hört von selbst auf, sobald der Prüfer dazukommt: dann
+  // soll man einander zuhören.
+  let musik = null;
+  const MUSIK_MERKER = 'ident.wartemusik';
+  // c-Moll-Pentatonik, tief und ohne Halbtonschritte – nichts, was sticht.
+  const TOENE = [261.63, 311.13, 349.23, 392.00, 466.16, 523.25];
+  function musikAn() {
+    if (musik) return;
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const summe = ctx.createGain(); summe.gain.value = 0;
+      summe.connect(ctx.destination);
+      // Sanft einblenden, damit es nicht anspringt.
+      summe.gain.linearRampToValueAtTime(0.055, ctx.currentTime + 2.5);
+      musik = { ctx, summe, timer: null, vis: 0 };
+      if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+      const ton = () => {
+        if (!musik) return;
+        const f = TOENE[Math.floor(Math.random() * TOENE.length)] * (Math.random() < 0.35 ? 2 : 1);
+        const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = f;
+        const g = ctx.createGain(); g.gain.value = 0;
+        o.connect(g); g.connect(summe);
+        const t = ctx.currentTime;
+        const dauer = 2.2 + Math.random() * 2.2;
+        g.gain.linearRampToValueAtTime(0.5, t + 0.5);            // weich anschwellen
+        g.gain.linearRampToValueAtTime(0, t + dauer);            // und ausklingen
+        o.start(t); o.stop(t + dauer + 0.1);
+        musik.vis = 1;
+        musik.timer = setTimeout(ton, 900 + Math.random() * 1400);
+      };
+      ton();
+      musikBalken();
+      merkeMusik(true);
+      musikKnopf(true);
+    } catch { musikKnopf(false); }
+  }
+  function musikAus() {
+    if (!musik) { musikKnopf(false); return; }
+    const { ctx, summe, timer } = musik;
+    clearTimeout(timer); musik = null;
+    try {
+      summe.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.6);
+      setTimeout(() => { try { ctx.close(); } catch {} }, 800);
+    } catch { try { ctx.close(); } catch {} }
+    musikKnopf(false);
+  }
+  function musikKnopf(an) {
+    const b = $('musikBtn'), kasten = $('musikBtn') && $('musikBtn').closest('.wmusik');
+    if (b) b.textContent = an ? '⏸ Musik aus' : '▶ Musik an';
+    if (kasten) kasten.classList.toggle('an', !!an);
+    const t = $('musikText');
+    if (t) t.textContent = an
+      ? 'Leise Wartemusik. Sie endet von selbst, wenn der Prüfer dazukommt.'
+      : 'Musik ist aus. Du kannst sie jederzeit anmachen.';
+  }
+  function musikBalken() {
+    const vis = $('musikVis'); if (!vis) return;
+    const striche = vis.querySelectorAll('i');
+    const lauf = () => {
+      if (!musik) { striche.forEach((s) => { s.style.height = '3px'; }); return; }
+      striche.forEach((s) => { s.style.height = (3 + Math.random() * 15).toFixed(0) + 'px'; });
+      setTimeout(lauf, 220);
+    };
+    lauf();
+  }
+  function merkeMusik(an) { try { localStorage.setItem(MUSIK_MERKER, an ? '1' : '0'); } catch {} }
+  function musikGewollt() { try { return localStorage.getItem(MUSIK_MERKER) !== '0'; } catch { return true; } }
+  if ($('musikBtn')) $('musikBtn').addEventListener('click', () => {
+    if (musik) { musikAus(); merkeMusik(false); } else musikAn();
+  });
   function pruefeKamera() {
     const t = state.localStream && state.localStream.getVideoTracks()[0];
     if (t && t.readyState === 'live' && !t.muted) {
@@ -1539,14 +1653,19 @@
       const an = ctx.createAnalyser(); an.fftSize = 512;
       ctx.createMediaStreamSource(state.localStream).connect(an);
       const buf = new Uint8Array(an.fftSize);
-      wroomAudio = { ctx, an, gehoert: false };
+      wroomAudio = { ctx, an, gehoert: false, pegel: 0 };
       const tick = () => {
         if (!wroomAudio || !wroomT) return;
         an.getByteTimeDomainData(buf);
         let max = 0;
         for (let i = 0; i < buf.length; i++) { const d = Math.abs(buf[i] - 128); if (d > max) max = d; }
         const p = Math.min(100, Math.round(max / 40 * 100));
-        if ($('wcMicBar')) $('wcMicBar').style.width = p + '%';
+        // Nicht den Rohwert anzeigen. Eine Stimme schwingt - der Balken sprang
+        // dadurch 60-mal je Sekunde zwischen 0 und 100 und sah aus wie ein
+        // Stroboskop. Man haelt das fuer kaputt. Also: Spitze halten und
+        // langsam abfallen lassen, wie bei einem echten Pegelmesser.
+        wroomAudio.pegel = Math.max(p, wroomAudio.pegel * 0.9);
+        if ($('wcMicBar')) $('wcMicBar').style.width = Math.round(wroomAudio.pegel) + '%';
         if (p > 18 && !wroomAudio.gehoert) {
           wroomAudio.gehoert = true;
           setzeCheck('wcMic', 'ok', 'Ton kommt an – alles gut');
@@ -1725,6 +1844,7 @@
       // Wer neu dazukommt, soll sofort wissen, ob meine Kamera gerade aus ist
       // und ob aufgezeichnet wird – sonst sieht er ein schwarzes Bild ohne Grund.
       if (!camAn()) dcSendTo(dc, { kind: 'cam', on: false });
+      if (!micAn()) dcSendTo(dc, { kind: 'mic', on: false });
       if (state.recorder) dcSendTo(dc, { kind: 'rec', on: true });
     };
     dc.onmessage = (e) => {
@@ -1754,6 +1874,10 @@
         setz('vName', m.ausweisName);
         setz('vDocType', m.ausweisArt);
         setz('vDocNumber', m.ausweisNr);
+        // Was der Bewerber selbst getippt hat, bleibt als Vergleich stehen.
+        state.vorab = { vBigoName: m.bigoName || '', vAge: m.age || '', vName: m.ausweisName || '',
+          vDocType: m.ausweisArt || '', vDocNumber: m.ausweisNr || '' };
+        zeigeVorab();
         if (m.ausweisName || m.ausweisNr) {
           const z = $('zusicherung');
           if (z) {
@@ -1776,6 +1900,13 @@
         state.vorleseZeile = String(m.text || '').slice(0, 200);
         const box = $('liestGerade');
         if (box) { box.style.display = state.vorleseZeile ? '' : 'none'; $('liestText').textContent = state.vorleseZeile; }
+      }
+      // Gegenüber hat sich stumm geschaltet oder wieder eingeschaltet.
+      else if (m.kind === 'mic') {
+        const P = state.peers.get(peerId);
+        const wer = P ? (P.name || (P.role === 'host' ? 'Prüfer' : 'Bewerber')) : 'Gegenüber';
+        if (P) P.micAus = !m.on;
+        zeigeMicAus(state.mainPeerId === peerId ? 'remote' : peerId, !m.on, wer);
       }
       // Gegenüber hat die Kamera aus- oder wieder eingeschaltet.
       else if (m.kind === 'cam') {
@@ -1976,13 +2107,33 @@
   $('lightbox').addEventListener('click', () => $('lightbox').classList.remove('on'));
 
   // ================= CHAT =================
-  function addChat(text, me) { const d = document.createElement('div'); d.className = 'msg ' + (me ? 'me' : 'them'); d.textContent = text; chatLog.appendChild(d); chatLog.scrollTop = chatLog.scrollHeight; }
+  function chatOffen() { const t = $('tabChat'); return !!t && t.classList.contains('sel'); }
+  function addChat(text, me) {
+    const d = document.createElement('div'); d.className = 'msg ' + (me ? 'me' : 'them'); d.textContent = text;
+    chatLog.appendChild(d); chatLog.scrollTop = chatLog.scrollHeight;
+    // Wer gerade auf dem anderen Reiter steht, hat die Nachricht nicht gesehen.
+    // Vorher passierte gar nichts: der Prüfer schrieb „halt den Ausweis höher",
+    // der Bewerber las weiter vor und wunderte sich später. Also: Zähler am
+    // Reiter, ein Hinweis, und beim Öffnen ist er weg.
+    if (!me && !chatOffen()) {
+      state.chatNeu = (state.chatNeu || 0) + 1;
+      zeigeChatNeu();
+      toast('💬 Neue Nachricht: ' + text.slice(0, 60));
+    }
+  }
+  function zeigeChatNeu() {
+    const t = $('tabChat'); if (!t) return;
+    const n = state.chatNeu || 0;
+    t.textContent = n ? 'Chat (' + n + ')' : 'Chat';
+    t.classList.toggle('neu', n > 0);
+  }
   function sendChat() { const v = $('chatInput').value.trim(); if (!v) return; if (dcBroadcast({ kind: 'chat', text: v })) { addChat(v, true); $('chatInput').value = ''; } else toast('Noch nicht verbunden.'); }
   $('chatSend').addEventListener('click', sendChat);
   $('chatInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') sendChat(); });
   document.querySelectorAll('.tabs button').forEach((b) => b.addEventListener('click', () => {
     document.querySelectorAll('.tabs button').forEach((x) => x.classList.toggle('sel', x === b));
     document.querySelectorAll('.pane').forEach((p) => p.classList.toggle('sel', p.dataset.pane === b.dataset.tab));
+    if (b.dataset.tab === 'chat') { state.chatNeu = 0; zeigeChatNeu(); $('chatInput').focus(); }
   }));
 
   // ================= MIKRO/KAMERA =================
@@ -1992,7 +2143,13 @@
     if (t) t.enabled = !!on;
     const b = $('micBtn');
     if (b) { b.textContent = on ? '🎤 Mikro an' : '🔇 Mikro aus (stumm)'; b.classList.toggle('danger', !on); }
+    zeigeMicAus('local', !on, 'Du');
+    // Dem Gegenüber sagen. Vorher wusste er es nicht: er sass da und wartete,
+    // dass endlich jemand redet. Und in der Aufnahme war die Stille später
+    // nicht zu erklären.
+    dcBroadcast({ kind: 'mic', on: !!on });
   }
+  function micAn() { const t = state.localStream && state.localStream.getAudioTracks()[0]; return !!(t && t.enabled); }
   $('micBtn').addEventListener('click', () => { const t = state.localStream && state.localStream.getAudioTracks()[0]; if (!t) return; setMic(!t.enabled); });
   // Kamera an/aus – auch mitten im Gespräch. Der andere sieht dann eine klare
   // Meldung statt eines eingefrorenen Bildes, und in der Aufnahme steht es auch.
@@ -2006,6 +2163,23 @@
     zeigeCamAus('local', !an, 'Du');
     dcBroadcast({ kind: 'cam', on: !!an });
   }
+  /**
+   * Kleines Zeichen am Bild, wenn jemand stumm ist.
+   *
+   * Bewusst kein grosser Vorhang wie bei der Kamera: man sieht den anderen ja
+   * weiter, er sagt nur nichts. Aber man muss erkennen, dass es Absicht ist und
+   * nicht ein kaputtes Mikrofon.
+   */
+  function zeigeMicAus(wo, aus, name) {
+    const host = wo === 'local' ? document.querySelector('.vwrap.local')
+      : wo === 'remote' ? document.querySelector('.vwrap.remote')
+        : document.querySelector('.vextra[data-peer="' + wo + '"]');
+    if (!host) return;
+    let el = host.querySelector('.micoff');
+    if (!aus) { if (el) el.remove(); return; }
+    if (!el) { el = document.createElement('div'); el.className = 'micoff'; host.appendChild(el); }
+    el.textContent = '🔇 ' + (name || 'stumm') + ' ist stumm';
+  }
   // Blende über dem Bild, wenn jemand seine Kamera ausgeschaltet hat.
   function zeigeCamAus(wo, aus, name) {
     const host = wo === 'local' ? document.querySelector('.vwrap.local')
@@ -2017,6 +2191,64 @@
     if (!el) { el = document.createElement('div'); el.className = 'camoff'; host.appendChild(el); }
     el.innerHTML = '<span class="co-ic">🚫</span><b>' + esc(name || 'Kamera') + '</b><span>Kamera ist aus</span>';
   }
+
+  // ================= AUSWEISDATEN ABGLEICHEN (nur Prüfer) ===================
+  //
+  // Der Bewerber tippt seine Ausweisdaten im Warteraum ein. Der Prüfer sieht
+  // den Ausweis im Bild – er ist der, der es beurteilen kann. Also stehen beide
+  // Werte nebeneinander: unten, was der Bewerber geschrieben hat, oben im Feld,
+  // was gilt. Ändern darf der Prüfer jederzeit; man sieht dann, dass er es
+  // getan hat. Nichts wird still überschrieben.
+  const VFELDER = ['vBigoName', 'vAge', 'vName', 'vDocType', 'vDocNumber'];
+  function zeigeVorab() {
+    const v = state.vorab || {};
+    VFELDER.forEach((id) => {
+      const marke = document.querySelector('.vorab-wert[data-fuer="' + id + '"]');
+      if (!marke) return;
+      const original = (v[id] || '').trim();
+      const jetzt = ($(id).value || '').trim();
+      if (!original) { marke.textContent = ''; marke.classList.remove('anders'); return; }
+      const anders = original !== jetzt;
+      marke.classList.toggle('anders', anders);
+      marke.innerHTML = anders
+        ? '↳ Bewerber schrieb: <b>' + esc(original) + '</b> – von dir geändert'
+        : '↳ so hat es der Bewerber selbst eingetippt';
+    });
+    grossPruefen();
+  }
+  VFELDER.forEach((id) => { if ($(id)) $(id).addEventListener('input', () => { zeigeVorab(); }); });
+
+  /**
+   * Großschreibung. Auf einem Handy schreiben viele alles klein – „mia
+   * beispiel", „t99001234". In der Akte steht das dann so, und beim Abgleich mit
+   * dem Ausweis später sieht es nach einer anderen Person aus.
+   *
+   * Nichts passiert von selbst: der Prüfer sieht den Hinweis und entscheidet.
+   * Automatisch korrigieren wäre falsch – manche Namen schreiben sich wirklich
+   * anders, und der Ausweis hat immer recht, nicht die Regel.
+   */
+  function grossName(s) {
+    return String(s || '').toLowerCase().replace(/(^|[\s\-'’.])([\p{L}])/gu, (_, vor, b) => vor + b.toUpperCase());
+  }
+  function grossVorschlag() {
+    return { vName: grossName($('vName').value), vDocNumber: ($('vDocNumber').value || '').toUpperCase(),
+      vDocType: grossName($('vDocType').value) };
+  }
+  function grossPruefen() {
+    const h = $('grossHinweis'); if (!h) return;
+    const v = grossVorschlag();
+    const tun = Object.keys(v).filter((id) => $(id) && ($(id).value || '').trim() && $(id).value !== v[id]);
+    h.classList.toggle('tun', tun.length > 0);
+    h.textContent = tun.length
+      ? 'Schreibweise prüfen: ' + tun.map((id) => ({ vName: 'Name', vDocNumber: 'Ausweis-Nr.', vDocType: 'Ausweisart' }[id])).join(', ')
+      : (($('vName').value || '').trim() ? 'Schreibweise sieht gut aus.' : '');
+  }
+  if ($('grossRichten')) $('grossRichten').addEventListener('click', () => {
+    const v = grossVorschlag();
+    Object.keys(v).forEach((id) => { if ($(id) && ($(id).value || '').trim()) $(id).value = v[id]; });
+    zeigeVorab();
+    toast('Schreibweise gerichtet – bitte mit dem Ausweis im Bild vergleichen.');
+  });
 
   // ================= AUFNAHME (Prüfer) =================
   function pickMime() { for (const m of ['video/mp4;codecs=h264,aac', 'video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm']) { const ext = m.startsWith('video/mp4') ? 'mp4' : 'webm'; if (window.MediaRecorder && MediaRecorder.isTypeSupported(m)) return { mime: m, ext }; } return { mime: '', ext: 'webm' }; }
@@ -2033,6 +2265,9 @@
         lastDraw = ts; ctx.fillStyle = '#0d1526'; ctx.fillRect(0, 0, W, H);
         cover(ctx, remoteVideo, 0, 0, W / 2, H, gegenueberCamAus(), gegenueberName());
         cover(ctx, localVideo, W / 2, 0, W / 2, H, !camAn(), state.name || 'Prüfer');
+        // Stumm gehört ins Bild: sonst ist die Stille später nicht zu erklären.
+        stummZeichen(ctx, 0, 0, W / 2, gegenueberMicAus());
+        stummZeichen(ctx, W / 2, 0, W / 2, !micAn());
         vorleseBand(ctx, W, H, state.vorleseZeile);
       }
       requestAnimationFrame(draw);
@@ -2115,8 +2350,21 @@
     const dw = v.videoWidth * s, dh = v.videoHeight * s;
     ctx.drawImage(v, x + (w - dw) / 2, y + (h - dh) / 2, dw, dh);
   }
+  /** Kleines „stumm"-Schild oben in der jeweiligen Bildhälfte der Aufnahme. */
+  function stummZeichen(ctx, x, y, w, stumm) {
+    if (!stumm) return;
+    const t = '🔇 stumm';
+    ctx.font = '600 17px -apple-system,Segoe UI,Roboto,sans-serif';
+    const b = ctx.measureText(t).width + 20;
+    ctx.fillStyle = 'rgba(120,20,35,.85)';
+    ctx.fillRect(x + w - b - 12, y + 12, b, 28);
+    ctx.fillStyle = '#ffd9e0'; ctx.textBaseline = 'middle';
+    ctx.fillText(t, x + w - b - 2, y + 26);
+    ctx.textBaseline = 'alphabetic';
+  }
   // Ist die Kamera des Gegenübers gerade aus?
   function gegenueberCamAus() { const P = state.mainPeerId && state.peers.get(state.mainPeerId); return !!(P && P.camAus); }
+  function gegenueberMicAus() { const P = state.mainPeerId && state.peers.get(state.mainPeerId); return !!(P && P.micAus); }
   function gegenueberName() { const P = state.mainPeerId && state.peers.get(state.mainPeerId); return P ? (P.name || (P.role === 'host' ? 'Prüfer' : 'Bewerber')) : 'Gegenüber'; }
   // ---- Die Aufnahme wandert mit, Stück für Stück ---------------------------
   // Der Server bekommt jede Sekunde ein Stück und legt es verschlüsselt ab.
@@ -2256,6 +2504,9 @@
     checkBoxes().forEach((c) => c.checked = false); $('approveBtn').disabled = true; $('rejectBtn').disabled = false;
     // Der Abgleich gehoert zum vorigen Bewerber - fuer den naechsten von vorn.
     letzteSuche = ''; const tk = $('personTreffer'); if (tk) { tk.className = 'treffer'; tk.innerHTML = ''; }
+    state.vorab = null; state.vorleseZeile = ''; zeigeVorab();
+    const lg = $('liestGerade'); if (lg) lg.style.display = 'none';
+    document.querySelectorAll('.micoff, .camoff').forEach((e) => e.remove());
     $('reviewStatus').className = 'status pending'; $('reviewStatus').textContent = 'Warte auf die Bilder des Bewerbers …';
     $('okBadge').classList.remove('on'); chatLog.innerHTML = '';
     remoteVideo.srcObject = null; remoteWaiting.style.display = ''; remoteWaiting.textContent = 'Warte auf Gegenüber …';

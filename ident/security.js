@@ -129,7 +129,12 @@ const rate = new Map();         // ip -> { n, reset }
 
 const MAX_IP_FAILS = 10, IP_BLOCK_MS = 10 * 60 * 1000;
 const MAX_ACCOUNT_FAILS = 5;
-const RATE_MAX = 60, RATE_WINDOW = 60 * 1000; // 60 Anfragen / Minute (nur unangemeldet)
+// Nur API-Aufrufe von Unangemeldeten. Statische Dateien zählen nicht mehr mit –
+// sonst verbraucht eine geöffnete Bewerber-Seite das halbe Kontingent und zwei
+// Prüfer hinter derselben Leitung sperren sich gegenseitig aus.
+// 240/Minute ist reichlich für echte Menschen und immer noch eine Bremse.
+// Das eigentliche Schloss gegen Durchprobieren sitzt am Login selbst.
+const RATE_MAX = 240, RATE_WINDOW = 60 * 1000;
 
 // ---- Erhöhte Sicherheitsstufe für den Admin-Login ------------------------
 // Deutlich strenger als der normale Login: schon nach wenigen Fehlversuchen

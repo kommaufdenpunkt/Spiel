@@ -436,6 +436,21 @@ async function handleApi(req, res, urlPath, ip) {
   }
 
   // ---- Audition-Text (Teleprompter) – Abruf öffentlich (Bewerber liest ihn) ----
+  // ---- Stimmt die Zugangsnummer? -------------------------------------------
+  // Wird gefragt, bevor der Bewerber irgendetwas eingibt. Vorher wurde die
+  // Nummer erst beim Betreten des Raums geprüft – der Bewerber las die
+  // Einleitung, stimmte zu, startete die Kamera und wurde dann zurückgeworfen.
+  // Ein Tippfehler kostete den ganzen Weg.
+  //
+  // Die Antwort sagt nur ja oder nein, nichts weiter. Durchprobieren bringt
+  // niemandem etwas: 36^8 Möglichkeiten, dazu die Bremse für zu viele Anfragen.
+  if (urlPath === '/api/code-check' && req.method === 'POST') {
+    let body; try { body = await readJson(req, 2 * 1024); } catch { body = {}; }
+    const nummer = String(body.code || '').trim();
+    const gut = !!nummer && store.isCodeUsable(nummer);
+    if (!gut) sec.recordEvent('info', ip, 'Zugangsnummer abgelehnt: ' + nummer.slice(0, 12));
+    sendJson(res, 200, { ok: gut }); return true;
+  }
   if (urlPath === '/api/script' && req.method === 'GET') { sendJson(res, 200, { script: store.getScript() }); return true; }
   if (urlPath === '/api/intro' && req.method === 'GET') { sendJson(res, 200, { intro: store.getIntro() }); return true; }
   // Startseite: liegt ein echtes Team-Foto im Ordner public? (öffentlich)
@@ -1224,7 +1239,21 @@ const server = http.createServer(async (req, res) => {
 
   sec.setSecurityHeaders(res);
   if (sec.isBlocked(ip)) { res.writeHead(403); res.end('Forbidden'); return; }
-  if (urlPath !== '/healthz' && !authed(req, ip) && !sec.rateLimit(ip)) { res.writeHead(429); res.end('Zu viele Anfragen'); return; }
+  // Anfragebremse – aber nur für die API, nicht für die Seite selbst.
+  //
+  // Vorher zählte jede Datei mit: HTML, Skripte, Bilder, das Kamerabild-Symbol.
+  // Eine einzige geöffnete Bewerber-Seite verbraucht davon zwanzig. Sitzen zwei
+  // Prüfer im selben Büro hinter derselben Leitung – oder hängen sie am selben
+  // Mobilfunknetz –, war das Kontingent weg, und der Login antwortete mit 429.
+  // Im Browser stand dann „Anmeldung fehlgeschlagen", obwohl das Passwort
+  // stimmte. Sie haben sich gegenseitig ausgesperrt und die Schuld beim
+  // Passwort gesucht.
+  //
+  // Gegen Durchprobieren schützt nicht diese Bremse, sondern die eigene Sperre
+  // am Login: Zählung je Konto, Zählung je IP, wachsende Wartezeit. Die bleibt.
+  if (urlPath.startsWith('/api/') && !authed(req, ip) && !sec.rateLimit(ip)) {
+    sendJson(res, 429, { reason: 'zu-viele-anfragen' }); return;
+  }
 
   if (urlPath === '/healthz') { res.writeHead(200, { 'Content-Type': 'text/plain' }); res.end('ok'); return; }
   if (urlPath === '/ice') { res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify({ iceServers: buildIceServers() })); return; }
