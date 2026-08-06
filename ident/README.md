@@ -14,8 +14,13 @@ Ordner des Streamers.
 |---|---|---|
 | `4ever1.tv` / `www` | alle | öffentliche Startseite der Agentur (`www` leitet auf die kurze Form) |
 | `ident.4ever1.tv` | Bewerber | Zugangsnummer, Warteraum, Audition |
-| `mcp.4ever1.tv` | Team | Übersicht, Warteraum, Streamer-Ordner, Verwaltung unter `/verwaltung` |
-| `acp.4ever1.tv` | Admins | Diagnose, Überwachung – **und nur hier lässt sich löschen** |
+| `mcp.4ever1.tv` | Team | Übersicht, Warteraum, Streamer-Ordner, Zugangsnummern |
+| `acp.4ever1.tv` | Admins | Einrichten, Diagnose, Überwachung – **und nur hier lässt sich löschen** |
+
+Der Team-Bereich verlinkt den Adminbereich **nirgends** und erwähnt ihn auch
+nicht – auch nicht für angemeldete Admins. `mcp.<domain>/verwaltung` gibt es
+nicht mehr; die Adresse antwortet mit „Nicht gefunden". Eine Weiterleitung
+gäbe es preis, nach dem niemand fragen soll.
 
 `pruefer.` und `admin.` leiten auf `mcp.` weiter (Übergang, kann später weg).
 `mein.4ever1.tv` gehört **nicht** hierher – dort läuft das PK-Board auf einem
@@ -42,16 +47,84 @@ Suchmaschinen sehen nur die Startseite; alle Arbeitsbereiche antworten mit
 8. **Freigeben oder Ablehnen** → die Akte wird verschlüsselt gespeichert und
    wandert in den **Ordner des Streamers**, zugeordnet über die BIGO-ID.
 
+## Wird die Person schon geführt?
+
+Das prüft ident von selbst – zweimal:
+
+1. **Beim Reinkommen.** Der Bewerber nennt seine BIGO-ID; der Server sieht
+   nach und die Warteschlange zeigt „📁 schon im Ordner" samt Zahl der
+   Auditions, Status und Vermerken. Der Prüfer weiss es also, **bevor** er
+   das Gespräch annimmt.
+2. **Beim Ausfüllen der Akte.** Während der Prüfer die Ausweisdaten eintippt,
+   läuft der Abgleich mit. Drei Wege führen zu einem Treffer:
+   - dieselbe **BIGO-ID** – sicher, die Audition wird angehängt
+   - dieselbe **Ausweisnummer** – dieselbe Person mit neuer BIGO-ID; dann
+     erscheint eine Warnung mit der alten Nummer
+   - derselbe **Name und dasselbe Alter** – nur ein Hinweis zum Nachprüfen
+
+Gibt es keinen Treffer, steht da „Neu bei uns – mit der Freigabe wird ein
+neuer Ordner angelegt." Es entsteht also nie versehentlich ein zweiter Ordner
+für dieselbe Person.
+
 ## Streamer-Ordner
 
 Ein Ordner je BIGO-ID mit allen Auditions, Aufnahmen samt Auswertung,
-Ausweisbildern und Protokollen.
+Ausweisbildern, abgehakten Fragen, dem Wortlaut der Texte und Protokollen.
+Der **Vorlese-Text wird bei jeder Audition mitgespeichert** – er ist die
+Einwilligung, die der Bewerber in die Kamera gesprochen hat. Wird er später
+geändert, steht in der alten Akte weiterhin, was an dem Tag galt.
 
 - **Art:** Familie oder Streamer, mit Filter in der Übersicht
 - **Status:** neu · aktiv · pausiert · abgelehnt · nicht mehr dabei
 - **Vermerke:** Anrufe, Absprachen, Verwarnungen, Lob – mit acht Vorlagen und
   Textaufbereitung vor dem Speichern. Schreiben darf jeder Prüfer, ändern nur
   Admins, löschen nur über `acp.`
+
+## Der blaue Haken (Altersverifikation ohne Audition)
+
+Wer längst dabei ist, muss kein Gespräch nachholen. Der Prüfer öffnet die
+Akte, tippt auf **„🪪 Jetzt verifizieren"** und trägt ein, was er gesehen hat:
+Name laut Ausweis, Ausweisart, Nummer, Geburtsdatum – dazu die **Grundlage**
+(im Videogespräch gesehen · Original vor Ort · aus der Audition-Akte
+übernommen · Ausweisbild in der Akte geprüft) und eine Erklärung, die er
+abhaken muss:
+
+> Ich habe den Ausweis gesehen, das Gesicht stimmt überein und das
+> Geburtsdatum belegt mindestens 18 Jahre.
+
+Ohne Ausweisart und Grundlage nimmt **der Server** es nicht an – das ist keine
+Höflichkeitsabfrage im Browser. Wer bestanden hat, trägt danach den blauen
+Haken ✓ auf der Ordner-Karte und ganz oben in der Akte, mit Datum, Prüfer und
+Grundlage im Tooltip.
+
+- **Nichts wird überschrieben:** jede Prüfung bleibt im Verlauf stehen, auch
+  die abgelehnten. Man kann später nachlesen, was wann geprüft wurde.
+- **Abgelehnt hebt den Haken auf** – ein abgelaufener Ausweis darf nicht
+  weiter als „geprüft" dastehen.
+- **Filter „ohne ✓"** in der Ordner-Übersicht zeigt, wer noch fehlt.
+- Die **Suche** findet „verifiziert" / „nicht verifiziert", den prüfenden
+  Namen und die Ausweisnummer aus der Verifikation.
+- Der Haken selbst ist kein Geheimnis: er sagt nur, **dass** geprüft wurde.
+  Die Ausweisdaten dahinter liegen hinter der Grundangabe wie alles andere in
+  der Akte.
+
+## Am Handy
+
+`mcp.` ist zum Abarbeiten unterwegs gebaut, nicht bloß verkleinert:
+
+- Das Menü sitzt als **Leiste am unteren Rand**, wo der Daumen liegt – Zeichen
+  oben, Kurzname darunter, immer sichtbar. Passt nicht alles hinein, schiebt
+  man die Leiste seitlich.
+- Kein Kasten wird breiter als das Gerät. Feste Mindestbreiten sind aufgehoben,
+  damit der Browser die Seite nicht herauszoomt und die Schrift unlesbar wird.
+- Alles Antippbare ist mindestens 44 px hoch.
+
+## Adminbereich (`acp.`)
+
+Kantenmenü links nach Aufgaben gruppiert, Arbeitsfläche in der Mitte, rechts
+eine Spalte, die den Bereich erklärt, in dem man gerade steht – ausblendbar,
+der Browser merkt es sich. Die Übersicht zeigt Kacheln, die selbst sagen, ob
+etwas ansteht, und in ihren Bereich führen.
 
 ## Sicherheit
 
@@ -66,6 +139,18 @@ Ausweisbildern und Protokollen.
   Anmeldeversuche.
 - **Löschen** ist nur über `acp.<domain>` möglich – serverseitig erzwungen,
   nicht bloß ausgeblendet.
+- **Der einzige Weg in eine Akte** ist `POST /api/streamer-oeffnen` mit
+  genanntem Grund. Es gibt keine zweite Tür: `GET /api/streamer` antwortet 410.
+  Auch eine Altersverifikation schreibt sich ins Einsichtsprotokoll der Akte –
+  sonst wäre sie ein stiller Weg an der Grundangabe vorbei.
+- **Alles ab `/api/change-password`** liegt hinter einer gemeinsamen Sperre im
+  Server (`ab hier: gültiges Login nötig`). Ohne gültiges Login kommt von dort
+  nichts heraus – auch kein 410 und keine Fehlermeldung, die etwas verrät.
+  Wer die Wirkung einer einzelnen Route prüft, muss sich also anmelden;
+  ein nackter `curl` bekommt überall 401 und beweist damit nichts.
+- **Kein Durchprobieren:** `/api/person-suche` prüft die Anmeldung zusätzlich
+  selbst. Die Antwort nennt Name, Alter und Status – die Stelle ist es wert,
+  nicht allein auf die Sperre weiter oben zu vertrauen.
 - **Aufbewahrung:** automatische Löschung nach `RETENTION_DAYS` (Vorgabe 90).
 
 ## Betrieb
@@ -78,12 +163,33 @@ Umgebungsvariablen, siehe `.env.example`. Pflicht sind `STORAGE_KEY` und
 **Neue Fassung einspielen** (auf einem Server mit Docker und nginx):
 
 ```bash
-ssh <server> 'bash -s' < ident/deploy.sh
+ssh <server> '/opt/4ever1-ident/src/ident/deploy.sh'                 # Zweig main
+ssh <server> '/opt/4ever1-ident/src/ident/deploy.sh claude/mein-zweig'
 ```
+
+Der ganze Pfad heisst `4ever1-ident` (mit Bindestrich), nicht `4ever1/ident`.
+`ZWEIG=<zweig> …` geht weiterhin, der Zweig hinten dran ist nur bequemer.
 
 Das Skript holt den Quellcode, baut das Abbild, tauscht den Container und
 prüft, ob er antwortet – sonst stellt es die vorige Fassung wieder her. Daten
 und Zugangsdaten liegen ausserhalb des Containers und bleiben unberührt.
+
+**Wenn man nicht mehr hineinkommt** (acp. oder mcp.):
+
+```bash
+ssh <server> '/opt/4ever1-ident/src/ident/notzugang.sh'            # nachsehen, woran es liegt
+ssh <server> '/opt/4ever1-ident/src/ident/notzugang.sh --sperre-weg'
+```
+
+Das Skript zeigt zuerst nur die Lage: läuft der Dienst, ist die Gerätebindung
+an, ist 2FA an, welche Geräte sind freigegeben, und die letzten Anmeldeversuche
+mit Grund. Erst mit einem Schalter greift es ein – `--sperre-weg` (Neustart,
+löst Fehlversuch- und IP-Sperren), `--geraete-auf`, `--zweifach-aus`,
+`--alles-auf`. Nichts davon löscht Daten.
+
+Ein Zugang über Facebook, Google o. ä. ist bewusst **nicht** eingebaut: damit
+hinge die Akte an einem fremden Konto, das gesperrt oder übernommen werden
+kann. Wer den Server hat, schliesst sich selbst auf.
 
 **Lokal starten:**
 
@@ -112,12 +218,16 @@ ident/
 ├── mcp.js         Übergabe der fertigen Akte in den Streamer-Ordner
 ├── textpolish.js  räumt Vermerke und Protokoll-Einträge auf (regelbasiert)
 ├── deploy.sh      Quellcode holen, bauen, tauschen, im Fehlerfall zurück
+├── notzugang.sh   wieder hineinkommen, wenn Sperre, Gerätebindung oder 2FA zu ist
+├── sicherung.sh   nächtliche Sicherung (--einrichten legt den Zeitplan an)
+├── pkboard-import.sh  Mitglieder aus dem PK-Board als Akten übernehmen
+├── umzug.sh       einmaliger Serverumzug (liest Schlüssel und Daten mit)
 ├── public/
 │   ├── home.html · home.js         öffentliche Startseite
 │   ├── index.html · app.js         Bewerber und Team-Bereich
-│   ├── admin.html · admin.js       Verwaltung und Diagnose
+│   ├── admin.html · admin.js       Adminbereich (nur acp.)
 │   ├── figur.html · figur.js       Baukasten für die Comic-Figuren
 │   └── figur-core.js               Figuren zeichnen und vorlesen
-├── views/admin-dash.html           Verwaltung (erst nach dem Login geladen)
+├── views/admin-dash.html           Adminbereich (erst nach dem Login geladen)
 └── Dockerfile · .env.example · README.md
 ```

@@ -87,6 +87,9 @@
   .deck-me .muted{font-size:.74rem;color:var(--dim)}
   .deck-item{width:100%;text-align:left;font-size:.9rem}
   .deck-item.sel{border-color:var(--accent);background:#1b2740;color:var(--ink)}
+  /* Zeichen und Name stehen am Rechner in einer Zeile, der Kurzname schläft. */
+  .deck-item .ic{margin-right:.35rem}
+  .deck-item .kz{display:none}
   /* Teilüberschriften im Menü – trennen Audition, Bereiche, Verwaltung, Konto */
   .nav-gruppe{font-size:.64rem;letter-spacing:.18em;text-transform:uppercase;color:var(--dim);
     font-weight:700;margin:.85rem .2rem .1rem;padding-top:.6rem;border-top:1px solid var(--line)}
@@ -121,11 +124,66 @@
   .ord-card:hover{border-color:var(--accent);transform:translateY(-2px)}
   .ord-card .oid{font-weight:700;word-break:break-all}
   .ord-card .onm{color:var(--dim);font-size:.83rem}
+  .uebernommen{font-size:.72rem;color:#a9c2ff;line-height:1.35}
+  /* Akteneinsicht nur mit Grund - und offen sichtbar, wer nachgesehen hat. */
+  .grundbox{border:1px solid var(--warn);background:#2a2313;border-radius:16px;padding:1.1rem 1.2rem;max-width:520px}
+  .grundbox h3{margin:0 0 .5rem;font-size:1.05rem}
+  .grundbox p{margin:0 0 .8rem;font-size:.85rem;color:var(--dim);line-height:1.6}
+  .grund-schnell{display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:.7rem}
+  .grund-schnell button{font-size:.78rem;padding:.4rem .7rem}
+  .grundbox input{width:100%;margin-bottom:.7rem}
+  .grund-akt{display:flex;gap:.5rem;flex-wrap:wrap}
+  .ord-zugriffe{margin-top:.8rem}
+  .ord-zugriffe summary{cursor:pointer;user-select:none;color:var(--dim);font-size:.82rem}
+  .zg-liste{margin-top:.5rem;display:flex;flex-direction:column;gap:.45rem}
+  .zg{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:.5rem .65rem;font-size:.8rem}
+  .zg-rolle{font-size:.68rem;color:#bcd0ff;border:1px solid var(--line2);border-radius:999px;padding:.05rem .4rem;margin-left:.3rem}
+  .zg-zeit{float:right;color:var(--dim);font-size:.73rem}
+  .zg-grund{color:var(--dim);margin-top:.2rem;overflow-wrap:anywhere}
+  /* Fundstellen der Suche: zeigen, WARUM dieser Ordner dabei ist. */
+  .tr-fund{margin-top:.5rem;padding-top:.45rem;border-top:1px solid var(--line);font-size:.76rem;line-height:1.5}
+  .tr-zeile{color:var(--dim);margin-bottom:.2rem;overflow-wrap:anywhere}
+  .tr-zeile b{color:var(--ink);font-weight:600}
+  .tr-fund mark{background:#3a4f22;color:#dcf5b0;border-radius:3px;padding:0 .15em}
+  .tr-mehr{color:var(--dim);font-size:.72rem;opacity:.8}
   .ord-card .orow{display:flex;justify-content:space-between;align-items:center;margin-top:.5rem;gap:.4rem}
   .ord-aud{background:var(--panel2);border:1px solid var(--line);border-radius:14px;padding:.85rem .95rem;margin-bottom:.7rem}
   .ord-aud .ometa{color:var(--dim);font-size:.83rem;line-height:1.65}
   .ord-aud video{width:100%;max-width:360px;border-radius:10px;border:1px solid var(--line);background:#000;margin-top:.5rem}
+  /* Abgleich beim Ausfüllen der Akte: kennen wir die Person schon? */
+  .treffer:empty{display:none}
+  .treffer{border-radius:12px;padding:.6rem .75rem;margin:.2rem 0 .6rem;font-size:.83rem;line-height:1.55;
+    border:1px solid var(--line);background:var(--panel2)}
+  .treffer.neu{border-color:#2f6b4a;background:#132a20;color:#bfe9d2}
+  .treffer.da{border-color:var(--accent);background:#16233d;box-shadow:0 0 0 3px #5b8cff1f}
+  .treffer.vielleicht{border-color:var(--warn);background:#2a2313;color:#f0dca8}
+  .treffer .t-name{font-size:.95rem;font-weight:650;color:var(--ink);margin-top:.3rem}
+  .treffer .t-meta{color:var(--dim);font-size:.78rem;margin-top:.2rem}
+  .treffer .t-warn{margin-top:.35rem;color:#ffc9a3;font-size:.8rem}
+  .wait-pill.bekannt{border-color:var(--accent);color:#bcd0ff;background:#1a2744}
+  .bekannt-info{color:#a9c2ff;font-size:.78rem}
+  /* Ausweisbilder, Fragen und Wortlaut gehören mit in den Ordner – zugeklappt,
+     damit eine Akte mit vielen Auditions nicht unübersichtlich wird. */
+  .ord-bilder{display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.6rem}
+  .ord-bilder figure{margin:0;width:96px;display:flex;flex-direction:column;gap:.2rem;align-items:center}
+  .ord-bilder img{width:96px;height:78px;object-fit:cover;border:1px solid var(--line);border-radius:8px;cursor:zoom-in;background:#0f1728}
+  .ord-bilder figcaption{font-size:.62rem;color:var(--dim);text-align:center;line-height:1.3}
+  .ord-klapp{margin-top:.5rem}
+  .ord-klapp>summary{cursor:pointer;user-select:none;color:var(--dim);font-size:.8rem;list-style:none}
+  .ord-klapp>summary::-webkit-details-marker{display:none}
+  .ord-klapp>summary::before{content:"▸ ";color:var(--dim)}
+  .ord-klapp[open]>summary::before{content:"▾ "}
+  .ord-klapp>summary:hover{color:var(--ink)}
+  .ord-haken{margin:.4rem 0 0;padding-left:1.1rem;font-size:.81rem;color:var(--dim);line-height:1.6}
+  .ord-wortlaut{white-space:pre-wrap;font-size:.82rem;line-height:1.65;color:var(--ink);background:#0f1728;
+    border:1px solid var(--line);border-radius:10px;padding:.65rem .8rem;margin-top:.4rem;max-height:18rem;overflow:auto}
   .ord-prot{margin-top:.6rem;padding-top:.5rem;border-top:1px solid var(--line);font-size:.84rem}
+  /* Die Notiz, die der Prüfer im Gespräch geschrieben hat. Bewusst hervorgehoben:
+     das ist der einzige Teil der Akte, der aus seinem Kopf kommt. */
+  .ord-notiz{margin-top:.5rem;padding:.55rem .7rem;font-size:.85rem;line-height:1.6;
+    white-space:pre-wrap;background:#141d31;border-left:3px solid var(--accent);border-radius:0 10px 10px 0}
+  .ord-notiz b{display:block;font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;
+    color:var(--dim);margin-bottom:.2rem}
   /* Vermerke im Streamer-Ordner */
   .vorlagen{display:flex;flex-wrap:wrap;gap:.35rem;margin:.2rem 0 .6rem}
   .vorlagen button{padding:.32rem .65rem;font-size:.78rem;border-radius:999px;font-weight:600;
@@ -154,6 +212,7 @@
   .num.offen{border-color:#3a4a6b}
   .num.alt{border-color:#7a5a24}
   .num button{padding:.3rem .65rem;font-size:.78rem}
+  .ord-werkzeug{display:flex;gap:.5rem;margin-bottom:.8rem;flex-wrap:wrap;align-items:center}
   .artfilter{display:flex;gap:.25rem;background:#0f1728;border:1px solid var(--line);border-radius:10px;padding:.2rem}
   .artfilter button{border:0;background:transparent;padding:.35rem .7rem;font-size:.83rem;border-radius:8px;color:var(--dim)}
   .artfilter button.sel{background:var(--accent);color:#fff}
@@ -168,6 +227,10 @@
   .deck-stats span{font-size:.68rem;color:var(--dim);text-transform:uppercase;letter-spacing:.07em}
   .deck-spacer{flex:1;min-height:.5rem}
   .deck-main{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:1rem 1.1rem;min-width:0}
+  /* Ordner und Zugangsnummern brauchen die ganze Breite: sie haben keine
+     rechte Spalte. Das steht hier und nicht am Element, damit die
+     Handy-Regeln weiter unten es wieder zurueckdrehen koennen. */
+  .deck-main.breit{grid-column:2 / -1}
   .deck-head{display:flex;align-items:baseline;justify-content:space-between;gap:.7rem;margin-bottom:.8rem;flex-wrap:wrap}
   .deck-head h2{margin:0;font-size:1.15rem}
   .deck-head .muted{font-size:.8rem;color:var(--dim)}
@@ -192,6 +255,60 @@
     .deck-nav .deck-item{width:auto;flex:1;min-width:150px}
     .deck-me{border-bottom:0;padding:0;margin:0;width:100%}
     .deck-spacer{display:none}
+    /* Eine Spalte heisst: alles untereinander. Ohne das hier stellt sich der
+       Ordner in eine zweite Spalte, die es nicht gibt - dann quetscht sich
+       das Menue daneben zu einem Streifen zusammen. */
+    .deck-main.breit{grid-column:1 / -1}
+  }
+  /* Handy: Nichts darf die Seite breiter machen als das Geraet. Feste
+     Mindestbreiten (Suchfelder, Kacheln, Ordner) werden hier aufgehoben -
+     sonst zieht der Browser die ganze Seite auseinander und alles wird winzig.
+     Dazu ueberall genug Flaeche zum Antippen: Daumen statt Mauszeiger. */
+  @media(max-width:520px){
+    .kacheln{grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:.6rem}
+    .ord-grid{grid-template-columns:1fr;gap:.6rem}
+    #ordnerSuche,#nummerNotiz{min-width:0;width:100%;flex:1 1 100%}
+    /* Filter und Auffrischen in eine Zeile: das Suchfeld darüber, darunter die
+       Knöpfe nebeneinander. Sonst steht das ↻ allein in einer eigenen Zeile. */
+    .ord-werkzeug{gap:.4rem}
+    /* 50 % als Ausgangsbreite: dann passt das ↻ daneben und der Filter
+       wächst anschliessend in den Rest hinein. Mit "auto" wäre der Filter so
+       breit wie sein Inhalt und das ↻ fiele in eine eigene Zeile. */
+    .ord-werkzeug .artfilter{flex:1 1 50%;overflow-x:auto;scrollbar-width:none}
+    .ord-werkzeug .artfilter::-webkit-scrollbar{display:none}
+    .ord-werkzeug .artfilter button{white-space:nowrap;padding:.35rem .55rem}
+    .ord-werkzeug #ordnerNeu{flex:0 0 auto;min-width:48px}
+    .num .info,.deck-card .who,.obrow button,.snap-btns button{min-width:0}
+    button,.deck-item,input,select{min-height:44px}
+    /* Das Menue wandert an den unteren Rand - dorthin, wo der Daumen von
+       selbst liegt. Es bleibt immer sichtbar, egal wie weit man scrollt.
+       Zeichen oben, Kurzname darunter; wer wer ist, steht ohnehin oben im
+       Kopf. Passt nicht alles hinein, schiebt man die Leiste seitlich. */
+    .deck-nav{position:fixed;left:0;right:0;bottom:0;top:auto;z-index:60;
+      flex-direction:row;flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;
+      gap:.3rem;padding:.4rem .5rem calc(.4rem + env(safe-area-inset-bottom));
+      border:0;border-top:1px solid var(--line2);border-radius:0;
+      background:#0d1220f5;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+    .deck-nav::-webkit-scrollbar{display:none}
+    .deck-nav .deck-me,.deck-nav .nav-gruppe,.deck-nav .deck-stats{display:none}
+    .deck-nav .deck-item{flex:0 0 auto;width:auto;min-width:62px;padding:.3rem .5rem;
+      display:flex;flex-direction:column;align-items:center;justify-content:center;
+      gap:.1rem;font-size:.6rem;line-height:1.15;text-align:center;letter-spacing:0;
+      border-radius:12px;box-shadow:none}
+    .deck-nav .deck-item .ic{margin:0;font-size:1.15rem;line-height:1.1}
+    .deck-nav .deck-item .lb{display:none}
+    .deck-nav .deck-item .kz{display:block;white-space:nowrap}
+    /* Platz, damit die Leiste nichts verdeckt, was man antippen will. */
+    .deck{padding-bottom:4.6rem}
+    .block-zu{min-height:36px;min-width:36px;padding:.3rem .55rem}
+    .ord-bilder figure,.ord-bilder img{width:84px}
+    .deck-main{padding:.85rem .8rem}
+    /* Letzte Bremse: Kein Kasten darf breiter werden als das Geraet. Sonst
+       zoomt der Browser die Seite heraus und die Schrift wird unlesbar. */
+    body{overflow-x:hidden}
+    #waitingView,.deck,.deck-nav,.deck-main,.deck-side{max-width:100vw;min-width:0}
+    .deck-main *,.deck-nav *,.deck-side *{min-width:0;max-width:100%}
+    .deck-code,.ord-card .oid,.num .code{overflow-wrap:anywhere}
   }
 
   /* Lobby */
@@ -296,6 +413,82 @@
   .wlevel i{display:block;height:100%;width:0;border-radius:4px;
     background:linear-gradient(90deg,#3ec77b,#8ed7a2);transition:width .08s linear}
   .wroom-next{margin:.85rem 0 0;font-size:.82rem;color:var(--dim);line-height:1.55}
+  /* Was gleich passiert - beim Warten liest man so etwas wirklich. */
+  .ablauf{margin-top:.9rem;padding:.8rem .9rem;border:1px solid var(--line);border-radius:14px;background:var(--panel2);font-size:.85rem}
+  .ablauf b{font-size:.9rem}
+  .ablauf ol{margin:.5rem 0 .6rem;padding-left:1.2rem;line-height:1.7;color:var(--ink)}
+  .ablauf li{margin-bottom:.15rem}
+  .ablauf .muted{color:var(--dim);font-size:.8rem;line-height:1.55;display:block}
+  /* Ausweisdaten schon im Warteraum - der Pruefer hat sie dann vorliegen. */
+  .vorab{margin-top:.9rem;padding:.85rem .9rem;border:1px solid var(--line);border-radius:14px;background:var(--panel2)}
+  .vorab-kopf{font-size:.9rem;margin-bottom:.6rem}
+  .vorab-kopf .muted{font-size:.78rem;color:var(--dim)}
+  .vorab input,.vorab select{width:100%;margin-bottom:.5rem;font-size:.95rem;padding:.6rem .8rem;border-radius:10px;
+    border:1px solid var(--line);background:#0f1728;color:var(--ink)}
+  .vorab-zeile{display:flex;gap:.5rem;flex-wrap:wrap}
+  .vorab-zeile select,.vorab-zeile input{flex:1;min-width:150px}
+  .vorab-fuss{display:flex;gap:.6rem;align-items:center;justify-content:space-between;flex-wrap:wrap}
+  .vorab-fuss .muted{font-size:.78rem;color:var(--dim);flex:1;min-width:150px}
+  .vorab.fertig{border-color:var(--good);background:#132a20}
+  .vorab-erklaerung{display:flex;gap:.55rem;align-items:flex-start;font-size:.78rem;color:var(--dim);
+    line-height:1.55;margin:.2rem 0 .7rem;cursor:pointer}
+  .vorab-erklaerung input{width:auto;margin:.15rem 0 0;flex:none}
+  .vorab-erklaerung b{color:var(--ink)}
+  /* Selfie mit Ausweis - direkt aus der Kamera, damit nichts montiert wird. */
+  .selfie{margin-top:.9rem;padding:.85rem .9rem;border:1px solid var(--accent);border-radius:14px;
+    background:linear-gradient(180deg,#16233d,var(--panel2))}
+  .selfie-kopf{font-size:.95rem;display:flex;align-items:center;gap:.5rem;flex-wrap:wrap}
+  .pflicht{font-size:.66rem;text-transform:uppercase;letter-spacing:.1em;color:#bcd0ff;
+    border:1px solid var(--line2);border-radius:999px;padding:.1rem .5rem}
+  .selfie-hilfe{margin:.5rem 0 .4rem;font-size:.83rem;color:var(--dim);line-height:1.55}
+  .selfie-hilfe b{color:var(--ink)}
+  .selfie-tipps{margin:0 0 .7rem;padding-left:1.1rem;font-size:.78rem;color:var(--dim);line-height:1.65}
+  .selfie-buehne{position:relative;border-radius:12px;overflow:hidden;background:#000;aspect-ratio:4/3;max-width:420px}
+  .selfie-buehne video,.selfie-buehne img{width:100%;height:100%;object-fit:cover;display:block}
+  .selfie-buehne img{display:none}
+  .selfie-buehne.zeigt video{display:none}
+  .selfie-buehne.zeigt img{display:block}
+  .selfie-rahmen{position:absolute;inset:8% 6%;pointer-events:none;display:flex;gap:4%}
+  .selfie-rahmen span,.selfie-rahmen i{flex:1;border:2px dashed #ffffff66;border-radius:12px;
+    font-style:normal;font-size:.7rem;color:#ffffffcc;display:flex;align-items:flex-end;justify-content:center;padding-bottom:.3rem}
+  .selfie-rahmen i{flex:.8}
+  .selfie-buehne.zeigt .selfie-rahmen{display:none}
+  .selfie-count{position:absolute;inset:0;display:none;align-items:center;justify-content:center;
+    font-size:4rem;font-weight:700;color:#fff;text-shadow:0 4px 24px #000;background:#0006}
+  .selfie-count.an{display:flex}
+  .selfie-akt{display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.6rem}
+  .selfie-status{font-size:.78rem;margin-top:.4rem}
+  .selfie-status.ok{color:#5fe0a0}
+  .zusicherung{margin:.5rem 0 .2rem;padding:.5rem .65rem;border-radius:10px;font-size:.8rem;line-height:1.5;
+    border:1px solid var(--line);background:var(--panel2);color:var(--dim)}
+  .zusicherung.ja{border-color:#2f6b4a;background:#163024;color:#bfe9d2}
+  .zusicherung.nein{border-color:var(--warn);background:#2a2313;color:#f0dca8}
+  /* Der blaue Haken: Alter und Ausweis geprüft. */
+  .haken{display:inline-grid;place-items:center;width:17px;height:17px;border-radius:50%;
+    background:linear-gradient(180deg,#5b9cff,#2a6ee0);color:#fff;font-size:.66rem;font-weight:700;
+    vertical-align:middle;margin-left:.15rem;box-shadow:0 2px 6px -2px #2a6ee0cc}
+  .haken.gross{width:30px;height:30px;font-size:1rem;flex:none}
+  .haken.leer{background:#2b3651;color:var(--dim);box-shadow:none}
+  .verif{margin-top:.8rem;padding:.75rem .85rem;border:1px solid var(--line);border-radius:14px;background:var(--panel2)}
+  .verif.hat{border-color:#2a6ee0;background:linear-gradient(180deg,#16233d,var(--panel2))}
+  .verif-kopf{display:flex;gap:.65rem;align-items:center;flex-wrap:wrap}
+  .verif-kopf>div{flex:1;min-width:180px}
+  .verif-kopf b{display:block;font-size:.95rem}
+  .verif-kopf .muted{font-size:.78rem;color:var(--dim);line-height:1.5;display:block}
+  .verif-verlauf{margin-top:.6rem}
+  .verif-verlauf summary{cursor:pointer;user-select:none;color:var(--dim);font-size:.8rem}
+  .vf{background:#0f1728;border:1px solid var(--line);border-radius:10px;padding:.45rem .6rem;margin-top:.4rem;font-size:.79rem}
+  .vf-ok{color:#5fe0a0;font-weight:600}.vf-no{color:#ff9b97;font-weight:600}
+  .vf-zeit{float:right;color:var(--dim);font-size:.73rem}
+  .vf-meta{color:var(--dim);margin-top:.2rem;line-height:1.5}
+  .verif-form{margin-top:.7rem;padding-top:.7rem;border-top:1px solid var(--line)}
+  .verif-form input,.verif-form select{width:100%;margin-bottom:.45rem}
+  .vfz{display:flex;gap:.45rem;flex-wrap:wrap}
+  .vfz input,.vfz select{flex:1;min-width:150px}
+  .vf-erkl{display:flex;gap:.5rem;align-items:flex-start;font-size:.79rem;color:var(--dim);line-height:1.5;margin:.3rem 0 .6rem;cursor:pointer}
+  .vf-erkl input{width:auto;margin:.15rem 0 0;flex:none}
+  .vf-erkl b{color:var(--ink)}
+  .vf-akt{display:flex;gap:.45rem;flex-wrap:wrap}
   /* Aufnahme-Hinweis, den auch der Bewerber sieht */
   .recinfo{display:none;align-items:center;gap:.5rem;font-size:.84rem;color:#ffc9d2;
     background:#2a1420;border:1px solid #5e2033;border-radius:999px;padding:.35rem .8rem}
@@ -405,12 +598,17 @@
         <input id="ageInput" inputmode="numeric" placeholder="z. B. 22" autocomplete="off">
       </div>
       <label class="consent"><input type="checkbox" id="consent">
-        Ich willige ausdrücklich und freiwillig ein, dass die Agentur 4EVER1 meine Angaben,
-        Ausweis- und Gesichtsbilder sowie die Bild- und Tonaufzeichnung dieses Bewerbungs-
-        gesprächs (Audition) zum Zweck meiner Bewerbung als Streamer:in bei BIGO Live
-        verarbeitet, verschlüsselt speichert und zur Bearbeitung meiner Bewerbung an den
-        BIGO-Support weiterleitet. Diese Einwilligung ist freiwillig und kann jederzeit mit
-        Wirkung für die Zukunft widerrufen werden.</label>
+        Ich bestätige, dass ich <b>mindestens 18 Jahre alt</b> bin und mich mit einem
+        <b>echten, gültigen Ausweis</b> ausweise, der mir gehört – das wird im Gespräch
+        überprüft (<b>Echtheitsnachweis</b>).<br>
+        Ich werde als Streamer:in der Agentur <b>4EVER1</b> aufgefordert, meine
+        <b>Ausweisdaten</b> anzugeben, und willige ausdrücklich und freiwillig ein, dass
+        4EVER1 diese Angaben, meine Ausweis- und Gesichtsbilder sowie die Bild- und
+        Tonaufzeichnung dieser Audition <b>weiterverarbeitet</b>, verschlüsselt speichert
+        und zur Bearbeitung meiner Bewerbung an den BIGO-Support weiterleitet.<br>
+        <b>Nur ein sehr kleiner Kreis kommt an diese Daten</b> – jeder Zugriff wird mit Name,
+        Uhrzeit und Grund festgehalten. Diese Einwilligung ist freiwillig und kann jederzeit
+        mit Wirkung für die Zukunft widerrufen werden.</label>
       <div class="dslink"><a href="/datenschutz" target="_blank" rel="noopener">Datenschutzerklärung</a> · <a href="/impressum" target="_blank" rel="noopener">Impressum</a></div>
     </div>
 
@@ -488,8 +686,75 @@
         <div class="wc" id="wcNet"><span class="wi">📶</span><div><b>Verbindung</b><span id="wcNetMsg">wird geprüft …</span></div><i class="wdot"></i></div>
       </div>
 
-      <p class="wroom-next">Nutz die Zeit: Der Vorlese-Text ist schon da – lies ihn ruhig einmal in Ruhe durch.
-        Deine Ausweisbilder kannst du auch jetzt bereits hochladen, dann geht es später schneller.</p>
+      <div class="ablauf">
+        <b>So geht es gleich weiter</b>
+        <ol>
+          <li>Ein Prüfer holt dich ins Gespräch – kurzes Hallo.</li>
+          <li><b>Echtheitsnachweis:</b> Er schaut sich deinen Ausweis live an, vergleicht
+              ihn mit deinem Gesicht und prüft, ob er echt ist. Halt ihn bereit.</li>
+          <li>Du liest den Text rechts in die Kamera. <b>Das Tempo bestimmst du selbst</b> –
+              mit dem Regler „Ablese-Tempo", auch währenddessen.</li>
+          <li>Fertig. Du erfährst gleich, ob es geklappt hat.</li>
+        </ol>
+        <span class="muted">Das Gespräch wird aufgezeichnet – du hast dem zugestimmt.
+          Nutz die Wartezeit: Text durchlesen und unten die Ausweisdaten eintragen,
+          dann geht es später viel schneller.</span>
+      </div>
+
+      <!-- Ausweisdaten schon im Warteraum. Der Prüfer bekommt sie beim
+           Verbinden übertragen und hat das Formular ausgefüllt vor sich –
+           statt im Gespräch zu tippen, während der Bewerber wartet. -->
+      <div class="vorab">
+        <div class="vorab-kopf">🪪 <b>Deine Ausweisdaten</b> <span class="muted">jetzt schon eintragen – spart Zeit</span></div>
+        <input id="vaName" placeholder="Name, genau wie er im Ausweis steht" autocomplete="name">
+        <div class="vorab-zeile">
+          <select id="vaArt">
+            <option value="">Ausweisart wählen …</option>
+            <option>Personalausweis</option>
+            <option>Reisepass</option>
+            <option>Aufenthaltstitel</option>
+            <option>Führerschein</option>
+          </select>
+          <input id="vaNr" placeholder="Ausweis-Nummer" autocomplete="off">
+        </div>
+        <label class="vorab-erklaerung"><input type="checkbox" id="vaEcht">
+          Ich bin <b>mindestens 18 Jahre alt</b>. Der Ausweis, den ich zeige, ist <b>echt,
+          gültig und meiner</b> – keine Kopie, kein fremder, kein bearbeitetes Bild.
+          Mir ist bewusst, dass der Prüfer das im Video überprüft (Echtheitsnachweis) und
+          dass falsche Angaben zur sofortigen Ablehnung führen.</label>
+        <div class="vorab-fuss">
+          <span id="vaStatus" class="muted">Wird beim Gespräch automatisch übermittelt.</span>
+          <button id="vaBilder" type="button">📄 Ausweis hochladen</button>
+        </div>
+      </div>
+
+      <!-- Der wichtigste Schritt: Gesicht und Ausweis auf EINEM Bild. Direkt
+           aus der laufenden Kamera, damit es keine Montage sein kann und
+           niemand ein altes Foto hochlädt. -->
+      <div class="selfie">
+        <div class="selfie-kopf">🤳 <b>Selfie mit Ausweis</b>
+          <span class="pflicht">wichtigster Schritt</span></div>
+        <p class="selfie-hilfe">Halte deinen Ausweis <b>neben dein Gesicht</b> – beide
+          im Bild, beide scharf. Der Prüfer muss dich und den Ausweis zusammen sehen.</p>
+        <ul class="selfie-tipps">
+          <li>Ausweis auf Höhe deiner Wange, Bildseite zur Kamera</li>
+          <li>Helles Licht von vorn, keine Lampe im Rücken</li>
+          <li>Finger nicht über Foto, Namen oder Nummer</li>
+          <li>Brille kurz abnehmen, wenn sie spiegelt</li>
+        </ul>
+        <div class="selfie-buehne">
+          <video id="selfieVideo" autoplay muted playsinline></video>
+          <div class="selfie-rahmen"><span>Gesicht</span><i>Ausweis</i></div>
+          <div class="selfie-count" id="selfieCount"></div>
+          <img id="selfieVorschau" alt="">
+        </div>
+        <div class="selfie-akt">
+          <button id="selfieStart" class="primary" type="button">📸 Aufnahme starten (3 Sek.)</button>
+          <button id="selfieNochmal" type="button" style="display:none">↺ Nochmal</button>
+          <button id="selfieOk" class="good" type="button" style="display:none">✓ Passt so</button>
+        </div>
+        <div class="selfie-status muted" id="selfieStatus">Noch kein Bild aufgenommen.</div>
+      </div>
     </div>
     <div class="controls">
       <button id="micBtn">🎤 Mikro an</button>
@@ -535,6 +800,8 @@
     <!-- PRÜFER -->
     <div class="pane sel" data-pane="main" id="reviewPane" style="display:none">
       <div class="status pending" id="reviewStatus">Warte auf die Bilder des Bewerbers …</div>
+      <!-- Bleibt stehen, auch wenn die Statuszeile darüber weiterläuft. -->
+      <div id="zusicherung" class="zusicherung" style="display:none"></div>
 
       <div class="sect">🎤 Fragen (Audition) <span class="qhint">nur für dich sichtbar – nicht im Video</span></div>
       <div class="qintro">Vorab vorlesen: „Bist du damit einverstanden, dass wir deine Daten speichern und zur Bearbeitung an den <b>BIGO-Support</b> weiterleiten dürfen? Unser 4ever1-Support nimmt deine Daten selbstverständlich sehr ernst." <br><small>Antwort des Bewerbers abwarten – sie wird im Video mit aufgezeichnet.</small></div>
@@ -570,6 +837,7 @@
         <label><input type="checkbox" data-chk> Ausweis gut lesbar & unverändert</label>
         <label><input type="checkbox" data-chk> Gesicht stimmt mit dem Ausweis überein</label>
         <label><input type="checkbox" data-chk> Ausweis wirkt echt (Hologramm/kein Foto vom Foto)</label>
+        <label><input type="checkbox" data-chk> <b>Mindestens 18 Jahre</b> – Geburtsdatum im Ausweis geprüft</label>
       </div>
       <button id="approveBtn" class="good" disabled>✅ Freigeben &amp; Akte anlegen</button>
       <button id="rejectBtn" class="danger">✖ Ablehnen</button>
@@ -593,32 +861,32 @@
         <div><b id="waitWho">–</b><div class="muted" id="waitRole">Prüfer</div></div>
       </div>
 
+      <!-- Jeder Menuepunkt hat drei Teile: Zeichen, langer Name, kurzer Name.
+           Am Rechner steht der lange da. Auf dem Handy wird das Menue zu einer
+           Leiste am unteren Rand - dort passt nur der kurze. -->
       <div class="nav-gruppe">Audition</div>
-      <button class="deck-item primary" id="takeNextBtn">▶ Nächsten annehmen</button>
-      <button class="deck-item" id="newCodeBtn">➕ Zugangsnummer</button>
+      <button class="deck-item primary" id="takeNextBtn"><span class="ic">▶</span><span class="lb">Nächsten annehmen</span><span class="kz">Nächster</span></button>
+      <button class="deck-item" id="newCodeBtn"><span class="ic">➕</span><span class="lb">Zugangsnummer</span><span class="kz">Nummer</span></button>
       <div class="deck-stats">
         <div><b id="statWaiting">0</b><span>wartend</span></div>
         <div><b id="statRunning">0</b><span>laufend</span></div>
       </div>
 
       <div class="nav-gruppe">Bereiche</div>
-      <button class="deck-item" id="navSuche">🔎 Suchen</button>
-      <button class="deck-item" id="navUebersicht">🏠 Übersicht</button>
-      <button class="deck-item" id="navWarteraum">🕒 Warteraum</button>
-      <button class="deck-item" id="navOrdner">📁 Streamer-Ordner</button>
-      <button class="deck-item" id="navNummern">🎟 Zugangsnummern</button>
+      <button class="deck-item" id="navSuche"><span class="ic">🔎</span><span class="lb">Suchen</span><span class="kz">Suchen</span></button>
+      <button class="deck-item" id="navUebersicht"><span class="ic">🏠</span><span class="lb">Übersicht</span><span class="kz">Übersicht</span></button>
+      <button class="deck-item" id="navWarteraum"><span class="ic">🕒</span><span class="lb">Warteraum</span><span class="kz">Warteraum</span></button>
+      <button class="deck-item" id="navOrdner"><span class="ic">📁</span><span class="lb">Streamer-Ordner</span><span class="kz">Ordner</span></button>
+      <button class="deck-item" id="navNummern"><span class="ic">🎟</span><span class="lb">Zugangsnummern</span><span class="kz">Nummern</span></button>
 
-      <div class="nav-gruppe" id="gruppeVerwaltung" style="display:none">Verwaltung</div>
-      <a class="deck-item" id="navVerwaltung" href="/verwaltung" target="_blank" rel="noopener"
-         style="display:none;text-decoration:none;text-align:left">⚙️ Einstellungen &amp; Konten</a>
-      <a class="deck-item" id="navDiagnose" href="#" target="_blank" rel="noopener"
-         style="display:none;text-decoration:none;text-align:left">🩺 Diagnose &amp; Löschen</a>
-
-      <button class="deck-item" id="blockeZurueck" style="display:none">↩︎ Ausgeblendetes zeigen</button>
+      <!-- Bewusst kein Verwaltungs-Menü: Adminaufgaben, Diagnose und Löschen
+           liegen auf einer eigenen Adresse und werden hier nirgends verlinkt
+           oder erwähnt – auch nicht für Admins. -->
+      <button class="deck-item" id="blockeZurueck" style="display:none"><span class="ic">↩︎</span><span class="lb">Ausgeblendetes zeigen</span><span class="kz">Zeigen</span></button>
       <div class="deck-spacer"></div>
       <div class="nav-gruppe">Konto</div>
-      <button class="deck-item" id="setupPasskeyBtn" type="button" style="display:none">🔐 Face ID einrichten</button>
-      <button class="deck-item danger" id="waitLogout">Abmelden</button>
+      <button class="deck-item" id="setupPasskeyBtn" type="button" style="display:none"><span class="ic">🔐</span><span class="lb">Face ID einrichten</span><span class="kz">Face ID</span></button>
+      <button class="deck-item danger" id="waitLogout"><span class="ic">🚪</span><span class="lb">Abmelden</span><span class="kz">Abmelden</span></button>
     </aside>
 
     <!-- MITTE: Übersicht mit Kacheln -->
@@ -660,17 +928,18 @@
     </aside>
 
     <!-- MITTE (alternativ): Streamer-Ordner -->
-    <main class="deck-main" id="paneOrdner" style="display:none;grid-column:2 / -1">
+    <main class="deck-main breit" id="paneOrdner" style="display:none">
       <div class="deck-head">
         <h2>📁 Streamer-Ordner</h2>
         <span class="muted">Jede abgeschlossene Audition landet hier automatisch.</span>
       </div>
-      <div style="display:flex;gap:.5rem;margin-bottom:.8rem;flex-wrap:wrap;align-items:center">
-        <input id="ordnerSuche" placeholder="🔎 BIGO-ID oder Name suchen …" style="flex:1;min-width:180px">
+      <div class="ord-werkzeug">
+        <input id="ordnerSuche" placeholder="🔎 Suchen: Name, BIGO-ID, Vermerke, wer was geschrieben hat, Prüfer, Ausweis-Nr. …" style="flex:1;min-width:180px">
         <div class="artfilter">
           <button data-art="alle" class="sel">Alle</button>
           <button data-art="familie">👨‍👩‍👧 Familie</button>
           <button data-art="streamer">Streamer</button>
+          <button data-art="unverifiziert" title="Noch keine Altersverifikation">ohne ✓</button>
         </div>
         <button id="ordnerNeu">↻</button>
       </div>
@@ -678,7 +947,7 @@
     </main>
 
     <!-- MITTE (alternativ): Suche über alles -->
-    <main class="deck-main" id="paneSuche" style="display:none;grid-column:2 / -1">
+    <main class="deck-main breit" id="paneSuche" style="display:none">
       <div class="deck-head">
         <h2>🔎 Suchen</h2>
         <span class="muted">Über Ordner, Vermerke, Auditions und Zugangsnummern.</span>
@@ -688,7 +957,7 @@
     </main>
 
     <!-- MITTE (alternativ): Zugangsnummern -->
-    <main class="deck-main" id="paneNummern" style="display:none;grid-column:2 / -1">
+    <main class="deck-main breit" id="paneNummern" style="display:none">
       <div class="deck-head">
         <h2>🎟 Zugangsnummern</h2>
         <span class="muted">Wer hat eine bekommen und noch nicht eingelöst?</span>

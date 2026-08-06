@@ -244,6 +244,11 @@ function saveCase(data) {
     rejectReason: String(data.rejectReason || '').slice(0, 200),
     agentName: String(data.agentName || '').slice(0, 60),
     checklist: Array.isArray(data.checklist) ? data.checklist.slice(0, 20) : [],
+    // Wortlaut, der an diesem Tag galt. Der Vorlese-Text ist die Einwilligung,
+    // die der Bewerber in die Kamera gesprochen hat – ohne ihn liesse sich
+    // später nicht mehr belegen, worin genau eingewilligt wurde.
+    skript: String(data.skript || '').slice(0, 20000),
+    einleitung: String(data.einleitung || '').slice(0, 20000),
     createdAt: new Date().toISOString(), docs,
     // Übergabe an mcp.4ever1.tv: '' | laeuft | uebergeben | fehlgeschlagen
     mcpStatus: '', mcpText: '', mcpAt: '',
@@ -302,9 +307,144 @@ function listStreamers() {
   streamers.forEach((s) => { if (!s.art) s.art = 'streamer'; if (!Array.isArray(s.eintraege)) s.eintraege = []; });
   return streamers.slice().sort((a, b) => String(b.letzteAktivitaet || b.angelegtAm).localeCompare(String(a.letzteAktivitaet || a.angelegtAm)));
 }
+
+/**
+ * Dieselbe Liste, aber ohne Inhalte: Wer nicht Admin ist, sieht zunächst nur,
+ * DASS es eine Akte gibt – nicht, was drinsteht. Vermerke, Auditionen,
+ * Ausweisnummern und Protokolle bleiben draussen, bis ein Grund genannt ist.
+ * Das ist keine Anzeige-Entscheidung im Browser, sondern der Server schickt
+ * die Inhalte gar nicht erst mit.
+ */
+function listStreamersKurz() {
+  return listStreamers().map((s) => ({
+    id: s.id, bigoId: s.bigoId, name: s.name, alter: s.alter,
+    status: s.status, art: s.art || 'streamer', herkunft: s.herkunft || '',
+    angelegtAm: s.angelegtAm, letzteAktivitaet: s.letzteAktivitaet,
+    anzahlAuditions: (s.auditions || []).length,
+    anzahlVermerke: (s.eintraege || []).length,
+    // Der blaue Haken ist kein Geheimnis - er sagt nur, DASS geprüft wurde.
+    verifiziert: s.verifiziert || null,
+    verschlossen: true,
+  }));
+}
+
+/**
+ * Akteneinsicht festhalten. Wer eine Akte öffnet, hinterlässt eine Spur –
+ * mit Grund. Das steht anschliessend in der Akte selbst, für alle sichtbar.
+ * Nicht heimlich: Wer nachsieht, wird gesehen.
+ */
+function protokolliereZugriff(id, { wer, rolle, grund, ip }) {
+  const s = getStreamer(id); if (!s) return null;
+  if (!Array.isArray(s.zugriffe)) s.zugriffe = [];
+  const rec = {
+    id: crypto.randomUUID(),
+    wer: String(wer || 'unbekannt').slice(0, 60),
+    rolle: rolle === 'admin' ? 'admin' : 'pruefer',
+    grund: String(grund || '').slice(0, 300),
+    ip: String(ip || '').slice(0, 60),
+    am: new Date().toISOString(),
+  };
+  s.zugriffe.unshift(rec);
+  if (s.zugriffe.length > 300) s.zugriffe.length = 300;
+  save('streamers.json', streamers);
+  return rec;
+}
 function getStreamer(id) {
   return streamers.find((s) => s.id === id || ordnerSchluessel(s.bigoId) === ordnerSchluessel(id)) || null;
 }
+
+/**
+ * Kennen wir die Person schon? Sucht in den Ordnern und – falls dort noch
+ * nichts liegt – auch in den Akten. Drei Wege führen zu einem Treffer:
+ *   1. dieselbe BIGO-ID          (sicher, danach wird zugeordnet)
+ *   2. dieselbe Ausweisnummer    (dieselbe Person mit neuer BIGO-ID)
+ *   3. derselbe Name + Alter     (schwacher Hinweis, nur zum Nachschauen)
+ * Zurück kommt, was der Prüfer wissen muss – nicht die ganze Akte.
+ */
+function suchePerson({ bigoId, docNumber, name, age }) {
+  const norm = (x) => String(x || '').trim().toLowerCase();
+  const nurZiffern = (x) => String(x || '').replace(/[^a-z0-9]/gi, '').toLowerCase();
+  const bId = norm(bigoId), dNr = nurZiffern(docNumber), nm = norm(name), alt = norm(age);
+  if (!bId && !dNr && !nm) return null;
+
+  const treffer = (ordner, grund, sicher) => ({
+    grund, sicher,
+    ordnerId: ordner.id, bigoId: ordner.bigoId, name: ordner.name || '', alter: ordner.alter || '',
+    status: ordner.status || 'neu', art: ordner.art || 'streamer',
+    auditionen: (ordner.auditions || []).length,
+    letzteAudition: (ordner.auditions || []).map((a) => a.erstelltAm).sort().pop() || '',
+    letzteAktivitaet: ordner.letzteAktivitaet || ordner.angelegtAm || '',
+    vermerke: (ordner.eintraege || []).length,
+    notiz: ordner.notiz || '',
+  });
+
+  if (bId) {
+    const o = streamers.find((s) => ordnerSchluessel(s.bigoId) === bId);
+    if (o) return treffer(o, 'bigo', true);
+  }
+  if (dNr) {
+    // Die Ausweisnummer steht in den Akten, nicht im Ordner – über sie führt
+    // der Weg zur BIGO-ID und damit zum Ordner.
+    const f = cases.find((c) => nurZiffern(c.docNumber) && nurZiffern(c.docNumber) === dNr);
+    if (f) {
+      const o = streamers.find((s) => ordnerSchluessel(s.bigoId) === norm(f.bigoName));
+      if (o) return { ...treffer(o, 'ausweis', true), andereBigoId: norm(f.bigoName) !== bId ? f.bigoName : '' };
+    }
+  }
+  if (nm) {
+    const f = cases.find((c) => norm(c.verifiedName) === nm && (!alt || norm(c.age) === alt));
+    if (f) {
+      const o = streamers.find((s) => ordnerSchluessel(s.bigoId) === norm(f.bigoName));
+      if (o) return treffer(o, 'name', false);
+    }
+  }
+  return null;
+}
+/**
+ * Ordner anlegen, ohne dass eine Audition stattgefunden hat.
+ *
+ * Wer schon im PK-Board mitläuft, soll auch hier eine Akte haben – sonst
+ * fangen wir bei jedem bestehenden Streamer bei null an. Der Ordner ist von
+ * Anfang an da, Vermerke lassen sich pflegen, und wenn später doch eine
+ * Audition kommt, hängt sie sich einfach an.
+ *
+ * Gibt es den Ordner schon, wird NICHTS überschrieben – nur ergänzt, was
+ * bisher leer war. Das Skript darf also jederzeit erneut laufen.
+ */
+function ordnerAnlegen({ bigoId, name, alter, art, notiz, herkunft, status }) {
+  const id = String(bigoId || '').trim();
+  const schluessel = ordnerSchluessel(id);
+  if (!schluessel) return { angelegt: false, grund: 'keine-bigo-id' };
+  const jetzt = new Date().toISOString();
+
+  const vorhanden = streamers.find((s) => ordnerSchluessel(s.bigoId) === schluessel);
+  if (vorhanden) {
+    // Nur Lücken füllen. Was das Team hier gepflegt hat, bleibt unangetastet.
+    let geaendert = false;
+    if (!vorhanden.name && name) { vorhanden.name = String(name).slice(0, 120); geaendert = true; }
+    if (!vorhanden.alter && alter) { vorhanden.alter = String(alter).slice(0, 10); geaendert = true; }
+    if (geaendert) save('streamers.json', streamers);
+    return { angelegt: false, ergaenzt: geaendert, ordner: vorhanden };
+  }
+
+  const ordner = {
+    id: crypto.randomUUID(), bigoId: id,
+    name: String(name || '').slice(0, 120),
+    alter: String(alter || '').slice(0, 10),
+    status: ['neu', 'aktiv', 'pausiert', 'abgelehnt', 'raus'].includes(status) ? status : 'aktiv',
+    notiz: String(notiz || '').slice(0, 500),
+    art: art === 'familie' ? 'familie' : 'streamer',
+    // Woher kommt dieser Ordner? Ein übernommener sieht anders aus als einer,
+    // der aus einer Audition entstanden ist – das soll man sehen.
+    herkunft: String(herkunft || 'uebernommen').slice(0, 40),
+    angelegtAm: jetzt, letzteAktivitaet: jetzt,
+    auditions: [], eintraege: [],
+  };
+  streamers.push(ordner);
+  save('streamers.json', streamers);
+  return { angelegt: true, ordner };
+}
+
 /**
  * Eine fertige Audition in den Ordner des Streamers legen. Gibt es noch keinen
  * Ordner, wird er angelegt. Kommt dieselbe Audition ein zweites Mal (etwa beim
@@ -346,6 +486,18 @@ function ablegen(paket) {
     ausweisnummer: String(a.ausweisnummer || '').slice(0, 60),
     notiz: String(a.notiz || '').slice(0, 500),
     erstelltAm: String(a.erstelltAm || jetzt),
+    // Was der Prüfer abgehakt hat und welcher Wortlaut galt – beides gehört
+    // dauerhaft in den Ordner, nicht nur in die Akte auf der anderen Seite.
+    // Die Fragen kommen als {label, checked} - hier wird daraus lesbarer Text,
+    // damit im Ordner steht, was tatsaechlich abgehakt wurde.
+    checkliste: Array.isArray(a.checkliste) ? a.checkliste.slice(0, 20).map((x) => {
+      if (x && typeof x === 'object') return ((x.checked ? '\u2611 ' : '\u2610 ') + String(x.label || '')).slice(0, 300);
+      return String(x).slice(0, 300);
+    }) : [],
+    texte: {
+      vorlese: String((paket.texte && paket.texte.vorlese) || '').slice(0, 20000),
+      begruessung: String((paket.texte && paket.texte.begruessung) || '').slice(0, 20000),
+    },
     aufnahme: paket.aufnahme || null,
     protokoll: Array.isArray(paket.protokoll) ? paket.protokoll.slice(0, 200) : [],
     dateien: Array.isArray(paket.dateien) ? paket.dateien.slice(0, 20).map((d) => ({
@@ -364,6 +516,50 @@ function ablegen(paket) {
   save('streamers.json', streamers);
   return ordner;
 }
+/**
+ * Altersverifikation eintragen – ohne Audition.
+ *
+ * Für alle, die längst dabei sind: kein Gespräch, kein Teleprompter. Der
+ * Prüfer sieht den Ausweis (live oder im Video), vergleicht ihn mit dem
+ * Gesicht, hakt ab – fertig. Das Ergebnis bleibt dauerhaft in der Akte, mit
+ * Datum, Prüfer und Grundlage. Wer bestanden hat, trägt den blauen Haken.
+ *
+ * Eine erneute Verifikation überschreibt die alte nicht: beide bleiben stehen,
+ * damit man später nachvollziehen kann, was wann geprüft wurde.
+ */
+function verifikationEintragen(id, { geprueftVon, nameLautAusweis, ausweisart, ausweisnummer,
+                                     geburtsdatum, ergebnis, notiz, grundlage }) {
+  const s = getStreamer(id); if (!s) return null;
+  if (!Array.isArray(s.verifikationen)) s.verifikationen = [];
+  const jetzt = new Date().toISOString();
+  const rec = {
+    id: crypto.randomUUID(),
+    ergebnis: ergebnis === 'bestanden' ? 'bestanden' : 'abgelehnt',
+    geprueftVon: String(geprueftVon || 'Unbekannt').slice(0, 60),
+    nameLautAusweis: String(nameLautAusweis || '').slice(0, 120),
+    ausweisart: String(ausweisart || '').slice(0, 40),
+    ausweisnummer: String(ausweisnummer || '').slice(0, 60),
+    geburtsdatum: String(geburtsdatum || '').slice(0, 20),
+    // Woran wurde geprüft: im Videogespräch, im Original vor Ort, aus der Akte
+    grundlage: String(grundlage || '').slice(0, 80),
+    notiz: String(notiz || '').slice(0, 500),
+    am: jetzt,
+  };
+  s.verifikationen.unshift(rec);
+  if (s.verifikationen.length > 50) s.verifikationen.length = 50;
+  // Der blaue Haken hängt an der jüngsten bestandenen Prüfung.
+  if (rec.ergebnis === 'bestanden') {
+    s.verifiziert = { am: jetzt, von: rec.geprueftVon, grundlage: rec.grundlage };
+    if (!s.name && rec.nameLautAusweis) s.name = rec.nameLautAusweis;
+  } else {
+    // Abgelehnt hebt einen früheren Haken auf – sonst stimmt die Anzeige nicht.
+    s.verifiziert = null;
+  }
+  s.letzteAktivitaet = jetzt;
+  save('streamers.json', streamers);
+  return rec;
+}
+
 // ---- Vermerke im Streamer-Ordner ------------------------------------------
 // Alles, was im Laufe der Zeit dazukommt: Anrufe, Absprachen, Auffälligkeiten.
 function streamerEintraege(s) { if (!Array.isArray(s.eintraege)) s.eintraege = []; return s.eintraege; }
@@ -624,6 +820,7 @@ module.exports = {
   setAgentPassword, changeOwnPassword, lockAgent, unlockAgent, deleteAgent, agentCount,
   addPasskey, getAgentByPasskeyId, setPasskeyCounter, agentPasskeys,
   createCode, getCode, isCodeUsable, consumeCode, revokeCode, listCodes,
+  suchePerson, ordnerAnlegen, listStreamersKurz, protokolliereZugriff, verifikationEintragen,
   saveCase, listCases, getCase, deleteCase, readDoc, purgeOlderThan,
   saveRecording, listRecordings, getRecording, readRecording, reviewRecording, deleteRecording,
   setCaseMcp, getRecordingByCode,

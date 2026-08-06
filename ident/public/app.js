@@ -33,6 +33,19 @@
   function sysMsg(text) { const d = document.createElement('div'); d.className = 'msg sys'; d.textContent = text; chatLog.appendChild(d); chatLog.scrollTop = chatLog.scrollHeight; }
   function esc(s) { return String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
   const pad = (n) => String(n).padStart(2, '0');
+  /**
+   * Beschriftung eines Menüknopfs ändern, ohne ihn zu zerlegen.
+   * Jeder Knopf im Menü besteht aus drei Teilen: Zeichen, langer Name, kurzer
+   * Name. Am Rechner steht der lange da, auf dem Handy in der unteren Leiste
+   * der kurze. Wer einfach textContent setzt, wirft alle drei weg – dann ist
+   * das Zeichen fort und die Leiste sieht kaputt aus.
+   */
+  function setzeBeschriftung(el, lang, kurz) {
+    if (!el) return;
+    const l = el.querySelector('.lb'); const k = el.querySelector('.kz');
+    if (l) l.textContent = lang; else el.textContent = lang;
+    if (k) k.textContent = kurz || lang;
+  }
 
   // ---- API ----
   async function api(method, path, body) {
@@ -43,7 +56,25 @@
     try { res = await fetch(path, { method, headers, body: body ? JSON.stringify(body) : undefined }); }
     catch { return { status: 0, body: {} }; }
     let json = {}; try { json = await res.json(); } catch {}
+    if (res.status === 401 && state.token) sitzungAbgelaufen();
     return { status: res.status, body: json };
+  }
+
+  // Der Anmelde-Nachweis liegt im Arbeitsspeicher des Servers. Startet der
+  // Server neu – oder zeigt die Adresse auf einen anderen Server, wie beim
+  // Umzug –, gilt er nicht mehr. Vorher zeigte der Bereich dann stumm leere
+  // Listen und nichts liess sich mehr anlegen. Jetzt landet man sauber wieder
+  // beim Login und weiss auch, warum.
+  function sitzungAbgelaufen() {
+    if (!state.token) return;
+    state.token = ''; state.name = ''; state.isAdmin = false;
+    clearInterval(state.waitingTimer); state.waitingTimer = 0;
+    if ($('waitingView')) $('waitingView').style.display = 'none';
+    if ($('lobby')) $('lobby').style.display = '';
+    if ($('passInput')) $('passInput').value = '';
+    if ($('totpInput')) $('totpInput').value = '';
+    if ($('lobbyErr')) $('lobbyErr').textContent = 'Die Anmeldung gilt nicht mehr – bitte neu anmelden.';
+    toast('Anmeldung abgelaufen. Bitte neu anmelden.');
   }
   async function loadIce() { try { const r = await fetch('ice', { cache: 'no-store' }); return (await r.json()).iceServers; } catch { return FALLBACK_ICE; } }
 
@@ -71,8 +102,11 @@
     const guest = m !== 'host';
     $('applicantFields').style.display = guest ? '' : 'none';
     $('staffFields').style.display = guest ? 'none' : '';
-    $('lobbyTitle').textContent = guest ? 'Audition starten' : 'Mitarbeiter-Anmeldung';
-    $('lobbySub').textContent = guest ? 'Gib deine Zugangsnummer ein, die du erhalten hast.' : 'Nur für Prüfer und Admins.';
+    // Der Team-Login bleibt bewusst wortkarg. Wer hierher gehoert, weiss, was
+    // das ist. Wer nicht, soll aus der Seite nichts ablesen koennen.
+    $('lobbyTitle').textContent = guest ? 'Audition starten' : 'Anmeldung';
+    $('lobbySub').textContent = guest ? 'Gib deine Zugangsnummer ein, die du erhalten hast.' : '';
+    $('lobbySub').style.display = guest ? '' : 'none';
     $('enterBtn').textContent = guest ? 'Audition starten' : 'Anmelden';
     $('staffToggle').textContent = guest ? 'Mitarbeiter-Login →' : '← Zurück';
   }
@@ -267,19 +301,8 @@
     $('waitRole').textContent = state.isAdmin ? 'Admin' : 'Prüfer';
     $('waitAvatar').textContent = (state.name || 'P').charAt(0).toUpperCase();
     $('newCodeResult').textContent = '';
-    if ($('navVerwaltung')) $('navVerwaltung').style.display = state.isAdmin ? '' : 'none';
-    if ($('gruppeVerwaltung')) $('gruppeVerwaltung').style.display = state.isAdmin ? '' : 'none';
-    if ($('navDiagnose') && state.isAdmin) {
-      // acp.<domain> aus der eigenen Adresse ableiten. Bei einer IP-Adresse
-      // oder localhost gibt es keine Unteradressen – dann bleibt der Punkt weg.
-      const wirt = location.hostname.toLowerCase();
-      const echteDomain = wirt.includes('.') && !/^(\d+\.){3}\d+$/.test(wirt);
-      if (echteDomain) {
-        const basis = wirt.replace(/^(mcp|pruefer|admin|ident|acp)\./, '');
-        $('navDiagnose').href = location.protocol + '//acp.' + basis + (location.port ? ':' + location.port : '');
-        $('navDiagnose').style.display = '';
-      }
-    }
+    // Der Team-Bereich verlinkt bewusst nichts Administratives – weder für
+    // Prüfer noch für Admins. Wer dorthin muss, kennt die Adresse.
     // Ordner im Voraus holen, damit die Kacheln gleich Zahlen zeigen.
     ladeOrdner(false, true);
     ladeNummern().then(() => { if (state.bereich === 'uebersicht') zeichneKacheln(); }).catch(() => {});
@@ -304,7 +327,7 @@
     if (state.bereich === 'ordner') ladeOrdner();
     if (state.bereich === 'uebersicht') zeichneKacheln();
     if (state.bereich === 'nummern') ladeNummern();
-    if (state.bereich === 'suche') { setTimeout(() => $('sucheFeld') && $('sucheFeld').focus(), 60); suchen(); }
+    if (state.bereich === 'suche') { setTimeout(() => $('sucheFeld') && $('sucheFeld').focus(), 60); sucheVorbereiten(); }
   }
   if ($('navNummern')) $('navNummern').addEventListener('click', () => zeigeBereich('nummern'));
   if ($('navSuche')) $('navSuche').addEventListener('click', () => zeigeBereich('suche'));
@@ -364,10 +387,8 @@
       'ausgegeben, noch nicht benutzt', () => zeigeBereich('nummern')));
     host.appendChild(kachel('➕', null, 'Zugangsnummer',
       'für den nächsten Bewerber', () => { zeigeBereich('warteraum'); $('newCodeBtn').click(); }));
-    if (state.isAdmin) {
-      host.appendChild(kachel('⚙️', null, 'Verwaltung',
-        'Konten, Texte, Sicherheit', () => window.open('/verwaltung', '_blank', 'noopener')));
-    }
+    // Keine Kachel für Adminaufgaben – die liegen auf einer eigenen Adresse,
+    // und der Team-Bereich verrät sie nicht. Auch Admins nicht.
   }
 
   // ---- Blöcke rechts wegklicken und zurückholen ----------------------------
@@ -393,7 +414,7 @@
     const zurueck = $('blockeZurueck');
     if (zurueck) {
       zurueck.style.display = zu.length ? '' : 'none';
-      zurueck.textContent = '↩︎ Ausgeblendetes zeigen (' + zu.length + ')';
+      setzeBeschriftung(zurueck, 'Ausgeblendetes zeigen (' + zu.length + ')', 'Zeigen (' + zu.length + ')');
     }
   }
   document.querySelectorAll('.block-zu').forEach((k) => {
@@ -419,11 +440,33 @@
     return (von ? '\u2026 ' : '') + esc(t.slice(von, i)) + '<mark>' + esc(t.slice(i, i + q.length)) + '</mark>'
       + esc(t.slice(i + q.length, bis)) + (bis < t.length ? ' \u2026' : '');
   }
+  /**
+   * Vor dem Suchen muss das Durchsuchte auch da sein.
+   *
+   * Die Suche arbeitet auf dem, was der Browser schon geholt hat – Ordner und
+   * Zugangsnummern. Wer „Suchen" direkt aufruft, ohne vorher in den Ordnern
+   * oder Nummern gewesen zu sein, hatte beides leer. Die Suche meldete dann
+   * seelenruhig „Nichts gefunden zu …", und man glaubte, die Person sei nicht
+   * bei uns. Genau falsch herum: erst holen, dann suchen.
+   */
+  async function sucheVorbereiten() {
+    // Immer frisch holen, nicht nur wenn noch gar nichts da ist. Ein
+    // Zwischenstand von vor zehn Minuten sieht genauso aus wie „gibt es nicht",
+    // und man merkt den Unterschied nicht.
+    state.sucheLaedt = true;
+    suchen();
+    await Promise.all([ladeOrdner(false, true), ladeNummern(true)]);
+    state.sucheLaedt = false;
+    suchen();
+  }
+
   function suchen() {
     const host = $('sucheInhalt'); if (!host) return;
     const q = ($('sucheFeld').value || '').trim().toLowerCase();
     host.innerHTML = '';
     if (q.length < 2) { host.innerHTML = '<div class="deck-empty">Mindestens zwei Zeichen eingeben.</div>'; return; }
+    // Solange noch geholt wird, lieber nichts behaupten.
+    if (state.sucheLaedt) { host.innerHTML = '<div class="deck-empty">Wird geladen …</div>'; return; }
     const treffer = [];
     (state.ordner || []).forEach((s) => {
       const wo = [];
@@ -467,10 +510,12 @@
   // ---- Zugangsnummern: welche sind noch offen? -----------------------------
   // Eine Nummer wird erzeugt und weitergegeben - danach war bisher nicht mehr
   // zu sehen, welche noch aussteht. Genau das zeigt dieser Bereich.
-  async function ladeNummern() {
+  // still = nur holen, nicht zeichnen. Wird von der Suche benutzt, die die
+  // Nummern braucht, ohne dass ihr Bereich gerade offen ist.
+  async function ladeNummern(still) {
     const r = await api('GET', '/api/codes');
     state.nummern = (r.body && r.body.codes) || [];
-    zeichneNummern();
+    if (!still) zeichneNummern();
   }
   function alterText(iso) {
     const min = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
@@ -529,7 +574,13 @@
     const b = $('nummerNeu'); b.disabled = true;
     const r = await api('POST', '/api/code', { note: $('nummerNotiz').value.trim() });
     b.disabled = false;
-    if (r.status !== 200) { toast('Nummer konnte nicht erzeugt werden.'); return; }
+    if (r.status !== 200) {
+      // Sagen, woran es liegt – „ging nicht" hilft niemandem weiter.
+      if (r.status === 401) return;                       // Login-Hinweis kommt schon
+      toast(r.status === 0 ? 'Keine Verbindung zum Server.'
+        : 'Nummer konnte nicht erzeugt werden (Fehler ' + r.status + ').');
+      return;
+    }
     $('nummerNotiz').value = '';
     toast('Neue Nummer: ' + r.body.code);
     ladeNummern();
@@ -621,16 +672,237 @@
     zeichneOrdner();
     if (state.bereich === 'uebersicht') zeichneKacheln();
   }
+  // ---- Suche quer durch die ganze Akte -------------------------------------
+  // Nicht nur BIGO-ID und Name: auch Vermerke, wer sie geschrieben hat,
+  // Prüfer, Ausweisnummern, Zugangsnummern, Ablehnungsgründe und das
+  // Protokoll. Und die Trefferstelle wird gezeigt - sonst sucht man zwar
+  // erfolgreich, weiss aber nicht, warum dieser Ordner dabei ist.
+  const STATUSWORT = { neu: 'neu', aktiv: 'aktiv', pausiert: 'pausiert', abgelehnt: 'abgelehnt', raus: 'nicht mehr dabei' };
+  const ERGWORT = { approved: 'freigegeben', rejected: 'abgelehnt', open: 'offen' };
+  function trefferIn(s, q) {
+    const gefunden = [];
+    const pruef = (wo, text) => {
+      if (!text) return;
+      const t = String(text);
+      if (t.toLowerCase().includes(q)) gefunden.push({ wo, text: t });
+    };
+    pruef('BIGO-ID', s.bigoId);
+    pruef('Name', s.name);
+    pruef('Notiz', s.notiz);
+    pruef('Status', STATUSWORT[s.status] || s.status);
+    if ((s.art || 'streamer') === 'familie') pruef('Art', 'Familie');
+    if (s.herkunft === 'pkboard') pruef('Herkunft', 'aus dem PK-Board übernommen');
+    pruef('Verifikation', s.verifiziert
+      ? 'verifiziert – Alter und Ausweis geprüft von ' + s.verifiziert.von
+      : 'nicht verifiziert – Alter noch nicht geprüft');
+    (s.verifikationen || []).forEach((v) => {
+      pruef('Verifikation von', v.geprueftVon);
+      pruef('Verifikation Ausweis', v.ausweisnummer);
+      pruef('Verifikation Notiz', v.notiz);
+    });
+    (s.eintraege || []).forEach((e) => {
+      pruef('Vermerk', e.text);
+      pruef('Vermerk von', e.author);
+    });
+    (s.auditions || []).forEach((a) => {
+      pruef('Prüfer', a.pruefer);
+      pruef('Zugangsnummer', a.zugangsnummer);
+      pruef('Ausweis-Nr.', a.ausweisnummer);
+      pruef('Ausweisart', a.ausweisart);
+      pruef('Notiz zur Audition', a.notiz);
+      pruef('Ablehnungsgrund', a.ablehnungsgrund);
+      pruef('Ergebnis', ERGWORT[a.ergebnis] || a.ergebnis);
+      if (a.aufnahme) pruef('Aufnahme', a.aufnahme.begruendung);
+      (a.checkliste || []).forEach((c) => pruef('Abgehakt', c));
+      (a.protokoll || []).forEach((e) => { pruef('Protokoll', e.text); pruef('Protokoll von', e.autor); });
+    });
+    return gefunden;
+  }
+  // Fundstelle mit hervorgehobenem Suchwort, gekürzt auf das Wesentliche.
+  function markiere(text, q) {
+    const t = String(text);
+    const i = t.toLowerCase().indexOf(q);
+    if (i < 0) return esc(t.slice(0, 90));
+    const von = Math.max(0, i - 28);
+    const bis = Math.min(t.length, i + q.length + 46);
+    return (von > 0 ? '…' : '') + esc(t.slice(von, i))
+      + '<mark>' + esc(t.slice(i, i + q.length)) + '</mark>'
+      + esc(t.slice(i + q.length, bis)) + (bis < t.length ? '…' : '');
+  }
+  function trefferZeilen(treffer) {
+    if (!treffer || !treffer.length) return '';
+    const q = ($('ordnerSuche').value || '').trim().toLowerCase();
+    // BIGO-ID und Name stehen schon oben auf der Karte - die muss man nicht
+    // nochmal als Fundstelle zeigen.
+    const zeigen = treffer.filter((t) => !['BIGO-ID', 'Name'].includes(t.wo));
+    if (!zeigen.length) return '';
+    const mehr = zeigen.length > 2 ? '<div class="tr-mehr">+ ' + (zeigen.length - 2) + ' weitere Fundstelle'
+      + (zeigen.length - 2 === 1 ? '' : 'n') + '</div>' : '';
+    return '<div class="tr-fund">' + zeigen.slice(0, 2).map((t) =>
+      '<div class="tr-zeile"><b>' + esc(t.wo) + ':</b> ' + markiere(t.text, q) + '</div>').join('') + mehr + '</div>';
+  }
+
+  // ---- Akteneinsicht: erst der Grund, dann der Inhalt ----------------------
+  // Prüfer müssen sagen, warum sie eine Akte öffnen. Der Grund steht danach in
+  // der Akte, für alle sichtbar. Admins kommen ohne Angabe hinein - ihr
+  // Zugriff wird trotzdem festgehalten. Kein heimliches Nachschauen.
+  async function akteOeffnen(id) {
+    if (state.isAdmin) return holeAkte(id, '');
+    const grund = await grundFragen();
+    if (grund === null) return;               // abgebrochen
+    return holeAkte(id, grund);
+  }
+  async function holeAkte(id, grund) {
+    const r = await api('POST', '/api/streamer-oeffnen', { id, grund });
+    if (r.status === 400) { toast('Bitte einen Grund angeben (mindestens 5 Zeichen).'); return; }
+    if (r.status !== 200 || !r.body.ordner) { toast('Akte konnte nicht geöffnet werden.'); return; }
+    // Den vollen Stand in die Liste zurückschreiben, damit die Ansicht ihn hat.
+    const i = (state.ordner || []).findIndex((x) => x.id === id);
+    if (i >= 0) state.ordner[i] = r.body.ordner; else (state.ordner = state.ordner || []).push(r.body.ordner);
+    state.offenerOrdner = id;
+    zeichneOrdner();
+  }
+  function grundFragen() {
+    return new Promise((fertig) => {
+      const host = $('ordnerInhalt'); if (!host) { fertig(null); return; }
+      host.innerHTML = '';
+      const k = document.createElement('div');
+      k.className = 'grundbox';
+      k.innerHTML = '<h3>🔒 Warum möchtest du diese Akte öffnen?</h3>'
+        + '<p>In der Akte stehen Ausweisdaten, Aufnahmen und Vermerke. Einsicht wird '
+        + 'protokolliert – dein Name, die Uhrzeit und dieser Grund stehen danach in der Akte.</p>'
+        + '<div class="grund-schnell">'
+        + ['Rückfrage vom Streamer', 'Vorbereitung Audition', 'Vermerk eintragen', 'Beschwerde prüfen', 'Datenabgleich']
+          .map((g) => '<button type="button" data-g="' + esc(g) + '">' + esc(g) + '</button>').join('')
+        + '</div>'
+        + '<input id="grundText" placeholder="oder eigenen Grund eintippen …" maxlength="300">'
+        + '<div class="grund-akt"><button id="grundOk" class="primary">Akte öffnen</button>'
+        + '<button id="grundAb">Abbrechen</button></div>'
+        + '<div class="err" id="grundErr"></div>';
+      host.appendChild(k);
+      const feld = k.querySelector('#grundText');
+      feld.focus();
+      k.querySelectorAll('.grund-schnell button').forEach((b) => {
+        b.addEventListener('click', () => { feld.value = b.dataset.g; feld.focus(); });
+      });
+      const ab = () => { fertig(null); state.offenerOrdner = null; zeichneOrdner(); };
+      k.querySelector('#grundAb').addEventListener('click', ab);
+      const ok = () => {
+        const g = feld.value.trim();
+        if (g.length < 5) { k.querySelector('#grundErr').textContent = 'Bitte kurz begründen – mindestens 5 Zeichen.'; feld.focus(); return; }
+        fertig(g);
+      };
+      k.querySelector('#grundOk').addEventListener('click', ok);
+      feld.addEventListener('keydown', (e) => { if (e.key === 'Enter') ok(); });
+    });
+  }
+
+  // Wer hat in diese Akte gesehen - und warum? Steht offen in der Akte.
+  function zugriffeBlock(s) {
+    const box = document.createElement('div');
+    box.className = 'ord-zugriffe';
+    const l = (s.zugriffe || []).slice(0, 12);
+    box.innerHTML = '<details' + (l.length ? '' : ' hidden') + '><summary>🔒 Akteneinsicht (' + (s.zugriffe || []).length + ')</summary>'
+      + '<div class="zg-liste">' + l.map((z) =>
+        '<div class="zg"><b>' + esc(z.wer) + '</b>'
+        + (z.rolle === 'admin' ? ' <span class="zg-rolle">Admin</span>' : '')
+        + '<span class="zg-zeit">' + esc(new Date(z.am).toLocaleString('de-DE')) + '</span>'
+        + '<div class="zg-grund">' + esc(z.grund || '—') + '</div></div>').join('')
+      + '</div></details>';
+    return box;
+  }
+
+  // ---- Altersverifikation: der blaue Haken ---------------------------------
+  // Kein Gespraech, kein Teleprompter. Ausweis ansehen, mit dem Gesicht
+  // vergleichen, abhaken - fertig. Bleibt dauerhaft in der Akte stehen.
+  const GRUNDLAGEN = ['im Videogespräch gesehen', 'Original vor Ort gesehen',
+    'aus der Audition-Akte übernommen', 'Ausweisbild in der Akte geprüft'];
+  function verifikationBlock(s) {
+    const box = document.createElement('div');
+    box.className = 'verif' + (s.verifiziert ? ' hat' : '');
+    const liste = (s.verifikationen || []).slice(0, 8);
+    box.innerHTML = '<div class="verif-kopf">'
+      + (s.verifiziert
+          ? '<span class="haken gross">✓</span><div><b>Verifiziert</b>'
+            + '<span class="muted">Alter und Ausweis geprüft am '
+            + esc(new Date(s.verifiziert.am).toLocaleDateString('de-DE'))
+            + ' von ' + esc(s.verifiziert.von)
+            + (s.verifiziert.grundlage ? ' · ' + esc(s.verifiziert.grundlage) : '') + '</span></div>'
+          : '<span class="haken leer">–</span><div><b>Noch nicht verifiziert</b>'
+            + '<span class="muted">Alter und Ausweis sind nicht geprüft. Keine Audition nötig – '
+            + 'Ausweis ansehen, vergleichen, eintragen.</span></div>')
+      + '<button class="primary" data-verif>' + (s.verifiziert ? '↺ Erneut prüfen' : '🪪 Jetzt verifizieren') + '</button></div>'
+      + (liste.length ? '<details class="verif-verlauf"><summary>Verlauf (' + (s.verifikationen || []).length + ')</summary>'
+          + liste.map((v) => '<div class="vf">'
+            + (v.ergebnis === 'bestanden' ? '<span class="vf-ok">✓ bestanden</span>' : '<span class="vf-no">✖ abgelehnt</span>')
+            + '<span class="vf-zeit">' + esc(new Date(v.am).toLocaleString('de-DE')) + '</span>'
+            + '<div class="vf-meta">' + esc(v.geprueftVon)
+            + (v.grundlage ? ' · ' + esc(v.grundlage) : '')
+            + (v.ausweisart ? ' · ' + esc(v.ausweisart) : '')
+            + (v.ausweisnummer ? ' Nr. ' + esc(v.ausweisnummer) : '')
+            + (v.notiz ? '<br>' + esc(v.notiz) : '') + '</div></div>').join('')
+          + '</details>' : '');
+    const b = box.querySelector('[data-verif]');
+    if (b) b.addEventListener('click', () => verifFormular(s, box));
+    return box;
+  }
+  function verifFormular(s, box) {
+    if (box.querySelector('.verif-form')) return;
+    const f = document.createElement('div');
+    f.className = 'verif-form';
+    f.innerHTML = '<div class="vfz"><input id="vfName" placeholder="Name laut Ausweis" value="' + esc(s.name || '') + '">'
+      + '<input id="vfGeb" placeholder="Geburtsdatum (TT.MM.JJJJ)"></div>'
+      + '<div class="vfz"><select id="vfArt"><option value="">Ausweisart …</option>'
+      + ['Personalausweis', 'Reisepass', 'Aufenthaltstitel', 'Führerschein'].map((a) => '<option>' + a + '</option>').join('')
+      + '</select><input id="vfNr" placeholder="Ausweis-Nummer"></div>'
+      + '<select id="vfGrundlage"><option value="">Woran hast du geprüft? …</option>'
+      + GRUNDLAGEN.map((g) => '<option>' + esc(g) + '</option>').join('') + '</select>'
+      + '<label class="vf-erkl"><input type="checkbox" id="vfHaken"> Ich habe den Ausweis gesehen, '
+      + 'das <b>Gesicht stimmt überein</b> und das <b>Geburtsdatum belegt mindestens 18 Jahre</b>. '
+      + 'Der Ausweis wirkte echt und unverändert.</label>'
+      + '<input id="vfNotiz" placeholder="Notiz (optional)">'
+      + '<div class="vf-akt"><button id="vfOk" class="good">✓ Verifikation bestätigen</button>'
+      + '<button id="vfNein" class="danger">✖ Nicht bestanden</button>'
+      + '<button id="vfAb">Abbrechen</button></div><div class="err" id="vfErr"></div>';
+    box.appendChild(f);
+    const w = (id) => (f.querySelector('#' + id) ? f.querySelector('#' + id).value.trim() : '');
+    const senden = async (ergebnis) => {
+      if (ergebnis === 'bestanden') {
+        if (!w('vfArt')) { f.querySelector('#vfErr').textContent = 'Bitte die Ausweisart angeben.'; return; }
+        if (!w('vfGrundlage')) { f.querySelector('#vfErr').textContent = 'Bitte angeben, woran du geprüft hast.'; return; }
+        if (!f.querySelector('#vfHaken').checked) {
+          f.querySelector('#vfErr').textContent = 'Bitte die Erklärung bestätigen – sie ist der Kern der Prüfung.'; return;
+        }
+      }
+      const r = await api('POST', '/api/streamer-verifizieren', {
+        id: s.id, ergebnis, nameLautAusweis: w('vfName'), geburtsdatum: w('vfGeb'),
+        ausweisart: w('vfArt'), ausweisnummer: w('vfNr'), grundlage: w('vfGrundlage'), notiz: w('vfNotiz'),
+      });
+      if (r.status !== 200) { f.querySelector('#vfErr').textContent = 'Konnte nicht gespeichert werden.'; return; }
+      const i = (state.ordner || []).findIndex((x) => x.id === s.id);
+      if (i >= 0) state.ordner[i] = r.body.ordner;
+      toast(ergebnis === 'bestanden' ? 'Verifiziert ✓ – blauer Haken gesetzt.' : 'Als nicht bestanden festgehalten.');
+      zeichneOrdner();
+    };
+    f.querySelector('#vfOk').addEventListener('click', () => senden('bestanden'));
+    f.querySelector('#vfNein').addEventListener('click', () => senden('abgelehnt'));
+    f.querySelector('#vfAb').addEventListener('click', () => f.remove());
+  }
+
   function zeichneOrdner() {
     const host = $('ordnerInhalt'); if (!host) return;
     if (state.offenerOrdner) { zeichneEinenOrdner(state.offenerOrdner); return; }
     const q = ($('ordnerSuche').value || '').trim().toLowerCase();
     const f = state.artFilter || 'alle';
     const liste = (state.ordner || [])
-      .filter((s) => f === 'alle' || (f === 'still'
-        ? (['aktiv', 'neu'].includes(s.status) && stilleTage(s) >= STILL_AB)
-        : (s.art || 'streamer') === f))
-      .filter((s) => !q || (s.bigoId || '').toLowerCase().includes(q) || (s.name || '').toLowerCase().includes(q));
+      .filter((s) => f === 'alle'
+        ? true
+        : f === 'still' ? (['aktiv', 'neu'].includes(s.status) && stilleTage(s) >= STILL_AB)
+        : f === 'unverifiziert' ? !s.verifiziert
+        : (s.art || 'streamer') === f)
+      .map((s) => ({ s, treffer: q ? trefferIn(s, q) : [] }))
+      .filter((x) => !q || x.treffer.length)
+      .map((x) => { x.s._treffer = x.treffer; return x.s; });
     if (!liste.length) {
       host.innerHTML = (state.ordner || []).length
         ? '<div class="deck-empty">' + (f === 'familie' ? 'Noch niemand als Familie eingetragen.<br>Ordner öffnen und dort umstellen.'
@@ -644,13 +916,21 @@
       const fam = (s.art || 'streamer') === 'familie';
       const d = document.createElement('div'); d.className = 'ord-card' + (fam ? ' familie' : '');
       const n = (s.auditions || []).length;
-      d.innerHTML = '<div class="oid">' + esc(s.bigoId) + (fam ? ' <span class="fam-pill">Familie</span>' : '') + '</div>'
+      d.innerHTML = '<div class="oid">' + esc(s.bigoId) + (fam ? ' <span class="fam-pill">Familie</span>' : '')
+        + (s.verifiziert ? ' <span class="haken" title="Alter und Ausweis geprüft am '
+            + esc(new Date(s.verifiziert.am).toLocaleDateString('de-DE')) + ' von ' + esc(s.verifiziert.von) + '">✓</span>' : '')
+        + '</div>'
         + '<div class="onm">' + esc(s.name || 'Name unbekannt') + (s.alter ? ' · ' + esc(s.alter) + ' J.' : '') + '</div>'
-        + '<div class="orow">' + ordPill(s.status) + '<span class="muted">' + n + ' Audition' + (n === 1 ? '' : 'en') + '</span></div>'
+        + '<div class="orow">' + ordPill(s.status)
+        + (n === 0 && s.herkunft === 'pkboard'
+            ? '<span class="uebernommen" title="Aus dem PK-Board übernommen">aus dem PK-Board · noch keine Audition</span>'
+            : '<span class="muted">' + n + ' Audition' + (n === 1 ? '' : 'en') + '</span>')
+        + '</div>'
+        + trefferZeilen(s._treffer)
         + (['aktiv', 'neu'].includes(s.status) && stilleTage(s) >= STILL_AB
           ? '<div class="muted" style="margin-top:.35rem;font-size:.75rem;color:var(--warm)">🕰 seit '
             + stilleTage(s) + ' Tagen kein Eintrag</div>' : '');
-      d.addEventListener('click', () => { state.offenerOrdner = s.id; zeichneOrdner(); });
+      d.addEventListener('click', () => { akteOeffnen(s.id); });
       grid.appendChild(d);
     });
   }
@@ -780,6 +1060,8 @@
     host.appendChild(kopf);
 
     host.appendChild(vermerkeBlock(s));
+    host.appendChild(verifikationBlock(s));
+    host.appendChild(zugriffeBlock(s));
 
     (s.auditions || []).forEach((a) => {
       const auf = a.aufnahme;
@@ -798,9 +1080,15 @@
         + '<div class="ometa">Prüfer: ' + esc(a.pruefer || '—') + ' · Nummer: ' + esc(a.zugangsnummer || '—')
         + '<br>' + esc(a.ausweisart || 'Ausweis unbekannt') + ' · Nr.: ' + esc(a.ausweisnummer || '—')
         + (a.ablehnungsgrund ? '<br>Grund: ' + esc(a.ablehnungsgrund) : '') + '</div>'
+        // Was der Prüfer während des Gesprächs notiert hat. Das lag bisher in
+        // der Akte, ohne dass man es lesen konnte – gespeichert, aber unsichtbar.
+        + (a.notiz ? '<div class="ord-notiz"><b>Notiz des Prüfers</b>' + esc(a.notiz) + '</div>' : '')
         + '<div style="margin-top:.45rem">' + aufTxt + '</div>'
         + (auf ? '<video controls preload="metadata" src="/api/recording?id=' + encodeURIComponent(auf.id)
             + '&token=' + encodeURIComponent(state.token) + '"></video>' : '')
+        + ausweisBilder(a)
+        + hakenListe(a)
+        + wortlaut(a)
         + ((a.protokoll || []).length ? '<div class="ord-prot"><b>Protokoll</b>'
             + a.protokoll.map((e) => '<div style="padding:.3rem 0">' + esc(e.text)
               + '<small>' + esc(e.autor || '') + ' · ' + esc(new Date(e.am).toLocaleString('de-DE')) + '</small></div>').join('')
@@ -808,6 +1096,166 @@
       host.appendChild(d);
     });
   }
+  // ---- Was in einer Audition steckt, gehört auch in den Ordner ------------
+  // Ausweisbilder, abgehakte Fragen und der Wortlaut, der an dem Tag galt.
+  // Die Bilder liegen bei der Akte; abgeholt werden sie über deren Nummer.
+  function ausweisBilder(a) {
+    const bilder = (a.dateien || []).filter((d) => d.art === 'ausweis' && d.dateiname);
+    if (!bilder.length || !a.auditionId) return '';
+    return '<div class="ord-bilder">' + bilder.map((d) => {
+      const src = '/api/doc?id=' + encodeURIComponent(a.auditionId)
+        + '&file=' + encodeURIComponent(d.dateiname) + '&token=' + encodeURIComponent(state.token);
+      return '<figure><a href="' + src + '" target="_blank" rel="noopener">'
+        + '<img src="' + src + '" alt="" loading="lazy"></a>'
+        + '<figcaption>' + esc(d.bezeichnung || 'Bild') + '</figcaption></figure>';
+    }).join('') + '</div>';
+  }
+  function hakenListe(a) {
+    const l = Array.isArray(a.checkliste) ? a.checkliste : [];
+    if (!l.length) return '';
+    return '<details class="ord-klapp"><summary>\u2705 Abgehakte Fragen (' + l.length + ')</summary>'
+      + '<ul class="ord-haken">' + l.map((x) => '<li>' + esc(x) + '</li>').join('') + '</ul></details>';
+  }
+  function wortlaut(a) {
+    const t = a.texte || {};
+    const teil = (titel, text) => (text
+      ? '<details class="ord-klapp"><summary>' + titel + '</summary>'
+        + '<div class="ord-wortlaut">' + esc(text) + '</div></details>' : '');
+    const beides = teil('\ud83d\udcd6 Vorlese-Text (die gesprochene Einwilligung)', t.vorlese)
+      + teil('\ud83d\udc4b Begr\u00fc\u00dfung / Ablauf', t.begruessung);
+    return beides || '<div class="muted" style="margin-top:.4rem;font-size:.78rem">'
+      + 'Wortlaut nicht mitgespeichert \u2013 Audition von vor dieser \u00c4nderung.</div>';
+  }
+
+  // ---- Kennen wir die Person schon? ---------------------------------------
+  // Der Bewerber gibt seine BIGO-ID beim Reinkommen an; der Server sieht damit
+  // sofort nach. Der Prüfer weiss also schon in der Warteschlange, ob er einen
+  // bestehenden Ordner vor sich hat - und liest vorher die Vermerke.
+  function bekanntPille(w) {
+    if (!w.bekannt) return '';
+    return ' <span class="wait-pill bekannt">\ud83d\udcc1 schon im Ordner</span>';
+  }
+  function bekanntZeile(w) {
+    const t = w.bekannt; if (!t) return '';
+    const teile = [];
+    teile.push(t.auditionen + ' Audition' + (t.auditionen === 1 ? '' : 'en'));
+    if (t.status) teile.push('Status: ' + t.status);
+    if (t.vermerke) teile.push(t.vermerke + ' Vermerk' + (t.vermerke === 1 ? '' : 'e'));
+    if (t.art === 'familie') teile.push('Familie');
+    return '<br><span class="bekannt-info">\ud83d\udcc1 ' + esc(t.name || t.bigoId) + ' \u2013 '
+      + esc(teile.join(' \u00b7 ')) + '</span>';
+  }
+
+  // ---- Ausweisdaten schon im Warteraum -------------------------------------
+  // Wer wartet, kann die Zeit nutzen. Der Pruefer bekommt die Angaben beim
+  // Verbinden uebertragen und muss im Gespraech nichts mehr abtippen.
+  function vorabPaket() {
+    const w = (id) => { const e = $(id); return e ? e.value.trim() : ''; };
+    return {
+      kind: 'profile',
+      bigoName: (state.profile && state.profile.bigoName) || '',
+      age: (state.profile && state.profile.age) || '',
+      ausweisName: w('vaName'), ausweisArt: w('vaArt'), ausweisNr: w('vaNr'),
+      // Selbstauskunft des Bewerbers: volljaehrig und echter Ausweis. Ersetzt
+      // die Pruefung nicht - der Pruefer sieht sie sich trotzdem an -, macht
+      // aber sichtbar, was der Bewerber zugesichert hat.
+      echtBestaetigt: !!($('vaEcht') && $('vaEcht').checked),
+    };
+  }
+  function vorabStand() {
+    const box = document.querySelector('.vorab'); if (!box) return;
+    const p = vorabPaket();
+    const fertig = !!(p.ausweisName && p.ausweisArt && p.ausweisNr && p.echtBestaetigt);
+    box.classList.toggle('fertig', fertig);
+    const st = $('vaStatus');
+    if (st) st.textContent = fertig
+      ? '✓ Alles da – der Prüfer bekommt es beim Gespräch automatisch.'
+      : (p.ausweisName && p.ausweisArt && p.ausweisNr && !p.echtBestaetigt)
+        ? 'Bitte noch die Erklärung zu Alter und Echtheit bestätigen.'
+        : 'Wird beim Gespräch automatisch übermittelt.';
+    // Sitzt schon ein Prüfer im Raum? Dann gleich nachreichen.
+    dcBroadcast(p);
+  }
+  ['vaName', 'vaArt', 'vaNr', 'vaEcht'].forEach((id) => {
+    const el = $(id); if (!el) return;
+    el.addEventListener('change', vorabStand);
+    el.addEventListener('blur', vorabStand);
+  });
+  if ($('vaBilder')) $('vaBilder').addEventListener('click', () => {
+    // Fuehrt in denselben Ablauf wie im Gespraech - die Bilder warten dann
+    // auf den Pruefer und gehen los, sobald er da ist.
+    const b = $('upFront'); if (b) b.click();
+  });
+
+  // ---- Selfie mit Ausweis: aus der laufenden Kamera --------------------------
+  // Bewusst kein Datei-Upload: Das Bild entsteht hier und jetzt aus dem
+  // eigenen Kamerabild. Ein altes Foto oder eine Montage kommt so nicht
+  // hinein. Der Countdown gibt Zeit, den Ausweis richtig zu halten.
+  function selfieBuehne() { return document.querySelector('.selfie-buehne'); }
+  function selfieKameraAn() {
+    const v = $('selfieVideo');
+    if (!v || !state.localStream) return;
+    if (v.srcObject !== state.localStream) { v.srcObject = state.localStream; v.play().catch(() => {}); }
+  }
+  function selfieAufnehmen() {
+    const v = $('selfieVideo');
+    if (!v || !v.videoWidth) { toast('Kamera ist noch nicht bereit – kurz warten.'); return; }
+    const c = document.createElement('canvas');
+    c.width = v.videoWidth; c.height = v.videoHeight;
+    c.getContext('2d').drawImage(v, 0, 0);
+    const url = c.toDataURL('image/jpeg', 0.9);
+    $('selfieVorschau').src = url;
+    selfieBuehne().classList.add('zeigt');
+    state.selfieEntwurf = url;
+    $('selfieStart').style.display = 'none';
+    $('selfieNochmal').style.display = '';
+    $('selfieOk').style.display = '';
+    $('selfieStatus').textContent = 'Sieht man dein Gesicht UND den Ausweis deutlich? Dann „Passt so".';
+    $('selfieStatus').classList.remove('ok');
+  }
+  function selfieCountdown() {
+    selfieKameraAn();
+    const k = $('selfieCount'); if (!k) return;
+    let n = 3;
+    k.textContent = n; k.classList.add('an');
+    $('selfieStart').disabled = true;
+    const t = setInterval(() => {
+      n--;
+      if (n > 0) { k.textContent = n; return; }
+      clearInterval(t);
+      k.classList.remove('an');
+      $('selfieStart').disabled = false;
+      selfieAufnehmen();
+    }, 1000);
+  }
+  function selfieVerwerfen() {
+    state.selfieEntwurf = '';
+    selfieBuehne().classList.remove('zeigt');
+    $('selfieStart').style.display = '';
+    $('selfieNochmal').style.display = 'none';
+    $('selfieOk').style.display = 'none';
+    $('selfieStatus').textContent = 'Noch kein Bild aufgenommen.';
+    $('selfieStatus').classList.remove('ok');
+    selfieKameraAn();
+  }
+  function selfieUebernehmen() {
+    const url = state.selfieEntwurf; if (!url) return;
+    const label = 'Selfie mit Ausweis';
+    state.myUploads = state.myUploads || [];
+    // Ein zweiter Versuch ersetzt den ersten - sonst sammeln sich Fehlgriffe.
+    state.myUploads = state.myUploads.filter((d) => d.label !== label);
+    state.myUploads.push({ label, dataUrl: url });
+    addShot('guestShots', label, url);
+    sendDocAll(label, url);              // Prüfer im Raum bekommt es sofort
+    $('selfieOk').style.display = 'none';
+    $('selfieStatus').textContent = '✓ Gespeichert. Der Prüfer bekommt es beim Gespräch.';
+    $('selfieStatus').classList.add('ok');
+    vorabStand();
+  }
+  if ($('selfieStart')) $('selfieStart').addEventListener('click', selfieCountdown);
+  if ($('selfieNochmal')) $('selfieNochmal').addEventListener('click', selfieVerwerfen);
+  if ($('selfieOk')) $('selfieOk').addEventListener('click', selfieUebernehmen);
+
   async function refreshWaiting() {
     const r = await api('GET', '/api/waiting');
     if (r.status === 200) renderWaiting(r.body.waiting || [], r.body);
@@ -826,7 +1274,11 @@
     $('statWaiting').textContent = queue.length;
     $('statRunning').textContent = running.length;
     $('takeNextBtn').disabled = queue.length === 0;
-    $('takeNextBtn').textContent = queue.length ? '▶ Nächsten annehmen (' + queue.length + ')' : '▶ Niemand wartet';
+    // Nur die Beschriftung austauschen, nicht den ganzen Knopf: das Zeichen und
+    // der Kurzname für die Handy-Leiste sollen stehen bleiben.
+    setzeBeschriftung($('takeNextBtn'),
+      queue.length ? 'Nächsten annehmen (' + queue.length + ')' : 'Niemand wartet',
+      queue.length ? 'Nächster (' + queue.length + ')' : 'Niemand');
 
     // --- Warteschlange (Mitte) ---
     const el = $('waitingList'); el.innerHTML = '';
@@ -838,9 +1290,11 @@
         const div = document.createElement('div');
         div.className = 'deck-card' + (i === 0 ? ' next' : '');
         const pill = '<span class="wait-pill' + (secs > 180 ? ' long' : '') + '">⏱ ' + sinceText(secs) + '</span>';
-        div.innerHTML = '<div class="who"><b>' + esc(w.code) + '</b> ' + pill
+        div.innerHTML = '<div class="who"><b>' + esc(w.code) + '</b> ' + pill + bekanntPille(w)
           + '<div class="meta">' + (i === 0 ? 'Als Nächster dran' : 'Platz ' + (i + 1) + ' in der Schlange')
-          + (w.note ? ' · ' + esc(w.note) : '') + '</div></div>';
+          + (w.bigoId ? ' · BIGO-ID ' + esc(w.bigoId) : '')
+          + (w.note ? ' · ' + esc(w.note) : '')
+          + bekanntZeile(w) + '</div></div>';
         const acts = document.createElement('div'); acts.className = 'acts';
         const b = document.createElement('button');
         b.className = 'primary'; b.textContent = '📞 Abholen';
@@ -1033,6 +1487,7 @@
     pruefeKamera();
     pruefeMikro();
     pruefeLicht();
+    selfieKameraAn();
   }
   function wroomAus() {
     const box = $('wroom'); if (box) box.style.display = 'none';
@@ -1120,7 +1575,13 @@
     closeAllPeers(); state.myUploads = state.myUploads || []; state.leaving = false;
     const proto = location.protocol === 'https:' ? 'wss' : 'ws';
     const ws = new WebSocket(`${proto}://${location.host}`); state.ws = ws;
-    ws.onopen = () => ws.send(JSON.stringify({ type: 'join', room: state.code, role: state.role, token: state.token || '', name: state.name }));
+    // BIGO-ID und Alter gehen gleich mit: Der Server schaut damit nach, ob es
+    // die Person schon gibt, und der Prüfer sieht es in der Warteschlange -
+    // bevor er das Gespräch annimmt, nicht erst danach.
+    ws.onopen = () => ws.send(JSON.stringify({
+      type: 'join', room: state.code, role: state.role, token: state.token || '', name: state.name,
+      bigo: (state.profile && state.profile.bigoName) || '', alter: (state.profile && state.profile.age) || '',
+    }));
     ws.onmessage = async (ev) => {
       let m; try { m = JSON.parse(ev.data); } catch { return; }
       switch (m.type) {
@@ -1227,7 +1688,7 @@
     const P = state.peers.get(peerId); if (P) P.dc = dc;
     dc.onopen = () => {
       if (state.role === 'guest') {
-        if (state.profile) dcSendTo(dc, { kind: 'profile', bigoName: state.profile.bigoName, age: state.profile.age });
+        if (state.profile) dcSendTo(dc, vorabPaket());
         (state.myUploads || []).forEach((d) => sendDocTo(dc, d.label, d.dataUrl)); // auch später dazugekommene Prüfer bekommen die Bilder
         $('guideStatus').textContent = 'Verbunden mit dem Prüfer. Bitte lade die Bilder hoch.';
       }
@@ -1240,10 +1701,42 @@
       let m; try { m = JSON.parse(e.data); } catch { return; }
       const key = peerId + ':' + m.id;
       if (m.kind === 'chat') addChat(m.text, false);
-      else if (m.kind === 'doc-start') incoming[key] = { label: m.label, n: m.n, parts: [] };
-      else if (m.kind === 'doc-part') { const it = incoming[key]; if (!it) return; it.parts[m.i] = m.part; if (it.parts.filter(Boolean).length === it.n) { onDocReceived(it.label, it.parts.join('')); delete incoming[key]; } }
+      // Angekündigte Bilder mit 0 Teilen gibt es nicht – die würden nur ewig
+      // im Wartezustand hängen.
+      else if (m.kind === 'doc-start') { if (m.n >= 1) incoming[key] = { label: m.label, n: m.n, parts: [], da: 0 }; }
+      // Gezählt wird, wie viele Teile eingetroffen sind – nicht, wie viele
+      // davon nicht leer sind. Ein leerer Teil hätte das Bild sonst für immer
+      // blockiert, und zwar lautlos.
+      else if (m.kind === 'doc-part') {
+        const it = incoming[key]; if (!it) return;
+        if (it.parts[m.i] === undefined) it.da++;
+        it.parts[m.i] = m.part;
+        if (it.da === it.n) { onDocReceived(it.label, it.parts.join('')); delete incoming[key]; }
+      }
       else if (m.kind === 'result') onResult(m.result);
-      else if (m.kind === 'profile') { if (m.bigoName && !$('vBigoName').value) $('vBigoName').value = m.bigoName; if (m.age && !$('vAge').value) $('vAge').value = m.age; }
+      else if (m.kind === 'profile') {
+        // Der Bewerber hat im Warteraum schon eingetragen, was im Ausweis
+        // steht. Der Pruefer bekommt das Formular ausgefuellt - er prueft nur
+        // noch, statt im Gespraech zu tippen.
+        const setz = (id, wert) => { if (wert && !$(id).value) $(id).value = wert; };
+        setz('vBigoName', m.bigoName);
+        setz('vAge', m.age);
+        setz('vName', m.ausweisName);
+        setz('vDocType', m.ausweisArt);
+        setz('vDocNumber', m.ausweisNr);
+        if (m.ausweisName || m.ausweisNr) {
+          const z = $('zusicherung');
+          if (z) {
+            z.style.display = '';
+            z.className = 'zusicherung ' + (m.echtBestaetigt ? 'ja' : 'nein');
+            z.innerHTML = m.echtBestaetigt
+              ? '✓ <b>18+ und Echtheit zugesichert.</b> Der Bewerber hat erklärt, volljährig zu sein und '
+                + 'einen echten, eigenen Ausweis zu zeigen. <b>Bitte im Bild überprüfen.</b>'
+              : '⚠️ <b>Erklärung fehlt.</b> Der Bewerber hat 18+ und Echtheit noch nicht bestätigt – bitte nachfragen.';
+          }
+        }
+        personSuchen();   // gleich nachsehen, ob wir die Person kennen
+      }
       // Der Bewerber soll sehen, wenn aufgezeichnet wird – er hat zugestimmt,
       // also darf er es auch jederzeit erkennen.
       else if (m.kind === 'rec') zeigeRec(!!m.on);
@@ -1258,7 +1751,17 @@
   }
   function dcSendTo(dc, obj) { if (dc && dc.readyState === 'open') { dc.send(JSON.stringify(obj)); return true; } return false; }
   function dcBroadcast(obj) { let any = false; if (state.peers) state.peers.forEach((P) => { if (dcSendTo(P.dc, obj)) any = true; }); return any; }
-  function sendDocTo(dc, label, dataUrl) { const id = Math.random().toString(36).slice(2); const size = 15000; const n = Math.ceil(dataUrl.length / size); if (!dcSendTo(dc, { kind: 'doc-start', id, label, n })) return; for (let i = 0; i < n; i++) dcSendTo(dc, { kind: 'doc-part', id, i, part: dataUrl.slice(i * size, (i + 1) * size) }); }
+  // Ein leeres Bild wird nicht verschickt. Sonst kündigt der Bewerber ein Bild
+  // mit 0 Teilen an, der Prüfer wartet für immer darauf und sieht nur die Lücke
+  // nicht. Lieber gar nichts senden und es beim Absender melden.
+  function sendDocTo(dc, label, dataUrl) {
+    if (!dataUrl) return false;
+    const id = Math.random().toString(36).slice(2); const size = 15000;
+    const n = Math.ceil(dataUrl.length / size);
+    if (n < 1 || !dcSendTo(dc, { kind: 'doc-start', id, label, n })) return false;
+    for (let i = 0; i < n; i++) dcSendTo(dc, { kind: 'doc-part', id, i, part: dataUrl.slice(i * size, (i + 1) * size) });
+    return true;
+  }
   function sendDocAll(label, dataUrl) { if (state.peers) state.peers.forEach((P) => { if (P.dc && P.dc.readyState === 'open') sendDocTo(P.dc, label, dataUrl); }); }
 
   // ================= BEWERBER: Bilder hochladen =================
@@ -1269,6 +1772,18 @@
   $('fileInput').addEventListener('change', async (e) => {
     const f = e.target.files && e.target.files[0]; if (!f) return;
     const dataUrl = await resizeImage(f, 1600, 0.85);
+    // Konnte der Browser die Datei nicht als Bild lesen (HEIC auf einem alten
+    // Handy, ein PDF aus Versehen, eine kaputte Datei), dann darf hier NICHTS
+    // weiterlaufen. Vorher stand beim Bewerber „alle Bilder hochgeladen", und
+    // beim Prüfer kam nie etwas an – niemand hat es gemerkt. Das ist genau der
+    // Fall, in dem eine Audition ohne Ausweisbild durchgeht.
+    if (!dataUrl) {
+      $('guideStatus').className = 'status bad';
+      $('guideStatus').textContent = 'Dieses Bild konnte nicht gelesen werden. Bitte ein anderes '
+        + 'wählen – am besten ein Foto als JPG oder PNG, direkt aus der Kamera.';
+      toast('Bild nicht lesbar – bitte ein anderes wählen.');
+      return;
+    }
     addShot('guestShots', state.uploadTarget, dataUrl);
     if (state._gstep) $(state._gstep).classList.add('done');
     state.myUploads = state.myUploads || []; state.myUploads.push({ label: state.uploadTarget, dataUrl });
@@ -1311,6 +1826,66 @@
   }
   function checkBoxes() { return Array.from(document.querySelectorAll('#checklist input[data-chk]')); }
   $('checklist').addEventListener('change', () => { $('approveBtn').disabled = state.caseDone || !checkBoxes().every((c) => c.checked); });
+
+  // ---- Abgleich beim Ausfuellen der Akte -----------------------------------
+  // Waehrend der Pruefer die Ausweisdaten eintippt, wird nachgesehen, ob es
+  // die Person schon gibt. Drei Wege: BIGO-ID, Ausweisnummer, Name + Alter.
+  // Die Ausweisnummer findet auch jemanden, der mit einer neuen BIGO-ID
+  // wiederkommt - genau dann muss der Pruefer stutzig werden.
+  let sucheT = 0, letzteSuche = '';
+  function personKasten() {
+    let k = $('personTreffer');
+    if (!k) {
+      k = document.createElement('div');
+      k.id = 'personTreffer'; k.className = 'treffer';
+      const anker = $('vBigoName');
+      if (anker && anker.parentNode) anker.parentNode.insertBefore(k, anker);
+    }
+    return k;
+  }
+  async function personSuchen() {
+    const daten = {
+      bigoId: $('vBigoName').value.trim(),
+      docNumber: $('vDocNumber').value.trim(),
+      name: $('vName').value.trim(),
+      age: $('vAge').value.trim(),
+    };
+    const schluessel = JSON.stringify(daten);
+    if (schluessel === letzteSuche) return;
+    letzteSuche = schluessel;
+    const k = personKasten();
+    if (!daten.bigoId && !daten.docNumber && !daten.name) { k.className = 'treffer'; k.innerHTML = ''; return; }
+    const r = await api('POST', '/api/person-suche', daten);
+    const t = r.body && r.body.treffer;
+    if (!t) {
+      k.className = 'treffer neu';
+      k.innerHTML = '\u2728 <b>Neu bei uns.</b> Mit der Freigabe wird ein neuer Ordner angelegt.';
+      return;
+    }
+    const wieso = t.grund === 'bigo' ? 'gleiche BIGO-ID'
+      : t.grund === 'ausweis' ? 'gleiche Ausweisnummer' : 'gleicher Name und gleiches Alter';
+    const zeilen = [];
+    zeilen.push(t.auditionen + ' Audition' + (t.auditionen === 1 ? '' : 'en'));
+    if (t.letzteAudition) zeilen.push('zuletzt ' + new Date(t.letzteAudition).toLocaleDateString('de-DE'));
+    if (t.status) zeilen.push('Status: ' + t.status);
+    if (t.vermerke) zeilen.push(t.vermerke + ' Vermerk' + (t.vermerke === 1 ? '' : 'e'));
+    k.className = 'treffer ' + (t.sicher ? 'da' : 'vielleicht');
+    k.innerHTML = (t.sicher ? '\ud83d\udcc1 <b>Kennen wir schon.</b>' : '\u2753 <b>K\u00f6nnte dieselbe Person sein.</b>')
+      + ' <span class="muted">(' + esc(wieso) + ')</span>'
+      + '<div class="t-name">' + esc(t.name || '\u2014') + ' \u00b7 BIGO-ID ' + esc(t.bigoId) + '</div>'
+      + '<div class="t-meta">' + esc(zeilen.join(' \u00b7 ')) + '</div>'
+      + (t.andereBigoId ? '<div class="t-warn">\u26a0\ufe0f Damals unter BIGO-ID <b>' + esc(t.andereBigoId)
+          + '</b> \u2013 bitte nachfragen, warum sie sich ge\u00e4ndert hat.</div>' : '')
+      + (t.notiz ? '<div class="t-meta">Notiz: ' + esc(t.notiz) + '</div>' : '')
+      + '<div class="t-meta">' + (t.sicher
+        ? 'Die Audition wird an diesen Ordner angeh\u00e4ngt, nicht neu angelegt.'
+        : 'Pr\u00fcfe kurz, ob das wirklich dieselbe Person ist.') + '</div>';
+  }
+  ['vBigoName', 'vAge', 'vName', 'vDocNumber'].forEach((id) => {
+    const el = $(id); if (!el) return;
+    el.addEventListener('input', () => { clearTimeout(sucheT); sucheT = setTimeout(personSuchen, 450); });
+    el.addEventListener('blur', () => { clearTimeout(sucheT); personSuchen(); });
+  });
 
   $('approveBtn').addEventListener('click', () => saveCase('approved'));
   $('rejectBtn').addEventListener('click', () => {
@@ -1532,6 +2107,8 @@
     ['hostShots', 'snapShots', 'guestShots'].forEach((id) => $(id).innerHTML = '');
     ['vName', 'vDocNumber', 'vDocType'].forEach((id) => $(id).value = '');
     checkBoxes().forEach((c) => c.checked = false); $('approveBtn').disabled = true; $('rejectBtn').disabled = false;
+    // Der Abgleich gehoert zum vorigen Bewerber - fuer den naechsten von vorn.
+    letzteSuche = ''; const tk = $('personTreffer'); if (tk) { tk.className = 'treffer'; tk.innerHTML = ''; }
     $('reviewStatus').className = 'status pending'; $('reviewStatus').textContent = 'Warte auf die Bilder des Bewerbers …';
     $('okBadge').classList.remove('on'); chatLog.innerHTML = '';
     remoteVideo.srcObject = null; remoteWaiting.style.display = ''; remoteWaiting.textContent = 'Warte auf Gegenüber …';

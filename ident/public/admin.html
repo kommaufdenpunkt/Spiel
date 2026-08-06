@@ -37,18 +37,66 @@
   .card h2{margin:.2rem 0 1rem;font-size:1.3rem}
   .field{margin-bottom:.9rem}.field label{display:block;font-size:.72rem;color:var(--dim);margin-bottom:.3rem;text-transform:uppercase;letter-spacing:.09em}
   .err{color:var(--bad);font-size:.85rem;margin-top:.7rem;min-height:1.1em}
-  .dash{flex:1;display:none;min-height:0}.dash.on{display:flex}
-  .nav{width:220px;border-right:1px solid var(--line);background:var(--panel);padding:.8rem;display:flex;flex-direction:column;gap:.35rem;flex:none}
-  .nav button{text-align:left;background:transparent;border:0;color:var(--dim);box-shadow:none;padding:.7rem .8rem;border-radius:10px;font-size:.92rem}
-  .nav button:hover{color:var(--ink);background:#212b42}
-  .nav button.sel{color:#fff;background:linear-gradient(180deg,#4a7bf5,#2a55c8)}
-  .content{flex:1;overflow:auto;padding:1.4rem 1.6rem;min-width:0}
+  /* Drei Spalten wie im Team-Bereich: Kantenmenü links, Arbeitsfläche in der
+     Mitte, mitdenkende Spalte rechts. Damit sieht die Verwaltung nicht mehr
+     aus wie ein fremdes Programm. */
+  .dash{flex:1;display:none;min-height:0}
+  .dash.on{display:grid;grid-template-columns:236px minmax(0,1fr) 320px;gap:1rem;padding:1rem 1.2rem;align-items:start;overflow:auto}
+  .deck-nav,.deck-side{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:.9rem}
+  .nav{display:flex;flex-direction:column;gap:.4rem;position:sticky;top:1rem}
+  .deck-me{display:flex;align-items:center;gap:.6rem;padding:.1rem .1rem .7rem;border-bottom:1px solid var(--line);margin-bottom:.1rem}
+  .deck-avatar{width:38px;height:38px;flex:none;border-radius:11px;display:grid;place-items:center;font-weight:700;
+    background:linear-gradient(135deg,#6f9bff,#3b6ef0);color:#fff;box-shadow:0 6px 16px -6px #3b6ef0cc}
+  .deck-me b{font-size:.95rem;display:block;line-height:1.2}
+  .deck-me .muted{font-size:.74rem;color:var(--dim)}
+  .nav-gruppe{font-size:.64rem;letter-spacing:.18em;text-transform:uppercase;color:var(--dim);
+    padding:.7rem .3rem .15rem;border-top:1px solid var(--line);margin-top:.3rem}
+  .deck-me + .nav-gruppe{margin-top:0;padding-top:.5rem;border-top:0}
+  .deck-item{width:100%;text-align:left;font-size:.9rem;display:block;padding:.6rem .8rem}
+  .nav .deck-item{background:transparent;border:1px solid transparent;color:var(--dim);box-shadow:none;border-radius:10px}
+  .nav .deck-item:hover{color:var(--ink);background:#212b42;transform:none;box-shadow:none;border-color:transparent}
+  .nav .deck-item.sel{color:#fff;background:linear-gradient(180deg,#4a7bf5,#2a55c8);border-color:#2a55c8}
+  .deck-spacer{flex:1;min-height:.6rem}
+  .content{min-width:0;background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:1.1rem 1.2rem}
   .content h2{margin:.1rem 0 1rem;font-size:1.3rem}
-  .sub{color:var(--dim);font-size:.85rem;margin:-.6rem 0 1.2rem;line-height:1.5}
+  .deck-head{display:flex;align-items:baseline;justify-content:space-between;gap:.7rem;margin-bottom:.9rem;flex-wrap:wrap}
+  .deck-head h2{margin:0;font-size:1.15rem}
+  .deck-head .muted{font-size:.8rem;color:var(--dim)}
+  .uh{font-size:1rem;margin:.2rem 0 .3rem}
+  .sub{color:var(--dim);font-size:.85rem;margin:.1rem 0 1rem;line-height:1.5}
   .section{display:none}.section.on{display:block}
-  .stats{display:flex;gap:.8rem;flex-wrap:wrap;margin-bottom:1.3rem}
-  .stat{flex:1;min-width:130px;background:var(--panel2);border:1px solid var(--line);border-radius:14px;padding:1rem 1.1rem}
-  .stat .n{font-size:1.7rem;font-weight:700}.stat .l{font-size:.76rem;color:var(--dim);text-transform:uppercase;letter-spacing:.08em;margin-top:.2rem}
+  hr{border:0;border-top:1px solid var(--line);margin:1.5rem 0}
+  textarea.gross{width:100%;min-height:220px;font-family:inherit;font-size:.95rem;line-height:1.6;padding:.8rem;
+    border-radius:12px;border:1px solid var(--line);background:#0f1728;color:var(--ink)}
+  textarea.gross:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px #3b6ef033}
+  .speicherzeile{margin-top:.7rem;display:flex;gap:.6rem;align-items:center;flex-wrap:wrap}
+  /* Kacheln statt Zahlenreihe: anklickbar, sie führen in ihren Bereich. */
+  .kacheln{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:.8rem}
+  .kachel{background:var(--panel2);border:1px solid var(--line);border-radius:16px;padding:.9rem 1rem;
+    text-align:left;display:flex;flex-direction:column;gap:.15rem;box-shadow:none}
+  .kachel:hover:not(:disabled){border-color:var(--accent);transform:translateY(-3px)}
+  .kachel .ki{font-size:1.35rem;line-height:1}
+  .kachel .kz{font-size:1.8rem;font-weight:700;line-height:1.1;margin-top:.2rem}
+  .kachel .kt{font-size:.9rem;font-weight:650}
+  .kachel .ku{font-size:.74rem;color:var(--dim);line-height:1.4}
+  .kachel.ruft{border-color:var(--warm);background:linear-gradient(180deg,#2a2016,#1c2438)}
+  .kachel.ruft .kz{color:var(--warm)}
+  .kachel.still{cursor:default}
+  .kachel.still:hover{border-color:var(--line);transform:none}
+  /* Rechte Kante */
+  .deck-side{display:flex;flex-direction:column;gap:1rem;position:sticky;top:1rem}
+  .deck-side.leer{display:none}
+  .seiten-block{display:none}
+  .seiten-block.an{display:block}
+  .seiten-block .deck-head{margin-bottom:.5rem;align-items:center}
+  .seiten-block .deck-head h2{font-size:.98rem}
+  .block-zu{border:0;background:transparent;color:var(--dim);padding:.1rem .35rem;font-size:.95rem;
+    line-height:1;box-shadow:none;border-radius:8px}
+  .block-zu:hover:not(:disabled){background:#22304d;color:var(--ink);transform:none;box-shadow:none}
+  .hlp{font-size:.84rem;color:var(--dim);line-height:1.6;margin:.2rem 0 .7rem}
+  .hlp b{color:var(--ink);font-weight:600}
+  .hlp code{background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:.05rem .35rem;font-size:.94em}
+  .hlp-akt{display:flex;flex-direction:column;gap:.45rem}
   .row{display:flex;justify-content:space-between;align-items:center;gap:.6rem;border:1px solid var(--line);border-radius:12px;padding:.7rem .85rem;margin-bottom:.5rem;background:var(--panel2);font-size:.9rem}
   .row .acts{display:flex;gap:.4rem;flex-wrap:wrap}.muted{color:var(--dim);font-size:.78rem}
   .pill{font-size:.72rem;padding:.15rem .5rem;border-radius:999px;border:1px solid var(--line);white-space:nowrap}
@@ -63,6 +111,10 @@
   .evlog{font-size:.8rem;font-family:ui-monospace,Menlo,Consolas,monospace;border:1px solid var(--line);border-radius:10px;overflow:hidden}
   .evrow{display:grid;grid-template-columns:11rem 8rem 1fr;gap:.5rem;padding:.4rem .7rem;border-bottom:1px solid var(--line)}.evrow:last-child{border-bottom:0}.evrow .t{color:var(--dim)}
   .empty{color:var(--dim);font-size:.9rem;padding:1rem 0}
+  /* Wortlaut in der Akte: so gesetzt, wie er vorgelesen wurde. */
+  .wortlaut{white-space:pre-wrap;font-size:.85rem;line-height:1.65;color:var(--ink);background:#0f1728;
+    border:1px solid var(--line);border-radius:10px;padding:.7rem .85rem;margin-top:.45rem;max-height:20rem;overflow:auto}
+  .hakenliste{margin:.45rem 0 0;padding-left:1.1rem;font-size:.83rem;color:var(--dim);line-height:1.6}
   .reclist{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:1rem}
   .reccard{border:1px solid var(--line);border-radius:14px;background:var(--panel2);overflow:hidden;display:flex;flex-direction:column}
   .recvid{position:relative;background:#000;aspect-ratio:16/10}
@@ -72,7 +124,18 @@
   .recacts{display:flex;gap:.4rem;flex-wrap:wrap;align-items:center;padding:.7rem .85rem;border-top:1px solid var(--line)}
   .reclink{color:var(--accent);font-size:.85rem;text-decoration:underline;align-self:center}
   .toast{position:fixed;left:50%;bottom:1.3rem;transform:translateX(-50%) translateY(8px);background:#141c2ef2;color:var(--ink);border:1px solid var(--line2);padding:.65rem 1.1rem;border-radius:12px;font-size:.85rem;opacity:0;transition:.22s;pointer-events:none;box-shadow:var(--shadow)}.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
-  @media(max-width:760px){.nav{width:100%;flex-direction:row;overflow:auto;border-right:0;border-bottom:1px solid var(--line)}.dash.on{flex-direction:column}}
+  /* Schmal: eine Spalte. Das Kantenmenü wird zur Zeile, die rechte Spalte
+     rutscht unter die Arbeitsfläche – sie bleibt lesbar, statt zu verschwinden. */
+  @media(max-width:1080px){
+    .dash.on{grid-template-columns:1fr;gap:.8rem;padding:.8rem}
+    .nav,.deck-side{position:static}
+    .nav{flex-direction:row;flex-wrap:wrap;align-items:center}
+    .nav .deck-item{width:auto;flex:1;min-width:140px;text-align:center}
+    .deck-me{border-bottom:0;padding:0;margin:0;width:100%}
+    .nav-gruppe{width:100%;border-top:0;padding:.4rem .3rem .1rem;margin-top:0}
+    .deck-spacer{display:none}
+  }
+  @media(max-width:520px){.kacheln{grid-template-columns:repeat(auto-fill,minmax(132px,1fr))}}
 </style>
 </head>
 <body>

@@ -5,8 +5,9 @@
   let token = '';
   function toast(m) { const t = $('toast'); t.textContent = m; t.classList.add('show'); clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('show'), 2400); }
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
-  // acp.<domain> ist der Diagnose-Bereich: nur dort darf endgültig gelöscht
-  // werden. Im Tagesgeschäft (mcp./verwaltung) sind die Knöpfe gar nicht da.
+  // Diese Seite gibt es nur auf acp.<domain>. Der Team-Bereich verlinkt sie
+  // nirgends. Nur hier darf endgültig gelöscht werden – das erzwingt der
+  // Server, die Knöpfe sind nicht bloss ausgeblendet.
   const AUF_ACP = /^acp\./.test(location.hostname.toLowerCase());
   function btn(label, cls, fn) { const b = document.createElement('button'); b.textContent = label; if (cls) b.className = cls; b.addEventListener('click', fn); return b; }
 
@@ -14,7 +15,22 @@
     const headers = {}; if (body) headers['Content-Type'] = 'application/json'; if (token) headers['Authorization'] = 'Bearer ' + token;
     let res; try { res = await fetch(path, { method, headers, body: body ? JSON.stringify(body) : undefined }); } catch { return { status: 0, body: {} }; }
     let json = {}; try { json = await res.json(); } catch {}
+    if (res.status === 401 && token) sitzungAbgelaufen();
     return { status: res.status, body: json };
+  }
+
+  // Der Anmelde-Nachweis lebt im Arbeitsspeicher des Servers. Nach einem
+  // Neustart gilt er nicht mehr – dann zurück zum Login statt leerer Seiten.
+  function sitzungAbgelaufen() {
+    if (!token) return;
+    token = '';
+    // Nicht per style ausblenden: openDash() blendet später über die Klasse
+    // "on" wieder ein und würde ein inline gesetztes display:none nicht
+    // loswerden – der Bereich bliebe nach dem erneuten Anmelden leer.
+    $('dash').classList.remove('on');
+    $('login').style.display = '';
+    $('pw').value = ''; if ($('totp')) $('totp').value = '';
+    $('loginErr').textContent = 'Die Anmeldung gilt nicht mehr – bitte neu anmelden.';
   }
 
   // ---- Geräte-Kennung ----
@@ -115,11 +131,32 @@
       bindDash();
     }
     $('login').style.display = 'none'; $('dash').classList.add('on');
-    $('whoami').textContent = AUF_ACP ? 'Diagnose · Admin' : 'Verwaltung · Admin';
+    $('whoami').textContent = 'Verwaltung · Admin';
     hinweisBereich();
+    kopfzeile();
     show('overview');
     return true;
   }
+
+  // Links oben: wo man ist, dazu der Rückweg in den Team-Bereich. Umgekehrt
+  // führt von dort kein Weg hierher – das ist Absicht.
+  function kopfzeile() {
+    if ($('admWo')) $('admWo').textContent = 'Einrichten & Diagnose';
+    if ($('admAvatar')) $('admAvatar').textContent = 'A';
+    const wirt = location.hostname.toLowerCase();
+    const echteDomain = wirt.includes('.') && !/^(\d+\.){3}\d+$/.test(wirt);
+    const basis = wirt.replace(/^(mcp|pruefer|admin|ident|acp)\./, '');
+    if ($('hlpTeamAdresse')) $('hlpTeamAdresse').textContent = echteDomain ? 'mcp.' + basis : 'den Team-Bereich';
+    const z = $('zurueckTeam');
+    if (z && echteDomain) {
+      z.href = location.protocol + '//mcp.' + basis + (location.port ? ':' + location.port : '');
+      z.style.display = '';
+    } else if (z && !AUF_ACP) { z.style.display = ''; }
+  }
+
+  // Der Team-Bereich verlinkt nichts Administratives mehr. Alles, was zum
+  // Einrichten, Nachsehen und Löschen gehört, liegt hier zusammen – ein Ort
+  // je Aufgabe, statt zwei halbe.
 
   // Kurz erklären, wo man gerade ist – Löschen gibt es nur im Diagnose-Bereich.
   function hinweisBereich() {
@@ -127,9 +164,8 @@
     const d = document.createElement('div');
     d.id = 'bereichHinweis'; d.className = 'note';
     d.style.cssText = 'margin:0 0 1rem';
-    d.innerHTML = AUF_ACP
-      ? '🩺 <b>Diagnose-Bereich.</b> Hier siehst du die Überwachung – und nur hier lässt sich endgültig löschen. Bitte mit Bedacht.'
-      : '⚙️ <b>Verwaltung.</b> Endgültiges Löschen von Akten, Aufnahmen und Konten geht bewusst nicht hier, sondern nur über <b>acp.4ever1.tv</b>.';
+    d.innerHTML = '⚙️ <b>Verwaltung.</b> Einrichten, nachsehen, Diagnose – und als einziger Ort das '
+      + 'endgültige Löschen von Akten, Aufnahmen und Konten. Bitte mit Bedacht.';
     const inhalt = document.querySelector('.content');
     if (inhalt) inhalt.prepend(d);
   }
@@ -137,6 +173,7 @@
   function bindDash() {
     $('logout').addEventListener('click', () => { token = ''; $('dash').classList.remove('on'); $('login').style.display = ''; $('pw').value = ''; $('totp').value = ''; });
     document.querySelector('.nav').addEventListener('click', (e) => { const b = e.target.closest('button[data-sec]'); if (b) show(b.dataset.sec); });
+    bindeKante();
     if ($('scriptSave')) $('scriptSave').addEventListener('click', saveScript);
     if ($('introSave')) $('introSave').addEventListener('click', saveIntro);
     if ($('caseSearch')) $('caseSearch').addEventListener('input', (e) => renderCases(e.target.value));
@@ -156,7 +193,47 @@
   function show(sec) {
     document.querySelectorAll('.nav button[data-sec]').forEach((b) => b.classList.toggle('sel', b.dataset.sec === sec));
     document.querySelectorAll('.section').forEach((s) => s.classList.toggle('on', s.dataset.pane === sec));
+    zeigeKante(sec);
     ({ overview: loadOverview, cases: loadCases, rec: loadRec, agents: loadAgents, script: loadScriptEditor, adminsec: loadA2fa, security: loadSecurity }[sec] || (() => {}))();
+  }
+
+  // ---- Rechte Kante --------------------------------------------------------
+  // Zu jedem Bereich der passende Hinweis, und nur der. Wer ihn nicht braucht,
+  // klickt ihn weg; der Browser merkt sich das je Bereich.
+  const KANTE_KEY = 'ident.admin.kante';
+  function kanteZu() { try { return JSON.parse(localStorage.getItem(KANTE_KEY) || '[]'); } catch { return []; } }
+  function merkeKante(l) { try { localStorage.setItem(KANTE_KEY, JSON.stringify(l)); } catch {} }
+  function zeigeKante(sec) {
+    const side = $('admSide'); if (!side) return;
+    const zu = kanteZu();
+    let sichtbar = 0;
+    side.querySelectorAll('.seiten-block').forEach((b) => {
+      const f = b.dataset.hilfe;
+      const dran = f === '*' ? zu.length > 0 : (f === sec && !zu.includes(f));
+      b.classList.toggle('an', dran);
+      if (dran) sichtbar++;
+    });
+    side.classList.toggle('leer', sichtbar === 0);
+  }
+  function bindeKante() {
+    const side = $('admSide'); if (!side) return;
+    side.querySelectorAll('.seiten-block').forEach((b) => {
+      const knopf = b.querySelector('.block-zu'); if (!knopf) return;
+      knopf.addEventListener('click', () => {
+        const f = b.dataset.hilfe;
+        if (f === '*') { b.classList.remove('an'); return; }
+        const zu = kanteZu(); if (!zu.includes(f)) zu.push(f);
+        merkeKante(zu); zeigeKante(aktuellerBereich());
+        toast('Ausgeblendet – unten wieder einblendbar.');
+      });
+    });
+    if ($('hilfeZurueck')) $('hilfeZurueck').addEventListener('click', () => {
+      merkeKante([]); zeigeKante(aktuellerBereich()); toast('Hinweise wieder da.');
+    });
+  }
+  function aktuellerBereich() {
+    const b = document.querySelector('.nav button[data-sec].sel');
+    return b ? b.dataset.sec : 'overview';
   }
   // ---- Freigegebene Geräte ----
   async function loadDevices() {
@@ -266,12 +343,76 @@
   async function loadOverview() {
     const [ag, cs, rc, se] = await Promise.all([api('GET', '/api/agents'), api('GET', '/api/cases'), api('GET', '/api/recordings'), api('GET', '/api/security')]);
     const cases = cs.body.cases || [];
-    const stat = (n, l) => `<div class="stat"><div class="n">${n}</div><div class="l">${esc(l)}</div></div>`;
-    $('stats').innerHTML = stat((ag.body.agents || []).length, 'Mitarbeiter')
-      + stat(cases.length, 'Fälle')
-      + stat(cases.filter((c) => c.result === 'approved').length, 'freigegeben')
-      + stat((rc.body.recordings || []).length, 'Aufnahmen')
-      + stat((se.body.blocked || []).length, 'gesperrte IPs');
+    const agents = ag.body.agents || [];
+    const recs = rc.body.recordings || [];
+    const gesperrt = (se.body.blocked || []).length;
+    const frei = cases.filter((c) => c.result === 'approved').length;
+    const offen = cases.filter((c) => c.result !== 'approved' && c.result !== 'rejected').length;
+    const ohne2fa = agents.filter((a) => !a.has2fa).length;
+
+    // Kacheln statt nackter Zahlenreihe: Jede führt dorthin, wo man etwas tun
+    // kann, und sagt selbst, ob sie in Ordnung ist oder ruft.
+    const host = $('stats'); host.innerHTML = '';
+    const kachel = (opt) => {
+      const el = document.createElement(opt.sec ? 'button' : 'div');
+      el.className = 'kachel' + (opt.ruft ? ' ruft' : '') + (opt.sec ? '' : ' still');
+      el.innerHTML = '<span class="ki">' + opt.ikon + '</span><span class="kz">' + opt.zahl + '</span>'
+        + '<span class="kt">' + esc(opt.titel) + '</span><span class="ku">' + opt.unten + '</span>';
+      if (opt.sec) el.addEventListener('click', () => show(opt.sec));
+      host.appendChild(el);
+    };
+    kachel({ ikon: '🗂', zahl: cases.length, titel: 'Fälle', sec: 'cases',
+      unten: cases.length ? frei + ' freigegeben' + (offen ? ' · ' + offen + ' offen' : '') : 'noch keine Audition' , ruft: offen > 0 });
+    kachel({ ikon: '🎬', zahl: recs.length, titel: 'Aufnahmen', sec: 'rec',
+      unten: recs.length ? 'verschlüsselt abgelegt' : 'noch keine' });
+    kachel({ ikon: '👥', zahl: agents.length, titel: 'Mitarbeiter', sec: 'agents',
+      unten: !agents.length ? 'noch keiner angelegt' : (ohne2fa ? ohne2fa + '× ohne 2FA' : 'alle mit 2FA'),
+      ruft: !agents.length });
+    kachel({ ikon: gesperrt ? '⛔' : '🛡', zahl: gesperrt, titel: 'gesperrte IPs', sec: 'security',
+      unten: gesperrt ? 'nachsehen, wer das war' : 'nichts Auffälliges', ruft: gesperrt > 0 });
+
+    // Die fünf jüngsten Fälle – damit man sieht, dass etwas passiert.
+    const l = $('letzteFaelle'); if (l) {
+      const jung = cases.slice().sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || ''))).slice(0, 5);
+      l.innerHTML = jung.length ? '' : '<div class="empty">Noch keine abgeschlossene Audition.</div>';
+      jung.forEach((c) => {
+        const d = document.createElement('div'); d.className = 'row';
+        const st = c.result === 'approved' ? 'ok' : (c.result === 'rejected' ? 'no' : 'warn');
+        d.innerHTML = '<span>' + esc(c.bigoName || c.code || '—')
+          + ' <span class="muted">· ' + esc(datumKurz(c.createdAt)) + '</span></span>'
+          + '<span class="pill ' + st + '">' + esc(statusText(c.result)) + '</span>';
+        l.appendChild(d);
+      });
+    }
+    if ($('standMsg')) $('standMsg').textContent = 'Stand: ' + new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) + ' Uhr';
+    hilfeAktionen(cases, agents, gesperrt);
+  }
+  function datumKurz(iso) {
+    if (!iso) return 'ohne Datum';
+    const d = new Date(iso); if (isNaN(d)) return 'ohne Datum';
+    return d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' });
+  }
+  // Rechts auf der Übersicht: nur das anbieten, was gerade wirklich ansteht.
+  function hilfeAktionen(cases, agents, gesperrt) {
+    const box = $('hlpAkt'); if (!box) return;
+    box.innerHTML = '';
+    const vorschlag = (text, sec) => {
+      const b = document.createElement('button');
+      b.style.cssText = 'width:100%;text-align:left;font-size:.83rem;line-height:1.4';
+      b.innerHTML = text;
+      b.addEventListener('click', () => show(sec));
+      box.appendChild(b);
+    };
+    const offen = cases.filter((c) => c.result !== 'approved' && c.result !== 'rejected').length;
+    if (offen) vorschlag('🗂 <b>' + offen + '</b> Akte(n) ohne Entscheidung ansehen', 'cases');
+    if (gesperrt) vorschlag('⛔ <b>' + gesperrt + '</b> gesperrte IP(s) prüfen', 'security');
+    if (!agents.length) vorschlag('👥 Ersten Prüfer anlegen', 'agents');
+    else if (agents.some((a) => a.mustChange)) vorschlag('👥 Konten mit Startpasswort ansehen', 'agents');
+    if (!box.children.length) {
+      const p = document.createElement('p'); p.className = 'hlp'; p.style.margin = '0';
+      p.textContent = 'Gerade steht nichts an. Alles ruhig.';
+      box.appendChild(p);
+    }
   }
 
   // ---- Fälle ----
@@ -304,7 +445,7 @@
              <video src="/api/recording?id=${encodeURIComponent(rc.id)}&token=${encodeURIComponent(token)}" controls preload="metadata" style="width:100%;max-width:340px;border-radius:10px;border:1px solid var(--line);background:#000"></video>
            </div>`
         : '<div class="muted" style="margin-top:.6rem">🎬 Keine Aufnahme zu dieser Akte gefunden.</div>';
-      div.innerHTML = `<div class="top"><div><div class="nm">${esc(c.bigoName || c.verifiedName || '—')}</div><div class="meta">${c.bigoName ? 'BIGO-ID: <b>' + esc(c.bigoName) + '</b> · ' : ''}${c.age ? 'Alter: ' + esc(c.age) + ' · ' : ''}Name: ${esc(c.verifiedName || '-')}<br>${esc(c.docType || '-')} · Nr.: ${esc(c.docNumber || '-')}<br>Nummer: ${esc(c.code || '-')} · Prüfer: ${esc(c.agentName || '-')} · ${esc(date)}${c.note ? '<br>Notiz: ' + esc(c.note) : ''}${c.rejectReason ? '<br>Grund: ' + esc(c.rejectReason) : ''}</div></div>${pill}</div><div class="thumbs">${thumbs}</div>${recBlock}${mcpZeile(c)}`;
+      div.innerHTML = `<div class="top"><div><div class="nm">${esc(c.bigoName || c.verifiedName || '—')}</div><div class="meta">${c.bigoName ? 'BIGO-ID: <b>' + esc(c.bigoName) + '</b> · ' : ''}${c.age ? 'Alter: ' + esc(c.age) + ' · ' : ''}Name: ${esc(c.verifiedName || '-')}<br>${esc(c.docType || '-')} · Nr.: ${esc(c.docNumber || '-')}<br>Nummer: ${esc(c.code || '-')} · Prüfer: ${esc(c.agentName || '-')} · ${esc(date)}${c.note ? '<br>Notiz: ' + esc(c.note) : ''}${c.rejectReason ? '<br>Grund: ' + esc(c.rejectReason) : ''}</div></div>${pill}</div><div class="thumbs">${thumbs}</div>${recBlock}${checkBlock(c)}${texteBlock(c)}${mcpZeile(c)}`;
       const acts = document.createElement('div'); acts.style.marginTop = '.7rem'; acts.style.display = 'flex'; acts.style.gap = '.4rem'; acts.style.flexWrap = 'wrap';
       acts.appendChild(btn('📄 Export / PDF', '', () => window.open(`/api/case-export?id=${c.id}&token=${encodeURIComponent(token)}`, '_blank')));
       if (mcpAn) {
@@ -325,6 +466,33 @@
   // ---- Protokoll-Einträge in der Akte ----
   // Text wird vor dem Speichern aufgeräumt; der Nutzer entscheidet, ob er den
   // verbesserten Vorschlag übernimmt.
+  // Der Wortlaut, der bei dieser Audition galt. Zugeklappt, damit die Akte
+  // übersichtlich bleibt – aber vorhanden, denn der Vorlese-Text IST die
+  // Einwilligung. Ältere Akten haben ihn nicht; dann steht das auch da.
+  function texteBlock(c) {
+    const teil = (titel, text, hinweis) => (text
+      ? `<details style="margin-top:.5rem"><summary class="muted" style="cursor:pointer;user-select:none">${titel}</summary>
+           <div class="wortlaut">${esc(text)}</div></details>`
+      : `<div class="muted" style="margin-top:.5rem">${titel} – ${hinweis}</div>`);
+    return '<div style="margin-top:.7rem;padding-top:.7rem;border-top:1px solid var(--line)">'
+      + teil('📖 Vorlese-Text (die gesprochene Einwilligung)', c.skript,
+        'nicht mitgespeichert (Akte von vor dieser Änderung)')
+      + teil('👋 Begrüßung / Ablauf', c.einleitung,
+        'nicht mitgespeichert')
+      + '</div>';
+  }
+  // Was der Prüfer im Gespräch abgehakt hat.
+  function checkBlock(c) {
+    const l = Array.isArray(c.checklist) ? c.checklist : [];
+    if (!l.length) return '';
+    const zeile = (x) => (x && typeof x === 'object'
+      ? (x.checked ? '☑ ' : '☐ ') + String(x.label || '') : String(x));
+    const gesetzt = l.filter((x) => !x || typeof x !== 'object' || x.checked).length;
+    return '<details style="margin-top:.7rem"><summary class="muted" style="cursor:pointer;user-select:none">'
+      + '✅ Abgehakte Fragen (' + gesetzt + ' von ' + l.length + ')</summary><ul class="hakenliste">'
+      + l.map((x) => '<li>' + esc(zeile(x)) + '</li>').join('') + '</ul></details>';
+  }
+
   // Stand der Übergabe an mcp.4ever1.tv
   function mcpZeile(c) {
     const wann = c.mcpAt ? new Date(c.mcpAt).toLocaleString('de-DE') : '';

@@ -546,6 +546,7 @@ async function handleApi(req, res, urlPath, ip) {
       if (room) for (const ws of room.values()) if (ws.role === 'host' && ws.pname) hosts.push(ws.pname);
       return {
         code: w.code, note: w.note, joinedAt: w.joinedAt, busy,
+        bigoId: w.bigoId || '', bekannt: w.bekannt || null,
         claimedBy: busy ? w.claimedBy : null,
         hosts, live: hosts.length > 0,
         waitingSec: Math.max(0, Math.round((Date.now() - w.joinedAt) / 1000)),
@@ -590,11 +591,88 @@ async function handleApi(req, res, urlPath, ip) {
     sendJson(res, 200, { ok: true }); return true;
   }
 
+  // ---- Streamer übernehmen, die es schon gibt (ohne Audition) ----
+  // Wer im PK-Board mitläuft, soll auch hier eine Akte haben. Das Skript
+  // pkboard-import.sh liest die Mitglieder und schickt sie hierher. Der
+  // Aufruf darf beliebig oft kommen: Vorhandenes wird nicht überschrieben.
+  if (urlPath === '/api/streamer-import' && req.method === 'POST') {
+    if (!adminOnly()) return true;
+    let body; try { body = await readJson(req, 2 * 1024 * 1024); } catch { sendJson(res, 413, { reason: 'too-large' }); return true; }
+    const leute = Array.isArray(body.leute) ? body.leute.slice(0, 5000) : [];
+    if (!leute.length) { sendJson(res, 400, { reason: 'keine-daten' }); return true; }
+    let neu = 0, vorhanden = 0, ergaenzt = 0, ohneId = 0;
+    const angelegt = [];
+    for (const p of leute) {
+      const r = store.ordnerAnlegen({
+        bigoId: p.bigoId, name: p.name, alter: p.alter, art: p.art,
+        notiz: p.notiz, status: p.status, herkunft: p.herkunft || 'pkboard',
+      });
+      if (r.grund === 'keine-bigo-id') { ohneId++; continue; }
+      if (r.angelegt) { neu++; angelegt.push(r.ordner.bigoId); }
+      else { vorhanden++; if (r.ergaenzt) ergaenzt++; }
+    }
+    sec.recordEvent('audit', ip, 'Streamer übernommen: ' + neu + ' neu, ' + vorhanden + ' vorhanden');
+    sendJson(res, 200, { neu, vorhanden, ergaenzt, ohneId, gesamt: leute.length, angelegt: angelegt.slice(0, 50) });
+    return true;
+  }
+
+  // ---- Altersverifikation ohne Audition ----
+  // Kurzer Weg für Leute, die schon dabei sind: Ausweis ansehen, mit dem
+  // Gesicht vergleichen, abhaken. Bleibt dauerhaft in der Akte.
+  if (urlPath === '/api/streamer-verifizieren' && req.method === 'POST') {
+    if (!authed(req, ip)) { sendJson(res, 401, { reason: 'auth' }); return true; }
+    let body; try { body = await readJson(req, 32 * 1024); } catch { body = {}; }
+    const s = store.getStreamer(body.id);
+    if (!s) { sendJson(res, 404, { reason: 'nicht-gefunden' }); return true; }
+    if (body.ergebnis === 'bestanden' && (!body.ausweisart || !body.grundlage)) {
+      sendJson(res, 400, { reason: 'angaben-fehlen' }); return true;
+    }
+    const rec = store.verifikationEintragen(s.id, { ...body, geprueftVon: reqName(req, ip) || 'Prüfer' });
+    // Eine Verifikation ist ein Griff in die Akte – also steht sie auch im
+    // Einsichtsprotokoll der Akte, nicht nur im Sicherheitsprotokoll. Sonst
+    // wäre das hier ein stiller Weg an der Grundangabe vorbei: einmal
+    // „abgelehnt" schicken und die ganze Akte zurückbekommen, ohne Spur.
+    store.protokolliereZugriff(s.id, {
+      wer: reqName(req, ip) || 'Unbekannt',
+      rolle: isAdmin(req, ip) ? 'admin' : 'pruefer',
+      grund: 'Altersverifikation eingetragen (' + rec.ergebnis + ')', ip,
+    });
+    sec.recordEvent('audit', ip, 'Verifikation ' + rec.ergebnis + ' (' + rec.geprueftVon + '): ' + s.bigoId);
+    sendJson(res, 200, { verifikation: rec, ordner: store.getStreamer(s.id) });
+    return true;
+  }
+
+  // ---- Kennen wir die Person schon? ----
+  // Wird beim Eintippen der Ausweisdaten gefragt. Der Prüfer soll wissen,
+  // ob die Audition an einen bestehenden Ordner angehängt wird oder ob ein
+  // neuer entsteht – vor der Freigabe, nicht danach.
+  if (urlPath === '/api/person-suche' && req.method === 'POST') {
+    // Zweiter Riegel. Die Anmeldepflicht kommt schon von der Sperre weiter
+    // oben ("ab hier: gültiges Login nötig") – dieser Aufruf hier hängt aber
+    // an der Antwort mit Name, Alter, Status und Zahl der Vermerke. Würde die
+    // Sperre oben jemals verrutschen, wäre das eine abfragbare Kartei: BIGO-IDs
+    // sind neunstellige Zahlen. Deshalb steht die Prüfung hier ausdrücklich
+    // noch einmal, direkt an der Stelle, die sie schützt.
+    if (!authed(req, ip)) { sendJson(res, 401, { reason: 'auth' }); return true; }
+    let body; try { body = await readJson(req, 8 * 1024); } catch { body = {}; }
+    const t = store.suchePerson({
+      bigoId: body.bigoId, docNumber: body.docNumber, name: body.name, age: body.age,
+    });
+    sendJson(res, 200, { treffer: t }); return true;
+  }
+
   // ---- Fall speichern (Prüfer) ----
   if (urlPath === '/api/case' && req.method === 'POST') {
     let body; try { body = await readJson(req); } catch { sendJson(res, 413, { reason: 'too-large' }); return true; }
     if (!body.code || !store.isCodeUsable(body.code)) { sendJson(res, 400, { reason: 'bad-code' }); return true; }
-    const rec = store.saveCase({ ...body, agentName: reqName(req, ip) || body.agentName });
+    // Die beiden Texte kommen vom Server, nicht vom Browser: Sie sind die
+    // Einwilligung, die der Bewerber abgegeben hat, und gehören unverändert
+    // in die Akte. Wird der Text später geändert, bleibt hier stehen, was
+    // an diesem Tag galt.
+    const rec = store.saveCase({
+      ...body, agentName: reqName(req, ip) || body.agentName,
+      skript: store.getScript(), einleitung: store.getIntro(),
+    });
     // Wurde die Aufnahme schon ausgewertet, bevor die Akte angelegt war?
     // Dann gehört die Einschätzung jetzt hier hinein.
     const auf = store.listRecordings().find((r) => r.code === rec.code && r.quality);
@@ -662,15 +740,45 @@ async function handleApi(req, res, urlPath, ip) {
 
   // ---- Streamer-Ordner (mcp.4ever1.tv) ------------------------------------
   // Prüfer dürfen die Ordner sehen; ändern und löschen nur Admins.
+  // Der Adminbereich sieht alles. Prüfer bekommen zunächst nur die Hülle:
+  // dass es eine Akte gibt, wie sie heisst, wie viel drinsteht. Der Inhalt
+  // kommt erst nach /api/streamer-oeffnen mit genanntem Grund – und zwar
+  // wirklich erst dann, der Server schickt ihn vorher nicht mit.
   if (urlPath === '/api/streamers' && req.method === 'GET') {
     if (!authed(req, ip)) { sendJson(res, 401, { reason: 'auth' }); return true; }
-    sendJson(res, 200, { streamers: store.listStreamers() }); return true;
+    const admin = isAdmin(req, ip);
+    sendJson(res, 200, {
+      streamers: admin ? store.listStreamers() : store.listStreamersKurz(),
+      voll: admin,
+    });
+    return true;
   }
-  if (urlPath === '/api/streamer' && req.method === 'GET') {
+
+  // ---- Akteneinsicht: nur mit Grund ----
+  // Wer kein Admin ist, muss sagen, warum er hineinschaut. Der Grund landet
+  // in der Akte, sichtbar für alle, und im Sicherheitsprotokoll. Admins
+  // kommen ohne Angabe hinein – aber auch ihr Zugriff wird festgehalten.
+  if (urlPath === '/api/streamer-oeffnen' && req.method === 'POST') {
     if (!authed(req, ip)) { sendJson(res, 401, { reason: 'auth' }); return true; }
-    const s = store.getStreamer(new URL(req.url, 'http://x').searchParams.get('id') || '');
-    if (!s) { sendJson(res, 404, { reason: 'gone' }); return true; }
-    sendJson(res, 200, { streamer: s }); return true;
+    let body; try { body = await readJson(req, 16 * 1024); } catch { body = {}; }
+    const admin = isAdmin(req, ip);
+    const grund = String(body.grund || '').trim();
+    if (!admin && grund.length < 5) { sendJson(res, 400, { reason: 'grund-fehlt' }); return true; }
+    const s = store.getStreamer(body.id);
+    if (!s) { sendJson(res, 404, { reason: 'nicht-gefunden' }); return true; }
+    const wer = reqName(req, ip) || 'Unbekannt';
+    store.protokolliereZugriff(s.id, { wer, rolle: admin ? 'admin' : 'pruefer', grund: admin ? (grund || 'Adminzugriff') : grund, ip });
+    sec.recordEvent('audit', ip, 'Akte geöffnet (' + wer + '): ' + s.bigoId + (grund ? ' – ' + grund : ''));
+    sendJson(res, 200, { ordner: store.getStreamer(s.id) });
+    return true;
+  }
+  // Die alte Abkürzung `GET /api/streamer?id=…` gibt es nicht mehr. Sie gab
+  // die komplette Akte an jeden angemeldeten Prüfer heraus – ohne Grund, ohne
+  // Protokoll. Damit war die Grundangabe nur noch Zierde: man musste sie im
+  // Browser nicht umgehen, man musste sie nur nicht benutzen. Der einzige Weg
+  // in eine Akte ist jetzt /api/streamer-oeffnen.
+  if (urlPath === '/api/streamer' && req.method === 'GET') {
+    sendJson(res, 410, { reason: 'nur-ueber-oeffnen' }); return true;
   }
   if (urlPath === '/api/streamer' && req.method === 'POST') {
     if (!adminOnly()) return true;
@@ -981,6 +1089,7 @@ async function handleApi(req, res, urlPath, ip) {
       table{border-collapse:collapse;width:100%;margin:1rem 0} th,td{border:1px solid #e3e9f2;padding:.5rem .7rem;text-align:left;font-size:.92rem;vertical-align:top} th{width:34%;background:#f6f8fc;font-weight:600}
       figure{margin:0} .imgs{display:flex;flex-wrap:wrap;gap:1rem;margin-top:1rem} .imgs img{max-width:240px;border:1px solid #e3e9f2;border-radius:8px} figcaption{font-size:.75rem;color:#6b7a90;text-align:center;margin-top:.2rem}
       ul{padding-left:1.1rem;margin:.4rem 0} .print{margin:1rem 0;padding:.6rem 1rem;border:1px solid #3b6ef0;background:#eef3ff;border-radius:8px}
+      pre.wortlaut{white-space:pre-wrap;font-family:inherit;font-size:.9rem;line-height:1.6;background:#f6f8fc;border:1px solid #e3e9f2;border-radius:8px;padding:.7rem .9rem;margin:.3rem 0}
       @media print{.print{display:none}}
     </style></head><body>
       <h1>4EVER1 · Audition</h1><p class="sub">BIGO Live · Bewerbungs-/Auditionsakte</p>
@@ -998,6 +1107,8 @@ async function handleApi(req, res, urlPath, ip) {
       </table>
       ${checks ? `<h3>Prüf-Checkliste</h3><ul>${checks}</ul>` : ''}
       ${imgs ? `<h3>Bilder</h3><div class="imgs">${imgs}</div>` : ''}
+      ${c.skript ? `<h3>Vorgelesener Text (Einwilligung)</h3><pre class="wortlaut">${eh(c.skript)}</pre>` : ''}
+      ${c.einleitung ? `<h3>Begrüßung / Ablauf</h3><pre class="wortlaut">${eh(c.einleitung)}</pre>` : ''}
     </body></html>`;
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' }); res.end(html); return true;
   }
@@ -1086,7 +1197,9 @@ const server = http.createServer(async (req, res) => {
   // laufende Sitzungen nicht ins Leere laufen. Vorübergehend (302), damit
   // Browser es nicht dauerhaft merken.
   if (altHost) {
-    const ziel = 'https://mcp.' + hostName.split('.').slice(1).join('.') + (hostName.startsWith('admin.') ? '/verwaltung' : '/');
+    // Beide landen im Team-Bereich. Auch admin.<domain> führt bewusst NICHT
+    // mehr in die Verwaltung – die liegt woanders und wird nicht verraten.
+    const ziel = 'https://mcp.' + hostName.split('.').slice(1).join('.') + '/';
     res.writeHead(302, { Location: ziel, 'Cache-Control': 'no-store' });
     res.end('Umgezogen nach ' + ziel); return;
   }
@@ -1108,10 +1221,12 @@ const server = http.createServer(async (req, res) => {
   if (urlPath === '/start' || urlPath === '/home') urlPath = '/home.html';
   // Eigener Direkt-Link für Prüfer -> Startseite öffnet gleich den Mitarbeiter-Login
   if (['/pruefer', '/login', '/team', '/mitarbeiter'].includes(urlPath)) urlPath = '/index.html';
-  // Die Verwaltung gibt es nur unter acp.<domain> und mcp.<domain>/verwaltung.
-  // Auf allen anderen Adressen (z. B. ident.4ever1.tv/admin) existiert sie nicht.
+  // Alles Administrative liegt ausschliesslich auf acp.<domain>: einrichten,
+  // Diagnose, Löschen. Auf jeder anderen Adresse – auch auf mcp. – gibt es
+  // die Verwaltung schlicht nicht. Kein Hinweis, keine Weiterleitung: eine
+  // Weiterleitung würde die Adresse verraten, nach der niemand fragen soll.
   if (['/panel', '/admin', '/admin.html', '/verwaltung'].includes(urlPath)) {
-    if (!acpHost && !mcpHost) { res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }); res.end('Nicht gefunden'); return; }
+    if (!acpHost) { res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }); res.end('Nicht gefunden'); return; }
     urlPath = '/admin.html';
   }
   // Suchmaschinen: Die Hauptseite darf gefunden werden, die Arbeitsbereiche
@@ -1195,7 +1310,15 @@ wss.on('connection', (ws, req) => {
 
       if (role === 'guest') {
         const note = store.getCode(code); // Notiz aus dem Code (falls hinterlegt)
-        waiting.set(code, { code, note: note ? note.note : '', joinedAt: Date.now(), claimedBy: null, claimedAt: 0 });
+        // Gleich nachsehen, ob wir die Person kennen. Steht damit in der
+        // Warteschlange, noch bevor jemand das Gespräch annimmt.
+        const bigo = String(msg.bigo || '').trim().slice(0, 80);
+        let bekannt = null;
+        try { bekannt = store.suchePerson({ bigoId: bigo, age: msg.alter }); } catch { bekannt = null; }
+        waiting.set(code, {
+          code, note: note ? note.note : '', joinedAt: Date.now(), claimedBy: null, claimedAt: 0,
+          bigoId: bigo, bekannt,
+        });
       } else {
         const w = waiting.get(code); if (w) { w.claimedBy = ws.pname; w.claimedAt = Date.now(); }
       }
