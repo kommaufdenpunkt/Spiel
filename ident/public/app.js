@@ -2044,6 +2044,15 @@
    * Das Video läuft direkt zwischen den beiden. Es geht den Signal-Server nichts
    * an, wenn der kurz weg war.
    */
+  // Zwei moegliche Wege. /api/ws zuerst: hinter einem Proxy ist das der Weg,
+  // der mit Upgrade weitergeleitet wird. Was einmal geklappt hat, wird gemerkt.
+  const WS_PFADE = ['/api/ws', '/'];
+  function wsPfadGemerkt() {
+    try { const p = localStorage.getItem('ident.wsPfad'); if (WS_PFADE.includes(p)) return p; } catch {}
+    return WS_PFADE[0];
+  }
+  function wsPfadMerken(p) { try { localStorage.setItem('ident.wsPfad', p); } catch {} }
+
   function connectSignaling(neuAufbauen) {
     if (neuAufbauen !== false) closeAllPeers();
     else {
@@ -2055,7 +2064,20 @@
     }
     state.myUploads = state.myUploads || []; state.leaving = false;
     const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-    const ws = new WebSocket(`${proto}://${location.host}`); state.ws = ws;
+    // ---- Der Weg der WebSocket -------------------------------------------
+    //
+    // Der Reverse-Proxy vor dem Dienst leitet nur an EINER Stelle mit Upgrade
+    // weiter: unter /api/ws. Auf / geht er ohne Upgrade durch und antwortet 200
+    // statt 101 - die Verbindung kommt nie zustande, und ohne sie gibt es kein
+    // Video. Genau daran hat es gelegen.
+    //
+    // Der Dienst selbst nimmt jeden Pfad an. Wir versuchen deshalb /api/ws und
+    // fallen auf / zurueck, wenn dort nichts zu holen ist - so laeuft es hinter
+    // beiden Einrichtungen, ohne dass jemand am Server schrauben muss.
+    if (!state.wsPfad) state.wsPfad = wsPfadGemerkt();
+    const pfad = state.wsPfad;
+    const ws = new WebSocket(`${proto}://${location.host}${pfad}`); state.ws = ws;
+    state.wsOffen = false;
     // BIGO-ID und Alter gehen gleich mit: Der Server schaut damit nach, ob es
     // die Person schon gibt, und der Prüfer sieht es in der Warteschlange -
     // bevor er das Gespräch annimmt, nicht erst danach.
@@ -2071,6 +2093,7 @@
           state.role = m.role; state.selfId = m.peerId; setupRoleUI();
           setzeCheck('wcNet', 'ok', 'Verbindung steht');
           state.wiederholung = 0;
+          state.wsOffen = true; wsPfadMerken(pfad);
           (m.peers || []).forEach((p) => ensurePeer(p.peerId, p.role, p.name, false));
           if ((m.peers || []).some((p) => p.role === 'host')) textFreigeben();
           // Nach einem Aussetzer erneut melden – sonst haengt sie als
@@ -2095,6 +2118,16 @@
     };
     ws.onclose = () => {
       if (state.leaving || !$('room').classList.contains('active')) { sysMsg('Verbindung zum Server getrennt.'); return; }
+      // Nie zustande gekommen? Dann liegt es am Weg – den anderen probieren.
+      if (!state.wsOffen) {
+        state.wsPfad = pfad === WS_PFADE[0] ? WS_PFADE[1] : WS_PFADE[0];
+        sysMsg('Verbindungsweg wechseln …');
+        clearTimeout(state.reconnectT);
+        state.reconnectT = setTimeout(() => {
+          if (!state.leaving && $('room').classList.contains('active')) connectSignaling(false);
+        }, 600);
+        return;
+      }
       // Läuft das Bild noch? Dann ist nur der Signalweg weg – das sagen wir
       // ruhig und ohne Schreck. Sonst steht da „unterbrochen", während man sich
       // bestens sieht und hört.

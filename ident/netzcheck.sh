@@ -98,15 +98,20 @@ if [ -z "$DOMAIN" ]; then
   warn "Konnte den Namen (mcp....) nicht aus nginx lesen – Schritt übersprungen."
 else
   echo "  Über: https://$DOMAIN/"
-  A2="$(curl -s -i --max-time 6 -k --resolve "$DOMAIN:443:127.0.0.1" \
-    -H 'Connection: Upgrade' -H 'Upgrade: websocket' \
-    -H 'Sec-WebSocket-Version: 13' -H 'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==' \
-    "https://$DOMAIN/" 2>/dev/null | head -1 | tr -d '\r')"
-  case "$A2" in
-    *101*) gut "nginx lässt WebSockets durch (101). Die Verbindung ist NICHT das Problem." ;;
-    '')    bad "Keine Antwort über nginx."; merke ;;
-    *)     bad "nginx antwortet mit >>$A2<< statt 101 – DAS ist die Ursache."; merke ;;
-  esac
+  DURCH=0
+  for PF in /api/ws /; do
+    A2="$(curl -s -i --max-time 6 -k --resolve "$DOMAIN:443:127.0.0.1" \
+      -H 'Connection: Upgrade' -H 'Upgrade: websocket' \
+      -H 'Sec-WebSocket-Version: 13' -H 'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==' \
+      "https://$DOMAIN$PF" 2>/dev/null | head -1 | tr -d '\r')"
+    printf '  %-10s >>%s<<\n' "$PF" "$A2"
+    case "$A2" in *101*) DURCH=1 ;; esac
+  done
+  if [ "$DURCH" = "1" ]; then
+    gut "Mindestens ein Weg kommt durch – die App nimmt ihn von selbst."
+  else
+    bad "KEIN Weg kommt durch. Ohne WebSocket gibt es kein Video."; merke
+  fi
 fi
 
 # ---- 5. TURN -------------------------------------------------------------
