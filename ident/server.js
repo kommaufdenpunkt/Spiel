@@ -26,6 +26,7 @@ const textpolish = require('./textpolish.js');
 const pdf = require('./pdf.js');
 
 const PORT = process.env.PORT || 8080;
+const STARTZEIT = new Date().toISOString();
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '';
@@ -1353,7 +1354,17 @@ const server = http.createServer(async (req, res) => {
     sendJson(res, 429, { reason: 'zu-viele-anfragen' }); return;
   }
 
-  if (urlPath === '/healthz') { res.writeHead(200, { 'Content-Type': 'text/plain' }); res.end('ok'); return; }
+  // Gesundheitsprüfung – sagt auch, WELCHE Fassung läuft.
+  //
+  // Zweimal hat uns die Frage „ist das schon drauf?" einen Durchgang gekostet:
+  // im Browser stand der alte Stand, und niemand konnte von aussen nachsehen.
+  // Die Kennung ist kein Geheimnis, aber sie beantwortet die Frage in einer
+  // Zeile: curl https://mcp.<domain>/healthz
+  if (urlPath === '/healthz') {
+    res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' });
+    res.end('ok ' + (process.env.IDENT_VERSION || 'unbekannt') + ' seit ' + STARTZEIT + '\n');
+    return;
+  }
   if (urlPath === '/ice') { res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify({ iceServers: buildIceServers() })); return; }
 
   if (urlPath.startsWith('/api/')) { try { if (await handleApi(req, res, urlPath, ip)) return; } catch { if (!res.headersSent) sendJson(res, 500, { reason: 'server-error' }); return; } }

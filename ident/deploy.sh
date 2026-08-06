@@ -80,6 +80,7 @@ docker run -d \
   --env-file "$UMGEBUNG" \
   -e DATA_DIR=/data \
   -e PORT=8080 \
+  -e IDENT_VERSION="$SHA" \
   -v "$DATEN:/data" \
   -p "127.0.0.1:$PORT:8080" \
   "$NAME:aktuell" >/dev/null
@@ -89,7 +90,12 @@ sage "Warten, bis der Dienst antwortet"
 for i in $(seq 1 30); do
   if curl -fsS --max-time 3 "$GESUNDHEIT" >/dev/null 2>&1; then
     echo "  antwortet nach ${i}s"
-    sage "Fertig – Stand $SHA ist live"
+    LIVE="$(curl -fsS --max-time 3 "$GESUNDHEIT" 2>/dev/null | head -1)"
+    echo "  Der Dienst meldet: $LIVE"
+    case "$LIVE" in
+      *"$SHA"*) sage "Fertig – Stand $SHA ist live" ;;
+      *) printf "\n\033[1;33m! Der Dienst meldet nicht %s. Bitte im Browser hart neu laden.\033[0m\n" "$SHA" ;;
+    esac
     docker image prune -f --filter "label=stage=build" >/dev/null 2>&1 || true
     exit 0
   fi
@@ -103,7 +109,7 @@ if [ -n "$ALT" ]; then
   sage "Zurück auf die vorige Fassung"
   docker rm -f "$NAME" >/dev/null 2>&1 || true
   docker run -d --name "$NAME" --restart unless-stopped \
-    --env-file "$UMGEBUNG" -e DATA_DIR=/data -e PORT=8080 \
+    --env-file "$UMGEBUNG" -e DATA_DIR=/data -e PORT=8080 -e IDENT_VERSION="$SHA-zurueck" \
     -v "$DATEN:/data" -p "127.0.0.1:$PORT:8080" "$ALT" >/dev/null
   echo "  Die alte Fassung läuft wieder."
 fi
