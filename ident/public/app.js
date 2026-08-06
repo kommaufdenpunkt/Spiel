@@ -1285,6 +1285,7 @@
     const fertig = !!(p.ausweisName && p.ausweisArt && p.ausweisNr && p.echtBestaetigt);
     box.classList.toggle('fertig', fertig);
     zeigeFertig();
+    merkeFortschritt();
     const st = $('vaStatus');
     if (st) st.textContent = fertig
       ? '✓ Alles da – der Prüfer bekommt es beim Gespräch automatisch.'
@@ -1412,7 +1413,10 @@
         div.innerHTML = '<div class="who"><b>' + esc(w.code) + '</b> ' + pill + bekanntPille(w)
           + '<div class="meta">'
           + (w.bereit ? '<b class="fertig-pill">✓ fertig – wartet auf dich</b>'
-            : '<span class="fuellt-pill">✍ füllt noch aus</span>') + ' · '
+            : '<span class="fuellt-pill">✍ füllt noch aus</span>')
+          + (w.weg ? ' <span class="weg-pill" title="Ihre Verbindung ist gerade weg – meist nur ein '
+              + 'Netzwechsel. Sie bleibt hier stehen und ist gleich zurück.">📵 kurz weg</span>' : '')
+          + ' · '
           + (i === 0 ? 'Als Nächster dran' : 'Platz ' + (i + 1) + ' in der Schlange')
           + (w.bigoId ? ' · BIGO-ID ' + esc(w.bigoId) : '')
           + (w.bigoNick ? ' · ' + esc(w.bigoNick) : '')
@@ -1485,7 +1489,20 @@
   async function joinRoom(code, alreadyRunning) {
     if (!alreadyRunning) {
       const claim = await api('POST', '/api/waiting/claim', { code });
-      if (claim.status !== 200) { toast(claim.body && claim.body.by ? 'Wird gerade von ' + claim.body.by + ' übernommen.' : 'Bewerber nicht mehr verfügbar.'); refreshWaiting(); return; }
+      if (claim.status !== 200) {
+        // Den WIRKLICHEN Grund sagen. „Nicht mehr verfügbar" war für jeden Fall
+        // dieselbe Antwort – man klickte und verstand nicht, warum nichts passiert.
+        const g = (claim.body && claim.body.reason) || '';
+        if (claim.body && claim.body.by) toast('Wird gerade von ' + claim.body.by + ' übernommen.');
+        else if (g === 'nicht-bereit') {
+          const s2 = (claim.body && claim.body.trotzdemAb) || 0;
+          toast('Sie ist noch nicht fertig – sie füllt gerade aus. '
+            + (s2 > 0 ? 'In ' + Math.ceil(s2 / 60) + ' Min. kannst du sie trotzdem holen.' : ''));
+        } else if (g === 'zu-frueh') toast('Noch zu früh – gib ihr einen Moment.');
+        else if (g === 'gone') toast('Sie ist nicht mehr im Warteraum.');
+        else toast('Abholen ging nicht (' + (g || claim.status) + ').');
+        refreshWaiting(); return;
+      }
     }
     clearInterval(state.waitingTimer); state.waitingTimer = 0;
     if (!(await startCamera())) { if (!alreadyRunning) api('POST', '/api/waiting/release', { code }); openWaiting(); toast('Kein Zugriff auf Kamera/Mikrofon.'); return; }
@@ -1708,8 +1725,11 @@
     // „Bereit" war ein Tippen – der Browser lässt Ton also zu. Wer die Musik
     // einmal ausgemacht hat, bekommt sie nicht wieder aufgedrängt.
     if (musikGewollt()) musikAn(); else musikKnopf(false);
-    state.bereitGemeldet = false; state.akGelesen = false; state.selfieFertig = false;
+    if (!state.wiederVorab) { state.bereitGemeldet = false; state.akGelesen = false; }
+    state.selfieFertig = false;
+    vorabZurueck();
     zeigeFertig();
+    merkeFortschritt();
   }
   function wroomAus() {
     const box = $('wroom'); if (box) box.style.display = 'none';
@@ -1717,6 +1737,80 @@
     clearInterval(wroomT); wroomT = null;
     if (wroomAudio) { try { wroomAudio.ctx.close(); } catch {} wroomAudio = null; }
     musikAus();
+  }
+
+  // ---- Weitermachen, wo man war ---------------------------------------------
+  //
+  // Sie schiebt den Tab beiseite, sperrt das Handy, ein Anruf kommt - und der
+  // Browser wirft die Seite weg. Ohne Gedaechtnis stand sie danach wieder am
+  // Anfang und musste alles neu eintippen, mit einer Nummer, die sie schon
+  // benutzt hat. Das gibt niemand zweimal ein.
+  //
+  // Was wir merken: Nummer, Kennungen, Alter und die getippten Ausweisdaten.
+  // Was wir NICHT merken: das Selfie und die Ausweisbilder. Die sollen nach dem
+  // Gespraech nicht auf ihrem Geraet liegen bleiben - sie sind in drei Sekunden
+  // neu aufgenommen. Nach dem Abschluss wird alles geloescht.
+  const MERKER = 'ident.lauf';
+  function merkeFortschritt() {
+    if (state.role !== 'guest' || !state.code) return;
+    try {
+      localStorage.setItem(MERKER, JSON.stringify({
+        code: state.code,
+        bigoId: (state.profile && state.profile.bigoId) || '',
+        bigoName: (state.profile && state.profile.bigoName) || '',
+        age: (state.profile && state.profile.age) || '',
+        vaName: ($('vaName') || {}).value || '',
+        vaArt: ($('vaArt') || {}).value || '',
+        vaNr: ($('vaNr') || {}).value || '',
+        vaEcht: !!(($('vaEcht') || {}).checked),
+        akGelesen: !!state.akGelesen,
+        bereit: !!state.bereitGemeldet,
+        am: Date.now(),
+      }));
+    } catch { /* privater Modus: dann eben ohne Gedaechtnis */ }
+  }
+  function holeFortschritt() {
+    try {
+      const r = JSON.parse(localStorage.getItem(MERKER) || 'null');
+      // Aelter als zwei Stunden ist kein laufender Versuch mehr.
+      if (!r || !r.code || Date.now() - (r.am || 0) > 2 * 3600 * 1000) return null;
+      return r;
+    } catch { return null; }
+  }
+  function vergessFortschritt() { try { localStorage.removeItem(MERKER); } catch {} }
+
+  /** Nach einem Neuladen: alles zurueckschreiben und weitermachen. */
+  async function fortsetzen(r) {
+    const c = await api('POST', '/api/code-check', { code: r.code });
+    if (c.status !== 200 || !c.body || !c.body.ok) { vergessFortschritt(); return false; }
+    $('codeInput').value = r.code;
+    $('bigoInput').value = r.bigoId || '';
+    if ($('bigoNickInput')) $('bigoNickInput').value = r.bigoName || '';
+    $('ageInput').value = r.age || '';
+    $('consent').checked = true;
+    state.role = 'guest'; state.code = r.code;
+    state.profile = { bigoId: r.bigoId || '', bigoName: r.bigoName || '', age: r.age || '' };
+    state.akGelesen = !!r.akGelesen;
+    state.bereitGemeldet = !!r.bereit;
+    $('lobby').style.display = 'none';
+    $('onboarding').style.display = '';
+    $('consentRec').checked = true;
+    loadIntro();
+    // Die Ausweisdaten stehen wieder da, sobald der Warteraum aufgeht.
+    state.wiederVorab = r;
+    toast('Willkommen zurück – du machst da weiter, wo du warst.');
+    return true;
+  }
+  /** Die getippten Ausweisdaten zurueckschreiben (beim Betreten des Warteraums). */
+  function vorabZurueck() {
+    const r = state.wiederVorab; if (!r) return;
+    state.wiederVorab = null;
+    if ($('vaName')) $('vaName').value = r.vaName || '';
+    if ($('vaArt')) $('vaArt').value = r.vaArt || '';
+    if ($('vaNr')) $('vaNr').value = r.vaNr || '';
+    if ($('vaEcht')) $('vaEcht').checked = !!r.vaEcht;
+    vorabStand();
+    if (r.vaName || r.vaNr) toast('Deine Ausweisdaten waren noch da.');
   }
 
   // ---- „Ich bin fertig" ----------------------------------------------------
@@ -1761,7 +1855,7 @@
     $('fertigBtn').disabled = true;
     const r = await api('POST', '/api/waiting/bereit', { code: state.code, bereit: true });
     if (r.status !== 200) { $('fertigBtn').disabled = false; toast('Konnte nicht gemeldet werden – bitte noch einmal.'); return; }
-    state.bereitGemeldet = true;
+    state.bereitGemeldet = true; merkeFortschritt();
     box.classList.add('gemeldet');
     $('fertigBtn').textContent = '✓ Gemeldet – wir kommen zu dir';
     $('fbHinweis').innerHTML = '<b>Das Team weiß Bescheid.</b> Bleib einfach hier, jemand holt dich gleich ins '
@@ -1772,7 +1866,7 @@
   if ($('fertigBtn')) $('fertigBtn').addEventListener('click', fertigMelden);
   // Aufklärung: einmal aufgeklappt zählt als gelesen.
   document.querySelectorAll('.akbox').forEach((d) => d.addEventListener('toggle', () => {
-    if (d.open) { state.akGelesen = true; zeigeFertig(); }
+    if (d.open) { state.akGelesen = true; zeigeFertig(); merkeFortschritt(); }
   }));
 
   // ---- Wartemusik ----------------------------------------------------------
@@ -1979,6 +2073,11 @@
           state.wiederholung = 0;
           (m.peers || []).forEach((p) => ensurePeer(p.peerId, p.role, p.name, false));
           if ((m.peers || []).some((p) => p.role === 'host')) textFreigeben();
+          // Nach einem Aussetzer erneut melden – sonst haengt sie als
+          // „fuellt noch aus" in der Schlange, obwohl sie fertig ist.
+          if (state.role === 'guest' && state.bereitGemeldet) {
+            api('POST', '/api/waiting/bereit', { code: state.code, bereit: true });
+          }
           if ((m.peers || []).length) $('bannerText').textContent = 'Verbunden.';
           break;
         case 'peer-joined':
@@ -2396,6 +2495,7 @@
       $('reviewStatus').textContent = result === 'approved' ? '✓ Ein Prüfer hat bereits freigegeben.' : '✖ Ein Prüfer hat bereits abgelehnt.';
       return;
     }
+    vergessFortschritt();
     if (result === 'approved') { $('okBadge').classList.add('on'); $('guideStatus').className = 'status ok'; $('guideStatus').textContent = '✓ Deine Audition wurde erfolgreich übermittelt. Viel Erfolg – die Agentur 4EVER1 meldet sich!'; toast('Übermittelt ✓'); }
     else { $('guideStatus').className = 'status bad'; $('guideStatus').textContent = '✖ Die Audition wurde nicht angenommen. Bei Fragen wende dich an die Agentur 4EVER1.'; }
   }
@@ -2481,7 +2581,8 @@
     let el = host.querySelector('.micoff');
     if (!aus) { if (el) el.remove(); return; }
     if (!el) { el = document.createElement('div'); el.className = 'micoff'; host.appendChild(el); }
-    el.textContent = '🔇 ' + (name || 'stumm') + ' ist stumm';
+    // „Du ist stumm" war falsch – bei sich selbst heisst es „bist".
+    el.textContent = name === 'Du' ? '🔇 Du bist stumm' : '🔇 ' + (name || 'Gegenüber') + ' ist stumm';
   }
   // Blende über dem Bild, wenn jemand seine Kamera ausgeschaltet hat.
   function zeigeCamAus(wo, aus, name) {

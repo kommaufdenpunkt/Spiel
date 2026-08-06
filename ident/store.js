@@ -443,8 +443,19 @@ function ordnerSchluessel(bigoId) { return String(bigoId || '').trim().toLowerCa
 // Jetzt hat jeder Ordner beides und dazu frühere Namen. Gesucht wird über alle
 // Wege gleichzeitig. Und was fehlt, wird beim Treffer nachgetragen.
 
-/** Zahlen-Kennung: nur Ziffern. „901 234 567" und „901234567" sind dasselbe. */
-function idSchluessel(x) { const s = String(x || '').replace(/\D+/g, ''); return s.length >= 4 ? s : ''; }
+/**
+ * Zahlen-Kennung: nur Ziffern. „901 234 567" und „901234567" sind dasselbe.
+ *
+ * Achtung: eine BIGO-ID muss KEINE Zahl sein – „melissa.darlyn" ist genauso
+ * eine. Solche werden über die Namens-Kennung gefunden; hier kommt dann leer
+ * heraus, und das ist richtig. Nur eine reine Zahlenfolge ist eine Zahl.
+ */
+function idSchluessel(x) {
+  const roh = String(x || '').trim();
+  if (!/^[\d\s.\-]+$/.test(roh)) return '';   // Buchstaben drin -> keine Zahl
+  const s = roh.replace(/\D+/g, '');
+  return s.length >= 4 ? s : '';
+}
 /**
  * Namens-Kennung: klein, ohne Zeichen, Umlaute aufgelöst.
  * „Tauchküken", „tauchkueken", „Tauch Küken" und „TAUCHKÜKEN_" sind dieselbe
@@ -478,7 +489,7 @@ function ordnerKennungen(s) {
     const n = namSchluessel(w);
     if (n.length >= 3) { namen.add(n); const k = ohneEy(n); if (k) namen.add(k); }
   };
-  dazu(s.bigoId); dazu(s.bigoName);
+  dazu(s.bigoId); dazu(s.bigoName); dazu(s.bigoIdText);
   (s.aliasse || []).forEach(dazu);
   return { zahlen, namen };
 }
@@ -518,6 +529,12 @@ function ordnerZuordnen(ordner, { bigoId, bigoName } = {}) {
   const ergaenzt = [];
   const zahl = idSchluessel(bigoId) || idSchluessel(bigoName);
   const neuName = String(bigoName || '').trim().slice(0, 80);
+  // Eine BIGO-ID aus Buchstaben (melissa.darlyn) ist genauso eine Kennung.
+  // Hat der Ordner noch keine, wird sie uebernommen.
+  const roh = String(bigoId || '').trim();
+  if (!zahl && roh && !ordner.bigoIdText && namSchluessel(roh) !== namSchluessel(ordner.bigoId)) {
+    ordner.bigoIdText = roh.slice(0, 60); ergaenzt.push('BIGO-ID ' + ordner.bigoIdText);
+  }
   if (zahl && !idSchluessel(ordner.bigoId)) {
     // Der Ordner lag unter einem Namen. Der Name wandert ins Namensfeld, die
     // Zahl wird die Kennung – so heisst der Ordner künftig wie überall sonst.

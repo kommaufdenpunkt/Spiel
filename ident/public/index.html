@@ -532,6 +532,7 @@
   /* Zustand in der Warteschlange: fertig oder fuellt noch aus */
   .fertig-pill{color:#5fe0a0;font-weight:700}
   .fuellt-pill{color:var(--warm,#ffc98a)}
+  .weg-pill{color:var(--dim);font-size:.76rem}
   /* Deckel ueber dem Vorlese-Text, solange niemand da ist */
   .prompter-deckel{display:flex;flex-direction:column;gap:.3rem;padding:1rem .85rem;border-radius:12px;
     border:1px dashed var(--line2);background:#0f1728;text-align:center;align-items:center}
@@ -797,8 +798,10 @@
       </div>
       <div class="field">
         <label for="bigoInput">BIGO-ID</label>
-        <input id="bigoInput" placeholder="z. B. 901234567" inputmode="numeric" autocomplete="off">
-        <small class="feldhilfe">Die Zahl aus deinem BIGO-Profil.</small>
+        <!-- Keine Zahlentastatur: BIGO-IDs koennen Buchstaben und Punkte
+             enthalten, z. B. melissa.darlyn. -->
+        <input id="bigoInput" placeholder="z. B. 901234567 oder melissa.darlyn" autocomplete="off" maxlength="60">
+        <small class="feldhilfe">Genau so, wie sie in deinem BIGO-Profil steht – Zahlen oder Buchstaben.</small>
       </div>
       <!-- Zweites Feld für den Namen. Beides zusammen ist der Schlüssel: viele
            kennen ihre Zahl nicht auswendig, aber ihren Namen immer. Und wenn wir

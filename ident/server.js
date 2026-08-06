@@ -591,6 +591,7 @@ async function handleApi(req, res, urlPath, ip) {
         code: w.code, note: w.note, joinedAt: w.joinedAt, busy,
         bigoId: w.bigoId || '', bigoNick: w.bigoNick || '', bekannt: w.bekannt || null,
         bereit: !!w.bereit, bereitSeit: w.bereitSeit || 0,
+        weg: !!w.wegSeit, wegSek: w.wegSeit ? Math.round((Date.now() - w.wegSeit) / 1000) : 0,
         claimedBy: busy ? w.claimedBy : null,
         hosts, live: hosts.length > 0,
         waitingSec: Math.max(0, Math.round((Date.now() - w.joinedAt) / 1000)),
@@ -1441,9 +1442,38 @@ const server = http.createServer(async (req, res) => {
   if (urlPath === '/impressum') urlPath = '/impressum.html';
   const filePath = path.normalize(path.join(PUBLIC_DIR, urlPath));
   if (!filePath.startsWith(PUBLIC_DIR)) { res.writeHead(403); res.end('Forbidden'); return; }
+  // Groesse und Aenderungszeit brauchen wir fuer die Cache-Marke.
+  let st = null;
+  try { st = fs.statSync(filePath); } catch { st = null; }
+  if (!st || !st.isFile()) { res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }); res.end('Nicht gefunden'); return; }
   fs.readFile(filePath, (err, data) => {
     if (err) { res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }); res.end('Nicht gefunden'); return; }
-    res.writeHead(200, { 'Content-Type': MIME[path.extname(filePath)] || 'application/octet-stream' });
+    // ---- Cache-Angaben: das Wichtigste an der ganzen Auslieferung ----------
+    //
+    // Vorher ging KEINE Angabe mit. Dann entscheidet der Browser selbst, und er
+    // entscheidet grosszügig: Safari behielt index.html und app.js stundenlang.
+    // Ergebnis: auf dem Server lief die neue Fassung, im Browser die alte – mit
+    // zerrissenen Fragen und ohne Verbindung, weil altes Skript gegen neuen
+    // Server lief. Das hat uns mehrere Durchgänge gekostet, und niemand konnte
+    // es sehen.
+    //
+    // Seite und Skripte: bei jedem Aufruf nachfragen. Bilder und Zeichensätze
+    // ändern sich nicht und dürfen liegen bleiben.
+    const endung = path.extname(filePath).toLowerCase();
+    const frisch = ['.html', '.js', '.css', '.webmanifest', '.json'].includes(endung);
+    const marke = '"' + st.size.toString(36) + '-' + Math.floor(st.mtimeMs).toString(36) + '"';
+    // Hat der Browser schon genau diesen Stand? Dann nur „unverändert" – das
+    // kostet nichts und ist trotzdem immer aktuell.
+    if (req.headers['if-none-match'] === marke) {
+      res.writeHead(304, { ETag: marke, 'Cache-Control': frisch ? 'no-cache' : 'public, max-age=86400' });
+      res.end(); return;
+    }
+    res.writeHead(200, {
+      'Content-Type': MIME[endung] || 'application/octet-stream',
+      'Cache-Control': frisch ? 'no-cache' : 'public, max-age=86400',
+      ETag: marke,
+      'Last-Modified': new Date(st.mtimeMs).toUTCString(),
+    });
     res.end(data);
   });
 });
@@ -1479,6 +1509,25 @@ const rooms = new Map();
 /** waiting: Map<code, {code, note, joinedAt, claimedBy, claimedAt}> */
 const waiting = new Map();
 const CLAIM_TTL = 30000;
+// Wie lange eine Bewerberin in der Schlange stehen bleibt, obwohl ihre
+// Verbindung weg ist. Zwei Minuten: lange genug fuer einen Netzwechsel oder
+// einen Blick in eine andere App, kurz genug, dass niemand ewig herumsteht.
+const WEG_TTL = 120000;
+// Wer schon "Ich bin fertig" gemeldet hat, wartet aktiv auf uns. Die bleibt
+// deutlich laenger stehen: sie hat ihren Teil getan, und wenn sie den Tab
+// beiseiteschiebt oder das Handy sperrt, darf sie deswegen nicht aus der
+// Schlange fallen.
+const WEG_TTL_BEREIT = 900000;
+const wartenAufraeumen = setInterval(() => {
+  waiting.forEach((w, code) => {
+    if (!w.wegSeit) return;
+    const room = rooms.get(code);
+    if (room && room.size > 0) { w.wegSeit = 0; return; }   // doch noch jemand da
+    const grenze = w.bereit ? WEG_TTL_BEREIT : WEG_TTL;
+    if (Date.now() - w.wegSeit > grenze) waiting.delete(code);
+  });
+}, 20000);
+wartenAufraeumen.unref && wartenAufraeumen.unref();
 const MAX_HOSTS = 4;
 function roomHosts(room) { let n = 0; if (room) for (const w of room.values()) if (w.role === 'host') n++; return n; }
 function roomHasGuest(room) { if (room) for (const w of room.values()) if (w.role === 'guest') return true; return false; }
@@ -1533,9 +1582,28 @@ wss.on('connection', (ws, req) => {
         // erkannt. Der Prüfer sieht in der Schlange dann schon, dass es kein
         // Neuling ist – bevor er das Gespräch annimmt.
         try { bekannt = store.suchePerson({ bigoId: bigo, bigoName: nick, age: msg.alter }); } catch { bekannt = null; }
+        // WICHTIG: einen bestehenden Eintrag NICHT ueberschreiben.
+        //
+        // Die Bewerberin verbindet sich neu, sobald das Netz kurz zuckt oder sie
+        // die App in den Hintergrund legt - auf dem Handy also andauernd. Wurde
+        // der Eintrag dabei neu angelegt, war ihr "Ich bin fertig" weg und die
+        // Wartezeit fing wieder bei null an. Der Pruefer sah einen freien
+        // Abhol-Knopf, der Server sagte Nein - und es "passierte nichts".
+        //
+        // Was sie gemeldet hat, gilt weiter. Nur die Angaben werden frisch
+        // uebernommen.
+        const vorhanden = waiting.get(code);
         waiting.set(code, {
-          code, note: note ? note.note : '', joinedAt: Date.now(), claimedBy: null, claimedAt: 0,
-          bigoId: bigo, bigoNick: nick, bekannt, bereit: false, bereitSeit: 0,
+          code, note: note ? note.note : '',
+          joinedAt: vorhanden ? vorhanden.joinedAt : Date.now(),
+          claimedBy: vorhanden ? vorhanden.claimedBy : null,
+          claimedAt: vorhanden ? vorhanden.claimedAt : 0,
+          bigoId: bigo || (vorhanden ? vorhanden.bigoId : ''),
+          bigoNick: nick || (vorhanden ? vorhanden.bigoNick : ''),
+          bekannt: bekannt || (vorhanden ? vorhanden.bekannt : null),
+          wegSeit: 0,                       // sie ist ja wieder da
+          bereit: vorhanden ? !!vorhanden.bereit : false,
+          bereitSeit: vorhanden ? (vorhanden.bereitSeit || 0) : 0,
         });
       } else {
         const w = waiting.get(code); if (w) { w.claimedBy = ws.pname; w.claimedAt = Date.now(); }
@@ -1555,7 +1623,22 @@ wss.on('connection', (ws, req) => {
     const room = rooms.get(ws.roomCode); if (!room) return;
     room.delete(ws.peerId);
     for (const other of room.values()) send(other, { type: 'peer-left', peerId: ws.peerId });
-    if (ws.role === 'guest') { waiting.delete(ws.roomCode); }
+    if (ws.role === 'guest') {
+      // NICHT loeschen. Das war die Ursache dafuer, dass "Abholen" nichts tat.
+      //
+      // Die Verbindung der Bewerberin bricht andauernd kurz weg: Netz zuckt,
+      // App in den Hintergrund, Proxy-Zeitlimit. Wurde sie dabei aus der
+      // Warteschlange geloescht, kam sie als NEUE Person zurueck - ohne ihr
+      // "Ich bin fertig" und mit neuer Wartezeit. Der Pruefer sah einen freien
+      // Abhol-Knopf (aus der vorigen Abfrage), der Server sagte Nein, und im
+      // Browser passierte scheinbar nichts.
+      //
+      // Sie bleibt jetzt stehen und ist als "kurz weg" gekennzeichnet. Kommt sie
+      // binnen zwei Minuten zurueck, war nie etwas. Kommt sie nicht, raeumt der
+      // Aufraeumer sie weg.
+      const w = waiting.get(ws.roomCode);
+      if (w) { w.wegSeit = Date.now(); }
+    }
     else {
       const w = waiting.get(ws.roomCode);
       if (w && roomHosts(room) === 0) { if (!store.isCodeUsable(ws.roomCode)) waiting.delete(ws.roomCode); else { w.claimedBy = null; w.claimedAt = 0; } }
