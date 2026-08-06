@@ -1501,17 +1501,27 @@ const WS_PING_MS = 25000;
 // Lebenszeichen sind knapp zwei Minuten; wer dann noch schweigt, ist wirklich
 // weg. Und JEDE eingehende Nachricht zaehlt als Lebenszeichen, nicht nur ein
 // Pong.
-const WS_STILL_MAX = 4;
+//
+// NICHT mehr abschalten wegen Stille. Im Protokoll stand:
+//     [ws] beendet nach 4 stillen Runden (188.107.91.158)
+// Das war eine FUNKTIONIERENDE Verbindung. Die Pong-Antworten kommen durch den
+// Reverse-Proxy nicht zurueck, also sah eine gesunde Verbindung tot aus - und
+// meine Schutzmassnahme hat sie nach 100 Sekunden abgeschossen. Damit war sie
+// der Schaden, nicht der Schutz.
+//
+// Der Ping bleibt: er halt die Leitung warm, und das kostet nichts. Wer wirklich
+// weg ist, meldet sich ueber 'close' - darauf ist Verlass, das steht im
+// Protokoll. Und der Proxy hier hat 3600s Zeitlimit, kappt also von sich aus
+// nichts.
 const wsPing = setInterval(() => {
   wss.clients.forEach((ws) => {
-    if (ws.stilleRunden === undefined) ws.stilleRunden = 0;
-    if (ws.stilleRunden >= WS_STILL_MAX) {
-      console.log('[ws] beendet nach ' + ws.stilleRunden + ' stillen Runden (' + (ws.ip || '?') + ')');
-      try { ws.terminate(); } catch {}
-      return;
+    ws.stilleRunden = (ws.stilleRunden || 0) + 1;
+    // Nur aufschreiben, nicht eingreifen. Lange Stille kann normal sein: das
+    // Video laeuft direkt zwischen den beiden, hier passiert dann nichts.
+    if (ws.stilleRunden === 20) {
+      console.log('[ws] seit ~8 Min. still, bleibt aber offen (' + (ws.role || '?') + ' ' + (ws.ip || '?') + ')');
     }
-    ws.stilleRunden++;
-    try { ws.ping(); } catch { try { ws.terminate(); } catch {} }
+    try { ws.ping(); } catch { /* wenn das nicht geht, meldet sich 'close' */ }
   });
 }, WS_PING_MS);
 wsPing.unref && wsPing.unref();

@@ -51,9 +51,10 @@ else
   for f in $KONFIG; do
     grep -q 'proxy_pass' "$f" 2>/dev/null || continue
     echo "  Datei: $f"
-    HAT_UP=$(grep -ci 'proxy_set_header[[:space:]]\+Upgrade' "$f" 2>/dev/null || echo 0)
-    HAT_CONN=$(grep -ci 'proxy_set_header[[:space:]]\+Connection' "$f" 2>/dev/null || echo 0)
-    HAT_11=$(grep -ci 'proxy_http_version[[:space:]]\+1\.1' "$f" 2>/dev/null || echo 0)
+    zaehl() { grep -ci "$1" "$f" 2>/dev/null | head -1; }
+    HAT_UP=$(zaehl 'proxy_set_header[[:space:]]\+Upgrade');   HAT_UP=${HAT_UP:-0}
+    HAT_CONN=$(zaehl 'proxy_set_header[[:space:]]\+Connection'); HAT_CONN=${HAT_CONN:-0}
+    HAT_11=$(zaehl 'proxy_http_version[[:space:]]\+1\.1');    HAT_11=${HAT_11:-0}
     [ "$HAT_11" -gt 0 ]   && gut "proxy_http_version 1.1 steht in der Datei" || { bad "proxy_http_version 1.1 FEHLT"; merke; }
     [ "$HAT_UP" -gt 0 ]   && gut "Upgrade-Kopfzeile steht in der Datei"      || { bad "proxy_set_header Upgrade FEHLT"; merke; }
     [ "$HAT_CONN" -gt 0 ] && gut "Connection-Kopfzeile steht in der Datei"   || { bad "proxy_set_header Connection FEHLT"; merke; }
@@ -146,8 +147,11 @@ fi
 
 sage "Ergebnis: $PROBLEME Punkt(e) gefunden"
 cat <<'ENDE'
-  Fehlen die WebSocket-Kopfzeilen in nginx, gehören diese Zeilen in den
-  location-Block der Seite (mcp. UND ident.):
+  HINWEIS: Wenn oben bei /api/ws eine 101 steht, ist alles gut – die App nimmt
+  diesen Weg von selbst. Die Meldung "im Block für / stehen sie nicht" ist dann
+  kein Problem, nur eine Feststellung.
+
+  Kommt KEIN Weg durch, gehören diese Zeilen in den location-Block für /:
 
       location / {
           proxy_pass http://127.0.0.1:8095;
