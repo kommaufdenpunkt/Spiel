@@ -80,6 +80,33 @@ geändert, steht in der alten Akte weiterhin, was an dem Tag galt.
   Textaufbereitung vor dem Speichern. Schreiben darf jeder Prüfer, ändern nur
   Admins, löschen nur über `acp.`
 
+## Die Aufnahme liegt schon während des Gesprächs auf dem Server
+
+Der Prüfer-Browser zeichnet beide Seiten in **ein** Bild (Bewerber links, Prüfer
+rechts, beide Tonspuren gemischt) – ein Raum, eine Datei. Neu ist, wohin sie
+geht: **jedes Stück wandert sofort zum Server**, einzeln verschlüsselt.
+
+Vorher sammelte der Browser alles im Speicher und schickte es erst beim
+Stoppen. Stürzte er ab, war die komplette Audition weg – rückstandslos. Jetzt:
+
+- Beim Start entsteht ein Lauf (`/api/rec/start`), danach geht sekündlich ein
+  Stück hoch (`/api/rec/chunk`), beim Stoppen wird zusammengesetzt
+  (`/api/rec/finish`). Der Prüfer sieht „↑ läuft auf dem Server mit".
+- **Bricht der Prüfer weg**, bleibt der Lauf liegen. Beim nächsten Start des
+  Dienstes wird er zu einer Aufnahme zusammengesetzt und als **abgebrochen**
+  gekennzeichnet – damit niemand sie für vollständig hält. Fehlen Stücke, steht
+  `unvollständig` dran.
+- Der alte Weg am Stück (`POST /api/recording`) bleibt als **Rückfalltür**:
+  schafft der Browser das Mitlaufen nicht, geht es am Ende noch einmal komplett.
+  Lieber doppelt als gar nicht.
+- `GET /api/rec/offen` (nur Admin) zeigt, was gerade offen hängt.
+
+**Der Vorlese-Text steht mit im Video.** Der Bewerber schickt den Satz, den er
+gerade vor sich hat; der Prüfer sieht ihn als „Liest gerade" und brennt ihn
+unten in die Aufnahme ein. Damit zeigt die Aufnahme nicht nur, *dass* jemand
+geredet hat, sondern *was er in dem Moment vor sich hatte* – der Unterschied
+zwischen einem Video und einem Nachweis der Einwilligung.
+
 ## Der blaue Haken (Altersverifikation ohne Audition)
 
 Wer längst dabei ist, muss kein Gespräch nachholen. Der Prüfer öffnet die

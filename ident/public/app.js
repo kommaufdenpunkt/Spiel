@@ -1450,8 +1450,38 @@
   if ($('prompterBox')) $('prompterBox').addEventListener('scroll', () => {
     const box = $('prompterBox');
     if (Math.abs(box.scrollTop - promptPos) > 3) promptPos = box.scrollTop; // vom Nutzer bewegt
+    meldeZeile();
   }, { passive: true });
   loadScript();
+
+  // ---- Was liest er gerade? Das gehört in die Aufnahme ---------------------
+  // Der Vorlese-Text ist die Einwilligung, die der Bewerber in die Kamera
+  // spricht. Bisher stand er nur im Ordner - man sah auf der Aufnahme jemanden
+  // reden, aber nicht, was auf seinem Bildschirm stand. Jetzt schickt der
+  // Bewerber die Zeile, die er gerade vor sich hat, und der Prüfer brennt sie
+  // unten in die Aufnahme ein. Wer sie später ansieht, liest mit.
+  let letzteZeile = '';
+  function meldeZeile() {
+    if (state.role !== 'guest') return;
+    const box = $('prompterBox'), txt = $('prompterText');
+    if (!box || !txt) return;
+    const zeile = sichtbareZeile(box, txt);
+    if (zeile === letzteZeile) return;
+    letzteZeile = zeile;
+    dcBroadcast({ kind: 'vorlese', text: zeile });
+  }
+  /** Der Satz, der gerade in der Mitte des Fensters steht. */
+  function sichtbareZeile(box, txt) {
+    const roh = (txt.textContent || '').replace(/\s+/g, ' ').trim();
+    if (!roh) return '';
+    const hoehe = box.scrollHeight - box.clientHeight;
+    const anteil = hoehe > 0 ? Math.min(1, Math.max(0, (box.scrollTop + box.clientHeight / 2) / box.scrollHeight)) : 0;
+    // In Sätze zerlegen und den nehmen, der an dieser Stelle steht. Genauer als
+    // Pixel zu rechnen wird es nicht - und genauer muss es auch nicht sein.
+    const saetze = roh.split(/(?<=[.!?])\s+/).filter((s) => s.trim().length > 1);
+    if (!saetze.length) return roh.slice(0, 160);
+    return saetze[Math.min(saetze.length - 1, Math.floor(anteil * saetze.length))].slice(0, 200);
+  }
 
   // ================= RAUM / WebRTC =================
   function startRoom() {
@@ -1740,6 +1770,13 @@
       // Der Bewerber soll sehen, wenn aufgezeichnet wird – er hat zugestimmt,
       // also darf er es auch jederzeit erkennen.
       else if (m.kind === 'rec') zeigeRec(!!m.on);
+      // Die Zeile, die der Bewerber gerade vorliest – wird unten in die
+      // Aufnahme geschrieben, damit man später mitlesen kann.
+      else if (m.kind === 'vorlese') {
+        state.vorleseZeile = String(m.text || '').slice(0, 200);
+        const box = $('liestGerade');
+        if (box) { box.style.display = state.vorleseZeile ? '' : 'none'; $('liestText').textContent = state.vorleseZeile; }
+      }
       // Gegenüber hat die Kamera aus- oder wieder eingeschaltet.
       else if (m.kind === 'cam') {
         const P = state.peers.get(peerId);
@@ -1996,6 +2033,7 @@
         lastDraw = ts; ctx.fillStyle = '#0d1526'; ctx.fillRect(0, 0, W, H);
         cover(ctx, remoteVideo, 0, 0, W / 2, H, gegenueberCamAus(), gegenueberName());
         cover(ctx, localVideo, W / 2, 0, W / 2, H, !camAn(), state.name || 'Prüfer');
+        vorleseBand(ctx, W, H, state.vorleseZeile);
       }
       requestAnimationFrame(draw);
     };
@@ -2007,7 +2045,17 @@
     const mixed = new MediaStream([...canvasStream.getVideoTracks(), ...dest.stream.getAudioTracks()]);
     const { mime, ext } = pickMime(); state.recMime = mime; state.recExt = ext; state.recChunks = [];
     const rec = mime ? new MediaRecorder(mixed, { mimeType: mime }) : new MediaRecorder(mixed); state.recorder = rec;
-    rec.ondataavailable = (e) => { if (e.data && e.data.size) state.recChunks.push(e.data); };
+    // Jedes Stück geht sofort zum Server. Der Browser hält es nur zusätzlich
+    // fest, als Rückfalltür – falls das Hochladen unterwegs nicht klappt.
+    state.recSitzung = null; state.recTeil = 0; state.recWarteschlange = []; state.recLaeuftHoch = false;
+    state.recHochOk = 0; state.recHochFehler = 0;
+    laufAnmelden(mime, ext);
+    rec.ondataavailable = (e) => {
+      if (!e.data || !e.data.size) return;
+      state.recChunks.push(e.data);
+      state.recWarteschlange.push(e.data);
+      schiebeStuecke();
+    };
     rec.onstop = finalizeRec; rec.start(1000); draw();
     state.recStart = Date.now(); $('recBadge').classList.add('on'); state.recTimer = setInterval(() => { const s = Math.floor((Date.now() - state.recStart) / 1000); $('recTime').textContent = pad(Math.floor(s / 60)) + ':' + pad(s % 60); }, 500);
     $('recBtn').disabled = true; $('stopRecBtn').disabled = false; toast('Aufnahme läuft');
@@ -2018,6 +2066,39 @@
     state.recorder = null; clearInterval(state.recTimer);
     $('recBadge').classList.remove('on'); $('recBtn').disabled = false; $('stopRecBtn').disabled = true;
     zeigeRec(false); dcBroadcast({ kind: 'rec', on: false });
+  }
+  /**
+   * Der Vorlese-Text unten in der Aufnahme – wie ein Untertitel.
+   *
+   * So sieht man später nicht nur, dass jemand geredet hat, sondern was er in
+   * dem Moment vor sich hatte. Das ist der Unterschied zwischen einem Video von
+   * einem sprechenden Menschen und einem Nachweis, dass er dieser Erklärung
+   * zugestimmt hat.
+   */
+  function vorleseBand(ctx, W, H, text) {
+    const t = String(text || '').trim(); if (!t) return;
+    ctx.font = '600 20px -apple-system,Segoe UI,Roboto,sans-serif';
+    const zeilen = umbrechen(ctx, t, W - 60, 2);
+    const zh = 26, hoehe = zeilen.length * zh + 18;
+    ctx.fillStyle = 'rgba(6,10,20,.78)';
+    ctx.fillRect(0, H - hoehe, W, hoehe);
+    ctx.fillStyle = '#eaf0ff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    zeilen.forEach((z, i) => ctx.fillText(z, W / 2, H - hoehe + 9 + zh * i + zh / 2));
+    ctx.textAlign = 'start'; ctx.textBaseline = 'alphabetic';
+  }
+  /** Text auf höchstens `max` Zeilen umbrechen; der Rest bekommt ein Auslassungszeichen. */
+  function umbrechen(ctx, text, breite, max) {
+    const worte = text.split(' '); const raus = []; let zeile = '';
+    for (const w of worte) {
+      const probe = zeile ? zeile + ' ' + w : w;
+      if (ctx.measureText(probe).width <= breite) { zeile = probe; continue; }
+      raus.push(zeile); zeile = w;
+      if (raus.length === max) break;
+    }
+    if (raus.length < max && zeile) raus.push(zeile);
+    if (!raus.length) return [text];
+    if (raus.length === max && ctx.measureText(raus[max - 1]).width > breite - 20) raus[max - 1] += ' …';
+    return raus;
   }
   function cover(ctx, v, x, y, w, h, aus, wer) {
     if (aus || !v || !v.videoWidth) {
@@ -2037,11 +2118,77 @@
   // Ist die Kamera des Gegenübers gerade aus?
   function gegenueberCamAus() { const P = state.mainPeerId && state.peers.get(state.mainPeerId); return !!(P && P.camAus); }
   function gegenueberName() { const P = state.mainPeerId && state.peers.get(state.mainPeerId); return P ? (P.name || (P.role === 'host' ? 'Prüfer' : 'Bewerber')) : 'Gegenüber'; }
+  // ---- Die Aufnahme wandert mit, Stück für Stück ---------------------------
+  // Der Server bekommt jede Sekunde ein Stück und legt es verschlüsselt ab.
+  // Bricht hier etwas ab, liegt dort schon alles, was gelaufen ist.
+  async function laufAnmelden(mime, ext) {
+    try {
+      const r = await api('POST', '/api/rec/start', { code: state.code, mime, ext });
+      if (r.status === 200 && r.body && r.body.sitzung) { state.recSitzung = r.body.sitzung; schiebeStuecke(); }
+      else sysMsg('Aufnahme wird nur im Browser gehalten – der Server hat sie nicht angenommen.');
+    } catch { sysMsg('Aufnahme wird nur im Browser gehalten – kein Kontakt zum Server.'); }
+  }
+  async function schiebeStuecke() {
+    if (state.recLaeuftHoch || !state.recSitzung) return;
+    state.recLaeuftHoch = true;
+    while (state.recWarteschlange.length) {
+      const stueck = state.recWarteschlange[0];
+      const nr = state.recTeil;
+      let ok = false;
+      // Zwei Anläufe je Stück. Mehr nicht: es kommt gleich das nächste, und
+      // ein Stück nachzujagen darf den Rest nicht aufhalten.
+      for (let v = 0; v < 2 && !ok; v++) {
+        try {
+          const res = await fetch('/api/rec/chunk?' + new URLSearchParams({ sitzung: state.recSitzung, i: String(nr) }), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/octet-stream', Authorization: 'Bearer ' + state.token },
+            body: stueck,
+          });
+          ok = res.ok;
+        } catch { ok = false; }
+        if (!ok && v === 0) await new Promise((r) => setTimeout(r, 400));
+      }
+      state.recWarteschlange.shift();
+      state.recTeil = nr + 1;
+      if (ok) state.recHochOk++; else state.recHochFehler++;
+      zeigeLaufStand();
+    }
+    state.recLaeuftHoch = false;
+  }
+  function zeigeLaufStand() {
+    const el = $('recInfo'); if (!el) return;
+    const s = state.recHochFehler
+      ? '⚠ ' + state.recHochFehler + ' Stück(e) nicht angekommen'
+      : (state.recSitzung ? '↑ läuft auf dem Server mit' : '');
+    const marke = el.querySelector('.rec-serverstand') || (() => {
+      const d = document.createElement('span'); d.className = 'rec-serverstand'; el.appendChild(d); return d;
+    })();
+    marke.textContent = s ? ' · ' + s : '';
+  }
+
   async function finalizeRec() {
     const blob = new Blob(state.recChunks, { type: state.recMime || 'video/webm' });
     if (state.audioCtx) { try { state.audioCtx.close(); } catch {} state.audioCtx = null; }
     const dur = state.recStart ? Math.round((Date.now() - state.recStart) / 1000) : 0;
     if (!state.token || !blob.size) return;
+    // 1. Weg: der Server hat schon alles. Nur noch abschliessen.
+    if (state.recSitzung) {
+      await schiebeStuecke();                       // Restliche Stücke noch hinterher
+      try {
+        const r = await api('POST', '/api/rec/finish', { sitzung: state.recSitzung, durationSec: dur });
+        if (r.status === 200 && r.body && r.body.id) {
+          sysMsg(r.body.unvollstaendig
+            ? 'Aufnahme gespeichert – aber unvollständig, es fehlen Stücke.'
+            : 'Aufnahme verschlüsselt gespeichert (lief schon während des Gesprächs mit).');
+          state.recSitzung = null;
+          recCheckOeffnen(r.body.id, dur, r.body.bytes);
+          return;
+        }
+      } catch { /* fällt unten auf den alten Weg zurück */ }
+      sysMsg('Abschluss auf dem Server ging nicht – wird jetzt am Stück nachgeschickt.');
+      state.recSitzung = null;
+    }
+    // 2. Weg (Rückfalltür): alles am Stück, wie früher.
     try {
       const res = await fetch('/api/recording?' + new URLSearchParams({ code: state.code, dur: String(dur), ext: state.recExt }), { method: 'POST', headers: { 'Content-Type': state.recMime || 'video/webm', 'Authorization': 'Bearer ' + state.token }, body: blob });
       sysMsg(res.ok ? 'Aufnahme verschlüsselt gespeichert.' : 'Aufnahme konnte nicht gespeichert werden (HTTP ' + res.status + ').');

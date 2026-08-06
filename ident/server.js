@@ -66,6 +66,19 @@ try {
   });
 } catch { /* beim ersten Start gibt es noch keine Akten */ }
 
+// Angefangene Aufnahmen, die niemand abgeschlossen hat, gehören gerettet. Der
+// Prüfer ist mitten im Gespräch weggebrochen – das Stück, das schon hier liegt,
+// ist trotzdem eine Audition und wird nicht weggeworfen. Sie ist als
+// abgebrochen gekennzeichnet, damit niemand sie für vollständig hält.
+try {
+  const gerettet = store.aufnahmenRetten();
+  if (gerettet.length) {
+    console.log('[ident] ' + gerettet.length + ' abgebrochene Aufnahme(n) gerettet: '
+      + gerettet.map((g) => g.code + ' (' + Math.round(g.bytes / 1024) + ' kB)').join(', '));
+    try { sec.recordEvent('audit', 'system', gerettet.length + ' abgebrochene Aufnahme(n) gerettet'); } catch {}
+  }
+} catch (e) { console.error('[ident] Aufnahmen retten fehlgeschlagen: ' + e.message); }
+
 /** Eine fertige Akte an mcp.4ever1.tv übergeben. Wirft nie – Fehler landen in der Akte. */
 function mcpUebergeben(fallId, vonHand) {
   return mcp.uebergeben(fallId, {
@@ -727,7 +740,44 @@ async function handleApi(req, res, urlPath, ip) {
     sendJson(res, ok ? 200 : 400, { ok }); return true;
   }
 
+  // ---- Aufnahme läuft mit: jedes Stück sofort auf den Server ---------------
+  // Nicht erst am Ende alles auf einmal. Wer mitten im Gespräch abbricht, hat
+  // dann trotzdem alles hier, was bis dahin gelaufen ist.
+  if (urlPath === '/api/rec/start' && req.method === 'POST') {
+    let body; try { body = await readJson(req, 8 * 1024); } catch { body = {}; }
+    const kopf = store.beginRecording({
+      code: body.code, agentName: reqName(req, ip) || 'Prüfer',
+      mime: body.mime, ext: body.ext,
+    });
+    if (!kopf) { sendJson(res, 500, { reason: 'kein-lauf' }); return true; }
+    sec.recordEvent('audit', ip, 'Aufnahme begonnen (' + kopf.agentName + ') zu ' + (kopf.code || '—'));
+    sendJson(res, 200, { sitzung: kopf.sitzung }); return true;
+  }
+  if (urlPath === '/api/rec/chunk' && req.method === 'POST') {
+    const q = new URL(req.url, 'http://x').searchParams;
+    let buf; try { buf = await readRaw(req, 40 * 1024 * 1024); } catch { sendJson(res, 413, { reason: 'too-large' }); return true; }
+    const r = store.appendRecordingChunk(q.get('sitzung'), q.get('i'), buf);
+    if (!r) { sendJson(res, 404, { reason: 'lauf-unbekannt' }); return true; }
+    sendJson(res, 200, r); return true;
+  }
+  if (urlPath === '/api/rec/finish' && req.method === 'POST') {
+    let body; try { body = await readJson(req, 8 * 1024); } catch { body = {}; }
+    const rec = store.finishRecording(body.sitzung, { durationSec: body.durationSec });
+    if (!rec) { sendJson(res, 404, { reason: 'nichts-angekommen' }); return true; }
+    sec.recordEvent('audit', ip, 'Aufnahme abgeschlossen: ' + rec.id + ' (' + rec.bytes + ' Bytes, '
+      + (rec.teile || 0) + ' Stücke' + (rec.unvollstaendig ? ', unvollständig' : '') + ')');
+    sendJson(res, 200, { id: rec.id, bytes: rec.bytes, durationSec: rec.durationSec,
+      teile: rec.teile || 0, unvollstaendig: !!rec.unvollstaendig }); return true;
+  }
+  // Welche Aufnahmen hängen gerade offen? Für die Diagnose auf acp.
+  if (urlPath === '/api/rec/offen' && req.method === 'GET') {
+    if (!adminOnly()) return true;
+    sendJson(res, 200, { offen: store.offeneAufnahmen() }); return true;
+  }
+
   // ---- Aufnahme hochladen (Prüfer, roher Video-Body) ----
+  // Bleibt als Rückfalltür: schafft der Browser das Mitlaufen nicht, geht es
+  // am Ende noch einmal am Stück. Lieber doppelt als gar nicht.
   if (urlPath === '/api/recording' && req.method === 'POST') {
     let buf; try { buf = await readRaw(req); } catch { sendJson(res, 413, { reason: 'too-large' }); return true; }
     if (!buf.length) { sendJson(res, 400, { reason: 'empty' }); return true; }

@@ -289,6 +289,108 @@ function saveRecording(data) {
   };
   recordings.push(rec); save('recordings.json', recordings); return rec;
 }
+// ---- Aufnahme, die schon während des Gesprächs auf dem Server liegt -------
+//
+// Bisher sammelte der Browser des Prüfers die ganze Aufnahme im Speicher und
+// schickte sie erst beim Stoppen hoch. Bricht dort etwas ab – Browser stürzt,
+// Tab zu, Rechner schläft ein, Leitung weg – war die komplette Audition
+// verloren. Und zwar rückstandslos: keine Datei, kein Rest, nichts.
+//
+// Jetzt wandert jedes Stück sofort hierher. Jedes Stück wird einzeln
+// verschlüsselt abgelegt; beim Abschluss werden sie in der Reihenfolge zu einer
+// Datei zusammengesetzt. Geht unterwegs etwas kaputt, liegt hier trotzdem
+// alles, was bis dahin angekommen ist – und lässt sich retten.
+function laufPfad(sitzung) {
+  const s = String(sitzung || '').replace(/[^a-zA-Z0-9-]/g, '');
+  if (s.length < 8) return null;
+  const p = path.normalize(path.join(REC_DIR, 'lauf-' + s));
+  return p.startsWith(REC_DIR) ? p : null;
+}
+function beginRecording({ code, agentName, mime, ext }) {
+  const sitzung = crypto.randomUUID();
+  const dir = laufPfad(sitzung); if (!dir) return null;
+  fs.mkdirSync(dir, { recursive: true });
+  const kopf = {
+    sitzung, code: String(code || '').slice(0, 20), agentName: String(agentName || '').slice(0, 60),
+    mime: String(mime || 'video/webm').slice(0, 80),
+    ext: String(ext || 'webm').toLowerCase().replace(/[^a-z0-9]/g, '') || 'webm',
+    begonnenAm: new Date().toISOString(),
+  };
+  fs.writeFileSync(path.join(dir, 'kopf.json'), JSON.stringify(kopf));
+  return kopf;
+}
+function appendRecordingChunk(sitzung, i, buffer) {
+  const dir = laufPfad(sitzung); if (!dir || !fs.existsSync(dir)) return null;
+  const buf = Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer || []);
+  if (!buf.length) return { gespeichert: 0 };
+  const n = Math.max(0, Math.min(999999, parseInt(i, 10) || 0));
+  // Feste Breite, damit die Reihenfolge auch alphabetisch stimmt.
+  const name = String(n).padStart(6, '0') + '.part';
+  fs.writeFileSync(path.join(dir, name), sec.hasKey() ? sec.encrypt(buf) : buf);
+  return { gespeichert: buf.length, teil: n };
+}
+/** Stücke der Reihe nach zusammensetzen. Fehlt eines, hört es dort auf. */
+function laufZusammensetzen(dir) {
+  const teile = fs.readdirSync(dir).filter((f) => f.endsWith('.part')).sort();
+  const stuecke = []; let erwartet = 0; let luecke = false;
+  for (const f of teile) {
+    const nr = parseInt(f, 10);
+    if (nr !== erwartet) luecke = true;    // ein Stück fehlt – wir merken es
+    erwartet = nr + 1;
+    let b = fs.readFileSync(path.join(dir, f));
+    if (sec.hasKey()) { try { b = sec.decrypt(b); } catch { luecke = true; continue; } }
+    stuecke.push(b);
+  }
+  return { buffer: Buffer.concat(stuecke), anzahl: stuecke.length, luecke };
+}
+function finishRecording(sitzung, { durationSec, abgebrochen } = {}) {
+  const dir = laufPfad(sitzung); if (!dir || !fs.existsSync(dir)) return null;
+  let kopf = {};
+  try { kopf = JSON.parse(fs.readFileSync(path.join(dir, 'kopf.json'), 'utf8')); } catch {}
+  const { buffer, anzahl, luecke } = laufZusammensetzen(dir);
+  if (!buffer.length) { try { fs.rmSync(dir, { recursive: true, force: true }); } catch {} return null; }
+  const rec = saveRecording({
+    buffer, mime: kopf.mime, ext: kopf.ext, code: kopf.code, agentName: kopf.agentName,
+    durationSec: durationSec || 0,
+  });
+  if (rec) {
+    rec.teile = anzahl;
+    // Ehrlich bleiben: Wenn Stücke fehlen oder der Prüfer nie abgeschlossen
+    // hat, steht das an der Aufnahme dran. Sonst hält man sie für vollständig.
+    if (luecke) rec.unvollstaendig = true;
+    if (abgebrochen) rec.abgebrochen = true;
+    save('recordings.json', recordings);
+    try { fs.rmSync(dir, { recursive: true, force: true }); } catch {}
+  }
+  return rec;
+}
+/** Angefangene Aufnahmen, die niemand abgeschlossen hat. */
+function offeneAufnahmen() {
+  if (!fs.existsSync(REC_DIR)) return [];
+  return fs.readdirSync(REC_DIR).filter((f) => f.startsWith('lauf-')).map((f) => {
+    const dir = path.join(REC_DIR, f);
+    let kopf = {};
+    try { kopf = JSON.parse(fs.readFileSync(path.join(dir, 'kopf.json'), 'utf8')); } catch {}
+    const teile = fs.readdirSync(dir).filter((x) => x.endsWith('.part'));
+    let bytes = 0; teile.forEach((x) => { try { bytes += fs.statSync(path.join(dir, x)).size; } catch {} });
+    return { sitzung: kopf.sitzung || f.slice(5), code: kopf.code || '', agentName: kopf.agentName || '',
+      begonnenAm: kopf.begonnenAm || '', teile: teile.length, bytes };
+  });
+}
+/**
+ * Beim Start retten, was liegengeblieben ist. Eine angefangene Aufnahme ohne
+ * Abschluss bedeutet: der Prüfer ist weg, mitten im Gespräch. Das Stück, das
+ * schon hier liegt, ist trotzdem eine Audition – die wird nicht weggeworfen.
+ */
+function aufnahmenRetten() {
+  const gerettet = [];
+  offeneAufnahmen().forEach((o) => {
+    if (!o.teile) { const d = laufPfad(o.sitzung); if (d) { try { fs.rmSync(d, { recursive: true, force: true }); } catch {} } return; }
+    const rec = finishRecording(o.sitzung, { abgebrochen: true });
+    if (rec) gerettet.push({ id: rec.id, code: rec.code, bytes: rec.bytes, teile: o.teile });
+  });
+  return gerettet;
+}
 function listRecordings() { return recordings.slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt)); }
 function getRecording(id) { return recordings.find((r) => r.id === id) || null; }
 function readRecording(id) {
@@ -823,6 +925,7 @@ module.exports = {
   suchePerson, ordnerAnlegen, listStreamersKurz, protokolliereZugriff, verifikationEintragen,
   saveCase, listCases, getCase, deleteCase, readDoc, purgeOlderThan,
   saveRecording, listRecordings, getRecording, readRecording, reviewRecording, deleteRecording,
+  beginRecording, appendRecordingChunk, finishRecording, offeneAufnahmen, aufnahmenRetten,
   setCaseMcp, getRecordingByCode,
   ablegen, listStreamers, getStreamer, setStreamer, deleteStreamer, streamerCount,
   addStreamerEintrag, updateStreamerEintrag, deleteStreamerEintrag,

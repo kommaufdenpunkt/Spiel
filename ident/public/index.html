@@ -463,6 +463,10 @@
     border:1px solid var(--line);background:var(--panel2);color:var(--dim)}
   .zusicherung.ja{border-color:#2f6b4a;background:#163024;color:#bfe9d2}
   .zusicherung.nein{border-color:var(--warn);background:#2a2313;color:#f0dca8}
+  /* Mitlesen: der Satz, den der Bewerber gerade vor sich hat. */
+  .liest{margin:.45rem 0 .2rem;padding:.45rem .65rem;border-radius:10px;font-size:.82rem;line-height:1.5;
+    border:1px solid var(--line2);background:#101a2e;color:var(--ink)}
+  .liest b{display:block;font-size:.66rem;letter-spacing:.12em;text-transform:uppercase;color:var(--dim);margin-bottom:.15rem}
   /* Der blaue Haken: Alter und Ausweis geprüft. */
   .haken{display:inline-grid;place-items:center;width:17px;height:17px;border-radius:50%;
     background:linear-gradient(180deg,#5b9cff,#2a6ee0);color:#fff;font-size:.66rem;font-weight:700;
@@ -802,6 +806,11 @@
       <div class="status pending" id="reviewStatus">Warte auf die Bilder des Bewerbers …</div>
       <!-- Bleibt stehen, auch wenn die Statuszeile darüber weiterläuft. -->
       <div id="zusicherung" class="zusicherung" style="display:none"></div>
+
+      <!-- Was der Bewerber in diesem Moment vor sich hat. Damit der Prüfer
+           mitlesen kann und merkt, wenn jemand Zeilen überspringt. Dieselbe
+           Zeile wird unten in die Aufnahme geschrieben. -->
+      <div id="liestGerade" class="liest" style="display:none"><b>Liest gerade</b><span id="liestText"></span></div>
 
       <div class="sect">🎤 Fragen (Audition) <span class="qhint">nur für dich sichtbar – nicht im Video</span></div>
       <div class="qintro">Vorab vorlesen: „Bist du damit einverstanden, dass wir deine Daten speichern und zur Bearbeitung an den <b>BIGO-Support</b> weiterleiten dürfen? Unser 4ever1-Support nimmt deine Daten selbstverständlich sehr ernst." <br><small>Antwort des Bewerbers abwarten – sie wird im Video mit aufgezeichnet.</small></div>
