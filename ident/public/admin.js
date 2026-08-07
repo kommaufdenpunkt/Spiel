@@ -576,7 +576,12 @@
         ? `<div style="margin-top:.7rem;padding-top:.7rem;border-top:1px solid var(--line)">
              <div class="muted" style="margin-bottom:.35rem">🎬 Aufnahme des Gesprächs · ${(rc.bytes / (1024 * 1024)).toFixed(1)} MB${rc.durationSec ? ' · ' + Math.floor(rc.durationSec / 60) + ':' + String(rc.durationSec % 60).padStart(2, '0') : ''}</div>
              ${qualiPill(rc)}
-             <video src="/api/recording?id=${encodeURIComponent(rc.id)}&token=${encodeURIComponent(token)}" controls preload="metadata" style="width:100%;max-width:340px;border-radius:10px;border:1px solid var(--line);background:#000"></video>
+             <video controls preload="none" style="width:100%;max-width:340px;border-radius:10px;border:1px solid var(--line);background:#000">
+               <source src="/api/recording?id=${encodeURIComponent(rc.id)}&token=${encodeURIComponent(token)}" type="video/${(rc.ext || 'webm') === 'mp4' ? 'mp4' : 'webm'}">
+               ${(rc.ext || 'webm') === 'mp4' ? '' : `<source src="/api/recording?mp4=1&id=${encodeURIComponent(rc.id)}&token=${encodeURIComponent(token)}" type="video/mp4">`}
+             </video>
+             <div style="margin-top:.4rem"><a class="reclink" download title="MP4 – zum Hochladen und Weitergeben"
+               href="/api/recording?dl=1&mp4=1&id=${encodeURIComponent(rc.id)}&token=${encodeURIComponent(token)}">⬇ Als MP4 herunterladen</a></div>
            </div>`
         : '<div class="muted" style="margin-top:.6rem">🎬 Keine Aufnahme zu dieser Akte gefunden.</div>';
       div.innerHTML = `<div class="top"><div><div class="nm">${esc(c.bigoName || c.verifiedName || '—')}</div><div class="meta">${c.bigoName ? 'BIGO-ID: <b>' + esc(c.bigoName) + '</b> · ' : ''}${c.age ? 'Alter: ' + esc(c.age) + ' · ' : ''}Name: ${esc(c.verifiedName || '-')}<br>${esc(c.docType || '-')} · Nr.: ${esc(c.docNumber || '-')}<br>Nummer: ${esc(c.code || '-')} · Prüfer: ${esc(c.agentName || '-')} · ${esc(date)}${c.note ? '<br>Notiz: ' + esc(c.note) : ''}${c.rejectReason ? '<br>Grund: ' + esc(c.rejectReason) : ''}</div></div>${pill}</div><div class="thumbs">${thumbs}</div>${recBlock}${checkBlock(c)}${texteBlock(c)}${mcpZeile(c)}`;
@@ -740,8 +745,24 @@
         loadRec(); loadCases();
       }));
       acts.appendChild(btn('🔍 Groß ansehen', '', () => window.open(src, '_blank')));
-      const dl = document.createElement('a'); dl.href = src; dl.className = 'reclink'; dl.textContent = '⬇ Herunterladen'; dl.setAttribute('download', 'audition_' + (rec.bigoName || rec.code || 'x') + '.' + (rec.ext || 'webm'));
+      // Herunterladen als MP4: das ist das Format, das man hochladen und
+      // weitergeben kann. Der Server wandelt einmal um, danach liegt es fertig
+      // da. Den Dateinamen gibt er selbst vor (Audition-NUMMER-DATUM.mp4).
+      const dl = document.createElement('a');
+      dl.href = `/api/recording?dl=1&mp4=1&id=${encodeURIComponent(rec.id)}&token=${encodeURIComponent(token)}`;
+      dl.className = 'reclink'; dl.textContent = '⬇ Als MP4 herunterladen';
+      dl.setAttribute('download', '');
+      dl.title = 'MP4 – lässt sich hochladen, weitergeben und auf jedem Handy ansehen. '
+        + 'Beim ersten Mal wandelt der Server um, das kann einen Moment dauern.';
       acts.appendChild(dl);
+      // Und das Original, falls jemand genau das braucht.
+      if ((rec.ext || 'webm') !== 'mp4') {
+        const dlo = document.createElement('a');
+        dlo.href = `/api/recording?dl=1&id=${encodeURIComponent(rec.id)}&token=${encodeURIComponent(token)}`;
+        dlo.className = 'reclink'; dlo.textContent = '⬇ Original (' + String(rec.ext || 'webm').toUpperCase() + ')';
+        dlo.setAttribute('download', '');
+        acts.appendChild(dlo);
+      }
       if (AUF_ACP) acts.appendChild(btn('🗑 Löschen', 'danger', async () => { if (!confirm('Aufnahme endgültig löschen?')) return; await api('POST', '/api/recording-delete', { id: rec.id }); loadRec(); loadOverview(); }));
       div.appendChild(acts); el.appendChild(div);
     });

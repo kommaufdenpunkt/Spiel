@@ -130,13 +130,26 @@ das kann ein iPhone nicht in „Fotos" legen, WhatsApp schickt es nicht weiter,
 und der BIGO-Support kann damit nichts anfangen. Die Aufnahme wäre da, aber
 nicht verwendbar.
 
-Deshalb wandelt der Server um (`ffmpeg`, H.264 + AAC, `+faststart`):
+Deshalb wandelt der Server um: **H.264 High / yuv420p / AAC-LC in MP4** mit
+`+faststart`. Das nimmt jedes Upload-Portal an, jedes Handy spielt es, und es
+startet ohne die ganze Datei zu laden.
+
+- **⬇ Als MP4 herunterladen** steht in `mcp.` in der Akte, im acp bei den
+  Aufnahmen und in der Fall-Akte. Daneben `⬇ Original (WEBM)`, falls jemand
+  genau das braucht.
+- Prüfen, ob der Server es kann: `netzcheck.sh`, Punkt 6.
+
+Im Einzelnen:
 
 - **Einmal** je Aufnahme. Danach liegt das MP4 verschlüsselt neben dem Original
   und wird von dort ausgeliefert – der zweite Abruf kommt in Millisekunden.
 - Das Original bleibt unangetastet. Gelöscht wird dabei nichts.
-- Fehlt `ffmpeg`, kommt das Original – lieber die Datei im falschen Format als
-  gar keine. Der Browser sagt dann, was das bedeutet (`X-Umwandlung`).
+- Fehlt `ffmpeg` **oder H.264**, kommt das Original – lieber die Datei im
+  falschen Format als gar keine. Der Browser sagt dann, was das bedeutet
+  (`X-Umwandlung`), und beim Start steht es im Log:
+  `[rec] MP4-Umwandlung bereit (Bild: libx264, Ton: aac).`
+  Welcher Encoder da ist, wird einmal nachgesehen statt vorausgesetzt –
+  `libx264` bevorzugt, `libopenh264` als Ersatz.
 - Der **Videoplayer in der Akte** hat zwei Quellen: zuerst das Original (kein
   Umwandeln nötig), und wenn der Browser das nicht kann – ein iPhone spielt kein
   WEBM – nimmt er von selbst die MP4-Fassung. `preload="none"`: erst beim

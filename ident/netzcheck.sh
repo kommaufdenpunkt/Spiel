@@ -11,6 +11,8 @@
 #   3. Kommt eine WebSocket direkt beim Dienst an?
 #   4. Und auch durch nginx hindurch?
 #   5. Ist ein TURN-Server eingetragen?   <- nötig, wenn beide im Mobilfunk sind
+#   6. Kann der Server MP4 erzeugen?      <- sonst kann man die Aufnahme nicht
+#                                            hochladen und nicht weitergeben
 #
 # Es wird NICHTS geändert. Am Ende steht, was zu tun ist.
 # ---------------------------------------------------------------------------
@@ -134,6 +136,30 @@ if [ -f "$UMGEBUNG" ]; then
   fi
 else
   warn "$UMGEBUNG nicht lesbar."
+fi
+
+# ---- 6. MP4 --------------------------------------------------------------
+# Ohne H.264 im Container bleibt die Aufnahme WEBM - die kann man nicht
+# hochladen und das iPhone spielt sie nicht. Das soll man sehen, bevor man
+# vor der Datei sitzt.
+sage "6. Kann der Server die Aufnahme in MP4 umwandeln?"
+if docker ps --format '{{.Names}}' 2>/dev/null | grep -qx "$NAME"; then
+  if docker exec "$NAME" sh -lc 'command -v ffmpeg >/dev/null' 2>/dev/null; then
+    if docker exec "$NAME" sh -lc 'ffmpeg -hide_banner -encoders 2>&1 | grep -qE " (libx264|libopenh264) "' 2>/dev/null; then
+      KODIERER="$(docker exec "$NAME" sh -lc 'ffmpeg -hide_banner -encoders 2>&1 | grep -oE " (libx264|libopenh264) " | head -1 | tr -d " "' 2>/dev/null)"
+      gut "ffmpeg mit H.264 ist da ($KODIERER) – Aufnahmen kommen als MP4 heraus."
+    else
+      bad "ffmpeg ist da, kann aber kein H.264. MP4 wäre auf dem Handy nicht"
+      bad "abspielbar, deshalb bleibt es bei WEBM. Im Abbild fehlt x264."; merke
+    fi
+  else
+    bad "Im Container ist kein ffmpeg. Aufnahmen bleiben WEBM – die kann man"
+    bad "weder hochladen noch auf dem iPhone ansehen."
+    echo "  Zu tun: einmal neu bauen, das Abbild bringt ffmpeg mit:"
+    echo "    $BASIS/src/ident/deploy.sh"; merke
+  fi
+else
+  warn "Container $NAME läuft nicht – nicht prüfbar."
 fi
 
 # ---- Ergebnis ------------------------------------------------------------

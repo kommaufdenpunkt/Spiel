@@ -483,10 +483,16 @@ function mp4Fassung(id) {
     fs.writeFileSync(ein, original.buffer);
     // -movflags +faststart: das Video startet auf dem Telefon sofort, ohne die
     // ganze Datei zu laden. yuv420p, weil ältere Geräte nur das können.
-    const r = spawnSync('ffmpeg', ['-y', '-hide_banner', '-loglevel', 'error', '-i', ein,
-      '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '26', '-pix_fmt', 'yuv420p',
-      '-c:a', 'aac', '-b:a', '96k', '-movflags', '+faststart', aus],
-    { timeout: 15 * 60 * 1000, maxBuffer: 4 * 1024 * 1024 });
+    const kann = ffmpegKann();
+    const args = ['-y', '-hide_banner', '-loglevel', 'error', '-i', ein, '-c:v', kann.video];
+    // -preset/-crf kennt nur x264; openh264 nimmt eine Bitrate.
+    if (kann.video === 'libx264') args.push('-preset', 'veryfast', '-crf', '26');
+    else args.push('-b:v', '1200k');
+    args.push('-pix_fmt', 'yuv420p');
+    if (kann.ton) args.push('-c:a', kann.ton, '-b:a', '96k');
+    else args.push('-an');                       // ohne Ton ist besser als ohne Datei
+    args.push('-movflags', '+faststart', aus);
+    const r = spawnSync('ffmpeg', args, { timeout: 15 * 60 * 1000, maxBuffer: 4 * 1024 * 1024 });
     if (r.status !== 0 || !fs.existsSync(aus)) {
       console.log('[rec] MP4-Umwandlung fehlgeschlagen: ' + String((r.stderr || '')).slice(0, 200));
       return { fehler: true };
@@ -500,14 +506,38 @@ function mp4Fassung(id) {
     try { fs.rmSync(tmp, { recursive: true, force: true }); } catch {}
   }
 }
-let ffmpegGeprueft = null;
-function ffmpegDa() {
-  if (ffmpegGeprueft !== null) return ffmpegGeprueft;
-  const r = spawnSync('ffmpeg', ['-version'], { timeout: 8000 });
-  ffmpegGeprueft = r.status === 0;
-  if (!ffmpegGeprueft) console.log('[rec] ffmpeg ist nicht installiert – es wird nur das Originalformat ausgeliefert.');
-  return ffmpegGeprueft;
+/**
+ * Was kann der ffmpeg auf diesem Server?
+ *
+ * Ein MP4 ist nur brauchbar, wenn H.264 drinsteckt – das versteht jedes Handy.
+ * Welcher Encoder dafür mitgeliefert ist, hängt vom Paket ab: meist `libx264`,
+ * manchmal nur `libopenh264`. Wir sehen einmal nach und merken es uns, statt es
+ * darauf ankommen zu lassen und mitten in der Umwandlung zu scheitern.
+ */
+let ffmpegKunde = null;
+function ffmpegKann() {
+  if (ffmpegKunde) return ffmpegKunde;
+  const v = spawnSync('ffmpeg', ['-version'], { timeout: 8000 });
+  if (v.status !== 0) {
+    console.log('[rec] ffmpeg ist nicht installiert – es wird nur das Originalformat ausgeliefert.');
+    ffmpegKunde = { da: false, video: '', ton: '' };
+    return ffmpegKunde;
+  }
+  const e = spawnSync('ffmpeg', ['-hide_banner', '-encoders'], { timeout: 15000, maxBuffer: 8 * 1024 * 1024 });
+  const liste = String((e.stdout || '') + (e.stderr || ''));
+  const hat = (n) => new RegExp('\\s' + n + '\\s').test(liste);
+  const video = ['libx264', 'libopenh264', 'h264_v4l2m2m'].find(hat) || '';
+  const ton = ['aac', 'libfdk_aac'].find(hat) || '';
+  if (!video) {
+    console.log('[rec] ffmpeg ist da, kann aber kein H.264 – MP4 wäre auf dem Handy nicht abspielbar. '
+      + 'Es bleibt beim Originalformat. Fehlendes Paket: x264.');
+  } else {
+    console.log('[rec] MP4-Umwandlung bereit (Bild: ' + video + ', Ton: ' + (ton || 'ohne') + ').');
+  }
+  ffmpegKunde = { da: !!video, video, ton };
+  return ffmpegKunde;
 }
+function ffmpegDa() { return ffmpegKann().da; }
 
 // ---- Streamer-Ordner (mcp.4ever1.tv) ---------------------------------------
 // Jeder Streamer hat genau einen Ordner, zugeordnet über die BIGO-ID. Dort
