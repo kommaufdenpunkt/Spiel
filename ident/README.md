@@ -134,10 +134,34 @@ Deshalb wandelt der Server um: **H.264 High / yuv420p / AAC-LC in MP4** mit
 `+faststart`. Das nimmt jedes Upload-Portal an, jedes Handy spielt es, und es
 startet ohne die ganze Datei zu laden.
 
-- **⬇ Als MP4 herunterladen** steht in `mcp.` in der Akte, im acp bei den
-  Aufnahmen und in der Fall-Akte. Daneben `⬇ Original (WEBM)`, falls jemand
-  genau das braucht.
+**Drei Fassungen, drei Zwecke** – überall zum Herunterladen, in `mcp.` in der
+Akte und im acp bei den Aufnahmen wie in der Fall-Akte:
+
+| Fassung | Wofür | Grösse (gemessen) |
+|---|---|---|
+| **MP4** | hochladen, im Management einreichen, auf dem iPhone ansehen | 3 Min ≈ 20 MB |
+| **MP4 klein** | WhatsApp – dort ist bei **16 MB** Schluss | 3 / 10 / 20 Min → 13,8 / 14,1 / 14,5 MB |
+| **Original** | unverändert, wie der Browser aufgenommen hat | wie aufgenommen |
+
+Die kleine Fassung wird aus **Dauer und Grenze zurückgerechnet**: Bitrate so,
+dass die Datei unter 16 MB landet. Wird es knapp, gibt zuerst der Ton nach
+(64 → 48 → 32 kbit) und dann die Bildbreite (854 → 640 → 480) – ein kleineres
+Bild bei gleicher Bitrate ist schärfer als ein grosses, das verschmiert. Bei
+x264 mit *capped CRF* (`-crf 30 -maxrate`), damit eine **kurze** Aufnahme nicht
+grösser wird als die normale Fassung; mit fester Bitrate passierte genau das,
+und dann wäre „klein" eine Lüge. Reicht es trotzdem nicht (halbe Stunde und
+mehr), steht die echte Grösse am Knopf und ein Hinweis, dass WhatsApp sie nur
+noch als Datei nimmt.
+
 - Prüfen, ob der Server es kann: `netzcheck.sh`, Punkt 6.
+- **Alte Aufnahmen nachziehen:** acp → 🎬 Aufnahmen → `🔄 Jetzt alle umwandeln`.
+  Läuft im Hintergrund, eine nach der anderen, mit Fortschritt („17 von 42");
+  die Seite kann man dabei zumachen. Sonst wird jede Datei erst beim ersten
+  Herunterladen gerechnet – also genau dann, wenn man sie braucht.
+- **Der Server bleibt dabei bedienbar.** ffmpeg läuft asynchron in einem eigenen
+  Prozess, immer nur einer. Mit `spawnSync` stand Node still, solange gerechnet
+  wurde: bei einer Viertelstunde Gespräch ein bis zwei Minuten, in denen niemand
+  ins mcp kommt und laufende Gespräche ihre Verbindung verlieren.
 
 Im Einzelnen:
 
@@ -265,8 +289,14 @@ zwischen einem Video und einem Nachweis der Einwilligung.
 Wer ablesen und dabei in die Kamera schauen soll, braucht grosse Schrift und
 kurze Sätze. Also:
 
-- **Standardgrösse 1,6 rem**, einstellbar über `A−` / `A+` neben dem
-  Ablese-Tempo. Die Einstellung bleibt für das nächste Mal gemerkt.
+- **Standardgrösse 1,9 rem** (rund 30 px am Telefon), einstellbar über `A−` /
+  `A+` bis 3,4 rem. Die Einstellung bleibt für das nächste Mal gemerkt.
+- **`⛶ Groß`** legt den Text über den ganzen Bildschirm und vergrössert ihn noch
+  einmal um ein Drittel (rund 48 px). Das ist der eigentliche Weg zum Ablesen:
+  im kleinen Kasten stehen bei grosser Schrift nur drei Zeilen, und wer
+  zwischendurch in die Kamera schaut, verliert die Stelle. Das eigene Bild
+  braucht man dabei nicht. Die Bedienung wandert mit nach unten, Escape oder
+  `✕ Kleiner` führt zurück, der Selbstlauf läuft dort genauso.
 - **Ein Satz pro Zeile**, jeder in einem Atemzug sprechbar. Leere Zeilen sind
   Pausen.
 - **Abkürzungen ausgeschrieben.** Wer „bzw." oder „V-System" vor sich hat,

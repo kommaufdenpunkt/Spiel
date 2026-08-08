@@ -944,6 +944,21 @@ async function handleApi(req, res, urlPath, ip) {
     sendJson(res, 200, { id: rec.id, bytes: rec.bytes, durationSec: rec.durationSec,
       teile: rec.teile || 0, unvollstaendig: !!rec.unvollstaendig }); return true;
   }
+  // ---- Alte Aufnahmen nachträglich umwandeln ------------------------------
+  // Für alles, was schon hier lag, bevor es die MP4-Umwandlung gab: einmal
+  // anstossen, danach kommt jede Datei ohne Warten. Läuft im Hintergrund, eine
+  // nach der anderen – der Server soll dabei weiter bedienbar bleiben.
+  if (urlPath === '/api/aufnahmen-umwandeln' && req.method === 'POST') {
+    if (!adminOnly()) return true;
+    const stand = store.aufnahmenUmwandeln();
+    sec.recordEvent('audit', ip, 'Umwandeln aller Aufnahmen angestossen (' + (reqName(req, ip) || '?') + ')');
+    sendJson(res, 200, stand); return true;
+  }
+  if (urlPath === '/api/aufnahmen-umwandeln' && req.method === 'GET') {
+    if (!adminOnly()) return true;
+    const k = store.ffmpegKann();
+    sendJson(res, 200, { ...store.aufnahmenUmwandelnStand(), kann: k.da, kodierer: k.video }); return true;
+  }
   // Welche Aufnahmen hängen gerade offen? Für die Diagnose auf acp.
   if (urlPath === '/api/rec/offen' && req.method === 'GET') {
     if (!adminOnly()) return true;
@@ -1434,10 +1449,15 @@ async function handleApi(req, res, urlPath, ip) {
     // Server nicht dazu (kein ffmpeg), liefert er das Original – lieber die
     // Datei im falschen Format als gar keine.
     let umgewandelt = false;
+    let anhang = '';
     let data = null;
-    if (q0.get('mp4')) {
-      const m = store.mp4Fassung(recId);
-      if (m && m.buffer) { data = m; umgewandelt = true; }
+    // fassung=klein: dieselbe Aufnahme, nur klein genug für WhatsApp.
+    const fassung = q0.get('fassung') === 'klein' ? 'klein' : 'mp4';
+    if (q0.get('mp4') || q0.get('fassung')) {
+      // await: das Umwandeln läuft in einem eigenen Prozess, der Server bleibt
+      // währenddessen ansprechbar. Vorher stand er still und Gespräche rissen ab.
+      const m = await store.mp4Fassung(recId, fassung);
+      if (m && m.buffer) { data = m; umgewandelt = true; anhang = m.anhang || ''; }
       else if (m && m.fehlt) res.setHeader('X-Umwandlung', 'ffmpeg-fehlt');
       else if (m && m.fehler) res.setHeader('X-Umwandlung', 'fehlgeschlagen');
     }
@@ -1449,7 +1469,7 @@ async function handleApi(req, res, urlPath, ip) {
     if (q0.get('dl')) {
       const datum = String(meta.createdAt || '').slice(0, 10);
       const wer = String(meta.code || 'audition').replace(/[^\w-]/g, '');
-      const name = 'Audition-' + wer + '-' + datum + '.' + (umgewandelt ? 'mp4' : (meta.ext || 'webm'));
+      const name = 'Audition-' + wer + '-' + datum + anhang + '.' + (umgewandelt ? 'mp4' : (meta.ext || 'webm'));
       sec.recordEvent('audit', ip, 'Aufnahme heruntergeladen (' + (reqName(req, ip) || '?') + '): ' + recId);
       res.writeHead(200, { 'Content-Type': data.mime, 'Content-Length': data.buffer.length,
         'Cache-Control': 'no-store', 'Content-Disposition': 'attachment; filename="' + name + '"' });

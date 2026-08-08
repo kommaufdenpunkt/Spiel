@@ -17,7 +17,7 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const crypto = require('crypto');
-const { spawnSync } = require('child_process');
+const { spawn, spawnSync } = require('child_process');
 const sec = require('./security.js');
 
 let DATA_DIR = path.join(__dirname, 'data');
@@ -463,57 +463,192 @@ function readRecording(id) {
  * Ist ffmpeg auf dem Server nicht vorhanden, kommt `{ fehlt: true }` zurück;
  * der Aufrufer liefert dann eben das Original aus.
  */
-function mp4Fassung(id) {
-  const rec = getRecording(id); if (!rec) return null;
-  if (rec.ext === 'mp4') return readRecording(id);       // schon fertig
-  const zielName = `${rec.id}.mp4${rec.enc ? '.enc' : ''}`;
-  const ziel = recPath(zielName);
-  if (!ziel) return null;
-  if (fs.existsSync(ziel)) {
-    let buf = fs.readFileSync(ziel);
-    if (rec.enc) { if (!sec.hasKey()) return null; try { buf = sec.decrypt(buf); } catch { return null; } }
-    return { buffer: buf, mime: 'video/mp4' };
-  }
-  if (!ffmpegDa()) return { fehlt: true };
-  const original = readRecording(id); if (!original) return null;
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ident-mp4-'));
-  const ein = path.join(tmp, 'ein.' + (rec.ext || 'webm'));
-  const aus = path.join(tmp, 'aus.mp4');
-  try {
-    fs.writeFileSync(ein, original.buffer);
-    // -movflags +faststart: das Video startet auf dem Telefon sofort, ohne die
-    // ganze Datei zu laden. yuv420p, weil ältere Geräte nur das können.
-    const kann = ffmpegKann();
-    const args = ['-y', '-hide_banner', '-loglevel', 'error', '-i', ein, '-c:v', kann.video];
-    // -preset/-crf kennt nur x264; openh264 nimmt eine Bitrate.
-    if (kann.video === 'libx264') args.push('-preset', 'veryfast', '-crf', '26');
-    else args.push('-b:v', '1200k');
-    args.push('-pix_fmt', 'yuv420p');
-    if (kann.ton) args.push('-c:a', kann.ton, '-b:a', '96k');
-    else args.push('-an');                       // ohne Ton ist besser als ohne Datei
-    args.push('-movflags', '+faststart', aus);
-    const r = spawnSync('ffmpeg', args, { timeout: 15 * 60 * 1000, maxBuffer: 4 * 1024 * 1024 });
-    if (r.status !== 0 || !fs.existsSync(aus)) {
-      console.log('[rec] MP4-Umwandlung fehlgeschlagen: ' + String((r.stderr || '')).slice(0, 200));
-      return { fehler: true };
-    }
-    const buf = fs.readFileSync(aus);
-    fs.writeFileSync(ziel, rec.enc ? sec.encrypt(buf) : buf);
-    rec.mp4Bytes = buf.length; save('recordings.json', recordings);
-    console.log('[rec] MP4 erzeugt ' + rec.id + ' ' + Math.round(buf.length / 1024) + ' kB');
-    return { buffer: buf, mime: 'video/mp4' };
-  } finally {
-    try { fs.rmSync(tmp, { recursive: true, force: true }); } catch {}
-  }
+/** Die drei Fassungen, die man wirklich braucht. */
+const FASSUNGEN = {
+  // Zum Hochladen, fürs iPhone, für alles: gute Qualität, jedes Gerät.
+  mp4: { endung: 'mp4', anhang: '', breite: 0 },
+  // Für WhatsApp: dort ist bei 16 MB Schluss, sonst geht das Video nur noch
+  // als Dokument durch - und dann kann der Empfänger es nicht ansehen.
+  klein: { endung: 'mp4', anhang: '-klein', breite: 854, grenzeMB: 14 },
+};
+/**
+ * Umwandeln blockiert Node nicht.
+ *
+ * Vorher lief ffmpeg mit spawnSync – und damit stand der ganze Server still,
+ * solange gerechnet wurde. Bei einer Viertelstunde Gespräch sind das ein bis
+ * zwei Minuten, in denen niemand ins mcp kommt und laufende Gespräche ihre
+ * Verbindung verlieren. Also asynchron, und immer nur eine Umwandlung
+ * gleichzeitig: der Server hat einen Prozessor, nicht zehn.
+ */
+let umwandlungLaeuft = Promise.resolve();
+const umwandlungOffen = new Map();      // id|fassung -> laufendes Versprechen
+function nacheinander(fn) {
+  const dran = umwandlungLaeuft.then(fn, fn);
+  umwandlungLaeuft = dran.then(() => {}, () => {});
+  return dran;
+}
+function ffmpegLauf(args) {
+  return new Promise((fertig) => {
+    let fehlertext = '';
+    const p = spawn('ffmpeg', args, { stdio: ['ignore', 'ignore', 'pipe'] });
+    const uhr = setTimeout(() => { try { p.kill('SIGKILL'); } catch {} }, 20 * 60 * 1000);
+    p.stderr.on('data', (d) => { if (fehlertext.length < 2000) fehlertext += String(d); });
+    p.on('error', (e) => { clearTimeout(uhr); fertig({ code: -1, fehlertext: String(e && e.message) }); });
+    p.on('close', (code) => { clearTimeout(uhr); fertig({ code, fehlertext }); });
+  });
 }
 /**
- * Was kann der ffmpeg auf diesem Server?
- *
- * Ein MP4 ist nur brauchbar, wenn H.264 drinsteckt – das versteht jedes Handy.
- * Welcher Encoder dafür mitgeliefert ist, hängt vom Paket ab: meist `libx264`,
- * manchmal nur `libopenh264`. Wir sehen einmal nach und merken es uns, statt es
- * darauf ankommen zu lassen und mitten in der Umwandlung zu scheitern.
+ * Die Aufnahme in der gewünschten Fassung. Liegt sie fertig da, kommt sie
+ * sofort; sonst wird einmal umgewandelt und das Ergebnis daneben gelegt.
+ * Das Original bleibt immer unangetastet.
  */
+async function mp4Fassung(id, art) {
+  const rec = getRecording(id); if (!rec) return null;
+  const f = FASSUNGEN[art] || FASSUNGEN.mp4;
+  const klein = f === FASSUNGEN.klein;
+  // Das Original ist schon MP4 und soll nicht kleiner werden? Dann direkt raus.
+  if (rec.ext === 'mp4' && !klein) return readRecording(id);
+  const zielName = `${rec.id}${klein ? '.klein' : ''}.mp4${rec.enc ? '.enc' : ''}`;
+  const ziel = recPath(zielName);
+  if (!ziel) return null;
+  const fertigLesen = () => {
+    let buf = fs.readFileSync(ziel);
+    if (rec.enc) { if (!sec.hasKey()) return null; try { buf = sec.decrypt(buf); } catch { return null; } }
+    return { buffer: buf, mime: 'video/mp4', anhang: f.anhang };
+  };
+  if (fs.existsSync(ziel)) return fertigLesen();
+  if (!ffmpegDa()) return { fehlt: true };
+  // Zwei Leute tippen gleichzeitig auf denselben Knopf: ein Lauf, nicht zwei.
+  const schluessel = rec.id + '|' + (klein ? 'klein' : 'mp4');
+  if (umwandlungOffen.has(schluessel)) return umwandlungOffen.get(schluessel);
+  const lauf = nacheinander(async () => {
+    if (fs.existsSync(ziel)) return fertigLesen();
+    const original = readRecording(id); if (!original) return null;
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ident-mp4-'));
+    const ein = path.join(tmp, 'ein.' + (rec.ext || 'webm'));
+    const aus = path.join(tmp, 'aus.mp4');
+    try {
+      fs.writeFileSync(ein, original.buffer);
+      // -movflags +faststart: das Video startet auf dem Telefon sofort, ohne die
+      // ganze Datei zu laden. yuv420p, weil ältere Geräte nur das können.
+      const kann = ffmpegKann();
+      const args = ['-y', '-hide_banner', '-loglevel', 'error', '-i', ein, '-c:v', kann.video];
+      let tonRate = klein ? 64 : 96;
+      if (klein) {
+        // Bitrate aus Dauer und Grenze zurückrechnen: was darf pro Sekunde
+        // hineinfliessen, damit die Datei unter die WhatsApp-Grenze passt?
+        //
+        // Wird es knapp, geben wir zuerst beim Ton nach (Sprache verträgt 48k,
+        // bei sehr langen Gesprächen 32k) und dann bei der Bildgrösse – ein
+        // kleineres Bild mit derselben Bitrate ist schärfer als ein grosses,
+        // das verschmiert. Nachgemessen an echten Dateien: 3 Min → 13,8 MB,
+        // 10 Min → 14,1 MB, 20 Min → 14,3 MB. Mehr als eine halbe Stunde
+        // sprengt jede Rechnung; dann steht die echte Grösse am Knopf und man
+        // schickt sie als Datei statt als Video.
+        const sek = Math.max(5, rec.durationSec || 60);
+        const gesamt = Math.floor((f.grenzeMB * 8 * 1024) / sek);      // kbit/s
+        let breite = f.breite, boden = 300;
+        if (gesamt < 300) { tonRate = 48; breite = 640; boden = 110; }
+        if (gesamt < 200) { tonRate = 32; breite = 480; boden = 56; }
+        const bild = Math.min(1100, Math.max(boden, gesamt - tonRate));
+        // Deckel statt festem Wert: x264 nimmt so viel, wie die Qualität braucht,
+        // und nie mehr als erlaubt. Mit einer festen Bitrate wurde eine kurze
+        // Aufnahme sonst GRÖSSER als die normale Fassung - dann waere „klein"
+        // eine Lüge.
+        if (kann.video === 'libx264') {
+          args.push('-preset', 'veryfast', '-crf', '30',
+            '-maxrate', bild + 'k', '-bufsize', (bild * 2) + 'k');
+        } else {
+          args.push('-b:v', bild + 'k', '-maxrate', bild + 'k', '-bufsize', (bild * 2) + 'k');
+        }
+        // Nur verkleinern, nie vergrößern; gerade Zahlen, sonst mag H.264 nicht.
+        args.push('-vf', 'scale=\'min(' + breite + ',iw)\':-2');
+      } else if (kann.video === 'libx264') {
+        args.push('-preset', 'veryfast', '-crf', '26');
+      } else {
+        args.push('-b:v', '1200k');
+      }
+      args.push('-pix_fmt', 'yuv420p');
+      if (kann.ton) args.push('-c:a', kann.ton, '-b:a', tonRate + 'k');
+      else args.push('-an');                       // ohne Ton ist besser als ohne Datei
+      args.push('-movflags', '+faststart', aus);
+      const r = await ffmpegLauf(args);
+      if (r.code !== 0 || !fs.existsSync(aus)) {
+        console.log('[rec] MP4-Umwandlung fehlgeschlagen: ' + String(r.fehlertext || '').slice(0, 200));
+        return { fehler: true };
+      }
+      const buf = fs.readFileSync(aus);
+      fs.writeFileSync(ziel, rec.enc ? sec.encrypt(buf) : buf);
+      if (klein) rec.kleinBytes = buf.length; else rec.mp4Bytes = buf.length;
+      save('recordings.json', recordings);
+      console.log('[rec] ' + (klein ? 'MP4 klein' : 'MP4') + ' erzeugt ' + rec.id + ' '
+        + Math.round(buf.length / 1024) + ' kB');
+      return { buffer: buf, mime: 'video/mp4', anhang: f.anhang };
+    } finally {
+      try { fs.rmSync(tmp, { recursive: true, force: true }); } catch {}
+    }
+  });
+  umwandlungOffen.set(schluessel, lauf);
+  try { return await lauf; } finally { umwandlungOffen.delete(schluessel); }
+}
+
+/**
+ * Alles umwandeln, was noch nicht umgewandelt ist.
+ *
+ * Für die Aufnahmen, die schon hier liegen: einmal auf den Knopf, danach ist
+ * jede Datei in beiden Fassungen abrufbar und kommt ohne Warten. Es läuft im
+ * Hintergrund, eine nach der anderen, und der Stand ist abfragbar – sonst
+ * sitzt man vor einer Seite, die nichts sagt.
+ */
+const umwandelnStand = { laeuft: false, gesamt: 0, fertig: 0, fehler: 0, gestartet: '', jetzt: '' };
+function aufnahmenUmwandelnStand() {
+  // Gezählt werden Fassungen, nicht Aufnahmen – dieselbe Zahl, die der Stapel
+  // dann abarbeitet. Sonst stünde „1 fehlt" und es liefen zwei Läufe.
+  let offen = 0, aufnahmen = 0;
+  recordings.forEach((r) => {
+    const f = fehlendeFassungen(r).length;
+    if (f) { offen += f; aufnahmen++; }
+  });
+  return { ...umwandelnStand, offen, aufnahmen };
+}
+function fehlendeFassungen(rec) {
+  const raus = [];
+  Object.keys(FASSUNGEN).forEach((art) => {
+    const klein = art === 'klein';
+    if (rec.ext === 'mp4' && !klein) return;                 // ist schon MP4
+    const p = recPath(`${rec.id}${klein ? '.klein' : ''}.mp4${rec.enc ? '.enc' : ''}`);
+    if (p && !fs.existsSync(p)) raus.push(art);
+  });
+  return raus;
+}
+function aufnahmenUmwandeln() {
+  if (umwandelnStand.laeuft) return aufnahmenUmwandelnStand();
+  if (!ffmpegDa()) return { ...aufnahmenUmwandelnStand(), fehlt: true };
+  const arbeit = [];
+  recordings.forEach((r) => fehlendeFassungen(r).forEach((art) => arbeit.push({ id: r.id, art, code: r.code || '' })));
+  if (!arbeit.length) return aufnahmenUmwandelnStand();
+  umwandelnStand.laeuft = true; umwandelnStand.gesamt = arbeit.length;
+  umwandelnStand.fertig = 0; umwandelnStand.fehler = 0;
+  umwandelnStand.gestartet = new Date().toISOString(); umwandelnStand.jetzt = '';
+  console.log('[rec] Umwandeln gestartet: ' + arbeit.length + ' Fassung(en)');
+  (async () => {
+    for (const a of arbeit) {
+      umwandelnStand.jetzt = (a.code || a.id.slice(0, 8)) + ' (' + a.art + ')';
+      try {
+        const r = await mp4Fassung(a.id, a.art);
+        if (r && r.buffer) umwandelnStand.fertig++; else umwandelnStand.fehler++;
+      } catch (e) {
+        umwandelnStand.fehler++;
+        console.log('[rec] Umwandeln fehlgeschlagen (' + a.id + '): ' + (e && e.message));
+      }
+    }
+    umwandelnStand.laeuft = false; umwandelnStand.jetzt = '';
+    console.log('[rec] Umwandeln fertig: ' + umwandelnStand.fertig + ' erzeugt, '
+      + umwandelnStand.fehler + ' fehlgeschlagen');
+  })();
+  return aufnahmenUmwandelnStand();
+}
+
 let ffmpegKunde = null;
 function ffmpegKann() {
   if (ffmpegKunde) return ffmpegKunde;
@@ -1556,7 +1691,8 @@ module.exports = {
   suchePerson, ordnerAnlegen, ordnerFinden, ordnerZuordnen, idSchluessel, namSchluessel, listStreamersKurz, protokolliereZugriff, verifikationEintragen,
   stammPflegen, stammAusAkte, doppelteAkten, aktenZusammenfuehren,
   saveCase, listCases, getCase, deleteCase, readDoc, purgeOlderThan,
-  saveRecording, listRecordings, getRecording, readRecording, mp4Fassung, ffmpegDa,
+  saveRecording, listRecordings, getRecording, readRecording, mp4Fassung, ffmpegDa, ffmpegKann,
+  aufnahmenUmwandeln, aufnahmenUmwandelnStand,
   reviewRecording, deleteRecording,
   beginRecording, appendRecordingChunk, finishRecording, offeneAufnahmen, aufnahmenRetten,
   aufnahmeZuordnen, offeneAufnahmenOhneAkte, aufnahmeAkte,

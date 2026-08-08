@@ -715,7 +715,50 @@
   }
 
   // ---- Aufnahmen ----
+  // ---- Alte Aufnahmen nachträglich umwandeln -------------------------------
+  // Was hier lag, bevor es MP4 gab, ist sonst erst beim ersten Abruf fertig -
+  // und dann wartet man genau dann, wenn man die Datei gerade braucht.
+  let umwandelnUhr = 0;
+  async function ladeUmwandeln() {
+    const el = $('umwandelnBox'); if (!el) return;
+    const r = await api('GET', '/api/aufnahmen-umwandeln');
+    const s = r.body || {};
+    if (s.kann === false) {
+      el.innerHTML = '<b>⚠ Dieser Server kann noch nicht umwandeln.</b><div class="muted">Im Container fehlt '
+        + 'ffmpeg mit H.264. Einmal neu bauen (<code>deploy.sh</code>), dann geht es. '
+        + 'Bis dahin kommen die Aufnahmen im Originalformat – die nimmt kein Portal an.</div>';
+      clearInterval(umwandelnUhr); umwandelnUhr = 0; return;
+    }
+    if (s.laeuft) {
+      const von = (s.fertig || 0) + (s.fehler || 0);
+      el.innerHTML = '<b>🔄 Wird umgewandelt … ' + von + ' von ' + (s.gesamt || 0) + '</b>'
+        + '<div class="muted">Gerade: ' + esc(s.jetzt || '—') + '. Läuft im Hintergrund, eine nach der anderen – '
+        + 'du kannst weiterarbeiten und die Seite auch schliessen.'
+        + (s.fehler ? ' <b>' + s.fehler + ' fehlgeschlagen.</b>' : '') + '</div>';
+      if (!umwandelnUhr) umwandelnUhr = setInterval(ladeUmwandeln, 4000);
+      return;
+    }
+    clearInterval(umwandelnUhr); umwandelnUhr = 0;
+    if (!s.offen) {
+      el.innerHTML = '<b>✓ Alle Aufnahmen liegen in allen Fassungen bereit.</b>'
+        + '<div class="muted">Herunterladen kommt sofort, ohne Wartezeit.'
+        + (s.kodierer ? ' Umgewandelt mit ' + esc(s.kodierer) + '.' : '') + '</div>';
+      return;
+    }
+    el.innerHTML = '<b>' + s.offen + ' Fassung(en) fehlen noch.</b>'
+      + '<div class="muted">Sie werden sonst erst beim ersten Herunterladen gerechnet – dann wartet man genau '
+      + 'in dem Moment, in dem man die Datei braucht. Jetzt anstossen heisst: einmal warten, danach nie wieder.</div>';
+    const b = btn('🔄 Jetzt alle umwandeln', 'primary', async (e) => {
+      e.target.disabled = true;
+      await api('POST', '/api/aufnahmen-umwandeln', {});
+      ladeUmwandeln();
+    });
+    b.style.marginTop = '.5rem';
+    el.appendChild(b);
+  }
+
   async function loadRec() {
+    ladeUmwandeln();
     const r = await api('GET', '/api/recordings'); const list = r.body.recordings || [];
     const el = $('recList'); if (!list.length) { el.innerHTML = '<div class="empty">Noch keine Aufnahmen.</div>'; return; }
     el.className = 'reclist'; el.innerHTML = '';
@@ -755,6 +798,13 @@
       dl.title = 'MP4 – lässt sich hochladen, weitergeben und auf jedem Handy ansehen. '
         + 'Beim ersten Mal wandelt der Server um, das kann einen Moment dauern.';
       acts.appendChild(dl);
+      // Kleine Fassung: WhatsApp nimmt Videos nur bis 16 MB.
+      const dlk = document.createElement('a');
+      dlk.href = `/api/recording?dl=1&mp4=1&fassung=klein&id=${encodeURIComponent(rec.id)}&token=${encodeURIComponent(token)}`;
+      dlk.className = 'reclink'; dlk.textContent = '💬 Klein für WhatsApp';
+      dlk.setAttribute('download', '');
+      dlk.title = 'Dieselbe Aufnahme kleiner gerechnet, damit sie durch WhatsApp geht (dort ist bei 16 MB Schluss).';
+      acts.appendChild(dlk);
       // Und das Original, falls jemand genau das braucht.
       if ((rec.ext || 'webm') !== 'mp4') {
         const dlo = document.createElement('a');

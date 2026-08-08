@@ -232,6 +232,9 @@
   button.dl-knopf{appearance:none;-webkit-appearance:none;cursor:pointer;font-family:inherit;line-height:1.25}
   button.dl-knopf:disabled{opacity:.6;cursor:default;transform:none}
   .teil-knopf{background:#172b3f;border-color:var(--accent)}
+  /* Die kleine Fassung ist ein anderer Zweck, nicht dieselbe Datei - das soll
+     man sehen, damit man nicht die falsche verschickt. */
+  .klein-knopf{background:#16281c;border-color:#2f6b45}
   .dl-hinweis{flex:1;min-width:140px;font-size:.74rem;color:var(--dim);line-height:1.45}
   /* „Schon ausgefuellt" - woher die Angaben kommen und was noch zu tun ist */
   .vf-vorab{font-size:.8rem;line-height:1.5;color:#bfe9d2;background:#12261d;
@@ -766,6 +769,21 @@
   .prompter-ctrl input[type=range]{width:120px}
   .schriftgroesse{display:inline-flex;align-items:center;gap:.3rem}
   .schriftgroesse button{padding:.25rem .5rem;font-size:.85rem;font-weight:700;min-width:2.2rem}
+  /* Grossansicht: der Text ueber den ganzen Bildschirm. Zum Ablesen ist das der
+     eigentliche Weg - im kleinen Kasten stehen bei grosser Schrift nur drei
+     Zeilen, und man verliert beim Blick in die Kamera die Stelle. Das eigene
+     Bild braucht man dabei nicht. */
+  .prompter.gross{position:fixed;inset:0;z-index:60;height:auto;max-height:none;border-radius:0;
+    padding:max(1.2rem,env(safe-area-inset-top)) 1.4rem calc(5.5rem + env(safe-area-inset-bottom));
+    background:#080d16;border:0}
+  .prompter.gross #prompterText{font-size:calc(var(--vorlese,1.9rem) * 1.35);line-height:1.75;max-width:34em;margin:0 auto}
+  .prompter.gross::after{height:70px;background:linear-gradient(transparent,#080d16)}
+  /* Die Bedienung wandert mit nach unten, sonst kaeme man nicht mehr heran. */
+  .prompter-ctrl.gross{position:fixed;left:0;right:0;bottom:0;z-index:61;margin:0;
+    padding:.6rem .8rem calc(.6rem + env(safe-area-inset-bottom));
+    background:#0d1526;border-top:1px solid var(--line2);justify-content:center}
+  .prompter-ctrl.gross span[style]{display:none}   /* der erklaerende Satz stoert hier */
+  body.vorlesen-gross{overflow:hidden}
   .checklist{display:flex;flex-direction:column;gap:.5rem}
   /* Der Text steht in EINEM span. Ohne das wird jedes <b> ein eigenes Flex-Kind
      und die Frage steht in zerrissenen Spalten nebeneinander - unlesbar. */
@@ -1247,6 +1265,7 @@
           <button id="schriftKlein" type="button" title="kleiner">A−</button>
           <button id="schriftGross" type="button" title="größer">A+</button>
         </span>
+        <button id="prompterGross" type="button" title="Text über den ganzen Bildschirm – am besten zum Ablesen">⛶ Groß</button>
         <span style="opacity:.7">– du bestimmst selbst, auch während du liest.</span>
       </div>
 

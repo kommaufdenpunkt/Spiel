@@ -1384,46 +1384,57 @@
    * danach teilen, gilt der Tipp als verbraucht und das iPhone lehnt ab. Also:
    * erst „vorbereiten", dann „teilen".
    */
-  const videoBereit = new Map(); // Aufnahme-Nummer -> fertige Datei
+  const videoBereit = new Map(); // Aufnahme + Fassung -> fertige Datei
   function kannTeilen(datei) {
     try { return !!(navigator.canShare && navigator.canShare({ files: [datei] })); } catch { return false; }
   }
-  async function videoVorbereiten(recId, knopf) {
+  const FASSUNG_NAME = { mp4: 'MP4', klein: 'klein' };
+  async function videoVorbereiten(recId, fassung, knopf) {
     const vorher = knopf.textContent;
     knopf.disabled = true; knopf.textContent = '⏳ Video wird vorbereitet …';
     // Beim ersten Mal wird umgewandelt; das dauert bei langen Gesprächen. Nach
     // ein paar Sekunden sagen wir, dass es weiterläuft – sonst denkt man, es
     // hängt, und tippt noch einmal.
     const gedulden = setTimeout(() => {
-      if (knopf.disabled) knopf.textContent = '⏳ wird ins Handy-Format gebracht …';
+      if (knopf.disabled) knopf.textContent = '⏳ wird umgewandelt, bleib dran …';
     }, 4000);
     try {
-      // mp4=1: der Server wandelt um, wenn das Original ein Format ist, das
-      // Telefone nicht mögen. Das kann beim ersten Mal etwas dauern – danach
-      // liegt es fertig da.
-      const res = await fetch('/api/recording?dl=1&mp4=1&id=' + encodeURIComponent(recId)
+      // Der Server macht daraus MP4 – das kann jedes iPhone ansehen und jedes
+      // Portal annehmen. `fassung=klein` liefert dieselbe Aufnahme kleiner,
+      // damit sie durch WhatsApp geht.
+      const res = await fetch('/api/recording?dl=1&mp4=1&fassung=' + encodeURIComponent(fassung)
+        + '&id=' + encodeURIComponent(recId)
         + '&token=' + encodeURIComponent(state.token), { cache: 'no-store' });
       if (!res.ok) throw new Error('Status ' + res.status);
       const blob = await res.blob();
       const typ = blob.type || 'video/mp4';
       const endung = typ.indexOf('webm') >= 0 ? 'webm' : typ.indexOf('quicktime') >= 0 ? 'mov' : 'mp4';
-      // Den Namen gibt der Server vor („Audition-NUMMER-DATUM"). Genau der soll
-      // auch beim Teilen erscheinen, damit man die Datei später wiedererkennt.
+      // Den Namen gibt der Server vor („Audition-NUMMER-DATUM[-klein]"). Genau
+      // der soll auch beim Teilen erscheinen, damit man die Datei später
+      // wiedererkennt – und die kleine von der großen unterscheiden kann.
       const kopf = res.headers.get('content-disposition') || '';
       const gef = /filename="([^"]+)"/.exec(kopf);
       const name = gef ? gef[1] : 'Audition-' + String(recId).slice(0, 8) + '.' + endung;
       const datei = new File([blob], name, { type: typ });
-      videoBereit.set(recId, datei);
+      videoBereit.set(recId + '|' + fassung, datei);
+      const mb = blob.size / (1024 * 1024);
       knopf.disabled = false;
       knopf.dataset.fertig = '1';
+      // Das Format mit auf den Knopf: man soll sehen, dass es MP4 ist, bevor man
+      // die Datei irgendwo hochlädt.
       knopf.textContent = (kannTeilen(datei) ? '📤 Jetzt teilen · ' : '⬇ Jetzt speichern · ')
-        + (blob.size / (1024 * 1024)).toFixed(1) + ' MB · ' + endung.toUpperCase();
+        + mb.toFixed(1) + ' MB · ' + endung.toUpperCase();
       if (endung === 'webm') {
         // Konnte nicht umgewandelt werden. Dann ehrlich sagen, was das heißt.
         const g = res.headers.get('x-umwandlung') || '';
         toast(g === 'ffmpeg-fehlt'
-          ? 'Der Server kann noch nicht in MP4 umwandeln – die Datei kommt als WEBM. Am iPhone landet sie in „Dateien".'
-          : 'Format WEBM – das iPhone legt es in „Dateien" ab, nicht in „Fotos".');
+          ? 'Der Server kann noch nicht in MP4 umwandeln – die Datei kommt als WEBM. Die kann das iPhone nicht abspielen.'
+          : 'Format WEBM – nicht fürs iPhone geeignet.');
+      } else if (fassung === 'klein' && mb > 16) {
+        // Ehrlich sein statt hoffen: so gross geht sie bei WhatsApp nur als
+        // Datei durch, und dann kann der Empfänger sie nicht ansehen.
+        toast('Auch klein noch ' + mb.toFixed(1) + ' MB – das Gespräch ist lang. '
+          + 'WhatsApp nimmt Videos bis 16 MB; darüber nur als Datei.');
       }
     } catch (e) {
       knopf.disabled = false; knopf.textContent = vorher;
@@ -1432,11 +1443,11 @@
       clearTimeout(gedulden);
     }
   }
-  function videoTeilen(recId) {
-    const datei = videoBereit.get(recId);
+  function videoTeilen(recId, fassung) {
+    const datei = videoBereit.get(recId + '|' + fassung);
     if (!datei) return;
     if (kannTeilen(datei)) {
-      // Systemdialog: Fotos, Dateien, WhatsApp, Mail – der Nutzer entscheidet.
+      // Systemdialog: Fotos, Dateien, WhatsApp, Mail – du entscheidest, wohin.
       navigator.share({ files: [datei], title: 'Audition' })
         .then(() => toast('Weitergegeben ✓'))
         .catch((e) => { if (!e || e.name !== 'AbortError') videoSichern(datei); });
@@ -1455,9 +1466,10 @@
   /** Die Handy-Knöpfe in einem gerade gebauten Stück Akte scharf machen. */
   function handyKnoepfe(wurzel) {
     wurzel.querySelectorAll('.teil-knopf').forEach((b) => {
+      const fassung = b.dataset.fassung || 'mp4';
       b.addEventListener('click', () => {
-        if (b.dataset.fertig) videoTeilen(b.dataset.rec);
-        else videoVorbereiten(b.dataset.rec, b);
+        if (b.dataset.fertig) videoTeilen(b.dataset.rec, fassung);
+        else videoVorbereiten(b.dataset.rec, fassung, b);
       });
     });
   }
@@ -1505,17 +1517,35 @@
                 + '&token=' + encodeURIComponent(state.token) + '" type="video/mp4">')
             + '</video>'
             // Herunterladen und Weitergeben: ein Knopf, keine versteckte Menuefunktion.
+            // Drei Wege, weil drei verschiedene Dinge gebraucht werden: aufs
+            // eigene Handy legen (und von dort hochladen), an jemanden über
+            // WhatsApp schicken, oder am Rechner ablegen.
             + '<div class="dl-reihe">'
+            + '<button class="dl-knopf teil-knopf" data-fassung="mp4" data-rec="' + esc(auf.id) + '"'
+              + ' title="MP4 in bester Qualität – ansehen, in Fotos legen, im Management hochladen">'
+              + '📱 Aufs Handy (MP4)</button>'
+            + '<button class="dl-knopf teil-knopf klein-knopf" data-fassung="klein" data-rec="' + esc(auf.id) + '"'
+              + ' title="Dieselbe Aufnahme kleiner – WhatsApp nimmt Videos nur bis 16 MB">'
+              + '💬 Klein für WhatsApp</button>'
             + '<a class="dl-knopf" download href="/api/recording?dl=1&mp4=1&id=' + encodeURIComponent(auf.id)
-              + '&token=' + encodeURIComponent(state.token) + '">⬇ Video herunterladen</a>'
-            // Am Telefon der bessere Weg: erst laden, dann über den
-            // Systemdialog in Fotos, Dateien oder WhatsApp legen.
-            + '<button class="dl-knopf teil-knopf" data-rec="' + esc(auf.id) + '">'
-              + '📱 Aufs Handy speichern</button>'
-            + '<span class="dl-hinweis">Zum Weitergeben an den BIGO-Support. '
-              + 'Enthält Bild und Ton des Gesprächs – bitte nur dorthin, wo es hingehört.<br>'
-              + '<b>Am Handy:</b> „Aufs Handy speichern" antippen, warten, dann noch einmal antippen – '
-              + 'dann kommt die Auswahl von iPhone bzw. Android. Das Video bleibt dabei in der Akte.</span>'
+              + '&token=' + encodeURIComponent(state.token) + '">⬇ MP4</a>'
+            + '<a class="dl-knopf" download href="/api/recording?dl=1&mp4=1&fassung=klein&id='
+              + encodeURIComponent(auf.id) + '&token=' + encodeURIComponent(state.token)
+              + '" title="kleine Fassung, für WhatsApp">⬇ MP4 klein</a>'
+            // Das Original auch – wer genau das braucht, soll es bekommen.
+            + ((auf.ext || 'webm') === 'mp4' ? ''
+              : '<a class="dl-knopf" download href="/api/recording?dl=1&id=' + encodeURIComponent(auf.id)
+                + '&token=' + encodeURIComponent(state.token)
+                + '" title="unveränderte Aufnahme, wie der Browser sie gemacht hat">⬇ Original ('
+                + esc(String(auf.ext || 'webm').toUpperCase()) + ')</a>')
+            + '<span class="dl-hinweis">Enthält Bild und Ton des Gesprächs – bitte nur dorthin, wo es hingehört.'
+              + '<br><b>Am Handy zweimal antippen:</b> einmal holen (dann steht die Größe drauf), '
+              + 'einmal teilen – dann kommt die Auswahl von iPhone bzw. Android. '
+              + 'Über <b>„In Fotos speichern"</b> kannst du es erst ansehen und danach im Management hochladen. '
+              + 'Das Video bleibt dabei in der Akte.'
+              + '<br><b>MP4</b> nimmt jedes Portal an. <b>MP4 klein</b> ist dieselbe Aufnahme unter 16 MB, '
+              + 'damit sie durch WhatsApp geht. <b>Original</b> ist unverändert, wie der Browser sie gemacht hat '
+              + '– das mag nicht jedes Gerät.</span>'
             + '</div>' : '')
         + ausweisBilder(a)
         + hakenListe(a)
@@ -1978,7 +2008,11 @@
   // Sie war zu klein: wer ablesen und dabei in die Kamera schauen soll, beugt
   // sich sonst vor. Standard ist jetzt groß, und jeder kann es selbst
   // nachstellen – die Einstellung bleibt für das nächste Mal gemerkt.
-  const VORLESE_MIN = 1.1, VORLESE_MAX = 3.0, VORLESE_STD = 1.6;
+  // 1,9 rem als Standard: gemeldet wurde „kann man sehr schlecht ablesen", und
+  // wer vom Bildschirm liest und dabei in die Kamera schauen soll, braucht mehr
+  // als eine bequeme Lesegröße. Nach oben bis 3,4 rem, falls jemand die Brille
+  // nicht dabei hat.
+  const VORLESE_MIN = 1.1, VORLESE_MAX = 3.4, VORLESE_STD = 1.9;
   function vorleseGroesse() {
     let v = VORLESE_STD;
     try { const g = parseFloat(localStorage.getItem('ident.vorleseGroesse')); if (g >= VORLESE_MIN && g <= VORLESE_MAX) v = g; } catch {}
@@ -1996,6 +2030,35 @@
   });
   if ($('schriftKlein')) $('schriftKlein').addEventListener('click', () => {
     setzeVorleseGroesse(vorleseGroesse() - 0.15); promptPos = $('prompterBox') ? $('prompterBox').scrollTop : promptPos;
+  });
+  // ---- Großansicht -------------------------------------------------------
+  // Der Text über den ganzen Bildschirm. Im kleinen Kasten stehen bei großer
+  // Schrift nur drei Zeilen, und wer zwischendurch in die Kamera schaut,
+  // verliert die Stelle. Das eigene Bild braucht man beim Ablesen nicht.
+  function vorleseGross(an) {
+    const box = $('prompterBox'), ctrl = $('prompterCtrl'), knopf = $('prompterGross');
+    if (!box) return;
+    // Die Stelle im Text halten – sonst springt es beim Umschalten.
+    const anteil = box.scrollHeight > box.clientHeight
+      ? box.scrollTop / (box.scrollHeight - box.clientHeight) : 0;
+    box.classList.toggle('gross', an);
+    if (ctrl) ctrl.classList.toggle('gross', an);
+    document.body.classList.toggle('vorlesen-gross', an);
+    if (knopf) {
+      knopf.textContent = an ? '✕ Kleiner' : '⛶ Groß';
+      knopf.title = an ? 'Zurück zur normalen Ansicht' : 'Text über den ganzen Bildschirm – am besten zum Ablesen';
+    }
+    requestAnimationFrame(() => {
+      box.scrollTop = anteil * Math.max(0, box.scrollHeight - box.clientHeight);
+      promptPos = box.scrollTop;
+    });
+  }
+  if ($('prompterGross')) $('prompterGross').addEventListener('click', () => {
+    vorleseGross(!$('prompterBox').classList.contains('gross'));
+  });
+  // Mit Escape auch wieder heraus – am Rechner erwartet man das.
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && $('prompterBox') && $('prompterBox').classList.contains('gross')) vorleseGross(false);
   });
   // Manuelles Scrollen mit dem Auto-Scroll synchronisieren (Bewerber darf jederzeit
   // selbst scrollen; Auto-Scroll macht dann von dort weiter).
