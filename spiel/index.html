@@ -73,7 +73,6 @@
     box-shadow:inset 0 0 130px rgba(0,0,0,.78),0 10px 40px rgba(0,0,0,.6);border:1px solid #2e2418}
   .room.hall{background:linear-gradient(180deg,#2a2018 0%,#241a13 52%,#1c140e 52%,#150f0a 100%)}
   .room.library{background:linear-gradient(180deg,#241a20 0%,#1e1620 52%,#181018 52%,#120c12 100%)}
-  .room.cellar{background:linear-gradient(180deg,#20191a 0%,#191315 52%,#140f10 52%,#0e0a0b 100%)}
   .room::before{content:"";position:absolute;inset:0;pointer-events:none;
     background:radial-gradient(72% 62% at 50% 42%,transparent 34%,rgba(0,0,0,.62) 100%)}
   .hot{position:absolute;display:flex;flex-direction:column;align-items:center;justify-content:center;
@@ -269,64 +268,6 @@ const LEVELS = [
     L=>has('cellar_key') && 'Du hast den Kellerschlüssel — hinab durch die Kellertür!',
   ],
 },
-{
-  id:'cellar', theme:'cellar', em:'🕸️',
-  title:'Der Keller', subtitle:'Kapitel 3',
-  intro:'Feuchte Steinwände, der Geruch von altem Wein und kaltem Ruß. Irgendwo hier unten führt ein Weg zurück ans Tageslicht — wenn du ihn im Dunkeln findest.',
-  symbols:[], cipher:[],
-  items:{
-    matches :{icon:'🔥',name:'Streichhölzer',desc:'Eine trockene Schachtel Zündhölzer.'},
-    oil_lamp:{icon:'🪔',name:'Öllampe',desc:'Wirft warmes Licht — vertreibt das Dunkel des Kellers.'},
-    gate_key:{icon:'🔑',name:'Gitterschlüssel',desc:'Schwer und rostig. Öffnet das Eisengitter zur Treppe hinauf.'},
-  },
-  objects:[
-    {id:'door', icon:'🚪', label:'Treppe ins Freie', x:'5%', y:'18%', w:'104px', h:'156px',
-      type:'goal', requires:'gate_key',
-      examine:'Eine schmale Steintreppe führt hinauf ans Tageslicht — doch ein verriegeltes Eisengitter versperrt den Weg. Das Schloss verlangt einen schweren, rostigen Schlüssel.'},
-    {id:'crate', icon:'📦', label:'Werkzeugkiste', x:'23%', y:'58%', w:'96px', h:'92px',
-      type:'pickup', gives:['matches'], take:'Kiste durchwühlen',
-      examine:'Eine alte Holzkiste voll rostigem Werkzeug — auch im Halbdunkel ertastbar.',
-      pickupText:'Ganz obenauf, trocken geblieben: eine Schachtel Streichhölzer.',
-      emptyText:'Nur noch rostiges Werkzeug. Die Streichhölzer hast du.'},
-    {id:'lamp', icon:'🪔', label:'Öllampe an der Wand', x:'44%', y:'12%', w:'80px', h:'84px',
-      type:'locked', requires:'matches', gives:['oil_lamp'], setFlag:'light',
-      lockedText:'Eine verrußte Öllampe hängt an einem Haken. Ohne Flamme bleibt der Keller stockdunkel — du brauchst etwas zum Anzünden.',
-      openText:'Du entzündest den Docht — warmes Licht flutet den Keller und drängt die Schatten in die Ecken zurück.',
-      emptyText:'Die Lampe brennt ruhig und erhellt den Raum.'},
-    {id:'ledger', icon:'📓', label:'Kellerbuch', x:'44%', y:'60%', w:'92px', h:'86px',
-      type:'info',
-      examine:'Cornelius’ Kellerbuch liegt aufgeschlagen auf einem Fass:<br><span class="quote">„Der eiserne Wächter öffnet nur dem, der meine besten Jahrgänge kennt. Die versiegelten — vom ältesten zum jüngsten. Ihre letzte Ziffer, in dieser Ordnung, ist der Schlüssel."</span>',
-      hint:'Erst Licht machen — dann das Weinregal genau ansehen.'},
-    {id:'winerack', icon:'🍷', label:'Weinregal', x:'64%', y:'54%', w:'104px', h:'104px',
-      type:'info', needFlag:'light',
-      offText:'Im Dunkeln erkennst du nur schemenhaft die Umrisse von Flaschen. Ohne Licht bleibt alles unlesbar.',
-      examine:'Im Lampenschein glänzen die Etiketten. Vier Flaschen tragen ein <strong>rotes Wachssiegel</strong>: die Jahrgänge <strong>1892</strong>, <strong>1866</strong>, <strong>1900</strong> und <strong>1874</strong>. Die übrigen Flaschen sind unversiegelt.',
-      hint:'Nur die versiegelten Jahrgänge zählen — der Rest lenkt nur ab.'},
-    {id:'barrel', icon:'🛢️', label:'Großes Weinfass', x:'8%', y:'56%', w:'88px', h:'96px',
-      type:'reveal', reveal:'strongbox', setFlag:'barrel',
-      examine:'Ein mächtiges Eichenfass steht seltsam frei von der Wand — und klingt hohl, als wäre nichts darin.',
-      revealText:'Fass beiseiterollen'},
-    {id:'strongbox', icon:'🔒', label:'Eiserner Kasten', x:'9%', y:'56%', w:'86px', h:'92px', hidden:true,
-      type:'keypad', code:'6420', gives:['gate_key'],
-      prompt:'Hinter dem Fass, in die Mauer eingelassen: ein eiserner Kasten mit vierstelligem Zahlenrad.',
-      successText:'Das Zahlenrad rastet ein, der Kasten springt auf — darin ein schwerer, rostiger Gitterschlüssel.'},
-    {id:'furnace', icon:'🔥', label:'Kohleofen', x:'82%', y:'20%', w:'78px', h:'82px',
-      type:'info', needFlag:'light',
-      offText:'Eine kalte, dunkle Masse in der Ecke — im Finstern nicht zu erkennen.',
-      examine:'Ein längst erkalteter Kohleofen. In die eiserne Klappe geritzt: „C.N. — hier begann alles." Ein Schauer läuft dir über den Rücken.'},
-  ],
-  ending:`Der Gitterschlüssel dreht sich schwer im Schloss. Das Eisengitter schwingt quietschend auf,
-    und zum ersten Mal seit Stunden spürst du kühle Nachtluft und Regen auf der Haut.<br><br>
-    Über dir liegt der Ausgang der Villa Nachtschatten — hinter dir das Geheimnis deines Großonkels
-    Cornelius. Du hast es geschafft: <strong>du bist frei.</strong>`,
-  hints:[
-    L=>!has('matches') && 'Durchsuche die Werkzeugkiste — du brauchst zuerst eine Lichtquelle.',
-    L=>(has('matches')&&!flag('light')) && 'Zünde mit den Streichhölzern die Öllampe an der Wand an.',
-    L=>(flag('light')&&!flag('barrel')) && 'Lies das Kellerbuch und sieh dir das Weinregal genau an. Das große Fass steht verdächtig frei von der Wand.',
-    L=>(flag('barrel')&&!has('gate_key')) && 'Code: versiegelte Jahrgänge vom ältesten zum jüngsten — 1866, 1874, 1892, 1900 — je die letzte Ziffer: 6-4-2-0.',
-    L=>has('gate_key') && 'Du hast den Gitterschlüssel — hinauf und hinaus durch das Eisengitter!',
-  ],
-},
 ];
 
 /* =====================================================================
@@ -393,9 +334,9 @@ function showMenu(){
     </div>`;
   }).join('');
   // Teaser für kommende Räume
-  cards += `<div class="lvl locked"><div class="lockico">🔒</div><div class="em">🗝️</div>
-    <h3>Weitere Räume</h3><div class="sub">Kapitel 4+</div>
-    <div class="meta"><span>In Arbeit</span><span>Die Villa hat viele Türen</span></div></div>`;
+  cards += `<div class="lvl locked"><div class="lockico">🔒</div><div class="em">🕸️</div>
+    <h3>Der Keller</h3><div class="sub">Kapitel 3</div>
+    <div class="meta"><span>In Arbeit</span><span>Folgt bald</span></div></div>`;
   $('main').innerHTML=`<div class="menu">
     <p class="lead">Jeder Raum führt tiefer in die Villa. Löse die Rätsel, finde den Schlüssel zur nächsten Tür.</p>
     <div class="grid">${cards}</div></div>`;
@@ -588,13 +529,12 @@ function winLevel(){
   const prog=loadProg(); const rec=prog[L.def.id]||{}; const best=(rec.best&&rec.best<s)?rec.best:s;
   prog[L.def.id]={done:true,best}; saveProg(prog);
   const next=LEVELS[L.idx+1];
-  const finale=!next&&L.def.ending;
-  $('winCard').innerHTML=`<h2>${finale?'🌙 Entkommen!':'🔓 Tür geöffnet!'}</h2>
-    <p>${finale?L.def.ending:L.def.title+' gemeistert. Die nächste Tür der Villa steht offen …'}</p>
-    <div class="big">${fmt(s)}</div><p class="hint">Bestzeit: ${fmt(best)}${finale?' · Danke fürs Spielen!':''}</p>
+  $('winCard').innerHTML=`<h2>🔓 Tür geöffnet!</h2>
+    <p>${L.def.title} gemeistert. Die nächste Tür der Villa steht offen …</p>
+    <div class="big">${fmt(s)}</div><p class="hint">Bestzeit: ${fmt(best)}</p>
     <div class="act" style="justify-content:center">
       ${next?`<button onclick="$('winVeil').classList.remove('on');startLevel(${L.idx+1})">Weiter ins Haus ▶</button>`:''}
-      <button onclick="$('winVeil').classList.remove('on');${finale?'showTitle()':'showMenu()'}">${finale?'Zurück zum Titel':'Zur Raumauswahl'}</button></div>`;
+      <button onclick="$('winVeil').classList.remove('on');showMenu()">Zur Raumauswahl</button></div>`;
   $('winVeil').classList.add('on');
 }
 
