@@ -227,6 +227,12 @@ für dieselbe Person.
 
 ### Und wenn doch zwei Akten dastehen
 
+Es sagt sich von selbst: sobald eine Kennung dazukommt, die schon einem anderen
+Ordner gehört, steht in **beiden** Akten ein Vermerk („dieselbe Person liegt noch
+unter … in einer zweiten Akte") und im Log eine `[akte]`-Zeile. Vorher fiel das
+erst auf, wenn jemand im acp nachsah – und bis dahin hatte man in beiden Akten
+gearbeitet.
+
 Passiert, wenn eine Akte erst nur unter der Nummer lag und der Spitzname später
 nachgetragen wurde – unter dem gab es dann schon eine. Im **acp → 📁
 Streamer-Akten** steht das oben:

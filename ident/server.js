@@ -1344,10 +1344,16 @@ async function handleApi(req, res, urlPath, ip) {
     try {
       buf = pdf.ausweisblatt({
         bigoId: s2.bigoId, bigoName: s2.bigoName || '', aliasse: (s2.aliasse || []).join(', '),
-        name: aud.nameLautAusweis || s2.name || (fall && fall.verifiedName) || '',
+        // Die Stammdaten der Akte als weitere Quelle: dort steht das
+        // Geburtsdatum, das eine Audition nicht abfragt, und dort ist die
+        // Schreibweise gerichtet. Sonst blieben Felder auf dem Blatt leer,
+        // obwohl die Angabe in der Akte steht.
+        name: aud.nameLautAusweis || (s2.stamm && s2.stamm.nameLautAusweis) || s2.name
+          || (fall && fall.verifiedName) || '',
         alter: s2.alter || (fall && fall.age) || '',
-        ausweisart: aud.ausweisart || '', ausweisnummer: aud.ausweisnummer || '',
-        geburtsdatum: (fall && fall.geburtsdatum) || '',
+        ausweisart: aud.ausweisart || (s2.stamm && s2.stamm.ausweisart) || '',
+        ausweisnummer: aud.ausweisnummer || (s2.stamm && s2.stamm.ausweisnummer) || '',
+        geburtsdatum: (fall && fall.geburtsdatum) || (s2.stamm && s2.stamm.geburtsdatum) || '',
         pruefer: aud.pruefer || '', datum: zeit(aud.erstelltAm),
         grundlage: 'Audition per Video, Ausweis live gesehen',
         ergebnis: aud.ergebnis === 'approved' ? 'freigegeben' : (aud.ergebnis === 'rejected' ? 'abgelehnt' : 'offen'),

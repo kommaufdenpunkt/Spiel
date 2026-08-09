@@ -650,12 +650,21 @@ function aufnahmenUmwandeln() {
 }
 
 let ffmpegKunde = null;
+let ffmpegNegativAb = 0;
 function ffmpegKann() {
-  if (ffmpegKunde) return ffmpegKunde;
+  // Ein gutes Ergebnis gilt für immer – ffmpeg verschwindet nicht aus einem
+  // laufenden Container. Ein schlechtes gilt nur eine Minute: schlägt der
+  // Aufruf einmal fehl, weil dem Server gerade die Luft ausgeht, wäre MP4
+  // sonst bis zum nächsten Neustart abgeschaltet – und niemand wüsste, warum.
+  if (ffmpegKunde && (ffmpegKunde.da || Date.now() < ffmpegNegativAb)) return ffmpegKunde;
   const v = spawnSync('ffmpeg', ['-version'], { timeout: 8000 });
   if (v.status !== 0) {
-    console.log('[rec] ffmpeg ist nicht installiert – es wird nur das Originalformat ausgeliefert.');
+    const grund = v.error && v.error.code === 'ENOENT'
+      ? 'ist nicht installiert' : 'liess sich nicht starten (' + ((v.error && v.error.code) || v.status) + ')';
+    console.log('[rec] ffmpeg ' + grund + ' – es wird nur das Originalformat ausgeliefert. '
+      + 'Wird in einer Minute erneut versucht.');
     ffmpegKunde = { da: false, video: '', ton: '' };
+    ffmpegNegativAb = Date.now() + 60 * 1000;
     return ffmpegKunde;
   }
   const e = spawnSync('ffmpeg', ['-hide_banner', '-encoders'], { timeout: 15000, maxBuffer: 8 * 1024 * 1024 });
@@ -670,6 +679,9 @@ function ffmpegKann() {
     console.log('[rec] MP4-Umwandlung bereit (Bild: ' + video + ', Ton: ' + (ton || 'ohne') + ').');
   }
   ffmpegKunde = { da: !!video, video, ton };
+  // Kein H.264 ist ein Zustand des Abbilds, kein Aussetzer – aber auch den
+  // fragen wir gelegentlich neu, damit ein Neubau ohne Serverneustart greift.
+  if (!video) ffmpegNegativAb = Date.now() + 5 * 60 * 1000;
   return ffmpegKunde;
 }
 function ffmpegDa() { return ffmpegKann().da; }
@@ -801,6 +813,38 @@ function ordnerZuordnen(ordner, { bigoId, bigoName } = {}) {
       }
     }
     ordner.bigoName = neuName; ergaenzt.push('Name ' + neuName);
+  }
+  // Hat dieser Ordner jetzt eine Kennung, die schon einem anderen gehört?
+  //
+  // Genau so entstehen die Doppelten: eine Akte lag unter der Nummer, später
+  // wird der Spitzname nachgetragen – und unter dem Namen gab es längst eine.
+  // Wer das erst Wochen danach im acp entdeckt, hat zwischenzeitlich in beiden
+  // gearbeitet. Deshalb steht es ab sofort sofort als Vermerk in der Akte.
+  if (ergaenzt.length) {
+    const meine = ordnerKennungen(ordner);
+    const andere = streamers.find((x) => {
+      if (x === ordner || x.id === ordner.id) return false;
+      const k = ordnerKennungen(x);
+      for (const z of meine.zahlen) if (k.zahlen.has(z)) return true;
+      for (const n of meine.namen) if (k.namen.has(n)) return true;
+      return false;
+    });
+    if (andere) {
+      const text = 'Achtung: dieselbe Person liegt noch unter „'
+        + (andere.bigoId || andere.bigoName || '?') + '" in einer zweiten Akte. '
+        + 'Im acp unter „Streamer-Akten" lassen sich beide zusammenführen – dabei geht nichts verloren.';
+      [ordner, andere].forEach((o) => {
+        if (!Array.isArray(o.eintraege)) o.eintraege = [];
+        // Nicht bei jeder Audition erneut dazuschreiben.
+        if (o.eintraege.some((e) => e.kind === 'doppelt-warnung')) return;
+        o.eintraege.unshift({
+          id: crypto.randomUUID(), text, author: 'System', kind: 'doppelt-warnung',
+          am: new Date().toISOString(),
+        });
+      });
+      console.log('[akte] Doppelte Akte erkannt: „' + (ordner.bigoId || '?') + '" und „'
+        + (andere.bigoId || '?') + '" – im acp zusammenführen.');
+    }
   }
   return ergaenzt;
 }

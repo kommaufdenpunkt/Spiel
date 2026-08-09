@@ -1360,12 +1360,24 @@
         zeichneOrdner();
       });
       z.appendChild(b);
-      // Auch hier schon speichern können. Manchmal will man das Video sofort
-      // haben, ohne es vorher irgendwo einzusortieren.
+      // Auch hier schon speichern können, in denselben Fassungen wie in der
+      // Akte. Manchmal will man das Video sofort haben, ohne es vorher
+      // einzusortieren.
       const sp = document.createElement('button');
-      sp.className = 'dl-knopf teil-knopf'; sp.dataset.rec = a.id;
-      sp.textContent = '📱 Aufs Handy speichern';
-      z.appendChild(sp); handyKnoepfe(z);
+      sp.className = 'dl-knopf teil-knopf'; sp.dataset.rec = a.id; sp.dataset.fassung = 'mp4';
+      sp.textContent = '📱 Aufs Handy (MP4)';
+      z.appendChild(sp);
+      const spk = document.createElement('button');
+      spk.className = 'dl-knopf teil-knopf klein-knopf'; spk.dataset.rec = a.id; spk.dataset.fassung = 'klein';
+      spk.textContent = '💬 Klein für WhatsApp';
+      z.appendChild(spk);
+      const dlm = document.createElement('a');
+      dlm.className = 'dl-knopf'; dlm.setAttribute('download', '');
+      dlm.href = '/api/recording?dl=1&mp4=1&id=' + encodeURIComponent(a.id)
+        + '&token=' + encodeURIComponent(state.token);
+      dlm.textContent = '⬇ MP4';
+      z.appendChild(dlm);
+      handyKnoepfe(z);
       k.appendChild(z);
     });
     host.appendChild(k);
