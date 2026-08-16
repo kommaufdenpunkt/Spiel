@@ -16,6 +16,8 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const { execFile } = require('child_process');
+const os = require('os');
 const sec = require('./security.js');
 
 let DATA_DIR = path.join(__dirname, 'data');
@@ -414,6 +416,54 @@ function aufnahmenRetten() {
   });
   return gerettet;
 }
+
+// ---- Aufnahmen auf ein Format bringen, das überall läuft --------------------
+//
+// Safari nimmt MP4 auf, Chrome auf Android meistens WebM. Eine WebM-Datei
+// öffnet aber kein iPhone und kein QuickTime – die Teamleitung könnte mit der
+// halben Ausbeute nichts anfangen. Deshalb wird jede Aufnahme, die nicht schon
+// MP4 ist, hinterher umgewandelt.
+//
+// Das läuft NACH dem Speichern im Hintergrund: Der Prüfer wartet nicht, und
+// wenn die Umwandlung scheitert, bleibt das Original unangetastet erhalten.
+function konvertiereZuMp4(id, fertig) {
+  const rec = getRecording(id);
+  if (!rec || rec.ext === 'mp4') { if (fertig) fertig(null); return; }
+  const daten = readRecording(id);
+  if (!daten) { if (fertig) fertig('nicht-lesbar'); return; }
+  const tmpIn = path.join(os.tmpdir(), id + '-in.' + rec.ext);
+  const tmpOut = path.join(os.tmpdir(), id + '-out.mp4');
+  try { fs.writeFileSync(tmpIn, daten.buffer); } catch { if (fertig) fertig('schreibfehler'); return; }
+  // veryfast + crf 26: gut sichtbar, klein genug, und schnell genug, dass die
+  // Umwandlung nicht den halben Server blockiert. faststart, damit das Video
+  // sofort losläuft statt erst komplett zu laden.
+  execFile('ffmpeg', ['-y', '-i', tmpIn,
+    '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '26', '-pix_fmt', 'yuv420p',
+    '-c:a', 'aac', '-b:a', '96k', '-movflags', '+faststart', tmpOut],
+    { timeout: 15 * 60 * 1000, maxBuffer: 8 * 1024 * 1024 }, (err) => {
+      try { fs.unlinkSync(tmpIn); } catch {}
+      if (err || !fs.existsSync(tmpOut)) {
+        try { fs.unlinkSync(tmpOut); } catch {}
+        if (fertig) fertig('ffmpeg');
+        return;
+      }
+      try {
+        const mp4 = fs.readFileSync(tmpOut);
+        const enc = sec.hasKey();
+        const neuName = id + '.mp4' + (enc ? '.enc' : '');
+        fs.writeFileSync(recPath(neuName), enc ? sec.encrypt(mp4) : mp4);
+        const altName = rec.file;
+        rec.file = neuName; rec.ext = 'mp4'; rec.mime = 'video/mp4';
+        rec.bytes = mp4.length; rec.enc = enc; rec.konvertiert = new Date().toISOString();
+        save('recordings.json', recordings);
+        // Original erst weg, wenn die neue Datei sicher liegt.
+        if (altName !== neuName) { try { fs.unlinkSync(recPath(altName)); } catch {} }
+        if (fertig) fertig(null);
+      } catch { if (fertig) fertig('ablage'); }
+      try { fs.unlinkSync(tmpOut); } catch {}
+    });
+}
+
 function listRecordings() { return recordings.slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt)); }
 function getRecording(id) { return recordings.find((r) => r.id === id) || null; }
 function readRecording(id) {
@@ -1150,6 +1200,7 @@ function getFigureScript() { return typeof settings.figureScript === 'string' ? 
 function setFigureScript(text) { settings.figureScript = (typeof text === 'string') ? text.slice(0, 8000) : null; save('settings.json', settings); return true; }
 
 module.exports = {
+  konvertiereZuMp4,
   init, getScript, setScript, getIntro, setIntro, getAdminTotp, setAdminTotp,
   addCaseEntry, updateCaseEntry, deleteCaseEntry,
   addLoginEvent, listLoginEvents, loginFailCount, clearLoginLog,

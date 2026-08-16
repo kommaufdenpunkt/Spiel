@@ -2,7 +2,10 @@
 FROM node:22-alpine
 
 # su-exec: um im Entrypoint nach dem Rechte-Fix von root auf "node" zu wechseln
-RUN apk add --no-cache su-exec
+# ffmpeg: wandelt WebM-Aufnahmen in MP4 um. Ohne das kann ein iPhone die
+# Aufnahmen aus Android-Browsern nicht abspielen – und damit wäre die
+# Audition für die Teamleitung wertlos.
+RUN apk add --no-cache su-exec ffmpeg
 
 WORKDIR /app
 

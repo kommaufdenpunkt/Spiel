@@ -2180,7 +2180,11 @@
     // beiden Einrichtungen, ohne dass jemand am Server schrauben muss.
     if (!state.wsPfad) state.wsPfad = wsPfadGemerkt();
     const pfad = state.wsPfad;
-    const ws = new WebSocket(`${proto}://${location.host}${pfad}`); state.ws = ws;
+    // Läuft die App unter einem Unterpfad (mcp.4ever1.tv/audition), muss die
+    // Verbindung dort hin – sonst klopft sie beim PK-Board an, dem /api/ws
+    // unter dieser Adresse gehört, und das Video kommt nie zustande.
+    const basis = window.__BASIS || '';
+    const ws = new WebSocket(`${proto}://${location.host}${basis}${pfad}`); state.ws = ws;
     state.wsOffen = false;
     // BIGO-ID und Alter gehen gleich mit: Der Server schaut damit nach, ob es
     // die Person schon gibt, und der Prüfer sieht es in der Warteschlange -

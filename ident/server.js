@@ -23,10 +23,8 @@ const sec = require('./security.js');
 const store = require('./store.js');
 const mcp = require('./mcp.js');
 const textpolish = require('./textpolish.js');
-const pdf = require('./pdf.js');
 
 const PORT = process.env.PORT || 8080;
-const STARTZEIT = new Date().toISOString();
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '';
@@ -67,19 +65,6 @@ try {
     if (c.mcpStatus === 'laeuft') store.setCaseMcp(c.id, { status: 'fehlgeschlagen', text: 'Server wurde neu gestartet – bitte erneut übergeben' });
   });
 } catch { /* beim ersten Start gibt es noch keine Akten */ }
-
-// Angefangene Aufnahmen, die niemand abgeschlossen hat, gehören gerettet. Der
-// Prüfer ist mitten im Gespräch weggebrochen – das Stück, das schon hier liegt,
-// ist trotzdem eine Audition und wird nicht weggeworfen. Sie ist als
-// abgebrochen gekennzeichnet, damit niemand sie für vollständig hält.
-try {
-  const gerettet = store.aufnahmenRetten();
-  if (gerettet.length) {
-    console.log('[ident] ' + gerettet.length + ' abgebrochene Aufnahme(n) gerettet: '
-      + gerettet.map((g) => g.code + ' (' + Math.round(g.bytes / 1024) + ' kB)').join(', '));
-    try { sec.recordEvent('audit', 'system', gerettet.length + ' abgebrochene Aufnahme(n) gerettet'); } catch {}
-  }
-} catch (e) { console.error('[ident] Aufnahmen retten fehlgeschlagen: ' + e.message); }
 
 /** Eine fertige Akte an mcp.4ever1.tv übergeben. Wirft nie – Fehler landen in der Akte. */
 function mcpUebergeben(fallId, vonHand) {
@@ -438,21 +423,6 @@ async function handleApi(req, res, urlPath, ip) {
   }
 
   // ---- Audition-Text (Teleprompter) – Abruf öffentlich (Bewerber liest ihn) ----
-  // ---- Stimmt die Zugangsnummer? -------------------------------------------
-  // Wird gefragt, bevor der Bewerber irgendetwas eingibt. Vorher wurde die
-  // Nummer erst beim Betreten des Raums geprüft – der Bewerber las die
-  // Einleitung, stimmte zu, startete die Kamera und wurde dann zurückgeworfen.
-  // Ein Tippfehler kostete den ganzen Weg.
-  //
-  // Die Antwort sagt nur ja oder nein, nichts weiter. Durchprobieren bringt
-  // niemandem etwas: 36^8 Möglichkeiten, dazu die Bremse für zu viele Anfragen.
-  if (urlPath === '/api/code-check' && req.method === 'POST') {
-    let body; try { body = await readJson(req, 2 * 1024); } catch { body = {}; }
-    const nummer = String(body.code || '').trim();
-    const gut = !!nummer && store.isCodeUsable(nummer);
-    if (!gut) sec.recordEvent('info', ip, 'Zugangsnummer abgelehnt: ' + nummer.slice(0, 12));
-    sendJson(res, 200, { ok: gut }); return true;
-  }
   if (urlPath === '/api/script' && req.method === 'GET') { sendJson(res, 200, { script: store.getScript() }); return true; }
   if (urlPath === '/api/intro' && req.method === 'GET') { sendJson(res, 200, { intro: store.getIntro() }); return true; }
   // Startseite: liegt ein echtes Team-Foto im Ordner public? (öffentlich)
@@ -510,21 +480,14 @@ async function handleApi(req, res, urlPath, ip) {
     res.end(data.buffer); return true;
   }
 
-  // ---- „Ich bin fertig" ----------------------------------------------------
-  // Die Bewerberin selbst sagt Bescheid. Ohne Anmeldung, aber nur mit gültiger
-  // Zugangsnummer – es ist ihre eigene.
-  if (urlPath === '/api/waiting/bereit' && req.method === 'POST') {
-    let body; try { body = await readJson(req, 4 * 1024); } catch { body = {}; }
-    const code = String(body.code || '').trim().toUpperCase();
-    const entry = waiting.get(code);
-    if (!entry) { sendJson(res, 404, { reason: 'gone' }); return true; }
-    entry.bereit = body.bereit !== false;
-    entry.bereitSeit = entry.bereit ? Date.now() : 0;
-    sendJson(res, 200, { ok: true, bereit: entry.bereit }); return true;
-  }
-
   // ---- ab hier: gültiges Login nötig ----
-  if (!authed(req, ip)) { sendJson(res, 401, { reason: 'auth' }); return true; }
+  // Ausnahme: Das PK-Board darf sich mit dem gemeinsamen Schlüssel ausweisen.
+  // Damit kann die Teamleitung Zugangsnummern dort erzeugen, wo sie ohnehin
+  // arbeitet, statt sich ein zweites Mal anzumelden. Es gilt NUR für die
+  // Zugangsnummern – alles andere braucht weiterhin eine echte Anmeldung.
+  const perSchluessel = mcp.tokenOk(req.headers['authorization'])
+    && ['/api/code', '/api/codes', '/api/code-revoke'].includes(urlPath);
+  if (!perSchluessel && !authed(req, ip)) { sendJson(res, 401, { reason: 'auth' }); return true; }
 
   if (urlPath === '/api/change-password' && req.method === 'POST') {
     let body; try { body = await readJson(req, 16 * 1024); } catch { body = {}; }
@@ -570,7 +533,9 @@ async function handleApi(req, res, urlPath, ip) {
   // ---- Zugangscodes ----
   if (urlPath === '/api/code' && req.method === 'POST') {
     let body; try { body = await readJson(req, 16 * 1024); } catch { body = {}; }
-    const rec = store.createCode({ createdBy: reqName(req, ip), note: body.note });
+    const rec = store.createCode({
+      createdBy: perSchluessel ? (String(body.von || 'Teamleitung').slice(0, 60)) : reqName(req, ip),
+      note: body.note });
     sendJson(res, 200, { code: rec.code }); return true;
   }
   if (urlPath === '/api/codes' && req.method === 'GET') { sendJson(res, 200, { codes: store.listCodes() }); return true; }
@@ -589,9 +554,6 @@ async function handleApi(req, res, urlPath, ip) {
       if (room) for (const ws of room.values()) if (ws.role === 'host' && ws.pname) hosts.push(ws.pname);
       return {
         code: w.code, note: w.note, joinedAt: w.joinedAt, busy,
-        bigoId: w.bigoId || '', bigoNick: w.bigoNick || '', bekannt: w.bekannt || null,
-        bereit: !!w.bereit, bereitSeit: w.bereitSeit || 0,
-        weg: !!w.wegSeit, wegSek: w.wegSeit ? Math.round((Date.now() - w.wegSeit) / 1000) : 0,
         claimedBy: busy ? w.claimedBy : null,
         hosts, live: hosts.length > 0,
         waitingSec: Math.max(0, Math.round((Date.now() - w.joinedAt) / 1000)),
@@ -607,16 +569,10 @@ async function handleApi(req, res, urlPath, ip) {
   if (urlPath === '/api/waiting/next' && req.method === 'POST') {
     if (!authed(req, ip)) { sendJson(res, 401, { reason: 'auth' }); return true; }
     const name = reqName(req, ip) || 'Prüfer';
-    // „Nächsten annehmen" nimmt nur, wer fertig ist. Wer noch ausfüllt, wird
-    // übersprungen – nicht unterbrochen.
     const next = Array.from(waiting.values())
-      .filter((w) => !waitingBusy(w) && w.bereit)
-      .sort((a, b) => (a.bereitSeit || a.joinedAt) - (b.bereitSeit || b.joinedAt))[0];
-    if (!next) {
-      const fuellenNoch = Array.from(waiting.values()).filter((w) => !waitingBusy(w) && !w.bereit).length;
-      sendJson(res, 404, { reason: fuellenNoch ? 'noch-nicht-fertig' : 'none-waiting', fuellenNoch });
-      return true;
-    }
+      .filter((w) => !waitingBusy(w))
+      .sort((a, b) => a.joinedAt - b.joinedAt)[0];
+    if (!next) { sendJson(res, 404, { reason: 'none-waiting' }); return true; }
     next.claimedBy = name; next.claimedAt = Date.now();
     sendJson(res, 200, { code: next.code }); return true;
   }
@@ -631,32 +587,9 @@ async function handleApi(req, res, urlPath, ip) {
     // Prüfer mit dem eigenen Klick.
     const fremd = waitingBusy(entry) && entry.claimedBy !== wer;
     if (fremd) { sendJson(res, 409, { reason: 'busy', by: entry.claimedBy || '' }); return true; }
-    // Erst abholen, wenn sie fertig ist.
-    //
-    // Vorher konnte der Prüfer sofort zugreifen – mitten hinein, während sie
-    // noch die Aufklärung liest oder ihre Ausweisnummer sucht. Das ist unhöflich
-    // und kostet Zeit: die Daten sind dann noch nicht da und man tippt sie im
-    // Gespräch. Sie sagt selbst, wann es losgehen kann.
-    //
-    // Damit niemand hängen bleibt, der nicht weiterkommt, gibt es nach ein paar
-    // Minuten den ausdrücklichen Weg mit `trotzdem`. Der wird protokolliert.
-    const WARTE_BIS_TROTZDEM = 3 * 60 * 1000;
-    if (!entry.bereit && !body.trotzdem) {
-      sendJson(res, 409, { reason: 'nicht-bereit',
-        wartetSeit: Math.round((Date.now() - (entry.joinedAt || Date.now())) / 1000),
-        trotzdemAb: Math.max(0, Math.round((WARTE_BIS_TROTZDEM - (Date.now() - (entry.joinedAt || Date.now()))) / 1000)) });
-      return true;
-    }
-    if (!entry.bereit && body.trotzdem) {
-      if (Date.now() - (entry.joinedAt || Date.now()) < WARTE_BIS_TROTZDEM) {
-        sendJson(res, 409, { reason: 'zu-frueh' }); return true;
-      }
-      sec.recordEvent('audit', ip, 'Bewerber trotz „noch nicht fertig" geholt (' + wer + '): ' + code);
-    }
     entry.claimedBy = wer; entry.claimedAt = Date.now();
     sendJson(res, 200, { ok: true }); return true;
   }
-
   if (urlPath === '/api/waiting/release' && req.method === 'POST') {
     let body; try { body = await readJson(req, 16 * 1024); } catch { body = {}; }
     const code = String(body.code || '').trim().toUpperCase();
@@ -665,109 +598,11 @@ async function handleApi(req, res, urlPath, ip) {
     sendJson(res, 200, { ok: true }); return true;
   }
 
-  // ---- Streamer übernehmen, die es schon gibt (ohne Audition) ----
-  // Wer im PK-Board mitläuft, soll auch hier eine Akte haben. Das Skript
-  // pkboard-import.sh liest die Mitglieder und schickt sie hierher. Der
-  // Aufruf darf beliebig oft kommen: Vorhandenes wird nicht überschrieben.
-  if (urlPath === '/api/streamer-import' && req.method === 'POST') {
-    if (!adminOnly()) return true;
-    let body; try { body = await readJson(req, 2 * 1024 * 1024); } catch { sendJson(res, 413, { reason: 'too-large' }); return true; }
-    const leute = Array.isArray(body.leute) ? body.leute.slice(0, 5000) : [];
-    if (!leute.length) { sendJson(res, 400, { reason: 'keine-daten' }); return true; }
-    let neu = 0, vorhanden = 0, ergaenzt = 0, ohneId = 0;
-    const angelegt = [];
-    for (const p of leute) {
-      const r = store.ordnerAnlegen({
-        bigoId: p.bigoId, bigoName: p.bigoName || p.nick || '', name: p.name, alter: p.alter, art: p.art,
-        notiz: p.notiz, status: p.status, herkunft: p.herkunft || 'pkboard',
-      });
-      if (r.grund === 'keine-bigo-id') { ohneId++; continue; }
-      if (r.angelegt) { neu++; angelegt.push(r.ordner.bigoId); }
-      else { vorhanden++; if (r.ergaenzt) ergaenzt++; }
-    }
-    sec.recordEvent('audit', ip, 'Streamer übernommen: ' + neu + ' neu, ' + vorhanden + ' vorhanden');
-    sendJson(res, 200, { neu, vorhanden, ergaenzt, ohneId, gesamt: leute.length, angelegt: angelegt.slice(0, 50) });
-    return true;
-  }
-
-  // ---- Altersverifikation ohne Audition ----
-  // Kurzer Weg für Leute, die schon dabei sind: Ausweis ansehen, mit dem
-  // Gesicht vergleichen, abhaken. Bleibt dauerhaft in der Akte.
-  if (urlPath === '/api/streamer-verifizieren' && req.method === 'POST') {
-    if (!authed(req, ip)) { sendJson(res, 401, { reason: 'auth' }); return true; }
-    let body; try { body = await readJson(req, 32 * 1024); } catch { body = {}; }
-    const s = store.getStreamer(body.id);
-    if (!s) { sendJson(res, 404, { reason: 'nicht-gefunden' }); return true; }
-    if (body.ergebnis === 'bestanden' && (!body.ausweisart || !body.grundlage)) {
-      sendJson(res, 400, { reason: 'angaben-fehlen' }); return true;
-    }
-    const rec = store.verifikationEintragen(s.id, { ...body, geprueftVon: reqName(req, ip) || 'Prüfer' });
-    // Eine Verifikation ist ein Griff in die Akte – also steht sie auch im
-    // Einsichtsprotokoll der Akte, nicht nur im Sicherheitsprotokoll. Sonst
-    // wäre das hier ein stiller Weg an der Grundangabe vorbei: einmal
-    // „abgelehnt" schicken und die ganze Akte zurückbekommen, ohne Spur.
-    store.protokolliereZugriff(s.id, {
-      wer: reqName(req, ip) || 'Unbekannt',
-      rolle: isAdmin(req, ip) ? 'admin' : 'pruefer',
-      grund: 'Altersverifikation eingetragen (' + rec.ergebnis + ')', ip,
-    });
-    sec.recordEvent('audit', ip, 'Verifikation ' + rec.ergebnis + ' (' + rec.geprueftVon + '): ' + s.bigoId);
-    sendJson(res, 200, { verifikation: rec, ordner: store.getStreamer(s.id) });
-    return true;
-  }
-
-  // ---- Lose Aufnahmen einer Akte zuordnen ---------------------------------
-  // Bricht eine Audition ab, liegt die Aufnahme da und gehoert zu niemandem.
-  // Hier wird sie eingesortiert - der Zugriff steht wie immer in der Akte.
-  if (urlPath === '/api/aufnahmen-offen' && req.method === 'GET') {
-    if (!authed(req, ip)) { sendJson(res, 401, { reason: 'auth' }); return true; }
-    sendJson(res, 200, { aufnahmen: store.offeneAufnahmenOhneAkte() }); return true;
-  }
-  if (urlPath === '/api/aufnahme-zuordnen' && req.method === 'POST') {
-    if (!authed(req, ip)) { sendJson(res, 401, { reason: 'auth' }); return true; }
-    let body; try { body = await readJson(req, 16 * 1024); } catch { body = {}; }
-    const wer = reqName(req, ip) || 'Prüfer';
-    const r = store.aufnahmeZuordnen(String(body.id || ''), String(body.aufnahme || ''), { wer, notiz: body.notiz });
-    if (!r.ok) { sendJson(res, 400, { reason: r.grund }); return true; }
-    store.protokolliereZugriff(String(body.id || ''), {
-      wer, rolle: isAdmin(req, ip) ? 'admin' : 'pruefer',
-      grund: 'Aufnahme nachträglich zugeordnet', ip,
-    });
-    sec.recordEvent('audit', ip, 'Aufnahme zugeordnet (' + wer + '): ' + body.aufnahme + ' -> ' + body.id);
-    sendJson(res, 200, { ordner: r.ordner }); return true;
-  }
-
-  // ---- Kennen wir die Person schon? ----
-  // Wird beim Eintippen der Ausweisdaten gefragt. Der Prüfer soll wissen,
-  // ob die Audition an einen bestehenden Ordner angehängt wird oder ob ein
-  // neuer entsteht – vor der Freigabe, nicht danach.
-  if (urlPath === '/api/person-suche' && req.method === 'POST') {
-    // Zweiter Riegel. Die Anmeldepflicht kommt schon von der Sperre weiter
-    // oben ("ab hier: gültiges Login nötig") – dieser Aufruf hier hängt aber
-    // an der Antwort mit Name, Alter, Status und Zahl der Vermerke. Würde die
-    // Sperre oben jemals verrutschen, wäre das eine abfragbare Kartei: BIGO-IDs
-    // sind neunstellige Zahlen. Deshalb steht die Prüfung hier ausdrücklich
-    // noch einmal, direkt an der Stelle, die sie schützt.
-    if (!authed(req, ip)) { sendJson(res, 401, { reason: 'auth' }); return true; }
-    let body; try { body = await readJson(req, 8 * 1024); } catch { body = {}; }
-    const t = store.suchePerson({
-      bigoId: body.bigoId, bigoName: body.bigoName, docNumber: body.docNumber, name: body.name, age: body.age,
-    });
-    sendJson(res, 200, { treffer: t }); return true;
-  }
-
   // ---- Fall speichern (Prüfer) ----
   if (urlPath === '/api/case' && req.method === 'POST') {
     let body; try { body = await readJson(req); } catch { sendJson(res, 413, { reason: 'too-large' }); return true; }
     if (!body.code || !store.isCodeUsable(body.code)) { sendJson(res, 400, { reason: 'bad-code' }); return true; }
-    // Die beiden Texte kommen vom Server, nicht vom Browser: Sie sind die
-    // Einwilligung, die der Bewerber abgegeben hat, und gehören unverändert
-    // in die Akte. Wird der Text später geändert, bleibt hier stehen, was
-    // an diesem Tag galt.
-    const rec = store.saveCase({
-      ...body, agentName: reqName(req, ip) || body.agentName,
-      skript: store.getScript(), einleitung: store.getIntro(),
-    });
+    const rec = store.saveCase({ ...body, agentName: reqName(req, ip) || body.agentName });
     // Wurde die Aufnahme schon ausgewertet, bevor die Akte angelegt war?
     // Dann gehört die Einschätzung jetzt hier hinein.
     const auf = store.listRecordings().find((r) => r.code === rec.code && r.quality);
@@ -822,44 +657,7 @@ async function handleApi(req, res, urlPath, ip) {
     sendJson(res, ok ? 200 : 400, { ok }); return true;
   }
 
-  // ---- Aufnahme läuft mit: jedes Stück sofort auf den Server ---------------
-  // Nicht erst am Ende alles auf einmal. Wer mitten im Gespräch abbricht, hat
-  // dann trotzdem alles hier, was bis dahin gelaufen ist.
-  if (urlPath === '/api/rec/start' && req.method === 'POST') {
-    let body; try { body = await readJson(req, 8 * 1024); } catch { body = {}; }
-    const kopf = store.beginRecording({
-      code: body.code, agentName: reqName(req, ip) || 'Prüfer',
-      mime: body.mime, ext: body.ext,
-    });
-    if (!kopf) { sendJson(res, 500, { reason: 'kein-lauf' }); return true; }
-    sec.recordEvent('audit', ip, 'Aufnahme begonnen (' + kopf.agentName + ') zu ' + (kopf.code || '—'));
-    sendJson(res, 200, { sitzung: kopf.sitzung }); return true;
-  }
-  if (urlPath === '/api/rec/chunk' && req.method === 'POST') {
-    const q = new URL(req.url, 'http://x').searchParams;
-    let buf; try { buf = await readRaw(req, 40 * 1024 * 1024); } catch { sendJson(res, 413, { reason: 'too-large' }); return true; }
-    const r = store.appendRecordingChunk(q.get('sitzung'), q.get('i'), buf);
-    if (!r) { sendJson(res, 404, { reason: 'lauf-unbekannt' }); return true; }
-    sendJson(res, 200, r); return true;
-  }
-  if (urlPath === '/api/rec/finish' && req.method === 'POST') {
-    let body; try { body = await readJson(req, 8 * 1024); } catch { body = {}; }
-    const rec = store.finishRecording(body.sitzung, { durationSec: body.durationSec });
-    if (!rec) { sendJson(res, 404, { reason: 'nichts-angekommen' }); return true; }
-    sec.recordEvent('audit', ip, 'Aufnahme abgeschlossen: ' + rec.id + ' (' + rec.bytes + ' Bytes, '
-      + (rec.teile || 0) + ' Stücke' + (rec.unvollstaendig ? ', unvollständig' : '') + ')');
-    sendJson(res, 200, { id: rec.id, bytes: rec.bytes, durationSec: rec.durationSec,
-      teile: rec.teile || 0, unvollstaendig: !!rec.unvollstaendig }); return true;
-  }
-  // Welche Aufnahmen hängen gerade offen? Für die Diagnose auf acp.
-  if (urlPath === '/api/rec/offen' && req.method === 'GET') {
-    if (!adminOnly()) return true;
-    sendJson(res, 200, { offen: store.offeneAufnahmen() }); return true;
-  }
-
   // ---- Aufnahme hochladen (Prüfer, roher Video-Body) ----
-  // Bleibt als Rückfalltür: schafft der Browser das Mitlaufen nicht, geht es
-  // am Ende noch einmal am Stück. Lieber doppelt als gar nicht.
   if (urlPath === '/api/recording' && req.method === 'POST') {
     let buf; try { buf = await readRaw(req); } catch { sendJson(res, 413, { reason: 'too-large' }); return true; }
     if (!buf.length) { sendJson(res, 400, { reason: 'empty' }); return true; }
@@ -867,50 +665,30 @@ async function handleApi(req, res, urlPath, ip) {
     const rec = store.saveRecording({ buffer: buf, mime: (req.headers['content-type'] || 'video/webm').split(';')[0].trim(), ext: q.get('ext') || 'webm', durationSec: q.get('dur'), code: q.get('code') || '', agentName: reqName(req, ip) });
     if (!rec) { sendJson(res, 400, { reason: 'bad-recording' }); return true; }
     sec.recordEvent('audit', ip, 'Aufnahme gespeichert: ' + rec.id);
-    sendJson(res, 200, { id: rec.id, bytes: rec.bytes, durationSec: rec.durationSec }); return true;
+    // Antwort geht SOFORT raus – der Prüfer soll nicht auf die Umwandlung warten.
+    sendJson(res, 200, { id: rec.id, bytes: rec.bytes, durationSec: rec.durationSec });
+    // Danach im Hintergrund auf MP4 bringen, damit die Aufnahme auf jedem
+    // Gerät läuft (WebM aus Android-Browsern öffnet kein iPhone).
+    if (rec.ext !== 'mp4') {
+      store.konvertiereZuMp4(rec.id, (fehler) => {
+        if (fehler) sec.recordEvent('audit', ip, 'Aufnahme-Umwandlung fehlgeschlagen (' + fehler + '): ' + rec.id);
+        else sec.recordEvent('audit', ip, 'Aufnahme in MP4 umgewandelt: ' + rec.id);
+      });
+    }
+    return true;
   }
 
   // ---- Streamer-Ordner (mcp.4ever1.tv) ------------------------------------
   // Prüfer dürfen die Ordner sehen; ändern und löschen nur Admins.
-  // Der Adminbereich sieht alles. Prüfer bekommen zunächst nur die Hülle:
-  // dass es eine Akte gibt, wie sie heisst, wie viel drinsteht. Der Inhalt
-  // kommt erst nach /api/streamer-oeffnen mit genanntem Grund – und zwar
-  // wirklich erst dann, der Server schickt ihn vorher nicht mit.
   if (urlPath === '/api/streamers' && req.method === 'GET') {
     if (!authed(req, ip)) { sendJson(res, 401, { reason: 'auth' }); return true; }
-    const admin = isAdmin(req, ip);
-    sendJson(res, 200, {
-      streamers: admin ? store.listStreamers() : store.listStreamersKurz(),
-      voll: admin,
-    });
-    return true;
+    sendJson(res, 200, { streamers: store.listStreamers() }); return true;
   }
-
-  // ---- Akteneinsicht: nur mit Grund ----
-  // Wer kein Admin ist, muss sagen, warum er hineinschaut. Der Grund landet
-  // in der Akte, sichtbar für alle, und im Sicherheitsprotokoll. Admins
-  // kommen ohne Angabe hinein – aber auch ihr Zugriff wird festgehalten.
-  if (urlPath === '/api/streamer-oeffnen' && req.method === 'POST') {
-    if (!authed(req, ip)) { sendJson(res, 401, { reason: 'auth' }); return true; }
-    let body; try { body = await readJson(req, 16 * 1024); } catch { body = {}; }
-    const admin = isAdmin(req, ip);
-    const grund = String(body.grund || '').trim();
-    if (!admin && grund.length < 5) { sendJson(res, 400, { reason: 'grund-fehlt' }); return true; }
-    const s = store.getStreamer(body.id);
-    if (!s) { sendJson(res, 404, { reason: 'nicht-gefunden' }); return true; }
-    const wer = reqName(req, ip) || 'Unbekannt';
-    store.protokolliereZugriff(s.id, { wer, rolle: admin ? 'admin' : 'pruefer', grund: admin ? (grund || 'Adminzugriff') : grund, ip });
-    sec.recordEvent('audit', ip, 'Akte geöffnet (' + wer + '): ' + s.bigoId + (grund ? ' – ' + grund : ''));
-    sendJson(res, 200, { ordner: store.getStreamer(s.id) });
-    return true;
-  }
-  // Die alte Abkürzung `GET /api/streamer?id=…` gibt es nicht mehr. Sie gab
-  // die komplette Akte an jeden angemeldeten Prüfer heraus – ohne Grund, ohne
-  // Protokoll. Damit war die Grundangabe nur noch Zierde: man musste sie im
-  // Browser nicht umgehen, man musste sie nur nicht benutzen. Der einzige Weg
-  // in eine Akte ist jetzt /api/streamer-oeffnen.
   if (urlPath === '/api/streamer' && req.method === 'GET') {
-    sendJson(res, 410, { reason: 'nur-ueber-oeffnen' }); return true;
+    if (!authed(req, ip)) { sendJson(res, 401, { reason: 'auth' }); return true; }
+    const s = store.getStreamer(new URL(req.url, 'http://x').searchParams.get('id') || '');
+    if (!s) { sendJson(res, 404, { reason: 'gone' }); return true; }
+    sendJson(res, 200, { streamer: s }); return true;
   }
   if (urlPath === '/api/streamer' && req.method === 'POST') {
     if (!adminOnly()) return true;
@@ -1195,68 +973,14 @@ async function handleApi(req, res, urlPath, ip) {
       }),
     }); return true;
   }
-  // Ausweisbilder. Prüfer dürfen sie sehen – sie sind die, die den Ausweis
-  // beurteilen. Vorher kamen nur Admins daran, damit standen in der Akte für
-  // Dennis und Lisa leere Rahmen. Jeder Abruf wird protokolliert.
   if (urlPath === '/api/doc' && req.method === 'GET') {
-    if (!authed(req, ip)) { res.writeHead(401); res.end('Anmeldung nötig'); return true; }
+    if (!isAdmin(req, ip)) { res.writeHead(403); res.end('Forbidden'); return true; }
     const q = new URL(req.url, 'http://x').searchParams;
     const c = store.getCase(q.get('id'));
     const docRec = c && c.docs.find((d) => d.file === q.get('file'));
     const data = docRec && store.readDoc(c.id, docRec);
     if (!data) { res.writeHead(404); res.end('not found'); return true; }
-    if (!isAdmin(req, ip)) sec.recordEvent('audit', ip, 'Ausweisbild angesehen (' + (reqName(req, ip) || '?') + '): ' + (c.bigoName || c.id));
     res.writeHead(200, { 'Content-Type': data.mime, 'Cache-Control': 'no-store' }); res.end(data.buffer); return true;
-  }
-
-  // ---- Ausweisblatt als PDF ------------------------------------------------
-  // Ein Blatt je Audition: Deckblatt mit allen Angaben, danach die Bilder in
-  // Originalgröße. Damit hat man die Unterlagen in der Hand – zum Ablegen, zum
-  // Weitergeben an den BIGO-Support, zum Ausdrucken.
-  if (urlPath === '/api/akte-pdf' && req.method === 'GET') {
-    if (!authed(req, ip)) { res.writeHead(401); res.end('Anmeldung nötig'); return true; }
-    const q = new URL(req.url, 'http://x').searchParams;
-    const s2 = store.getStreamer(q.get('id'));
-    if (!s2) { res.writeHead(404); res.end('nicht gefunden'); return true; }
-    const aud = (s2.auditions || []).find((a) => a.auditionId === q.get('audition'))
-      || (s2.auditions || [])[0];
-    if (!aud) { res.writeHead(404); res.end('keine Audition'); return true; }
-    const fall = store.getCase(aud.auditionId);
-    const bilder = [];
-    if (fall) {
-      (fall.docs || []).forEach((d) => {
-        const data = store.readDoc(fall.id, d);
-        if (data) bilder.push({ label: d.label, buffer: data.buffer, mime: data.mime });
-      });
-    }
-    const zeit = (x) => { try { return new Date(x).toLocaleString('de-DE'); } catch { return String(x || ''); } };
-    let buf;
-    try {
-      buf = pdf.ausweisblatt({
-        bigoId: s2.bigoId, bigoName: s2.bigoName || '', aliasse: (s2.aliasse || []).join(', '),
-        name: aud.nameLautAusweis || s2.name || (fall && fall.verifiedName) || '',
-        alter: s2.alter || (fall && fall.age) || '',
-        ausweisart: aud.ausweisart || '', ausweisnummer: aud.ausweisnummer || '',
-        geburtsdatum: (fall && fall.geburtsdatum) || '',
-        pruefer: aud.pruefer || '', datum: zeit(aud.erstelltAm),
-        grundlage: 'Audition per Video, Ausweis live gesehen',
-        ergebnis: aud.ergebnis === 'approved' ? 'freigegeben' : (aud.ergebnis === 'rejected' ? 'abgelehnt' : 'offen'),
-        notiz: aud.notiz || '', erzeugtAm: zeit(new Date().toISOString()),
-        erklaerung: (aud.texte && aud.texte.vorlese) || '',
-      }, bilder);
-    } catch (e) {
-      sec.recordEvent('audit', ip, 'PDF fehlgeschlagen: ' + e.message);
-      res.writeHead(500); res.end('PDF konnte nicht gebaut werden'); return true;
-    }
-    store.protokolliereZugriff(s2.id, {
-      wer: reqName(req, ip) || 'Unbekannt', rolle: isAdmin(req, ip) ? 'admin' : 'pruefer',
-      grund: 'Ausweisblatt als PDF geholt', ip,
-    });
-    sec.recordEvent('audit', ip, 'Ausweisblatt PDF (' + (reqName(req, ip) || '?') + '): ' + s2.bigoId);
-    const name = 'Ausweis-' + String(s2.bigoId || 'akte').replace(/[^\w-]/g, '') + '.pdf';
-    res.writeHead(200, { 'Content-Type': 'application/pdf', 'Cache-Control': 'no-store',
-      'Content-Disposition': 'inline; filename="' + name + '"' });
-    res.end(buf); return true;
   }
   if (urlPath === '/api/case-export' && req.method === 'GET') {
     if (!isAdmin(req, ip)) { res.writeHead(403); res.end('Forbidden'); return true; }
@@ -1275,7 +999,6 @@ async function handleApi(req, res, urlPath, ip) {
       table{border-collapse:collapse;width:100%;margin:1rem 0} th,td{border:1px solid #e3e9f2;padding:.5rem .7rem;text-align:left;font-size:.92rem;vertical-align:top} th{width:34%;background:#f6f8fc;font-weight:600}
       figure{margin:0} .imgs{display:flex;flex-wrap:wrap;gap:1rem;margin-top:1rem} .imgs img{max-width:240px;border:1px solid #e3e9f2;border-radius:8px} figcaption{font-size:.75rem;color:#6b7a90;text-align:center;margin-top:.2rem}
       ul{padding-left:1.1rem;margin:.4rem 0} .print{margin:1rem 0;padding:.6rem 1rem;border:1px solid #3b6ef0;background:#eef3ff;border-radius:8px}
-      pre.wortlaut{white-space:pre-wrap;font-family:inherit;font-size:.9rem;line-height:1.6;background:#f6f8fc;border:1px solid #e3e9f2;border-radius:8px;padding:.7rem .9rem;margin:.3rem 0}
       @media print{.print{display:none}}
     </style></head><body>
       <h1>4EVER1 · Audition</h1><p class="sub">BIGO Live · Bewerbungs-/Auditionsakte</p>
@@ -1293,8 +1016,6 @@ async function handleApi(req, res, urlPath, ip) {
       </table>
       ${checks ? `<h3>Prüf-Checkliste</h3><ul>${checks}</ul>` : ''}
       ${imgs ? `<h3>Bilder</h3><div class="imgs">${imgs}</div>` : ''}
-      ${c.skript ? `<h3>Vorgelesener Text (Einwilligung)</h3><pre class="wortlaut">${eh(c.skript)}</pre>` : ''}
-      ${c.einleitung ? `<h3>Begrüßung / Ablauf</h3><pre class="wortlaut">${eh(c.einleitung)}</pre>` : ''}
     </body></html>`;
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' }); res.end(html); return true;
   }
@@ -1313,25 +1034,12 @@ async function handleApi(req, res, urlPath, ip) {
   if (urlPath === '/api/recording' && req.method === 'GET') {
     // Admins sehen alles. Ein Prüfer darf die Aufnahme ansehen, die er selbst
     // gemacht hat – sonst könnte er nicht beurteilen, ob sie etwas geworden ist.
-    const q0 = new URL(req.url, 'http://x').searchParams;
-    const recId = q0.get('id');
+    const recId = new URL(req.url, 'http://x').searchParams.get('id');
     const meta = store.getRecording(recId || '');
     const eigene = meta && authed(req, ip) && meta.agentName && meta.agentName === (reqName(req, ip) || '');
     if (!isAdmin(req, ip) && !eigene) { res.writeHead(403); res.end('Forbidden'); return true; }
     const data = store.readRecording(recId);
     if (!data) { res.writeHead(404); res.end('not found'); return true; }
-    // Herunterladen mit ordentlichem Namen. Vorher ging es nur ueber das
-    // versteckte Menue im Videofeld, und die Datei hiess dann "recording" -
-    // damit kann niemand etwas anfangen, der sie weitergeben soll.
-    if (q0.get('dl')) {
-      const datum = String(meta.createdAt || '').slice(0, 10);
-      const wer = String(meta.code || 'audition').replace(/[^\w-]/g, '');
-      const name = 'Audition-' + wer + '-' + datum + '.' + (meta.ext || 'webm');
-      sec.recordEvent('audit', ip, 'Aufnahme heruntergeladen (' + (reqName(req, ip) || '?') + '): ' + recId);
-      res.writeHead(200, { 'Content-Type': data.mime, 'Content-Length': data.buffer.length,
-        'Cache-Control': 'no-store', 'Content-Disposition': 'attachment; filename="' + name + '"' });
-      res.end(data.buffer); return true;
-    }
     const total = data.buffer.length; const range = req.headers['range'];
     const m = range && /^bytes=(\d*)-(\d*)$/.exec(range);
     if (m) {
@@ -1365,41 +1073,37 @@ async function handleApi(req, res, urlPath, ip) {
 }
 
 // ---- HTTP-Server -----------------------------------------------------------
+// ── Betrieb unter einem Unterpfad (z. B. mcp.4ever1.tv/audition) ──────
+//
+// Damit zwei Programme unter EINER Adresse leben können, läuft diese App
+// hier optional unter einem Präfix. Der Trick: Das Präfix wird ganz am
+// Eingang abgeschnitten und erst beim Ausliefern der Seiten wieder
+// eingesetzt. Die 1200 Zeilen Logik dazwischen merken davon nichts.
+//
+//   BASIS=/audition   -> App liegt unter /audition/...
+//   BASIS leer        -> alles wie bisher (Vorgabe)
+const BASIS = String(process.env.BASIS || '').replace(/\/+$/, '');
+
 const server = http.createServer(async (req, res) => {
   const ip = sec.clientIp(req);
+  // Präfix abschneiden, bevor irgendetwas anderes den Pfad ansieht.
+  // Gemerkt wird es PRO ANFRAGE – dieselbe Instanz bedient damit weiterhin
+  // ident.4ever1.tv an der Wurzel und gleichzeitig mcp.4ever1.tv/audition.
+  let basis = '';
+  if (BASIS && (req.url === BASIS || req.url.startsWith(BASIS + '/') || req.url.startsWith(BASIS + '?'))) {
+    basis = BASIS;
+    req.url = req.url.slice(BASIS.length) || '/';
+    if (!req.url.startsWith('/')) req.url = '/' + req.url;
+  }
   let urlPath;
   try { urlPath = decodeURIComponent(req.url.split('?')[0]); }
   catch { res.writeHead(400); res.end('Bad request'); return; }
 
   sec.setSecurityHeaders(res);
   if (sec.isBlocked(ip)) { res.writeHead(403); res.end('Forbidden'); return; }
-  // Anfragebremse – aber nur für die API, nicht für die Seite selbst.
-  //
-  // Vorher zählte jede Datei mit: HTML, Skripte, Bilder, das Kamerabild-Symbol.
-  // Eine einzige geöffnete Bewerber-Seite verbraucht davon zwanzig. Sitzen zwei
-  // Prüfer im selben Büro hinter derselben Leitung – oder hängen sie am selben
-  // Mobilfunknetz –, war das Kontingent weg, und der Login antwortete mit 429.
-  // Im Browser stand dann „Anmeldung fehlgeschlagen", obwohl das Passwort
-  // stimmte. Sie haben sich gegenseitig ausgesperrt und die Schuld beim
-  // Passwort gesucht.
-  //
-  // Gegen Durchprobieren schützt nicht diese Bremse, sondern die eigene Sperre
-  // am Login: Zählung je Konto, Zählung je IP, wachsende Wartezeit. Die bleibt.
-  if (urlPath.startsWith('/api/') && !authed(req, ip) && !sec.rateLimit(ip)) {
-    sendJson(res, 429, { reason: 'zu-viele-anfragen' }); return;
-  }
+  if (urlPath !== '/healthz' && !authed(req, ip) && !sec.rateLimit(ip)) { res.writeHead(429); res.end('Zu viele Anfragen'); return; }
 
-  // Gesundheitsprüfung – sagt auch, WELCHE Fassung läuft.
-  //
-  // Zweimal hat uns die Frage „ist das schon drauf?" einen Durchgang gekostet:
-  // im Browser stand der alte Stand, und niemand konnte von aussen nachsehen.
-  // Die Kennung ist kein Geheimnis, aber sie beantwortet die Frage in einer
-  // Zeile: curl https://mcp.<domain>/healthz
-  if (urlPath === '/healthz') {
-    res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' });
-    res.end('ok ' + (process.env.IDENT_VERSION || 'unbekannt') + ' seit ' + STARTZEIT + '\n');
-    return;
-  }
+  if (urlPath === '/healthz') { res.writeHead(200, { 'Content-Type': 'text/plain' }); res.end('ok'); return; }
   if (urlPath === '/ice') { res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify({ iceServers: buildIceServers() })); return; }
 
   if (urlPath.startsWith('/api/')) { try { if (await handleApi(req, res, urlPath, ip)) return; } catch { if (!res.headersSent) sendJson(res, 500, { reason: 'server-error' }); return; } }
@@ -1420,9 +1124,7 @@ const server = http.createServer(async (req, res) => {
   // laufende Sitzungen nicht ins Leere laufen. Vorübergehend (302), damit
   // Browser es nicht dauerhaft merken.
   if (altHost) {
-    // Beide landen im Team-Bereich. Auch admin.<domain> führt bewusst NICHT
-    // mehr in die Verwaltung – die liegt woanders und wird nicht verraten.
-    const ziel = 'https://mcp.' + hostName.split('.').slice(1).join('.') + '/';
+    const ziel = 'https://mcp.' + hostName.split('.').slice(1).join('.') + (hostName.startsWith('admin.') ? '/verwaltung' : '/');
     res.writeHead(302, { Location: ziel, 'Cache-Control': 'no-store' });
     res.end('Umgezogen nach ' + ziel); return;
   }
@@ -1444,12 +1146,10 @@ const server = http.createServer(async (req, res) => {
   if (urlPath === '/start' || urlPath === '/home') urlPath = '/home.html';
   // Eigener Direkt-Link für Prüfer -> Startseite öffnet gleich den Mitarbeiter-Login
   if (['/pruefer', '/login', '/team', '/mitarbeiter'].includes(urlPath)) urlPath = '/index.html';
-  // Alles Administrative liegt ausschliesslich auf acp.<domain>: einrichten,
-  // Diagnose, Löschen. Auf jeder anderen Adresse – auch auf mcp. – gibt es
-  // die Verwaltung schlicht nicht. Kein Hinweis, keine Weiterleitung: eine
-  // Weiterleitung würde die Adresse verraten, nach der niemand fragen soll.
+  // Die Verwaltung gibt es nur unter acp.<domain> und mcp.<domain>/verwaltung.
+  // Auf allen anderen Adressen (z. B. ident.4ever1.tv/admin) existiert sie nicht.
   if (['/panel', '/admin', '/admin.html', '/verwaltung'].includes(urlPath)) {
-    if (!acpHost) { res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }); res.end('Nicht gefunden'); return; }
+    if (!acpHost && !mcpHost) { res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }); res.end('Nicht gefunden'); return; }
     urlPath = '/admin.html';
   }
   // Suchmaschinen: Die Hauptseite darf gefunden werden, die Arbeitsbereiche
@@ -1471,118 +1171,50 @@ const server = http.createServer(async (req, res) => {
     res.writeHead(200, { 'Content-Type': 'application/xml; charset=utf-8', 'Cache-Control': 'public, max-age=3600' });
     res.end(xml); return;
   }
+  // Kleine Datei, die dem Frontend seinen Unterpfad mitteilt.
+  if (urlPath === '/__basis.js') {
+    res.writeHead(200, { 'Content-Type': 'application/javascript; charset=utf-8', 'Cache-Control': 'no-store' });
+    res.end('window.__BASIS=' + JSON.stringify(basis) + ';'); return;
+  }
   if (urlPath === '/figur' || urlPath === '/figuren') urlPath = '/figur.html';
   if (urlPath === '/datenschutz') urlPath = '/datenschutz.html';
   if (urlPath === '/impressum') urlPath = '/impressum.html';
   const filePath = path.normalize(path.join(PUBLIC_DIR, urlPath));
   if (!filePath.startsWith(PUBLIC_DIR)) { res.writeHead(403); res.end('Forbidden'); return; }
-  // Groesse und Aenderungszeit brauchen wir fuer die Cache-Marke.
-  let st = null;
-  try { st = fs.statSync(filePath); } catch { st = null; }
-  if (!st || !st.isFile()) { res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }); res.end('Nicht gefunden'); return; }
   fs.readFile(filePath, (err, data) => {
     if (err) { res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }); res.end('Nicht gefunden'); return; }
-    // ---- Cache-Angaben: das Wichtigste an der ganzen Auslieferung ----------
-    //
-    // Vorher ging KEINE Angabe mit. Dann entscheidet der Browser selbst, und er
-    // entscheidet grosszügig: Safari behielt index.html und app.js stundenlang.
-    // Ergebnis: auf dem Server lief die neue Fassung, im Browser die alte – mit
-    // zerrissenen Fragen und ohne Verbindung, weil altes Skript gegen neuen
-    // Server lief. Das hat uns mehrere Durchgänge gekostet, und niemand konnte
-    // es sehen.
-    //
-    // Seite und Skripte: bei jedem Aufruf nachfragen. Bilder und Zeichensätze
-    // ändern sich nicht und dürfen liegen bleiben.
-    const endung = path.extname(filePath).toLowerCase();
-    const frisch = ['.html', '.js', '.css', '.webmanifest', '.json'].includes(endung);
-    const marke = '"' + st.size.toString(36) + '-' + Math.floor(st.mtimeMs).toString(36) + '"';
-    // Hat der Browser schon genau diesen Stand? Dann nur „unverändert" – das
-    // kostet nichts und ist trotzdem immer aktuell.
-    if (req.headers['if-none-match'] === marke) {
-      res.writeHead(304, { ETag: marke, 'Cache-Control': frisch ? 'no-cache' : 'public, max-age=86400' });
-      res.end(); return;
+    const typ = MIME[path.extname(filePath)] || 'application/octet-stream';
+    // Unter einem Präfix müssen die festen Pfade in Seiten und Skripten
+    // mitwandern – sonst sucht der Browser sie weiter an der Wurzel.
+    if (basis && (typ.startsWith('text/html') || typ.includes('javascript'))) {
+      let txt = data.toString('utf8');
+      if (typ.startsWith('text/html')) {
+        // Die Basis als eigene Datei einbinden statt inline: Die App hat eine
+        // strenge Sicherheitsrichtlinie (script-src 'self'), und die soll auch
+        // strikt bleiben – ein Inline-Skript würde sie aufweichen.
+        txt = txt.replace(/<head([^>]*)>/i,
+          '<head$1><script src="/__basis.js"></script>');
+        txt = txt.replace(/(\s(?:src|href|action)=")\/(?!\/)/g, '$1' + basis + '/');
+      } else {
+        // Nur die eigenen Schnittstellen-Aufrufe, nichts sonst anfassen.
+        txt = txt.replace(/(fetch\(\s*[`'"])\/(api|ice|healthz)/g, '$1' + basis + '/$2');
+      }
+      const buf = Buffer.from(txt, 'utf8');
+      res.writeHead(200, { 'Content-Type': typ, 'Content-Length': buf.length });
+      res.end(buf); return;
     }
-    res.writeHead(200, {
-      'Content-Type': MIME[endung] || 'application/octet-stream',
-      'Cache-Control': frisch ? 'no-cache' : 'public, max-age=86400',
-      ETag: marke,
-      'Last-Modified': new Date(st.mtimeMs).toUTCString(),
-    });
+    res.writeHead(200, { 'Content-Type': typ });
     res.end(data);
   });
 });
 
 // ---- WebSocket-Signalisierung (WebRTC-Mesh: 1 Bewerber + bis zu 4 Prüfer) --
 const wss = new WebSocketServer({ server });
-
-// ---- Lebenszeichen für die WebSocket --------------------------------------
-//
-// Sobald das Video steht, läuft es direkt zwischen den beiden – über diese
-// Verbindung geht dann minutenlang nichts mehr. Ein Reverse-Proxy hält das für
-// eine vergessene Verbindung und kappt sie (nginx nach 60 Sekunden), Mobilfunk
-// oft noch früher.
-//
-// Der Browser merkte davon nur: „Verbindung unterbrochen – neuer Versuch". Und
-// weil beim Neuaufbau die bestehenden Verbindungen weggeworfen wurden, riss das
-// Gespräch jede Minute ab. Ohne dieses Lebenszeichen ist keine Audition über
-// eine echte Leitung durchzuhalten.
-//
-// Alle 25 Sekunden ein Ping. Wer zwei Pings nicht beantwortet, ist wirklich weg.
-const WS_PING_MS = 25000;
-// Grosszuegig zaehlen. Es gibt Zwischenstationen, die Pong-Antworten nicht
-// weiterreichen - wer da nach zwei Pings abschaltet, killt gesunde Verbindungen
-// im Minutentakt und macht es schlimmer als vorher. Vier Runden ohne jedes
-// Lebenszeichen sind knapp zwei Minuten; wer dann noch schweigt, ist wirklich
-// weg. Und JEDE eingehende Nachricht zaehlt als Lebenszeichen, nicht nur ein
-// Pong.
-//
-// NICHT mehr abschalten wegen Stille. Im Protokoll stand:
-//     [ws] beendet nach 4 stillen Runden (188.107.91.158)
-// Das war eine FUNKTIONIERENDE Verbindung. Die Pong-Antworten kommen durch den
-// Reverse-Proxy nicht zurueck, also sah eine gesunde Verbindung tot aus - und
-// meine Schutzmassnahme hat sie nach 100 Sekunden abgeschossen. Damit war sie
-// der Schaden, nicht der Schutz.
-//
-// Der Ping bleibt: er halt die Leitung warm, und das kostet nichts. Wer wirklich
-// weg ist, meldet sich ueber 'close' - darauf ist Verlass, das steht im
-// Protokoll. Und der Proxy hier hat 3600s Zeitlimit, kappt also von sich aus
-// nichts.
-const wsPing = setInterval(() => {
-  wss.clients.forEach((ws) => {
-    ws.stilleRunden = (ws.stilleRunden || 0) + 1;
-    // Nur aufschreiben, nicht eingreifen. Lange Stille kann normal sein: das
-    // Video laeuft direkt zwischen den beiden, hier passiert dann nichts.
-    if (ws.stilleRunden === 20) {
-      console.log('[ws] seit ~8 Min. still, bleibt aber offen (' + (ws.role || '?') + ' ' + (ws.ip || '?') + ')');
-    }
-    try { ws.ping(); } catch { /* wenn das nicht geht, meldet sich 'close' */ }
-  });
-}, WS_PING_MS);
-wsPing.unref && wsPing.unref();
 /** rooms: Map<code, Map<peerId, ws>> */
 const rooms = new Map();
 /** waiting: Map<code, {code, note, joinedAt, claimedBy, claimedAt}> */
 const waiting = new Map();
 const CLAIM_TTL = 30000;
-// Wie lange eine Bewerberin in der Schlange stehen bleibt, obwohl ihre
-// Verbindung weg ist. Zwei Minuten: lange genug fuer einen Netzwechsel oder
-// einen Blick in eine andere App, kurz genug, dass niemand ewig herumsteht.
-const WEG_TTL = 120000;
-// Wer schon "Ich bin fertig" gemeldet hat, wartet aktiv auf uns. Die bleibt
-// deutlich laenger stehen: sie hat ihren Teil getan, und wenn sie den Tab
-// beiseiteschiebt oder das Handy sperrt, darf sie deswegen nicht aus der
-// Schlange fallen.
-const WEG_TTL_BEREIT = 900000;
-const wartenAufraeumen = setInterval(() => {
-  waiting.forEach((w, code) => {
-    if (!w.wegSeit) return;
-    const room = rooms.get(code);
-    if (room && room.size > 0) { w.wegSeit = 0; return; }   // doch noch jemand da
-    const grenze = w.bereit ? WEG_TTL_BEREIT : WEG_TTL;
-    if (Date.now() - w.wegSeit > grenze) waiting.delete(code);
-  });
-}, 20000);
-wartenAufraeumen.unref && wartenAufraeumen.unref();
 const MAX_HOSTS = 4;
 function roomHosts(room) { let n = 0; if (room) for (const w of room.values()) if (w.role === 'host') n++; return n; }
 function roomHasGuest(room) { if (room) for (const w of room.values()) if (w.role === 'guest') return true; return false; }
@@ -1595,16 +1227,6 @@ function send(ws, obj) { if (ws && ws.readyState === ws.OPEN) ws.send(JSON.strin
 
 wss.on('connection', (ws, req) => {
   ws.ip = sec.clientIp(req);
-  ws.stilleRunden = 0;
-  ws.on('pong', () => { ws.stilleRunden = 0; });
-  // Auch normale Nachrichten sind ein Lebenszeichen.
-  ws.on('message', () => { ws.stilleRunden = 0; });
-  // Warum ist die Verbindung weggegangen? Ohne diese Zeile raet man nur.
-  ws.on('close', (nr, grund) => {
-    console.log('[ws] zu: ' + nr + ' ' + (grund ? String(grund).slice(0, 60) : '')
-      + ' rolle=' + (ws.role || '?') + ' nummer=' + (ws.roomCode || '-') + ' ' + (ws.ip || '?'));
-  });
-  ws.on('error', (e) => { console.log('[ws] Fehler: ' + (e && e.message) + ' ' + (ws.ip || '?')); });
   if (sec.isBlocked(ws.ip)) { try { ws.close(); } catch {} return; }
   ws.peerId = crypto.randomUUID();
 
@@ -1636,38 +1258,7 @@ wss.on('connection', (ws, req) => {
 
       if (role === 'guest') {
         const note = store.getCode(code); // Notiz aus dem Code (falls hinterlegt)
-        // Gleich nachsehen, ob wir die Person kennen. Steht damit in der
-        // Warteschlange, noch bevor jemand das Gespräch annimmt.
-        const bigo = String(msg.bigo || '').trim().slice(0, 80);
-        const nick = String(msg.bigoNick || '').trim().slice(0, 80);
-        let bekannt = null;
-        // Zahl UND Name in die Suche: wer nur den Namen weiss, wird trotzdem
-        // erkannt. Der Prüfer sieht in der Schlange dann schon, dass es kein
-        // Neuling ist – bevor er das Gespräch annimmt.
-        try { bekannt = store.suchePerson({ bigoId: bigo, bigoName: nick, age: msg.alter }); } catch { bekannt = null; }
-        // WICHTIG: einen bestehenden Eintrag NICHT ueberschreiben.
-        //
-        // Die Bewerberin verbindet sich neu, sobald das Netz kurz zuckt oder sie
-        // die App in den Hintergrund legt - auf dem Handy also andauernd. Wurde
-        // der Eintrag dabei neu angelegt, war ihr "Ich bin fertig" weg und die
-        // Wartezeit fing wieder bei null an. Der Pruefer sah einen freien
-        // Abhol-Knopf, der Server sagte Nein - und es "passierte nichts".
-        //
-        // Was sie gemeldet hat, gilt weiter. Nur die Angaben werden frisch
-        // uebernommen.
-        const vorhanden = waiting.get(code);
-        waiting.set(code, {
-          code, note: note ? note.note : '',
-          joinedAt: vorhanden ? vorhanden.joinedAt : Date.now(),
-          claimedBy: vorhanden ? vorhanden.claimedBy : null,
-          claimedAt: vorhanden ? vorhanden.claimedAt : 0,
-          bigoId: bigo || (vorhanden ? vorhanden.bigoId : ''),
-          bigoNick: nick || (vorhanden ? vorhanden.bigoNick : ''),
-          bekannt: bekannt || (vorhanden ? vorhanden.bekannt : null),
-          wegSeit: 0,                       // sie ist ja wieder da
-          bereit: vorhanden ? !!vorhanden.bereit : false,
-          bereitSeit: vorhanden ? (vorhanden.bereitSeit || 0) : 0,
-        });
+        waiting.set(code, { code, note: note ? note.note : '', joinedAt: Date.now(), claimedBy: null, claimedAt: 0 });
       } else {
         const w = waiting.get(code); if (w) { w.claimedBy = ws.pname; w.claimedAt = Date.now(); }
       }
@@ -1686,22 +1277,7 @@ wss.on('connection', (ws, req) => {
     const room = rooms.get(ws.roomCode); if (!room) return;
     room.delete(ws.peerId);
     for (const other of room.values()) send(other, { type: 'peer-left', peerId: ws.peerId });
-    if (ws.role === 'guest') {
-      // NICHT loeschen. Das war die Ursache dafuer, dass "Abholen" nichts tat.
-      //
-      // Die Verbindung der Bewerberin bricht andauernd kurz weg: Netz zuckt,
-      // App in den Hintergrund, Proxy-Zeitlimit. Wurde sie dabei aus der
-      // Warteschlange geloescht, kam sie als NEUE Person zurueck - ohne ihr
-      // "Ich bin fertig" und mit neuer Wartezeit. Der Pruefer sah einen freien
-      // Abhol-Knopf (aus der vorigen Abfrage), der Server sagte Nein, und im
-      // Browser passierte scheinbar nichts.
-      //
-      // Sie bleibt jetzt stehen und ist als "kurz weg" gekennzeichnet. Kommt sie
-      // binnen zwei Minuten zurueck, war nie etwas. Kommt sie nicht, raeumt der
-      // Aufraeumer sie weg.
-      const w = waiting.get(ws.roomCode);
-      if (w) { w.wegSeit = Date.now(); }
-    }
+    if (ws.role === 'guest') { waiting.delete(ws.roomCode); }
     else {
       const w = waiting.get(ws.roomCode);
       if (w && roomHosts(room) === 0) { if (!store.isCodeUsable(ws.roomCode)) waiting.delete(ws.roomCode); else { w.claimedBy = null; w.claimedAt = 0; } }
