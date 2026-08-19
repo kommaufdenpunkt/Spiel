@@ -489,6 +489,17 @@ th{color:var(--muted);font-weight:600;font-size:.78rem;text-transform:uppercase;
   border-radius:8px;padding:.5rem .7rem;font-size:.88rem;color:var(--ink);line-height:1.5}
 
 /* ---- Abholung / Live-Standort ---- */
+/* „Meine Fahrstunden" – tabellarische Historie */
+.ml-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:12px}
+.ml-table{width:100%;border-collapse:collapse;font-size:.86rem;min-width:520px}
+.ml-table th{background:var(--card2);color:var(--muted);font-size:.7rem;text-transform:uppercase;letter-spacing:.04em;
+  text-align:left;padding:.5rem .6rem;position:sticky;top:0}
+.ml-table td{padding:.55rem .6rem;border-top:1px solid var(--line);vertical-align:top}
+.ml-table tr:nth-child(even) td{background:rgba(255,255,255,.02)}
+.ml-when strong{color:var(--ink)}
+.ml-entry{display:block;font-size:.72rem;color:var(--warn);margin-top:.15rem}
+.ml-note{color:var(--muted);max-width:260px}
+.ml-noshow td{opacity:.7}
 .pickup-box{background:var(--card2);border:1px solid var(--line);border-radius:12px;
   padding:.75rem .85rem;margin:.7rem 0}
 .pickup-box .pb-line{font-size:.95rem}

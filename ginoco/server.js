@@ -15,7 +15,7 @@ const PUBLIC = join(__dirname, 'public');
 const PORT = Number(process.env.PORT || 3000);
 const HOST = process.env.HOST || '0.0.0.0'; // hinter Caddy: HOST=127.0.0.1 (nur Proxy erreicht Node)
 const SESSION_DAYS = 30;
-const APP_VERSION = "3.48.0";
+const APP_VERSION = "3.49.0";
 // Einstellungen, die Schueler/Oeffentlichkeit sehen duerfen (Rest bleibt beim Fahrlehrer)
 const PUBLIC_SETTINGS = ['instructor_name', 'instructor_phone', 'policy_text',
   'cancel_hours', 'lock_hours', 'booking_horizon_days', 'booking_horizon_days_rank2',
@@ -376,7 +376,7 @@ async function handleApi(req, res, url) {
   if (p === '/api/my/bookings' && method === 'GET') {
     if (!requireStudent()) return bad(res, 'Bitte anmelden', 401);
     const rows = db.prepare(
-      `SELECT id,date,start_time,duration_min,status,gearbox,plate,note,started_at,ended_at,confirmed,feedback,lesson_type
+      `SELECT id,date,start_time,duration_min,status,gearbox,plate,note,started_at,ended_at,confirmed,feedback,lesson_type,late_minutes,attended,created_at
        FROM bookings WHERE student_id = ? AND status != 'cancelled' ORDER BY date, start_time`
     ).all(sess.student_id);
     return ok(res, { bookings: rows, weekInfo: weekInfoForStudent(sess.student_id),
@@ -410,6 +410,39 @@ async function handleApi(req, res, url) {
     if (!requireStudent() && !requireInstructor()) return bad(res, 'Bitte anmelden', 401);
     const body = await readBody(req);
     return createBooking(res, sess, body);
+  }
+
+  // Fahrstunde NACHTRAGEN (Fahrlehrer): eine bereits gefahrene Stunde als "done"
+  // eintragen – mit echtem Fahrdatum+Uhrzeit (auch in der Vergangenheit).
+  // created_at = jetzt (Eintragedatum), date/start_time = tatsächliches Fahrdatum.
+  if (p === '/api/instructor/log-lesson' && method === 'POST') {
+    if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
+    const b = await readBody(req);
+    const sid = b.student_id ? Number(b.student_id) : null;
+    const date = b.date, start = b.start_time;
+    if (!sid) return bad(res, 'Bitte einen Fahrschüler wählen');
+    if (!date || !start) return bad(res, 'Bitte Fahrdatum und Uhrzeit angeben');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^\d{1,2}:\d{2}$/.test(start)) return bad(res, 'Datum/Uhrzeit ungültig');
+    if (!db.prepare('SELECT 1 FROM students WHERE id=?').get(sid)) return bad(res, 'Fahrschüler nicht gefunden');
+    const dur = Math.max(1, Number(b.duration_min) || getSettings().lesson_min);
+    const late = Math.max(0, Number(b.late_minutes) || 0);
+    const type = ['ueberland', 'autobahn', 'nacht'].includes(b.lesson_type) ? b.lesson_type : 'normal';
+    const attended = (b.attended === false || b.attended === 0 || b.attended === '0') ? 0 : 1;
+    const gear = ['schalt', 'automatik'].includes(b.gearbox) ? b.gearbox : null;
+    const vermerk = b.feedback ? String(b.feedback).trim() : null;
+    const info = db.prepare(
+      `INSERT INTO bookings(student_id,date,start_time,duration_min,status,gearbox,lesson_type,late_minutes,attended,feedback,confirmed,created_at)
+       VALUES(?,?,?,?,'done',?,?,?,?,?,1,?)`
+    ).run(sid, date, start, dur, gear, type, late, attended, vermerk, new Date().toISOString());
+    const bid = Number(info.lastInsertRowid);
+    const typeLbl = { ueberland: 'Überland', autobahn: 'Autobahn', nacht: 'Nachtfahrt' }[type];
+    const detail = attended
+      ? `nachgetragen: ${wdShort(date)} ${dmy(date)} ${start} Uhr (${dur} Min${late ? `, ${late} Min zu spät` : ''})${typeLbl ? ' – ' + typeLbl : ''}${vermerk ? ' – ' + vermerk : ''}`
+      : `nachgetragen (nicht erschienen): ${wdShort(date)} ${dmy(date)} ${start} Uhr${vermerk ? ' – ' + vermerk : ''}`;
+    logEvent(attended ? 'done' : 'noshow', { actor: 'instructor', studentId: sid, bookingId: bid, date, detail });
+    if (vermerk && attended) notify(sid, 'info',
+      `📝 Fahrstunde nachgetragen (${wdShort(date)} ${dmy(date)} ${start} Uhr): ${vermerk}`, date, bid);
+    return ok(res, { id: bid });
   }
 
   // Sammel-Import bestehender Termine (Fahrlehrer). Zwei Schritte:
@@ -1166,6 +1199,19 @@ async function handleApi(req, res, url) {
     return ok(res, { training });
   }
   // Ausbildungskarte lesen/speichern (Fahrlehrer)
+  // Gefahrene Fahrstunden eines Schülers (für Nachweis-Druck)
+  const lsm = p.match(/^\/api\/students\/(\d+)\/lessons$/);
+  if (lsm && method === 'GET') {
+    if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
+    const sid = Number(lsm[1]);
+    const st = db.prepare('SELECT name FROM students WHERE id=?').get(sid);
+    if (!st) return bad(res, 'Schüler nicht gefunden', 404);
+    const lessons = db.prepare(
+      `SELECT id,date,start_time,duration_min,status,gearbox,lesson_type,late_minutes,attended,feedback,created_at
+       FROM bookings WHERE student_id=? AND status='done' ORDER BY date,start_time`).all(sid);
+    return ok(res, { lessons, name: st.name });
+  }
+
   const trm = p.match(/^\/api\/students\/(\d+)\/training$/);
   if (trm && method === 'GET') {
     if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);

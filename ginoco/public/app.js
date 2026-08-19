@@ -405,8 +405,12 @@ function openTour() {
 window.__openTour = openTour;
 
 // ---------- Was ist neu? (Changelog) ----------
-const CHANGELOG_VER = '3.48';
+const CHANGELOG_VER = '3.49';
 const CHANGELOG = [
+  { v: '3.49', d: '19.08.2026', title: 'Meine Fahrstunden & Nachtragen', items: [
+    '📖 Fahrschüler sehen jetzt „Meine Fahrstunden“ – tabellarisch mit Datum & Uhrzeit, Dauer, Art, Verspätung und Vermerk.',
+    '➕ Fahrlehrer kann Fahrstunden nachtragen (echtes Fahrdatum, z. B. 18.08. 20:00) – das Eintragedatum wird zusätzlich vermerkt.',
+    '📄 Fahrstunden-Nachweis zum Ausdrucken (Tabelle mit Unterschriftsfeldern).'] },
   { v: '3.48', d: '26.07.2026', title: 'Karte aufgewertet & runder Look', items: [
     '🗺️ Live-Karte zeigt jetzt die echte Fahrzeit über die Straße (statt grober Schätzung).',
     '🎯 „Zentrieren“-Knopf – schaust du auf der Karte herum, bleibt die Ansicht stehen, bis du zurücktippst.',
@@ -706,6 +710,7 @@ const INSTR_NAV = [
 const STUDENT_NAV = [
   ['__group', 'Übersicht'],
   ['week-card', '📅', 'Meine Woche'], ['slots', '🚗', 'Termin buchen'],
+  ['lessons-card', '📖', 'Meine Fahrstunden'],
   ['__group', 'Mehr'],
   ['notif-card', '🔔', 'Mitteilungen'], ['offers-card', '🎁', 'Angebote'],
 ];
@@ -919,6 +924,7 @@ async function renderStudent() {
     <div class="card hidden" id="notif-card"></div>
     <div class="card hidden" id="profile-card"></div>
     <div class="card" id="week-card"></div>
+    <div class="card hidden" id="lessons-card"></div>
     <div class="card hidden" id="offers-card"></div>
     <div class="card">
       <h2>Termin buchen <span class="sub" id="horizon-note"></span></h2>
@@ -970,6 +976,7 @@ async function syncStudent() {
     renderLessonTimer(mine.bookings);
     refreshStudentLive();
     renderWeekCard(mine.weekInfo, mine.bookings, mine.progress);
+    renderMyLessons(mine.bookings);
     { const hn = $('#horizon-note'); if (hn && mine.progress) hn.textContent = `(bis ${mine.progress.horizon} Tage im Voraus · Rang ${mine.progress.rank})`; }
     renderOffers(off.offers, mine.weekInfo);
     state.lastSlotStart = day.slots.length ? day.slots[day.slots.length - 1].start : null;
@@ -978,6 +985,101 @@ async function syncStudent() {
     state.calMonth = firstOfMonth(state.date);
     renderBookingCalendar();
   } catch (e) { toast(e.message, 'err'); }
+}
+
+// ---------- „Meine Fahrstunden" (Schüler-Historie, tabellarisch) ----------
+function addMinHHMM(hhmm, min) {
+  const [h, m] = String(hhmm).split(':').map(Number);
+  const t = h * 60 + m + (Number(min) || 0);
+  return String(Math.floor(t / 60) % 24).padStart(2, '0') + ':' + String(((t % 60) + 60) % 60).padStart(2, '0');
+}
+function lessonTypeLabel(t) { return { ueberland: '🌄 Überland', autobahn: '🛣️ Autobahn', nacht: '🌙 Nachtfahrt' }[t] || 'Normal'; }
+function fmtDT(date, time) {
+  const d = parseD(date);
+  return d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }) + (time ? ', ' + time + ' Uhr' : '');
+}
+function renderMyLessons(bookings) {
+  const card = $('#lessons-card'); if (!card) return;
+  const done = (bookings || []).filter((b) => b.status === 'done')
+    .sort((a, z) => (z.date + z.start_time).localeCompare(a.date + a.start_time));
+  if (!done.length) { card.classList.add('hidden'); return; }
+  card.classList.remove('hidden');
+  const driven = done.filter((b) => b.attended !== 0);
+  const totalMin = driven.reduce((s, b) => s + (b.duration_min || 0), 0);
+  const rows = done.map((b) => {
+    const noshow = b.attended === 0;
+    const late = b.late_minutes || 0;
+    const entryDate = b.created_at ? String(b.created_at).slice(0, 10) : null;
+    const nachgetragen = entryDate && entryDate !== b.date;
+    return `<tr class="${noshow ? 'ml-noshow' : ''}">
+      <td class="ml-when"><strong>${fmtDT(b.date, b.start_time)}</strong>${nachgetragen ? `<span class="ml-entry">nachgetragen · eingetragen ${fmtDT(entryDate)}</span>` : ''}</td>
+      <td>${noshow ? '—' : 'bis ' + addMinHHMM(b.start_time, b.duration_min)}</td>
+      <td>${noshow ? '🚫 nicht da' : (b.duration_min + ' Min')}</td>
+      <td>${noshow ? '' : lessonTypeLabel(b.lesson_type)}</td>
+      <td>${late ? `⏱️ ${late} Min` : ''}</td>
+      <td class="ml-note">${b.feedback ? esc(b.feedback) : ''}</td>
+    </tr>`;
+  }).join('');
+  card.innerHTML = `<h2>📖 Meine Fahrstunden</h2>
+    <p class="hint">Alle deine gefahrenen Stunden – mit Datum &amp; Uhrzeit, Dauer, Art und Vermerk.</p>
+    <div class="inline" style="margin-bottom:.6rem;flex-wrap:wrap">
+      <span class="pill">🚗 ${driven.length} gefahren</span>
+      <span class="pill">⏱️ ${hLabel(totalMin)} gesamt</span>
+      <button class="sec sm" id="ml-print" style="margin-left:auto">📄 Nachweis drucken</button>
+    </div>
+    <div class="ml-wrap"><table class="ml-table">
+      <thead><tr><th>Datum &amp; Uhrzeit</th><th>Ende</th><th>Dauer</th><th>Art</th><th>Verspät.</th><th>Vermerk</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table></div>`;
+  const pb = $('#ml-print'); if (pb) pb.onclick = () => printLessonProof(state.user?.name || 'Fahrschüler', done);
+}
+// Druckbarer Fahrstunden-Nachweis (Tabelle + Unterschriften)
+function printLessonProof(name, done) {
+  const school = esc(state.settings?.instructor_name || 'Fahrschule');
+  const today = new Date().toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  const list = (done || []).slice().sort((a, z) => (a.date + a.start_time).localeCompare(z.date + z.start_time));
+  const driven = list.filter((b) => b.attended !== 0);
+  const totalMin = driven.reduce((s, b) => s + (b.duration_min || 0), 0);
+  const rows = list.map((b, i) => {
+    const noshow = b.attended === 0;
+    const late = b.late_minutes || 0;
+    const entryDate = b.created_at ? String(b.created_at).slice(0, 10) : null;
+    const nachgetragen = entryDate && entryDate !== b.date;
+    const artL = { ueberland: 'Überland', autobahn: 'Autobahn', nacht: 'Nachtfahrt' }[b.lesson_type] || 'Normal';
+    return `<tr>
+      <td class="c">${i + 1}</td>
+      <td>${fmtDT(b.date, b.start_time)}${nachgetragen ? `<br><span class="entry">nachgetragen · eingetragen ${fmtDT(entryDate)}</span>` : ''}</td>
+      <td class="c">${noshow ? '—' : addMinHHMM(b.start_time, b.duration_min)}</td>
+      <td class="c">${noshow ? 'nicht erschienen' : b.duration_min + ' Min'}</td>
+      <td class="c">${noshow ? '' : artL}</td>
+      <td class="c">${late ? late + ' Min' : ''}</td>
+      <td>${esc(b.feedback || '')}</td>
+    </tr>`;
+  }).join('');
+  const doc = `<!doctype html><html lang="de"><head><meta charset="utf-8"><title>Fahrstunden-Nachweis – ${esc(name)}</title>
+    <style>*{box-sizing:border-box}body{font-family:Arial,Helvetica,sans-serif;color:#111;margin:0;padding:26px 30px;max-width:900px}
+      .head{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #111;padding-bottom:10px;margin-bottom:12px}
+      .head h1{font-size:20px;margin:0}.head .meta{font-size:12px;color:#444;text-align:right;line-height:1.5}
+      .sum{font-size:13px;margin:6px 0 14px}
+      table{width:100%;border-collapse:collapse;font-size:12px}
+      th,td{border:1px solid #bbb;padding:5px 7px;text-align:left;vertical-align:top}
+      th{background:#f0f0f0;font-size:11px;text-transform:uppercase;letter-spacing:.03em}
+      td.c{text-align:center;white-space:nowrap} .entry{font-size:10px;color:#777}
+      tr{break-inside:avoid}
+      .sign{margin-top:40px;display:flex;gap:48px}.sign div{flex:1;border-top:1px solid #111;padding-top:5px;font-size:11px;color:#444}
+      .foot{margin-top:16px;font-size:11px;color:#666;border-top:1px solid #ccc;padding-top:8px}
+      @media print{body{padding:0}}</style></head><body>
+    <div class="head"><div><h1>Fahrstunden-Nachweis</h1><div style="font-size:13px;margin-top:2px">${esc(name)}</div></div>
+      <div class="meta">${school}<br>Stand: ${today}</div></div>
+    <div class="sum"><strong>${driven.length} gefahrene Fahrstunden · ${hLabel(totalMin)} gesamt</strong></div>
+    <table><thead><tr><th>#</th><th>Datum &amp; Uhrzeit (gefahren)</th><th>Ende</th><th>Dauer</th><th>Art</th><th>Verspätung</th><th>Vermerk</th></tr></thead>
+      <tbody>${rows}</tbody></table>
+    <div class="sign"><div>Unterschrift Fahrlehrer</div><div>Unterschrift Fahrschüler</div></div>
+    <div class="foot">Erstellt mit ginoco · ${today}. „Nachgetragen" = später eingetragene Fahrstunde; maßgeblich ist das angegebene Fahrdatum.</div>
+    <script>window.onload=function(){setTimeout(function(){window.print()},250)}<\/script></body></html>`;
+  const w = window.open('', '_blank');
+  if (!w) { toast('Bitte Pop-ups erlauben, um den Nachweis zu drucken.', 'err'); return; }
+  w.document.open(); w.document.write(doc); w.document.close();
 }
 
 // Monatskalender mit Ampel-Tagen: grün = frei, rot = ausgebucht, grau = zu/vorbei.
@@ -2106,6 +2208,41 @@ function openMarkModal(id) {
 }
 window.__closeModal = closeModal;
 
+// Fahrstunde NACHTRAGEN (Fahrlehrer): gefahrene Stunde mit echtem Datum+Uhrzeit eintragen
+function openLogLessonModal(sid, name) {
+  const s = state.settings || {};
+  modal(`<h3>➕ Fahrstunde nachtragen</h3>
+    <p class="hint">Trage eine bereits gefahrene Stunde für <strong>${esc(name)}</strong> ein – mit dem <strong>echten Fahrdatum &amp; Uhrzeit</strong>. Das Eintragedatum (heute) wird automatisch zusätzlich vermerkt, damit klar ist: gefahren am X, eingetragen am Y.</p>
+    <div class="row">
+      <div class="field"><label>Fahrdatum</label><input type="date" id="lg-date" value="${todayStr()}"></div>
+      <div class="field"><label>Uhrzeit (Beginn)</label><input id="lg-time" value="" placeholder="z.B. 20:00"></div>
+    </div>
+    <div class="row">
+      <div class="field"><label>Dauer (Min)</label><input type="number" id="lg-dur" value="${s.lesson_min || 80}" min="5" step="5"></div>
+      <div class="field"><label>Verspätung (Min)</label><input type="number" id="lg-late" value="0" min="0" step="5"></div>
+    </div>
+    <div class="field"><label>Fahrt-Art</label>
+      <select id="lg-type"><option value="">Normal</option><option value="ueberland">🌄 Überland</option><option value="autobahn">🛣️ Autobahn</option><option value="nacht">🌙 Nachtfahrt</option></select></div>
+    <label class="ck-line"><input type="checkbox" id="lg-att" checked> Fahrschüler ist erschienen (gefahren)</label>
+    <div class="field"><label>Vermerk <span class="muted">(sieht der Fahrschüler – z.B. Verlauf/Besonderes)</span></label>
+      <textarea id="lg-note" rows="3" placeholder="z.B. 20 Min zu spät gekommen, restliche 60 Min gefahren – Kreisverkehr & Vorfahrt geübt." style="resize:vertical"></textarea></div>
+    <div class="actions"><button class="sec" onclick="window.__closeModal()">Abbrechen</button><button id="lg-save">Nachtragen</button></div>`);
+  $('#lg-save').onclick = async () => {
+    const date = $('#lg-date').value, time = $('#lg-time').value.trim();
+    if (!date || !time) { toast('Bitte Fahrdatum und Uhrzeit angeben', 'err'); return; }
+    try {
+      await api('/api/instructor/log-lesson', { method: 'POST', body: {
+        student_id: sid, date, start_time: time,
+        duration_min: Number($('#lg-dur').value), late_minutes: Number($('#lg-late').value) || 0,
+        lesson_type: $('#lg-type').value || 'normal', attended: $('#lg-att').checked,
+        feedback: $('#lg-note').value } });
+      closeModal(); toast('Fahrstunde nachgetragen ✓', 'ok');
+      try { refreshEventBadge(); } catch {}
+      if (typeof tabSchueler === 'function' && $('#itab')) { /* Liste ggf. aktuell halten */ }
+    } catch (e) { toast(e.message, 'err'); }
+  };
+}
+
 async function instrCancel(id) {
   const reason = prompt('Grund für die Absage (optional, z.B. Krankheit) – wird dem Schüler mitgeteilt:');
   if (reason === null) return; // abgebrochen
@@ -2610,6 +2747,8 @@ async function tabSchueler(scope) {
           </div>
           <div class="stu-actions">
             <button class="ghost sm" data-edit="${s.id}">✏️ Bearbeiten</button>
+            <button class="ghost sm" data-log="${s.id}" data-lname="${esc(s.name)}">➕ Fahrstunde nachtragen</button>
+            <button class="ghost sm" data-proof="${s.id}" data-pname="${esc(s.name)}">📄 Nachweis</button>
             <button class="ghost sm" data-card="${s.id}" data-cname="${esc(s.name)}">📋 Ausbildungskarte</button>
             <button class="ghost sm" data-reset="${s.id}" data-uname="${esc(s.username || '')}" data-sname="${esc(s.name)}">🔑 Zugangsdaten</button>
             ${isArch
@@ -2638,6 +2777,14 @@ async function tabSchueler(scope) {
       openEditStudentModal(students.find((x) => x.id === Number(btn.dataset.edit))));
     $('#s-list').querySelectorAll('[data-card]').forEach((btn) => btn.onclick = () =>
       openTrainingCard(btn.dataset.card, btn.dataset.cname));
+    $('#s-list').querySelectorAll('[data-log]').forEach((btn) => btn.onclick = () =>
+      openLogLessonModal(Number(btn.dataset.log), btn.dataset.lname));
+    $('#s-list').querySelectorAll('[data-proof]').forEach((btn) => btn.onclick = async () => {
+      try { const r = await api('/api/students/' + btn.dataset.proof + '/lessons');
+        if (!r.lessons.length) { toast('Noch keine gefahrenen Stunden für den Nachweis.', 'err'); return; }
+        printLessonProof(r.name || btn.dataset.pname, r.lessons);
+      } catch (e) { toast(e.message, 'err'); }
+    });
     $('#s-list').querySelectorAll('[data-del]').forEach((btn) => btn.onclick = () =>
       deleteStudent(btn.dataset.del, btn.dataset.dname));
     $('#s-list').querySelectorAll('[data-arch]').forEach((btn) => btn.onclick = async () => {
