@@ -50,7 +50,7 @@ self.addEventListener('push', (e) => {
   const title = d.title || 'Ginoco';
   e.waitUntil(self.registration.showNotification(title, {
     body: d.body || '', icon: '/icon-192.png', badge: '/icon-192.png',
-    vibrate: [80, 40, 80], tag: 'ginoco', renotify: true,
+    lang: 'de', dir: 'ltr', vibrate: [80, 40, 80], tag: 'ginoco', renotify: true,
     data: { url: d.url || '/' },
   }));
 });

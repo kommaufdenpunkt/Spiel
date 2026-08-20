@@ -1807,8 +1807,9 @@ async function pushState() {
 async function enablePush() {
   try {
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) { toast('Dein Gerät unterstützt keine Push-Nachrichten', 'err'); return; }
+    if (Notification.permission === 'denied') { toast('Benachrichtigungen sind blockiert – bitte in den Browser-Einstellungen für ginoco.de wieder erlauben.', 'err'); refreshPushCtl(); return; }
     const perm = await Notification.requestPermission();
-    if (perm !== 'granted') { toast('Ohne Erlaubnis keine Benachrichtigungen', 'err'); return; }
+    if (perm !== 'granted') { toast('Ohne Erlaubnis keine Benachrichtigungen. Tippe im Browser-Fenster auf „Erlauben".', 'err'); refreshPushCtl(); return; }
     const reg = await navigator.serviceWorker.ready;
     const { key } = await api('/api/push/key');
     if (!key) { toast('Push ist gerade nicht bereit', 'err'); return; }
@@ -1830,14 +1831,28 @@ async function disablePush() {
 async function refreshPushCtl() {
   const el = $('#push-ctl'); if (!el) return;
   const st = await pushState();
-  if (st === 'unsupported') { el.innerHTML = '<span class="hint">🔔 Push-Nachrichten gehen auf diesem Gerät leider nicht (Tipp: App zum Home-Bildschirm hinzufügen).</span>'; return; }
-  if (st === 'on') el.innerHTML = `<span class="pill" style="background:var(--good-bg);color:var(--good)">🔔 Benachrichtigungen an</span>
-      <button class="ghost sm" id="push-test">Test</button><button class="ghost sm" id="push-off">Ausschalten</button>`;
-  else el.innerHTML = `<div class="hint" style="margin-bottom:.4rem">Verpass keine Termin-Erinnerung, Verschiebung oder Absage – auch wenn die App zu ist.</div>
-      <button class="sm" id="push-on">🔔 Benachrichtigungen einschalten</button>`;
+  const blocked = ('Notification' in window) && Notification.permission === 'denied';
+  if (st === 'unsupported') {
+    el.innerHTML = '<span class="hint">🔔 <strong>Handy-Benachrichtigungen</strong> gehen auf diesem Gerät leider nicht. Tipp fürs iPhone: die Seite über das Teilen-Symbol „Zum Home-Bildschirm" hinzufügen und die App von dort öffnen.</span>';
+    return;
+  }
+  if (blocked && st !== 'on') {
+    el.innerHTML = `<div class="hint">🔕 <strong>Benachrichtigungen sind blockiert.</strong> So erlaubst du sie wieder:
+      <br>• <strong>Handy:</strong> im Browser oben auf das Schloss-/„aA"-Symbol neben der Adresse tippen → „Benachrichtigungen" → „Erlauben".
+      <br>• <strong>PC:</strong> auf das Schloss-Symbol links neben der Adresse klicken → „Benachrichtigungen: Zulassen".
+      Danach diese Seite neu laden.</div>`;
+    return;
+  }
+  if (st === 'on') {
+    el.innerHTML = `<span class="pill" style="background:var(--good-bg);color:var(--good)">🔔 Benachrichtigungen sind an</span>
+      <button class="ghost sm" id="push-test">Test senden</button><button class="ghost sm" id="push-off">Ausschalten</button>`;
+  } else {
+    el.innerHTML = `<div class="hint" style="margin-bottom:.5rem">🔔 <strong>Handy-Benachrichtigungen einschalten:</strong> Erinnerungen, Verschiebungen, Absagen und Angebote direkt aufs Handy – auch wenn die App geschlossen ist. Beim nächsten Schritt fragt dein Browser einmal um Erlaubnis – bitte auf „Erlauben" tippen.</div>
+      <button class="sm" id="push-on">🔔 Jetzt einschalten</button>`;
+  }
   const on = $('#push-on'); if (on) on.onclick = enablePush;
   const off = $('#push-off'); if (off) off.onclick = disablePush;
-  const test = $('#push-test'); if (test) test.onclick = async () => { try { await api('/api/push/test', { method: 'POST' }); toast('Test gesendet 🔔', 'ok'); } catch (e) { toast(e.message, 'err'); } };
+  const test = $('#push-test'); if (test) test.onclick = async () => { try { await api('/api/push/test', { method: 'POST' }); toast('Test-Benachrichtigung gesendet 🔔', 'ok'); } catch (e) { toast(e.message, 'err'); } };
 }
 function renderNotifications(notifs, unread) {
   const card = $('#notif-card');
