@@ -4,9 +4,9 @@
    gerade kein Netz da ist. So sieht man Änderungen sofort – ganz ohne Hard-Refresh.
    Anmeldungen bleiben bestehen (Sitzung liegt im Cookie, nicht im Cache).
    API-Aufrufe (/api/...) laufen ohnehin immer direkt übers Netz – nie aus dem Cache. */
-const CACHE = 'ginoco-shell-v3';
+const CACHE = 'ginoco-shell-v4';
 const SHELL = ['/', '/index.html', '/app.js', '/styles.css', '/manifest.webmanifest',
-  '/icon-192.png', '/icon-512.png', '/apple-touch-icon.png'];
+  '/logo.svg', '/icon-192.png', '/icon-512.png', '/apple-touch-icon.png'];
 
 self.addEventListener('install', (e) => {
   // Sofort aktiv werden – neue Version wartet nicht auf Schließen aller Tabs.
