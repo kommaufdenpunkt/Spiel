@@ -302,6 +302,21 @@ function pushToStudent(studentId, message, url = '/') {
     }
   } catch (e) { console.error('pushToStudent', e); }
 }
+// Push an alle Geraete des Fahrlehrers (fuer neue Schueler-Nachrichten).
+function pushToInstructor(message, url = '/') {
+  try {
+    if (!getSettingRaw('vapid_public')) return;
+    const subs = db.prepare("SELECT * FROM push_subscriptions WHERE kind = 'instructor'").all();
+    if (!subs.length) return;
+    const payload = JSON.stringify({ title: 'Ginoco', body: String(message).slice(0, 300), url });
+    for (const s of subs) {
+      let body; try { body = encryptPush(payload, s.p256dh, s.auth); } catch { continue; }
+      postPush(s.endpoint, body, vapidAuth(s.endpoint)).then((r) => {
+        if (r.status === 404 || r.status === 410) db.prepare('DELETE FROM push_subscriptions WHERE id = ?').run(s.id);
+      }).catch(() => {});
+    }
+  } catch (e) { console.error('pushToInstructor', e); }
+}
 
 // Belegte Intervalle eines Tages (Buchungen + Bloecke), sortiert.
 function occupiedIntervals(date) {
@@ -655,6 +670,33 @@ async function handleApi(req, res, url) {
     }
     logEvent('info', { actor: 'student', studentId: sess.student_id, detail: `Bewertung abgegeben (${rating}★)` });
     return ok(res, { saved: true });
+  }
+
+  // ===== Nachrichten: Fahrschüler <-> Fahrlehrer =====
+  if (p === '/api/my/messages' && method === 'GET') {
+    if (!requireStudent()) return bad(res, 'Bitte anmelden', 401);
+    const rows = db.prepare('SELECT id,sender,body,created_at FROM messages WHERE student_id = ? ORDER BY id').all(sess.student_id);
+    // Fahrlehrer-Nachrichten als gelesen markieren
+    db.prepare("UPDATE messages SET read_student = 1 WHERE student_id = ? AND sender = 'instructor' AND read_student = 0").run(sess.student_id);
+    return ok(res, { messages: rows, instructorName: getSettingRaw('instructor_name') });
+  }
+  if (p === '/api/my/messages' && method === 'POST') {
+    if (!requireStudent()) return bad(res, 'Bitte anmelden', 401);
+    const b = await readBody(req);
+    const body = String(b.body || '').trim();
+    if (!body) return bad(res, 'Bitte etwas schreiben.');
+    if (body.length > 2000) return bad(res, 'Nachricht zu lang (max. 2000 Zeichen).');
+    db.prepare(`INSERT INTO messages(student_id,sender,body,read_student,read_instructor,created_at)
+      VALUES(?,?,?,1,0,?)`).run(sess.student_id, 'student', body, new Date().toISOString());
+    const st = db.prepare('SELECT name FROM students WHERE id = ?').get(sess.student_id);
+    logEvent('message', { actor: 'student', studentId: sess.student_id, detail: `Neue Nachricht: „${body.slice(0, 80)}"` });
+    pushToInstructor(`✉️ Neue Nachricht von ${st?.name || 'einem Fahrschüler'}: ${body.slice(0, 120)}`);
+    return ok(res, { sent: true });
+  }
+  if (p === '/api/my/messages/unread' && method === 'GET') {
+    if (!requireStudent()) return bad(res, 'Bitte anmelden', 401);
+    const n = db.prepare("SELECT COUNT(*) AS n FROM messages WHERE student_id = ? AND sender = 'instructor' AND read_student = 0").get(sess.student_id).n;
+    return ok(res, { unread: n });
   }
 
   // Abwesenheit des Fahrlehrers (Urlaub / freie Tage) – nur fuer eingeloggte Nutzer
@@ -1467,6 +1509,50 @@ async function handleApi(req, res, url) {
        WHERE e.type = 'reset' AND e.seen = 0 AND s.id IS NOT NULL
        ORDER BY e.at DESC`).all();
     return ok(res, { requests: rows });
+  }
+
+  // ===== Nachrichten (Fahrlehrer-Seite) =====
+  // Gesprächsliste: je Schüler letzte Nachricht + ungelesen-Anzahl
+  if (p === '/api/instructor/messages' && method === 'GET') {
+    if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
+    const rows = db.prepare(
+      `SELECT m.student_id, s.name AS student_name, s.username,
+              MAX(m.id) AS last_id,
+              (SELECT body FROM messages m2 WHERE m2.student_id = m.student_id ORDER BY m2.id DESC LIMIT 1) AS last_body,
+              (SELECT sender FROM messages m2 WHERE m2.student_id = m.student_id ORDER BY m2.id DESC LIMIT 1) AS last_sender,
+              (SELECT created_at FROM messages m2 WHERE m2.student_id = m.student_id ORDER BY m2.id DESC LIMIT 1) AS last_at,
+              SUM(CASE WHEN m.sender = 'student' AND m.read_instructor = 0 THEN 1 ELSE 0 END) AS unread
+       FROM messages m LEFT JOIN students s ON s.id = m.student_id
+       GROUP BY m.student_id ORDER BY last_id DESC`).all();
+    const totalUnread = db.prepare("SELECT COUNT(*) AS n FROM messages WHERE sender = 'student' AND read_instructor = 0").get().n;
+    return ok(res, { conversations: rows, totalUnread });
+  }
+  if (p === '/api/instructor/messages/unread' && method === 'GET') {
+    if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
+    const n = db.prepare("SELECT COUNT(*) AS n FROM messages WHERE sender = 'student' AND read_instructor = 0").get().n;
+    return ok(res, { unread: n });
+  }
+  const msgm = p.match(/^\/api\/instructor\/messages\/(\d+)$/);
+  if (msgm && method === 'GET') {
+    if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
+    const sid = Number(msgm[1]);
+    const rows = db.prepare('SELECT id,sender,body,created_at FROM messages WHERE student_id = ? ORDER BY id').all(sid);
+    db.prepare("UPDATE messages SET read_instructor = 1 WHERE student_id = ? AND sender = 'student' AND read_instructor = 0").run(sid);
+    const st = db.prepare('SELECT name,username FROM students WHERE id = ?').get(sid);
+    return ok(res, { messages: rows, student: st || null });
+  }
+  if (p === '/api/instructor/messages' && method === 'POST') {
+    if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
+    const b = await readBody(req);
+    const sid = Number(b.student_id);
+    const body = String(b.body || '').trim();
+    if (!sid || !body) return bad(res, 'Empfänger und Text nötig');
+    if (body.length > 2000) return bad(res, 'Nachricht zu lang (max. 2000 Zeichen).');
+    if (!db.prepare('SELECT 1 FROM students WHERE id = ?').get(sid)) return bad(res, 'Schüler nicht gefunden', 404);
+    db.prepare(`INSERT INTO messages(student_id,sender,body,read_student,read_instructor,created_at)
+      VALUES(?,?,?,0,1,?)`).run(sid, 'instructor', body, new Date().toISOString());
+    notify(sid, 'info', `✉️ Nachricht von deinem Fahrlehrer: ${body.slice(0, 140)}`);
+    return ok(res, { sent: true });
   }
   // Test-/Demo-Schueler mit einem Klick anlegen (zum Ausprobieren der Schueler-Ansicht)
   // Fahrschüler direkt anlegen (Fahrlehrer) – erzeugt Login + Startpasswort zum Weitergeben

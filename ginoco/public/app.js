@@ -408,8 +408,12 @@ function openTour() {
 window.__openTour = openTour;
 
 // ---------- Was ist neu? (Changelog) ----------
-const CHANGELOG_VER = '3.58';
+const CHANGELOG_VER = '3.59';
 const CHANGELOG = [
+  { v: '3.59', d: '20.08.2026', title: 'Nachrichten in der App', items: [
+    '✉️ Schreib direkt in der App mit deinem Fahrlehrer – Fragen, Bescheid geben, alles an einem Ort (wie ein Chat).',
+    '🔔 Neue Nachrichten kommen per Push aufs Handy; gelesen/ungelesen wird angezeigt.',
+    '🧑‍🏫 Der Fahrlehrer hat einen eigenen „Nachrichten"-Bereich mit allen Gesprächen und ungelesen-Zähler.'] },
   { v: '3.58', d: '20.08.2026', title: 'Passwort-Anfragen, Recht & App-Reif', items: [
     '🔑 „Passwort vergessen"-Anfragen erscheinen jetzt oben im Fahrlehrer-Dashboard – mit Ein-Tipp-Zurücksetzen und fertigen Zugangsdaten zum Weitergeben.',
     '📄 Datenschutzerklärung & Impressum (Vorlagen) hinzugefügt – verlinkt auf der Startseite, nötig für den App-Store.',
@@ -737,7 +741,7 @@ const INSTR_NAV = [
   ['__group', 'Übersicht'],
   ['heute', '📊', 'Heute & Ziele'], ['kalender', '📅', 'Kalender'],
   ['__group', 'Fahrschüler'],
-  ['schueler', '🧑‍🎓', 'Fahrschüler'], ['codes', '🔑', 'Zugangscodes'],
+  ['schueler', '🧑‍🎓', 'Fahrschüler'], ['nachrichten', '✉️', 'Nachrichten'], ['codes', '🔑', 'Zugangscodes'],
   ['__group', 'Planung'],
   ['arbeitszeiten', '🕒', 'Arbeitszeiten'], ['theorie', '📚', 'Theorie'],
   ['__group', 'System'],
@@ -749,6 +753,7 @@ const STUDENT_NAV = [
   ['week-card', '📅', 'Meine Woche'], ['slots', '🚗', 'Termin buchen'],
   ['lessons-card', '📖', 'Meine Fahrstunden'],
   ['__group', 'Mehr'],
+  ['messages-card', '✉️', 'Nachrichten'],
   ['notif-card', '🔔', 'Mitteilungen'], ['offers-card', '🎁', 'Angebote'],
   ['review-card', '⭐', 'Bewertung'],
 ];
@@ -1006,6 +1011,7 @@ async function renderStudent() {
     <div class="card hidden" id="profile-card"></div>
     <div class="card" id="week-card"></div>
     <div class="card hidden" id="lessons-card"></div>
+    <div class="card" id="messages-card"></div>
     <div class="card hidden" id="review-card"></div>
     <div class="card hidden" id="offers-card"></div>
     <div class="card">
@@ -1060,6 +1066,7 @@ async function syncStudent() {
     renderWeekCard(mine.weekInfo, mine.bookings, mine.progress);
     renderMyLessons(mine.bookings);
     renderReviewCard(mine.progress);
+    renderStudentMessages();
     { const hn = $('#horizon-note'); if (hn && mine.progress) hn.textContent = `(bis ${mine.progress.horizon} Tage im Voraus · Rang ${mine.progress.rank})`; }
     renderOffers(off.offers, mine.weekInfo);
     state.lastSlotStart = day.slots.length ? day.slots[day.slots.length - 1].start : null;
@@ -1115,6 +1122,40 @@ function renderMyLessons(bookings) {
       <tbody>${rows}</tbody>
     </table></div>`;
   const pb = $('#ml-print'); if (pb) pb.onclick = () => printLessonProof(state.user?.name || 'Fahrschüler', done);
+}
+
+// ---------- Nachrichten an den Fahrlehrer (Schüler) ----------
+function msgTime(iso) {
+  try { return new Date(iso).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }); } catch { return ''; }
+}
+async function renderStudentMessages() {
+  const card = $('#messages-card'); if (!card) return;
+  let data = {};
+  try { data = await api('/api/my/messages'); } catch { card.classList.add('hidden'); return; }
+  card.classList.remove('hidden');
+  const msgs = data.messages || [];
+  const who = data.instructorName || 'Fahrlehrer';
+  const bubbles = msgs.length
+    ? msgs.map((m) => `<div class="msg ${m.sender === 'student' ? 'me' : 'them'}">
+        <div class="msg-b">${esc(m.body)}</div><div class="msg-t">${m.sender === 'student' ? 'Du' : esc(who)} · ${msgTime(m.created_at)}</div>
+      </div>`).join('')
+    : `<p class="hint">Noch keine Nachrichten. Schreib deinem Fahrlehrer – z. B. eine Frage oder Bescheid, wenn du dich verspätest.</p>`;
+  card.innerHTML = `<h2>✉️ Nachrichten <span class="sub">an ${esc(who)}</span></h2>
+    <div class="msg-list" id="msg-list">${bubbles}</div>
+    <div class="msg-compose">
+      <textarea id="msg-in" rows="2" maxlength="2000" placeholder="Nachricht schreiben …"></textarea>
+      <button class="sm" id="msg-send">Senden</button>
+    </div>`;
+  const list = $('#msg-list'); if (list) list.scrollTop = list.scrollHeight;
+  const send = async () => {
+    const body = $('#msg-in').value.trim(); if (!body) return;
+    $('#msg-send').disabled = true;
+    try { await api('/api/my/messages', { method: 'POST', body: { body } }); $('#msg-in').value = ''; await renderStudentMessages(); }
+    catch (e) { toast(e.message, 'err'); }
+    finally { const b = $('#msg-send'); if (b) b.disabled = false; }
+  };
+  $('#msg-send').onclick = send;
+  $('#msg-in').onkeydown = (e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); send(); } };
 }
 
 // ---------- Bewertung abgeben (Schüler) ----------
@@ -2079,15 +2120,82 @@ async function refreshEventBadge() {
 function drawInstrTab() {
   app.querySelectorAll('.navtabs button').forEach((b) => b.classList.toggle('active', b.dataset.tab === state.instrTab));
   const t = state.instrTab;
+  if (t !== 'nachrichten') openConvo = null;
   if (t === 'heute') return tabHeute();
   if (t === 'kalender') return tabKalender();
   if (t === 'codes') return tabCodes();
   if (t === 'schueler') return tabSchueler();
+  if (t === 'nachrichten') return tabNachrichten();
   if (t === 'theorie') return tabTheorie();
   if (t === 'arbeitszeiten') return tabArbeitszeiten();
   if (t === 'bewertungen') return tabBewertungen();
   if (t === 'protokoll') return tabProtokoll();
   if (t === 'einstellungen') return tabEinstellungen();
+}
+
+// ---- Tab: Nachrichten (Fahrlehrer) ----
+let openConvo = null; // { id, name }
+async function tabNachrichten() {
+  const box = $('#itab');
+  if (openConvo) return convoView(openConvo.id, openConvo.name);
+  box.innerHTML = '<div class="card"><h2>✉️ Nachrichten</h2><p class="hint">Lädt…</p></div>';
+  let data = {};
+  try { data = await api('/api/instructor/messages'); } catch (e) { box.innerHTML = `<div class="card"><p class="err">${esc(e.message)}</p></div>`; return; }
+  const cs = data.conversations || [];
+  const rows = cs.map((c) => `<button class="convo ${c.unread > 0 ? 'unread' : ''}" data-convo="${c.student_id}" data-name="${esc(c.student_name || '')}">
+      <div class="convo-top"><strong>${esc(c.student_name || 'Fahrschüler')}</strong>
+        ${c.unread > 0 ? `<span class="badge offer">${c.unread}</span>` : ''}
+        <span class="hint" style="margin-left:auto">${msgTime(c.last_at)}</span></div>
+      <div class="convo-last">${c.last_sender === 'instructor' ? '↩︎ ' : ''}${esc(String(c.last_body || '').slice(0, 80))}</div>
+    </button>`).join('');
+  box.innerHTML = `<div class="card">
+    <h2>✉️ Nachrichten ${data.totalUnread ? `<span class="badge offer">${data.totalUnread} neu</span>` : ''}</h2>
+    <p class="hint">Schreib mit deinen Fahrschülern. Neue Nachrichten schicken dir eine Push-Benachrichtigung (falls aktiviert). Du kannst auch ein Gespräch mit einem Schüler beginnen.</p>
+    <button class="sec sm" id="msg-new" style="margin-bottom:.6rem">✏️ Neue Nachricht an …</button>
+    <div class="convo-list">${cs.length ? rows : '<p class="hint">Noch keine Nachrichten.</p>'}</div>
+  </div>`;
+  box.querySelectorAll('[data-convo]').forEach((b) => b.onclick = () => { openConvo = { id: Number(b.dataset.convo), name: b.dataset.name }; convoView(openConvo.id, openConvo.name); });
+  $('#msg-new').onclick = async () => {
+    let students = [];
+    try { students = (await api('/api/students')).students || []; } catch (e) { toast(e.message, 'err'); return; }
+    if (!students.length) { toast('Noch keine Fahrschüler', 'err'); return; }
+    modal(`<h3>Neue Nachricht</h3>
+      <div class="field"><label>An</label><select id="mn-stu">${students.map((s) => `<option value="${s.id}">${esc(s.name)}</option>`).join('')}</select></div>
+      <div class="field"><label>Nachricht</label><textarea id="mn-body" rows="3" maxlength="2000"></textarea></div>
+      <div class="actions"><button class="sec" onclick="window.__closeModal()">Abbrechen</button><button id="mn-go">Senden</button></div>`);
+    $('#mn-go').onclick = async () => {
+      const sid = Number($('#mn-stu').value), body = $('#mn-body').value.trim();
+      if (!body) return;
+      try { await api('/api/instructor/messages', { method: 'POST', body: { student_id: sid, body } }); closeModal(); openConvo = { id: sid, name: students.find((s) => s.id === sid)?.name || '' }; convoView(sid, openConvo.name); toast('Gesendet ✓', 'ok'); }
+      catch (e) { toast(e.message, 'err'); }
+    };
+  };
+}
+async function convoView(sid, name) {
+  const box = $('#itab');
+  box.innerHTML = '<div class="card"><p class="hint">Lädt…</p></div>';
+  let data = {};
+  try { data = await api('/api/instructor/messages/' + sid); } catch (e) { box.innerHTML = `<div class="card"><p class="err">${esc(e.message)}</p></div>`; return; }
+  const nm = data.student?.name || name || 'Fahrschüler';
+  const bubbles = (data.messages || []).map((m) => `<div class="msg ${m.sender === 'instructor' ? 'me' : 'them'}">
+      <div class="msg-b">${esc(m.body)}</div><div class="msg-t">${m.sender === 'instructor' ? 'Du' : esc(nm)} · ${msgTime(m.created_at)}</div></div>`).join('')
+    || '<p class="hint">Noch keine Nachrichten in diesem Gespräch.</p>';
+  box.innerHTML = `<div class="card">
+    <div class="inline" style="margin-bottom:.5rem"><button class="ghost sm" id="convo-back">← Zurück</button><h2 style="margin:0">${esc(nm)}</h2></div>
+    <div class="msg-list" id="msg-list">${bubbles}</div>
+    <div class="msg-compose"><textarea id="ci-body" rows="2" maxlength="2000" placeholder="Antwort schreiben …"></textarea><button class="sm" id="ci-send">Senden</button></div>
+  </div>`;
+  const list = $('#msg-list'); if (list) list.scrollTop = list.scrollHeight;
+  $('#convo-back').onclick = () => { openConvo = null; tabNachrichten(); };
+  const send = async () => {
+    const body = $('#ci-body').value.trim(); if (!body) return;
+    $('#ci-send').disabled = true;
+    try { await api('/api/instructor/messages', { method: 'POST', body: { student_id: sid, body } }); $('#ci-body').value = ''; await convoView(sid, nm); }
+    catch (e) { toast(e.message, 'err'); }
+    finally { const b = $('#ci-send'); if (b) b.disabled = false; }
+  };
+  $('#ci-send').onclick = send;
+  $('#ci-body').onkeydown = (e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); send(); } };
 }
 
 // ---- Tab: Bewertungen (Moderation) ----
@@ -3916,7 +4024,7 @@ const EV_META = {
   offer: ['🔄', 'Angeboten'], take: ['✅', 'Übernommen'], shift: ['🕐', 'Verschoben'],
   delay: ['⏱️', 'Verspätung'], done: ['🚗', 'Gefahren'], noshow: ['🚫', 'Nicht erschienen'],
   vacation: ['🌴', 'Urlaub'], reminder: ['🔔', 'Erinnerung'], info: ['ℹ️', 'Info'],
-  reset: ['🔑', 'Passwort vergessen'],
+  reset: ['🔑', 'Passwort vergessen'], message: ['✉️', 'Nachricht'],
 };
 async function tabProtokoll() {
   const box = $('#itab');

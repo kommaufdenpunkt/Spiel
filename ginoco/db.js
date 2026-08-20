@@ -200,6 +200,18 @@ db.exec(`CREATE TABLE IF NOT EXISTS push_subscriptions (
   created_at TEXT NOT NULL
 );`);
 db.exec('CREATE INDEX IF NOT EXISTS idx_push_student ON push_subscriptions(student_id)');
+
+// Nachrichten (Fahrschüler <-> Fahrlehrer). Ein Gespräch pro Schüler.
+db.exec(`CREATE TABLE IF NOT EXISTS messages (
+  id              INTEGER PRIMARY KEY AUTOINCREMENT,
+  student_id      INTEGER NOT NULL,               -- Gesprächspartner (immer ein Schüler)
+  sender          TEXT NOT NULL,                  -- 'student' | 'instructor'
+  body            TEXT NOT NULL,
+  read_student    INTEGER NOT NULL DEFAULT 0,     -- vom Schüler gelesen
+  read_instructor INTEGER NOT NULL DEFAULT 0,     -- vom Fahrlehrer gelesen
+  created_at      TEXT NOT NULL
+);`);
+db.exec('CREATE INDEX IF NOT EXISTS idx_messages_student ON messages(student_id, id)');
 ensureColumn('bookings', 'attended', 'attended INTEGER');            // 1 = da, 0 = nicht erschienen, NULL = offen
 ensureColumn('bookings', 'late_minutes', 'late_minutes INTEGER NOT NULL DEFAULT 0');
 ensureColumn('bookings', 'reason', 'reason TEXT');
