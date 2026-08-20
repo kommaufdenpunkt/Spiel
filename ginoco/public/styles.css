@@ -905,3 +905,8 @@ body:has(.fp-overlay) .pwa-install{display:none}
 .rr-item{display:flex;align-items:center;gap:.6rem;justify-content:space-between;flex-wrap:wrap;
   padding:.55rem 0;border-top:1px solid var(--line)}
 .rr-item:first-of-type{border-top:none}
+
+/* Rechtliche Links auf der Startseite */
+.legal-links{margin-top:.5rem;font-size:.82rem}
+.legal-links a{color:var(--muted);text-decoration:none}
+.legal-links a:hover{color:var(--brand);text-decoration:underline}

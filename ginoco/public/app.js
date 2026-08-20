@@ -410,8 +410,9 @@ window.__openTour = openTour;
 // ---------- Was ist neu? (Changelog) ----------
 const CHANGELOG_VER = '3.58';
 const CHANGELOG = [
-  { v: '3.58', d: '20.08.2026', title: 'Passwort-Anfragen & App-Reif', items: [
+  { v: '3.58', d: '20.08.2026', title: 'Passwort-Anfragen, Recht & App-Reif', items: [
     '🔑 „Passwort vergessen"-Anfragen erscheinen jetzt oben im Fahrlehrer-Dashboard – mit Ein-Tipp-Zurücksetzen und fertigen Zugangsdaten zum Weitergeben.',
+    '📄 Datenschutzerklärung & Impressum (Vorlagen) hinzugefügt – verlinkt auf der Startseite, nötig für den App-Store.',
     '📲 App-Reif: Digital-Asset-Links vorbereitet – Ginoco lässt sich als echte Play-Store-/App-Store-App verpacken.'] },
   { v: '3.57', d: '20.08.2026', title: 'Neues Ginoco-Logo & Schriftzug', items: [
     '🎨 Beim Öffnen begrüßt dich jetzt das Ginoco-Lenkrad-Emblem in Orange-Gelb und ein klarer „ginoco"-Schriftzug.',
@@ -873,6 +874,7 @@ function renderAuth() {
         <div id="authbody"></div>
       </div>
       <div class="center"><button class="ghost sm" onclick="window.__openThemePicker()">🎨 Aussehen</button></div>
+      <div class="center legal-links"><a href="/datenschutz.html">Datenschutz</a> · <a href="/impressum.html">Impressum</a></div>
       ${mode !== 'admin' ? '<div class="rev-marquee" id="rev-marquee" hidden></div>' : ''}
     </div></div>`;
     app.querySelectorAll('.tabs button').forEach((b) => b.onclick = () => { tab = b.dataset.t; draw(); });
