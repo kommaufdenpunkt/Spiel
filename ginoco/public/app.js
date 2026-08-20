@@ -408,8 +408,16 @@ function openTour() {
 window.__openTour = openTour;
 
 // ---------- Was ist neu? (Changelog) ----------
-const CHANGELOG_VER = '3.59';
+const CHANGELOG_VER = '3.60';
 const CHANGELOG = [
+  { v: '3.60', d: '20.08.2026', title: '🎉 Was gibt es Neues? – Das große Ginoco-Update', items: [
+    '✉️ <strong>Schreiben in der App:</strong> Du kannst deinem Fahrlehrer jetzt direkt in Ginoco schreiben – Fragen, kurz Bescheid geben, alles an einem Ort. Wie ein Chat.',
+    '🔔 <strong>Handy-Benachrichtigungen:</strong> Erinnerungen, Verschiebungen, Absagen und Angebote kommen als Push aufs Handy – auch wenn die App zu ist. Einmal erlauben unter „🔔 Mitteilungen".',
+    '📅 <strong>Lückenloses Buchen:</strong> Der Tag fließt – die nächste Fahrstunde schließt automatisch an die vorige an (inkl. Pause und Abholzeit). Fällt eine Stunde aus, rücken die folgenden nach.',
+    '📍 <strong>Live-Abholung:</strong> Kurz vor der Fahrstunde siehst du, wo dein Fahrlehrer gerade ist und wann er da ist – „Wo sollen wir dich einsammeln?" inklusive.',
+    '⭐ <strong>Bewertungen:</strong> Nach bestandener Prüfung darfst du Ginoco & die Fahrschule bewerten – mit Sternen, Text und wahlweise vollem Namen, abgekürzt oder anonym.',
+    '🔑 <strong>Passwort vergessen:</strong> Neues Passwort anfordern – die Anfrage landet direkt bei deinem Fahrlehrer, der es sicher neu setzt.',
+    '📲 <strong>App installieren:</strong> Ginoco lässt sich wie eine echte App aufs Handy legen – neues Logo, sauberer „ginoco"-Schriftzug und schnellerer Start.'] },
   { v: '3.59', d: '20.08.2026', title: 'Nachrichten in der App', items: [
     '✉️ Schreib direkt in der App mit deinem Fahrlehrer – Fragen, Bescheid geben, alles an einem Ort (wie ein Chat).',
     '🔔 Neue Nachrichten kommen per Push aufs Handy; gelesen/ungelesen wird angezeigt.',
