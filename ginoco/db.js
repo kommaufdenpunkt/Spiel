@@ -210,6 +210,9 @@ ensureColumn('bookings', 'feedback', 'feedback TEXT');       // Rückmeldung an 
 // Abholzeit (Minuten) je Schueler – vom Fahrlehrer gepflegt (z.B. Groß Schönebeck = 30).
 // NULL = automatisch aus dem Wohnort schaetzen (Luftlinie / Durchschnittstempo).
 ensureColumn('students', 'travel_min', 'travel_min INTEGER');
+// Von welchem Standort wird die Abholzeit gerechnet? '' = automatisch (naeherer),
+// 'main' = Eberswalde, 'finow' = zweiter Standort. Nur relevant fuer die Schaetzung.
+ensureColumn('students', 'home_base', 'home_base TEXT');
 
 // Live-Standort des Fahrlehrers (genau eine Zeile)
 db.exec(`CREATE TABLE IF NOT EXISTS live_location (
@@ -250,6 +253,11 @@ const DEFAULTS = {
   // Standort der Fahrschule (Untern Buchen, Eisenbahnstr. 31, 16321 Eberswalde) – Basis fuer die Abholzeit
   school_lat: '52.8300',
   school_lng: '13.8160',
+  school_label: 'Eberswalde (Eisenbahnstr. 31)',
+  // Zweiter Standort (Finow) – die Abholzeit wird automatisch vom naeheren Standort gerechnet
+  school2_label: 'Finow',
+  school2_lat: '52.8360',
+  school2_lng: '13.6990',
   travel_default_min: '0',   // Abholzeit, falls fuer einen Schueler nichts Genaues hinterlegt ist
   live_lead_min: '20',       // so viele Min vor Beginn wird der Live-Standort geteilt
   meet_default_label: '',    // Standard-Treffpunkt (Text)

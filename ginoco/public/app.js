@@ -405,8 +405,12 @@ function openTour() {
 window.__openTour = openTour;
 
 // ---------- Was ist neu? (Changelog) ----------
-const CHANGELOG_VER = '3.51';
+const CHANGELOG_VER = '3.52';
 const CHANGELOG = [
+  { v: '3.52', d: '20.08.2026', title: 'Zwei Standorte (Eberswalde + Finow)', items: [
+    '📍 Zweiter Standort Finow: die Abholzeit wird automatisch vom näheren Standort gerechnet.',
+    '🎛️ Pro Fahrschüler wählbar, ab welchem Standort geschätzt wird (automatisch/Eberswalde/Finow) – plus feste Abholzeit in Minuten.',
+    '🧪 Über 4.000 Zufalls-Prüfungen bestanden: nie Doppelbuchen, nie eine offene Lücke.'] },
   { v: '3.51', d: '20.08.2026', title: 'Bewertungen & Empfehlungen', items: [
     '⭐ Fahrschüler können eine Bewertung abgeben – mit Sternen, freiem Text und wahlweise vollem Namen, abgekürzt (Lena M.) oder anonym, optional mit Profilfoto.',
     '🎉 Nach bestandener Prüfung wird man freundlich um eine Bewertung gebeten – die Akte bleibt erhalten, nichts wird gelöscht.',
@@ -3073,9 +3077,17 @@ function openEditStudentModal(s) {
       <div class="field" style="max-width:130px"><label>PLZ</label><input id="es-zip" inputmode="numeric" value="${esc(s.zip || '')}"></div>
       <div class="field" style="flex:2"><label>Ort</label><input id="es-city" value="${esc(s.city || '')}"></div>
     </div>
-    <div class="field"><label>🚗 Abholzeit (Min) – Fahrt Fahrschule → Abholort</label>
-      <input id="es-travel" inputmode="numeric" value="${s.travel_min != null ? s.travel_min : ''}" placeholder="z.B. 30 (Groß Schönebeck)">
-      <div class="hint" style="margin:.3rem 0 0">Wird im Tagesplan vor jeder Fahrstunde eingerechnet, damit du pünktlich da bist. Leer lassen = automatisch schätzen${s.travel_est ? ` (aktuell ≈ ${s.travel_est} Min)` : ''}.</div></div>
+    <div class="row">
+      <div class="field"><label>🚗 Abholzeit (Min) – Fahrt Fahrschule → Abholort</label>
+        <input id="es-travel" inputmode="numeric" value="${s.travel_min != null ? s.travel_min : ''}" placeholder="z.B. 30 (Groß Schönebeck)"></div>
+      <div class="field" style="max-width:180px"><label>Standort für Schätzung</label>
+        <select id="es-base">
+          <option value="" ${!s.home_base ? 'selected' : ''}>Automatisch (näher)</option>
+          <option value="main" ${s.home_base === 'main' ? 'selected' : ''}>Eberswalde</option>
+          <option value="finow" ${s.home_base === 'finow' ? 'selected' : ''}>Finow</option>
+        </select></div>
+    </div>
+    <div class="hint" style="margin:-.2rem 0 .2rem">Abholzeit wird im Tagesplan vor jeder Fahrstunde eingerechnet. Leer lassen = automatisch schätzen${s.travel_est ? ` (aktuell ≈ ${s.travel_est} Min)` : ''} – vom gewählten (oder näheren) Standort aus.</div>
     <div class="field"><label>📝 Notiz / Karteikarte (nur für dich)</label>
       <textarea id="es-notes" rows="4" placeholder="z.B. Ausbildungsstand, was noch geübt werden muss, Besonderheiten …" style="resize:vertical">${esc(s.notes || '')}</textarea></div>
     <div class="actions">
@@ -3091,6 +3103,7 @@ function openEditStudentModal(s) {
         zip: $('#es-zip').value || null, city: $('#es-city').value || null,
         phone: $('#es-phone').value || null, email: $('#es-email').value || null,
         travel_min: $('#es-travel').value.trim() === '' ? '' : $('#es-travel').value.trim(),
+        home_base: $('#es-base').value || null,
         notes: $('#es-notes').value || null } });
       closeModal(); toast('Gespeichert ✓', 'ok'); tabSchueler();
     } catch (e) { const el = $('#autherr'); if (el) { el.textContent = e.message; el.classList.remove('hidden'); } else toast(e.message, 'err'); }
@@ -3819,11 +3832,16 @@ function tabEinstellungen() {
     ${sec('🔄', 'Fließender Tagesplan', 'Lückenlos, Pause + Abholzeit, automatisch nachrücken', `
       <label class="ck-line"><input type="checkbox" id="e-flow" ${s.flow_schedule !== '0' ? 'checked' : ''}> Fließender, lückenloser Tagesplan (Startzeit der nächsten Stunde wächst mit Dauer + Pause + Abholzeit)</label>
       <label class="ck-line" style="margin-top:.4rem"><input type="checkbox" id="e-autofill" ${s.auto_fill_gaps !== '0' ? 'checked' : ''}> Fällt eine Stunde aus, folgende automatisch nach vorne rücken (Schüler werden benachrichtigt)</label>
-      <div class="row" style="margin-top:.6rem">
-        <div class="field"><label>Fahrschule – Breite (lat) ${helpDot('Standort der Fahrschule als Startpunkt für die Abholzeit-Schätzung. Eisenbahnstr. 31, Eberswalde.')}</label><input id="e-schoollat" value="${esc(s.school_lat || '')}" placeholder="52.8300"></div>
-        <div class="field"><label>Fahrschule – Länge (lng)</label><input id="e-schoollng" value="${esc(s.school_lng || '')}" placeholder="13.8160"></div></div>
+      <div class="field" style="margin-top:.6rem"><label>Standort 1 – Name</label><input id="e-schoollabel" value="${esc(s.school_label || 'Eberswalde (Eisenbahnstr. 31)')}"></div>
+      <div class="row">
+        <div class="field"><label>Standort 1 – Breite (lat) ${helpDot('Hauptstandort als Startpunkt für die Abholzeit-Schätzung. Eisenbahnstr. 31, Eberswalde.')}</label><input id="e-schoollat" value="${esc(s.school_lat || '')}" placeholder="52.8300"></div>
+        <div class="field"><label>Standort 1 – Länge (lng)</label><input id="e-schoollng" value="${esc(s.school_lng || '')}" placeholder="13.8160"></div></div>
+      <div class="field"><label>Standort 2 – Name ${helpDot('Zweiter Standort (z. B. Finow). Die Abholzeit wird automatisch vom näheren Standort gerechnet – oder du wählst pro Schüler den Standort.')}</label><input id="e-school2label" value="${esc(s.school2_label || 'Finow')}"></div>
+      <div class="row">
+        <div class="field"><label>Standort 2 – Breite (lat)</label><input id="e-school2lat" value="${esc(s.school2_lat || '')}" placeholder="52.8360"></div>
+        <div class="field"><label>Standort 2 – Länge (lng)</label><input id="e-school2lng" value="${esc(s.school2_lng || '')}" placeholder="13.6990"></div></div>
       <div class="field"><label>Standard-Abholzeit (Min) ${helpDot('Wird genutzt, wenn beim Schüler keine eigene Abholzeit und kein Wohnort hinterlegt ist.')}</label><input id="e-travdef" type="number" value="${s.travel_default_min || '0'}" min="0" step="5"></div>
-      <div class="hint" style="margin:.3rem 0 0">Die Abholzeit pro Schüler stellst du direkt beim Schüler ein (Fahrschüler → bearbeiten → 🚗 Abholzeit). Ist dort nichts gesetzt, wird sie aus dem Wohnort geschätzt.</div>`)}
+      <div class="hint" style="margin:.3rem 0 0">Abholzeit pro Schüler: Fahrschüler → bearbeiten → 🚗 Abholzeit (feste Minuten) und „Standort für Schätzung". Ohne feste Minuten wird aus dem Wohnort geschätzt – vom gewählten oder näheren der beiden Standorte.</div>`)}
 
     ${sec('📅', 'Buchung & Stornierung', 'Vorausbuchung, Limits, Fristen, Aufklärungstext', `
       <div class="row"><div class="field"><label>Max. Fahrstunden pro Schüler & Woche</label><input id="e-max" type="number" value="${s.max_per_week}" min="1"></div>
@@ -3918,7 +3936,10 @@ function tabEinstellungen() {
         registration_open: $('#e-reg-open').checked ? '1' : '0',
         flow_schedule: $('#e-flow').checked ? '1' : '0',
         auto_fill_gaps: $('#e-autofill').checked ? '1' : '0',
+        school_label: $('#e-schoollabel').value.trim(),
         school_lat: $('#e-schoollat').value.trim(), school_lng: $('#e-schoollng').value.trim(),
+        school2_label: $('#e-school2label').value.trim(),
+        school2_lat: $('#e-school2lat').value.trim(), school2_lng: $('#e-school2lng').value.trim(),
         travel_default_min: Number($('#e-travdef').value) || 0,
         new_pin: $('#e-pin').value || undefined } });
       state.settings = r.settings; state.user.name = r.settings.instructor_name;

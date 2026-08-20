@@ -15,7 +15,7 @@ const PUBLIC = join(__dirname, 'public');
 const PORT = Number(process.env.PORT || 3000);
 const HOST = process.env.HOST || '0.0.0.0'; // hinter Caddy: HOST=127.0.0.1 (nur Proxy erreicht Node)
 const SESSION_DAYS = 30;
-const APP_VERSION = "3.51.0";
+const APP_VERSION = "3.52.0";
 // Einstellungen, die Schueler/Oeffentlichkeit sehen duerfen (Rest bleibt beim Fahrlehrer)
 const PUBLIC_SETTINGS = ['instructor_name', 'instructor_phone', 'policy_text',
   'cancel_hours', 'lock_hours', 'booking_horizon_days', 'booking_horizon_days_rank2',
@@ -196,12 +196,23 @@ function slotGrid(date) {
 // sonst aus dem Wohnort geschaetzt (Luftlinie / Durchschnittstempo), sonst Standardwert.
 function travelMin(studentId) {
   if (!studentId) return 0;
-  const st = db.prepare('SELECT travel_min, home_lat, home_lng FROM students WHERE id = ?').get(studentId);
+  const st = db.prepare('SELECT travel_min, home_lat, home_lng, home_base FROM students WHERE id = ?').get(studentId);
   if (!st) return 0;
-  if (st.travel_min != null) return Math.max(0, Math.round(st.travel_min));
-  const slat = Number(getSettingRaw('school_lat')), slng = Number(getSettingRaw('school_lng'));
-  if (st.home_lat != null && st.home_lng != null && slat && slng) {
-    const km = haversineKm(slat, slng, st.home_lat, st.home_lng);
+  if (st.travel_min != null) return Math.max(0, Math.round(st.travel_min)); // fest hinterlegt gewinnt
+  // Zwei moegliche Standorte (Eberswalde + Finow); je nach Wahl bzw. automatisch der naehere.
+  const bases = [];
+  const s1lat = Number(getSettingRaw('school_lat')), s1lng = Number(getSettingRaw('school_lng'));
+  const s2lat = Number(getSettingRaw('school2_lat')), s2lng = Number(getSettingRaw('school2_lng'));
+  if (s1lat && s1lng) bases.push({ key: 'main', lat: s1lat, lng: s1lng });
+  if (s2lat && s2lng) bases.push({ key: 'finow', lat: s2lat, lng: s2lng });
+  if (st.home_lat != null && st.home_lng != null && bases.length) {
+    let chosen;
+    if (st.home_base === 'finow') chosen = bases.find((b) => b.key === 'finow') || bases[0];
+    else if (st.home_base === 'main') chosen = bases.find((b) => b.key === 'main') || bases[0];
+    else chosen = bases                          // automatisch: der naehere Standort
+      .map((b) => ({ ...b, d: haversineKm(b.lat, b.lng, st.home_lat, st.home_lng) }))
+      .sort((a, z) => a.d - z.d)[0];
+    const km = haversineKm(chosen.lat, chosen.lng, st.home_lat, st.home_lng);
     const speed = Math.max(5, Number(getSettingRaw('avg_speed_kmh')) || 30);
     return Math.round((km / speed) * 60 / 5) * 5; // auf 5 Min gerundet
   }
@@ -1215,7 +1226,7 @@ async function handleApi(req, res, url) {
     const rows = db.prepare(
       `SELECT s.id,s.name,s.first_name,s.last_name,s.email,s.phone,s.username,s.birth_year,s.birth_date,
         s.street,s.house_no,s.zip,s.city,s.allowed_durations,s.created_at,
-        s.home_label,s.home_lat,s.home_lng,s.travel_min,s.archived_at,s.notes,
+        s.home_label,s.home_lat,s.home_lng,s.travel_min,s.home_base,s.archived_at,s.notes,
         (s.photo IS NOT NULL) AS has_photo,
         (SELECT COUNT(*) FROM bookings b WHERE b.student_id=s.id AND b.status='done') AS done_count
        FROM students s WHERE s.archived_at IS ${archived ? 'NOT NULL' : 'NULL'} ORDER BY s.name`
@@ -1262,6 +1273,11 @@ async function handleApi(req, res, url) {
       if ('travel_min' in b) {
         const tv = (b.travel_min === '' || b.travel_min == null) ? null : Math.max(0, Math.round(Number(b.travel_min)));
         fields.push('travel_min=?'); vals.push(Number.isFinite(tv) ? tv : null);
+      }
+      // Standort fuer die Abholzeit-Schaetzung: '' (auto) | 'main' | 'finow'
+      if ('home_base' in b) {
+        const hb = ['main', 'finow'].includes(b.home_base) ? b.home_base : null;
+        fields.push('home_base=?'); vals.push(hb);
       }
       if (!fields.length) return bad(res, 'Nichts zu aendern');
       db.prepare(`UPDATE students SET ${fields.join(', ')} WHERE id=?`).run(...vals, sid);
@@ -1558,7 +1574,8 @@ async function handleApi(req, res, url) {
       'meet_default_label', 'meet_default_lat', 'meet_default_lng',
       'anonymous_swaps', 'req_ueberland', 'req_autobahn', 'req_nacht',
       'rank2_min_lessons', 'booking_horizon_days_rank2', 'registration_open',
-      'flow_schedule', 'auto_fill_gaps', 'school_lat', 'school_lng', 'travel_default_min'];
+      'flow_schedule', 'auto_fill_gaps', 'school_lat', 'school_lng', 'travel_default_min',
+      'school_label', 'school2_label', 'school2_lat', 'school2_lng'];
     const emptyOk = new Set(['instructor_phone', 'meet_default_label', 'meet_default_lat', 'meet_default_lng', 'policy_text']);
     for (const k of allowed) {
       if (!(k in b) || b[k] == null) continue;
