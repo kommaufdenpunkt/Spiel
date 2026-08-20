@@ -860,3 +860,29 @@ body:has(.fp-overlay) .pwa-install{display:none}
 .rev-mod{border:1px solid var(--line);border-radius:12px;padding:.7rem .8rem;margin-bottom:.7rem;background:var(--card2)}
 .rev-mod.hidden-rev{opacity:.6}
 .rev-mod-top{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap}
+
+/* ===== Bewertungen: Moderation (Fahrlehrer) – ausgebaut ===== */
+.rev-head{display:flex;gap:1rem;align-items:center;flex-wrap:wrap;margin-bottom:.6rem}
+.rev-avg{text-align:center;min-width:110px}
+.rev-avg-num{font-size:2.4rem;font-weight:800;line-height:1;color:var(--ink)}
+.rev-avg-stars{color:#f5b301;letter-spacing:1px;font-size:1rem;margin:.15rem 0}
+.rev-dist{flex:1;min-width:180px}
+.rev-dist-row{display:flex;align-items:center;gap:.5rem;margin:.15rem 0}
+.rev-dist-lbl{font-size:.78rem;color:var(--muted);width:22px}
+.rev-dist-bar{flex:1;height:8px;background:var(--card);border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.rev-dist-bar span{display:block;height:100%;background:#f5b301;border-radius:6px}
+.rev-dist-c{font-size:.78rem;color:var(--muted);width:20px;text-align:right}
+.rev-toolbar{display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;margin:.6rem 0}
+.rev-ftabs{display:flex;gap:.3rem;flex-wrap:wrap;flex:1}
+.rev-ftab{background:var(--card2);border:1px solid var(--line);color:var(--muted);border-radius:20px;
+  padding:.35rem .8rem;font-size:.82rem;font-weight:600;cursor:pointer}
+.rev-ftab.active{background:var(--brand);border-color:var(--brand);color:#fff}
+.rev-mod.is-top{border-color:#f5b301;box-shadow:0 0 0 1px rgba(245,179,1,.35)}
+.rev-mod-who{display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;margin:.5rem 0 .1rem}
+.rev-actions{display:flex;gap:.4rem;flex-wrap:wrap;margin-top:.55rem}
+.tag.top{background:rgba(245,179,1,.18);color:#f5b301;border:1px solid rgba(245,179,1,.4)}
+/* Marquee-Zusätze */
+.rev-card.feat{border-color:rgba(245,179,1,.5)}
+.rev-toptag{color:#f5b301;font-size:.7rem;font-weight:700}
+.rev-verif{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;
+  background:var(--good);color:#fff;font-size:.7rem;font-weight:800;margin-left:.15rem}

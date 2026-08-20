@@ -12,6 +12,9 @@ const state = { user: null, settings: null, date: todayStr(), instrTab: 'heute' 
 // ---------- Farb-Themes (dunkel, augenschonend) ----------
 // Kein reines Schwarz (weniger Halo/Blendung), Text kontrastreich (>= WCAG AA).
 const THEMES = {
+  unternbuchen: { label: 'Untern Buchen', dot: 'linear-gradient(135deg,#f5c518,#ef7d1a)', vars: {
+    '--bg': '#0a0a0c', '--bg2': '#060608', '--bg-glow': '#2a1e07', '--card': '#141317', '--card2': '#1c1a1f',
+    '--line': '#2d2a31', '--brand': '#f2a01a', '--brand-dark': '#d8850f', '--ink': '#f4eee1', '--muted': '#a89e8a' } },
   nachtblau: { label: 'Nachtblau', dot: '#4d8dff', vars: {
     '--bg': '#0e131a', '--bg2': '#0a0e14', '--bg-glow': '#182233', '--card': '#161d27', '--card2': '#1c2531',
     '--line': '#28323f', '--brand': '#4d8dff', '--brand-dark': '#3a6fd4', '--ink': '#e7edf5', '--muted': '#93a1b3' } },
@@ -66,11 +69,11 @@ function shade(hex, pct) { // pct<0 dunkelt ab
   return '#' + ch.map((x) => x.toString(16).padStart(2, '0')).join('');
 }
 function applyThemeVars(key) {
-  const t = THEMES[key] || THEMES.nachtblau;
+  const t = THEMES[key] || THEMES.unternbuchen;
   for (const [k, v] of Object.entries(t.vars)) document.documentElement.style.setProperty(k, v);
 }
 function applyAppearance() {
-  applyThemeVars(state.theme || 'nachtblau');
+  applyThemeVars(state.theme || 'unternbuchen');
   const p = state.prefs || {}, root = document.documentElement;
   if (p.accent) { root.style.setProperty('--brand', p.accent); root.style.setProperty('--brand-dark', shade(p.accent, -16)); }
   if (p.ink) root.style.setProperty('--ink', p.ink);
@@ -88,7 +91,7 @@ function applyAppearance() {
 function loadAppearance() {
   const p = {};
   try {
-    state.theme = localStorage.getItem('fsp-theme') || 'nachtblau';
+    state.theme = localStorage.getItem('fsp-theme') || 'unternbuchen';
     p.accent = localStorage.getItem('fsp-accent') || '';
     p.font = localStorage.getItem('fsp-font') || 'system';
     p.ink = localStorage.getItem('fsp-ink') || '';
@@ -100,7 +103,7 @@ function loadAppearance() {
 }
 loadAppearance();
 
-function setTheme(key) { state.theme = THEMES[key] ? key : 'nachtblau'; try { localStorage.setItem('fsp-theme', state.theme); } catch {} applyAppearance(); }
+function setTheme(key) { state.theme = THEMES[key] ? key : 'unternbuchen'; try { localStorage.setItem('fsp-theme', state.theme); } catch {} applyAppearance(); }
 function savePref(k, v) {
   state.prefs = state.prefs || {};
   state.prefs[k] = v;
@@ -108,15 +111,15 @@ function savePref(k, v) {
   applyAppearance();
 }
 function resetAppearance() {
-  state.theme = 'nachtblau'; state.prefs = { font: 'system', size: 'normal', accent: '', ink: '', edge: '' };
+  state.theme = 'unternbuchen'; state.prefs = { font: 'system', size: 'normal', accent: '', ink: '', edge: '' };
   try { ['fsp-theme', 'fsp-accent', 'fsp-font', 'fsp-ink', 'fsp-edge', 'fsp-size'].forEach((k) => localStorage.removeItem(k)); } catch {}
   applyAppearance();
 }
 
 function openThemePicker() {
-  const cur = state.theme || 'nachtblau';
+  const cur = state.theme || 'unternbuchen';
   const p = state.prefs || {};
-  const accent = p.accent || (THEMES[cur] || THEMES.nachtblau).dot;
+  const accent = p.accent || (THEMES[cur] || THEMES.unternbuchen).dot;
   const swatch = (bg, on, extra = '') => `width:30px;height:30px;border-radius:50%;background:${bg};display:inline-block;border:2px solid ${on ? 'var(--ink)' : 'transparent'};${extra}`;
   modal(`<h3>🎨 Aussehen</h3>
     <p class="hint">Gestalte ginoco, wie es dir gefällt – alles wird auf diesem Gerät gespeichert.</p>
@@ -405,8 +408,12 @@ function openTour() {
 window.__openTour = openTour;
 
 // ---------- Was ist neu? (Changelog) ----------
-const CHANGELOG_VER = '3.53';
+const CHANGELOG_VER = '3.55';
 const CHANGELOG = [
+  { v: '3.55', d: '20.08.2026', title: 'Untern-Buchen-Look & Bewertungen ausgebaut', items: [
+    '🎨 Neues Standard-Design im Look der Fahrschule Untern Buchen (Schwarz + warmes Orange). Jederzeit umstellbar unter 🎨 Aussehen.',
+    '⭐ Bewertungen-Bereich stark erweitert: Durchschnitt & Sterne-Verteilung, Filter (Alle/Sichtbar/Verborgen/Top), „⭐ Top" anheften, selbst eintragen, bearbeiten, kopieren.',
+    '✅ „Echter Fahrschüler"-Haken bei Portal-Bewertungen; nach bestandener Prüfung wird automatisch um eine Bewertung gebeten.'] },
   { v: '3.53', d: '20.08.2026', title: 'Passwort vergessen', items: [
     '🔑 Fahrschüler können ein neues Passwort anfordern – die Anfrage landet direkt beim Fahrlehrer (im Protokoll), der es neu setzt und mitteilt.',
     '🔒 Sicher & ohne Konto-Verrat: die Antwort ist immer gleich, egal ob es den Login gibt.'] },
@@ -877,10 +884,10 @@ async function loadReviewMarquee() {
   try { reviews = (await api('/api/reviews')).reviews || []; } catch { return; }
   if (!reviews.length) return;
   const stars = (n) => '★★★★★'.slice(0, n) + '☆☆☆☆☆'.slice(0, 5 - n);
-  const card = (r) => `<div class="rev-card">
-    <div class="rev-stars">${stars(r.rating)}</div>
+  const card = (r) => `<div class="rev-card${r.featured ? ' feat' : ''}">
+    <div class="rev-stars">${stars(r.rating)}${r.featured ? ' <span class="rev-toptag">★ Top</span>' : ''}</div>
     <div class="rev-text">„${esc(r.text)}"</div>
-    <div class="rev-who">${r.photo ? `<img class="rev-pic" src="${esc(r.photo)}" alt="">` : '<span class="rev-pic ph">🙂</span>'}<span>${esc(r.author)}</span></div>
+    <div class="rev-who">${r.photo ? `<img class="rev-pic" src="${esc(r.photo)}" alt="">` : '<span class="rev-pic ph">🙂</span>'}<span>${esc(r.author)}</span>${r.verified ? '<span class="rev-verif" title="Echter Fahrschüler">✓</span>' : ''}</div>
   </div>`;
   // Inhalt doppelt fuer nahtlose Endlosschleife
   const items = reviews.map(card).join('');
@@ -2005,41 +2012,82 @@ function drawInstrTab() {
 }
 
 // ---- Tab: Bewertungen (Moderation) ----
+let revFilter = 'alle';
+const revStars = (n) => '★★★★★'.slice(0, n) + '☆☆☆☆☆'.slice(0, 5 - n);
 async function tabBewertungen() {
   const box = $('#itab');
   box.innerHTML = '<div class="card"><h2>⭐ Bewertungen</h2><p class="hint">Lädt…</p></div>';
   let reviews = [];
   try { reviews = (await api('/api/instructor/reviews')).reviews || []; } catch (e) { box.innerHTML = `<div class="card"><p class="err">${esc(e.message)}</p></div>`; return; }
-  const stars = (n) => '★★★★★'.slice(0, n) + '☆☆☆☆☆'.slice(0, 5 - n);
   const modeL = { full: 'voller Name', initials: 'abgekürzt', anon: 'anonym' };
-  const rows = reviews.map((r) => `<div class="rev-mod ${r.published ? '' : 'hidden-rev'}">
+  const total = reviews.length;
+  const visible = reviews.filter((r) => r.published).length;
+  const avg = total ? (reviews.reduce((s, r) => s + r.rating, 0) / total) : 0;
+  // Sterne-Verteilung 5..1
+  const dist = [5, 4, 3, 2, 1].map((n) => ({ n, c: reviews.filter((r) => r.rating === n).length }));
+  const maxc = Math.max(1, ...dist.map((d) => d.c));
+  const distHTML = dist.map((d) => `<div class="rev-dist-row"><span class="rev-dist-lbl">${d.n}★</span>
+    <span class="rev-dist-bar"><span style="width:${Math.round(d.c / maxc * 100)}%"></span></span>
+    <span class="rev-dist-c">${d.c}</span></div>`).join('');
+
+  // Filter anwenden
+  const shown = reviews.filter((r) =>
+    revFilter === 'sichtbar' ? r.published :
+    revFilter === 'verborgen' ? !r.published :
+    revFilter === 'top' ? r.featured : true);
+
+  const card = (r) => `<div class="rev-mod ${r.published ? '' : 'hidden-rev'} ${r.featured ? 'is-top' : ''}">
     <div class="rev-mod-top">
-      <span class="rev-stars">${stars(r.rating)}</span>
-      <span class="pill">${esc(r.author_name || 'Ein Fahrschüler')}</span>
-      <span class="hint">${modeL[r.author_mode] || ''}${r.show_photo ? ' · Foto' : ''} · ${r.created_at ? r.created_at.slice(0, 10) : ''}${r.archived_at ? ' · bestanden' : ''}</span>
-      <span style="margin-left:auto">${r.published ? '<span class="tag g">sichtbar</span>' : '<span class="tag x">verborgen</span>'}</span>
+      <span class="rev-stars">${revStars(r.rating)}</span>
+      ${r.featured ? '<span class="tag top">⭐ Top</span>' : ''}
+      ${r.published ? '<span class="tag g">sichtbar</span>' : '<span class="tag x">verborgen</span>'}
+      <span class="hint" style="margin-left:auto">${r.created_at ? r.created_at.slice(0, 10) : ''}</span>
     </div>
     <div class="rev-text">„${esc(r.text)}"</div>
     ${r.reply ? `<div class="rev-reply">↩︎ <em>${esc(r.reply)}</em></div>` : ''}
-    <div class="inline" style="margin-top:.5rem;flex-wrap:wrap">
-      <button class="sec sm" data-pub="${r.id}" data-to="${r.published ? 0 : 1}">${r.published ? '🙈 Verbergen' : '👁️ Sichtbar machen'}</button>
-      <button class="ghost sm" data-reply="${r.id}">↩︎ Antworten</button>
-      <button class="danger sm" data-del="${r.id}">Löschen</button>
+    <div class="rev-mod-who">
+      <span class="pill">${esc(r.author_name || 'Ein Fahrschüler')}</span>
+      <span class="hint">wird ${modeL[r.author_mode] || 'angezeigt'}${r.show_photo ? ' · mit Foto' : ''}${r.archived_at ? ' · bestanden ✓' : ''}${r.student_name && r.author_mode !== 'full' ? ` · von ${esc(r.student_name)}` : ''}</span>
     </div>
-  </div>`).join('');
-  box.innerHTML = `<div class="card">
-    <h2>⭐ Bewertungen <span class="sub">${reviews.length} gesamt · ${reviews.filter((r) => r.published).length} sichtbar</span></h2>
-    <p class="hint">Sichtbare Bewertungen laufen auf der Startseite als Empfehlung durch. Du kannst jede verbergen, beantworten oder löschen. Bewertungen bleiben dauerhaft erhalten – auch nach bestandener Prüfung.</p>
-    ${reviews.length ? rows : '<p class="hint">Noch keine Bewertungen. Deine Fahrschüler können in ihrem Portal unter „⭐ Bewertung" eine abgeben (z. B. nach bestandener Prüfung).</p>'}
+    <div class="rev-actions">
+      <button class="ghost sm" data-feat="${r.id}" data-to="${r.featured ? 0 : 1}">${r.featured ? '☆ Top lösen' : '⭐ Top'}</button>
+      <button class="sec sm" data-pub="${r.id}" data-to="${r.published ? 0 : 1}">${r.published ? '🙈 Verbergen' : '👁️ Sichtbar'}</button>
+      <button class="ghost sm" data-edit="${r.id}">✏️ Bearbeiten</button>
+      <button class="ghost sm" data-reply="${r.id}">↩︎ Antworten</button>
+      <button class="ghost sm" data-copy="${r.id}">📋 Kopieren</button>
+      <button class="danger sm" data-del="${r.id}">🗑️</button>
+    </div>
   </div>`;
-  box.querySelectorAll('[data-pub]').forEach((b) => b.onclick = async () => {
-    try { await api('/api/instructor/reviews/' + b.dataset.pub, { method: 'PATCH', body: { published: Number(b.dataset.to) } }); tabBewertungen(); }
-    catch (e) { toast(e.message, 'err'); }
-  });
+
+  const fTab = (k, l) => `<button class="rev-ftab ${revFilter === k ? 'active' : ''}" data-filter="${k}">${l}</button>`;
+  box.innerHTML = `<div class="card">
+    <div class="rev-head">
+      <div class="rev-avg"><div class="rev-avg-num">${total ? avg.toFixed(1) : '–'}</div>
+        <div class="rev-avg-stars">${revStars(Math.round(avg))}</div>
+        <div class="hint">${total} Bewertung${total === 1 ? '' : 'en'} · ${visible} sichtbar</div></div>
+      <div class="rev-dist">${distHTML}</div>
+    </div>
+    <p class="hint">Sichtbare Bewertungen laufen auf der Startseite als Laufschrift. „⭐ Top" hebt eine Stimme hervor (läuft ganz vorne). Bewertungen bleiben dauerhaft erhalten – auch nach bestandener Prüfung.</p>
+    <div class="rev-toolbar">
+      <div class="rev-ftabs">${fTab('alle', 'Alle')}${fTab('sichtbar', 'Sichtbar')}${fTab('verborgen', 'Verborgen')}${fTab('top', '⭐ Top')}</div>
+      <button class="sm" id="rev-add">➕ Eintragen</button>
+    </div>
+    <div class="rev-modlist">${shown.length ? shown.map(card).join('') : '<p class="hint" style="padding:.6rem 0">Keine Bewertungen in dieser Ansicht.' + (total ? '' : ' Deine Fahrschüler geben in ihrem Portal unter „⭐ Bewertung" eine ab – oder trag selbst eine ein (z. B. mündliches Lob).') + '</p>'}</div>
+  </div>`;
+
+  box.querySelectorAll('[data-filter]').forEach((b) => b.onclick = () => { revFilter = b.dataset.filter; tabBewertungen(); });
+  const patch = async (id, body) => { try { await api('/api/instructor/reviews/' + id, { method: 'PATCH', body }); tabBewertungen(); } catch (e) { toast(e.message, 'err'); } };
+  box.querySelectorAll('[data-pub]').forEach((b) => b.onclick = () => patch(b.dataset.pub, { published: Number(b.dataset.to) }));
+  box.querySelectorAll('[data-feat]').forEach((b) => b.onclick = () => patch(b.dataset.feat, { featured: Number(b.dataset.to) }));
   box.querySelectorAll('[data-del]').forEach((b) => b.onclick = async () => {
     if (!confirm('Diese Bewertung wirklich dauerhaft löschen?')) return;
     try { await api('/api/instructor/reviews/' + b.dataset.del, { method: 'DELETE' }); toast('Gelöscht', 'ok'); tabBewertungen(); }
     catch (e) { toast(e.message, 'err'); }
+  });
+  box.querySelectorAll('[data-copy]').forEach((b) => b.onclick = () => {
+    const r = reviews.find((x) => x.id === Number(b.dataset.copy));
+    const txt = `${revStars(r.rating)} „${r.text}" – ${r.author_name || 'Ein Fahrschüler'}`;
+    navigator.clipboard.writeText(txt).then(() => toast('Kopiert ✓', 'ok')).catch(() => toast('Kopieren nicht möglich', 'err'));
   });
   box.querySelectorAll('[data-reply]').forEach((b) => b.onclick = () => {
     const r = reviews.find((x) => x.id === Number(b.dataset.reply));
@@ -2053,6 +2101,35 @@ async function tabBewertungen() {
       catch (e) { toast(e.message, 'err'); }
     };
   });
+  box.querySelectorAll('[data-edit]').forEach((b) => b.onclick = () => openRevEdit(reviews.find((x) => x.id === Number(b.dataset.edit))));
+  $('#rev-add').onclick = () => openRevEdit(null);
+}
+// Bewertung bearbeiten (Sterne + Text) bzw. neu eintragen (mit Name)
+function openRevEdit(r) {
+  const isNew = !r;
+  const cur = r || { rating: 5, text: '', author_name: '', featured: 0 };
+  const starBtns = [1, 2, 3, 4, 5].map((i) => `<button type="button" class="rev-star" data-v="${i}">★</button>`).join('');
+  modal(`<h3>${isNew ? 'Bewertung eintragen' : 'Bewertung bearbeiten'}</h3>
+    ${errBox()}
+    ${isNew ? '<p class="hint">Trag ein mündliches Lob oder eine bestehende Rezension ein – erscheint als Empfehlung auf der Startseite.</p>' : ''}
+    <div class="field"><label>Sterne</label><div class="rev-starpick" id="rev-e-star" data-v="${cur.rating}">${starBtns}</div></div>
+    ${isNew ? '<div class="field"><label>Name (wie er angezeigt wird)</label><input id="rev-e-name" value="' + esc(cur.author_name || '') + '" placeholder="z. B. Lena M. oder Anonym"></div>' : ''}
+    <div class="field"><label>Text</label><textarea id="rev-e-text" rows="4" maxlength="800" style="resize:vertical" placeholder="z. B. Super Fahrlehrer, sehr geduldig – klare Empfehlung!">${esc(cur.text || '')}</textarea></div>
+    <label class="ck-line"><input type="checkbox" id="rev-e-feat" ${cur.featured ? 'checked' : ''}> ⭐ Als Top anheften (läuft ganz vorne)</label>
+    <div class="actions"><button class="sec" onclick="window.__closeModal()">Abbrechen</button><button id="rev-e-go">${isNew ? 'Eintragen' : 'Speichern'}</button></div>`);
+  const pick = $('#rev-e-star');
+  const paint = () => pick.querySelectorAll('.rev-star').forEach((x) => x.classList.toggle('on', Number(x.dataset.v) <= Number(pick.dataset.v)));
+  pick.querySelectorAll('.rev-star').forEach((x) => x.onclick = () => { pick.dataset.v = x.dataset.v; paint(); });
+  paint();
+  $('#rev-e-go').onclick = async () => {
+    const body = { rating: Number(pick.dataset.v) || 5, text: $('#rev-e-text').value.trim(), featured: $('#rev-e-feat').checked ? 1 : 0 };
+    if (body.text.length < 5) { showErr('Bitte ein paar Worte schreiben.'); return; }
+    try {
+      if (isNew) { body.author_name = $('#rev-e-name').value.trim(); await api('/api/instructor/reviews', { method: 'POST', body }); }
+      else await api('/api/instructor/reviews/' + r.id, { method: 'PATCH', body });
+      closeModal(); toast('Gespeichert ✓', 'ok'); tabBewertungen();
+    } catch (e) { showErr(e.message); }
+  };
 }
 
 // ---- Tab: Heute & Ziele (Tacho) ----

@@ -15,7 +15,7 @@ const PUBLIC = join(__dirname, 'public');
 const PORT = Number(process.env.PORT || 3000);
 const HOST = process.env.HOST || '0.0.0.0'; // hinter Caddy: HOST=127.0.0.1 (nur Proxy erreicht Node)
 const SESSION_DAYS = 30;
-const APP_VERSION = "3.54.0";
+const APP_VERSION = "3.55.0";
 // Einstellungen, die Schueler/Oeffentlichkeit sehen duerfen (Rest bleibt beim Fahrlehrer)
 const PUBLIC_SETTINGS = ['instructor_name', 'instructor_phone', 'policy_text',
   'cancel_hours', 'lock_hours', 'booking_horizon_days', 'booking_horizon_days_rank2',
@@ -449,13 +449,14 @@ async function handleApi(req, res, url) {
   // ===== Bewertungen (oeffentlich lesbar – fuer die Laufschrift auf der Startseite) =====
   if (p === '/api/reviews' && method === 'GET') {
     const rows = db.prepare(
-      `SELECT r.id, r.rating, r.text, r.author_mode, r.show_photo, r.reply, r.author_name, r.created_at,
+      `SELECT r.id, r.rating, r.text, r.author_mode, r.show_photo, r.reply, r.author_name, r.created_at, r.featured, r.student_id,
               (CASE WHEN r.show_photo=1 AND s.photo IS NOT NULL THEN s.photo ELSE NULL END) AS photo
        FROM reviews r LEFT JOIN students s ON s.id = r.student_id
-       WHERE r.published = 1 ORDER BY r.created_at DESC LIMIT 60`).all();
+       WHERE r.published = 1 ORDER BY r.featured DESC, r.created_at DESC LIMIT 60`).all();
     const reviews = rows.map((r) => ({
       id: r.id, rating: r.rating, text: r.text, reply: r.reply || null,
       author: r.author_name || 'Ein Fahrschüler', photo: r.photo || null,
+      verified: r.student_id != null, featured: !!r.featured,
       date: r.created_at ? r.created_at.slice(0, 10) : null,
     }));
     return ok(res, { reviews });
@@ -1193,6 +1194,20 @@ async function handleApi(req, res, url) {
        ORDER BY r.created_at DESC`).all();
     return ok(res, { reviews: rows });
   }
+  // Fahrlehrer legt selbst eine Bewertung an (z.B. mündliches Lob / Google-Rezension übertragen)
+  if (p === '/api/instructor/reviews' && method === 'POST') {
+    if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
+    const b = await readBody(req);
+    const text = String(b.text || '').trim();
+    if (text.length < 5) return bad(res, 'Bitte ein paar Worte schreiben.');
+    if (text.length > 800) return bad(res, 'Text zu lang (max. 800 Zeichen).');
+    const rating = Math.max(1, Math.min(5, Math.round(Number(b.rating) || 5)));
+    const author = String(b.author_name || '').trim() || 'Ein Fahrschüler';
+    const info = db.prepare(`INSERT INTO reviews(student_id,rating,text,author_mode,show_photo,author_name,published,featured,created_at)
+      VALUES(NULL,?,?,?,0,?,1,?,?)`).run(rating, text, 'full', author, b.featured ? 1 : 0, new Date().toISOString());
+    logEvent('info', { actor: 'instructor', detail: `Bewertung selbst eingetragen (${rating}★, ${author})` });
+    return ok(res, { id: Number(info.lastInsertRowid) });
+  }
   const rvm = p.match(/^\/api\/instructor\/reviews\/(\d+)$/);
   if (rvm && method === 'PATCH') {
     if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
@@ -1200,7 +1215,10 @@ async function handleApi(req, res, url) {
     const b = await readBody(req);
     const fields = [], vals = [];
     if ('published' in b) { fields.push('published=?'); vals.push(b.published ? 1 : 0); }
+    if ('featured' in b) { fields.push('featured=?'); vals.push(b.featured ? 1 : 0); }
     if ('reply' in b) { fields.push('reply=?'); vals.push(b.reply ? String(b.reply).trim() : null); }
+    if ('text' in b) { const t = String(b.text || '').trim(); if (t.length < 5) return bad(res, 'Text zu kurz'); fields.push('text=?'); vals.push(t.slice(0, 800)); }
+    if ('rating' in b) { fields.push('rating=?'); vals.push(Math.max(1, Math.min(5, Math.round(Number(b.rating) || 5)))); }
     if (!fields.length) return bad(res, 'Nichts zu aendern');
     vals.push(id);
     db.prepare(`UPDATE reviews SET ${fields.join(', ')} WHERE id=?`).run(...vals);
@@ -1458,6 +1476,10 @@ async function handleApi(req, res, url) {
     if (arm[2] === 'archive') {
       db.prepare('UPDATE students SET archived_at=? WHERE id=?').run(new Date().toISOString(), sid);
       logEvent('info', { actor: 'instructor', studentId: sid, detail: `Fahrschüler archiviert/bestanden (${st.name})` });
+      // Glückwunsch + Einladung zur Bewertung (nur, wenn noch keine abgegeben wurde)
+      const hasRev = db.prepare('SELECT 1 FROM reviews WHERE student_id=?').get(sid);
+      if (!hasRev) notify(sid, 'info',
+        '🎉 Herzlichen Glückwunsch zur bestandenen Prüfung! Wenn du magst, hinterlass eine Bewertung – unter „⭐ Bewertung" in der App. Das hilft anderen sehr.', null);
       return ok(res, { archived: true });
     }
     db.prepare('UPDATE students SET archived_at=NULL WHERE id=?').run(sid);

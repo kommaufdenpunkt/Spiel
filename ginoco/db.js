@@ -187,6 +187,7 @@ db.exec(`CREATE TABLE IF NOT EXISTS reviews (
   created_at  TEXT NOT NULL
 );`);
 db.exec('CREATE INDEX IF NOT EXISTS idx_reviews_pub ON reviews(published, created_at)');
+ensureColumn('reviews', 'featured', 'featured INTEGER NOT NULL DEFAULT 0'); // vom Fahrlehrer angeheftet -> zuerst
 ensureColumn('bookings', 'attended', 'attended INTEGER');            // 1 = da, 0 = nicht erschienen, NULL = offen
 ensureColumn('bookings', 'late_minutes', 'late_minutes INTEGER NOT NULL DEFAULT 0');
 ensureColumn('bookings', 'reason', 'reason TEXT');
