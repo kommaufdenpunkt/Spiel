@@ -15,7 +15,7 @@ const PUBLIC = join(__dirname, 'public');
 const PORT = Number(process.env.PORT || 3000);
 const HOST = process.env.HOST || '0.0.0.0'; // hinter Caddy: HOST=127.0.0.1 (nur Proxy erreicht Node)
 const SESSION_DAYS = 30;
-const APP_VERSION = "3.49.1";
+const APP_VERSION = "3.50.0";
 // Einstellungen, die Schueler/Oeffentlichkeit sehen duerfen (Rest bleibt beim Fahrlehrer)
 const PUBLIC_SETTINGS = ['instructor_name', 'instructor_phone', 'policy_text',
   'cancel_hours', 'lock_hours', 'booking_horizon_days', 'booking_horizon_days_rank2',
@@ -189,6 +189,102 @@ function slotGrid(date) {
     slots.push({ start: toHHMM(t), duration: s.lesson_min, end: toHHMM(t + s.lesson_min) });
   }
   return slots;
+}
+
+// ---- Fliessender Tagesplan (lueckenlos) ----
+// Abholzeit (Minuten) eines Schuelers: explizit gepflegt (z.B. Groß Schönebeck = 30),
+// sonst aus dem Wohnort geschaetzt (Luftlinie / Durchschnittstempo), sonst Standardwert.
+function travelMin(studentId) {
+  if (!studentId) return 0;
+  const st = db.prepare('SELECT travel_min, home_lat, home_lng FROM students WHERE id = ?').get(studentId);
+  if (!st) return 0;
+  if (st.travel_min != null) return Math.max(0, Math.round(st.travel_min));
+  const slat = Number(getSettingRaw('school_lat')), slng = Number(getSettingRaw('school_lng'));
+  if (st.home_lat != null && st.home_lng != null && slat && slng) {
+    const km = haversineKm(slat, slng, st.home_lat, st.home_lng);
+    const speed = Math.max(5, Number(getSettingRaw('avg_speed_kmh')) || 30);
+    return Math.round((km / speed) * 60 / 5) * 5; // auf 5 Min gerundet
+  }
+  return Math.max(0, Number(getSettingRaw('travel_default_min')) || 0);
+}
+
+// Rahmen eines Tages: Arbeitsbeginn, spaetestmoegliches Stundenende, Pause.
+function dayFrame(date) {
+  const s = getSettings();
+  const ov = date ? getOverride(date) : null;
+  if (ov && ov.closed) return { closed: true, dayStart: 0, workEnd: 0, brk: s.break_min, lessonMin: s.lesson_min };
+  const dayStart = toMin((ov && ov.start_time) || getSettingRaw('start_time'));
+  const lastStart = toMin((ov && ov.last_start) || getSettingRaw('last_start'));
+  const workEnd = lastStart + s.lesson_min; // spaetestes Stundenende des Tages
+  return { closed: false, dayStart, lastStart, workEnd, brk: s.break_min, lessonMin: s.lesson_min };
+}
+
+// Belegte Intervalle eines Tages (Buchungen + Bloecke), sortiert.
+function occupiedIntervals(date) {
+  const bookings = db.prepare(
+    "SELECT id,student_id,start_time,duration_min,status FROM bookings WHERE date = ? AND status IN ('booked','offered','done')").all(date);
+  const blocks = db.prepare('SELECT start_time,end_time,title FROM blocks WHERE date = ?').all(date);
+  const iv = [];
+  for (const b of bookings) iv.push({ s: toMin(b.start_time), e: toMin(b.start_time) + b.duration_min, kind: 'booking', b });
+  for (const bl of blocks) iv.push({ s: toMin(bl.start_time), e: toMin(bl.end_time), kind: 'block', title: bl.title });
+  iv.sort((a, z) => a.s - z.s || a.e - z.e);
+  return iv;
+}
+
+// Freie Startzeiten fuer eine NEUE Fahrstunde dieses Schuelers (fliessend, lueckenlos).
+// Vor jeder Stunde liegt die Abholzeit; zwischen zwei Stunden zusaetzlich die Pause.
+// Rueckgabe: [{ start(min), cap(min) }] – cap = spaetestes erlaubtes Stundenende an diesem Start.
+function freeStarts(date, studentId) {
+  const f = dayFrame(date);
+  if (f.closed) return [];
+  const travel = travelMin(studentId);
+  const brk = f.brk;
+  const minDur = 40; // kuerzestmoegliche Stunde, um einen Start ueberhaupt anzubieten
+  const iv = occupiedIntervals(date);
+  const out = [];
+
+  // Klassisches festes Raster (nur falls der fliessende Plan abgeschaltet ist):
+  // Startzeiten auf festem Abstand (Dauer + Pause), freie werden angeboten.
+  if (getSettingRaw('flow_schedule') === '0') {
+    const step = f.lessonMin + brk;
+    if (step <= 0) return [];
+    const capFor = (t) => {
+      let cap = f.workEnd;
+      for (const o of iv) if (o.s >= t + minDur && o.s - brk < cap) cap = o.s - brk;
+      return cap;
+    };
+    for (let t = f.dayStart; t <= f.lastStart; t += step) {
+      const busy = iv.some((o) => overlaps(t, t + minDur, o.s, o.e));
+      if (busy) continue;
+      const cap = capFor(t);
+      if (t + minDur <= cap) out.push({ start: t, cap });
+    }
+    return out;
+  }
+  // Heute: keine Startzeiten in der Vergangenheit anbieten (auf jetzt vorziehen).
+  const nowClamp = (date === todayStr()) ? Math.ceil(toMin(nowHHMM()) / 5) * 5 : -1;
+  const addWindow = (winStart, winEnd, isFirst) => {
+    if (winEnd <= winStart) return;
+    // fruehester Start: erste Stunde -> nur Abholzeit; sonst Pause + Abholzeit
+    let start = winStart + (isFirst ? 0 : brk) + travel;
+    start = Math.ceil(start / 5) * 5; // auf 5 Min aufrunden
+    if (nowClamp >= 0) start = Math.max(start, nowClamp);
+    // Ende dieses Fensters: bei einer Belegung dahinter muss noch die Pause passen
+    const interior = winEnd < f.workEnd;
+    const cap = interior ? winEnd - brk : winEnd;
+    if (start + minDur <= cap) out.push({ start, cap });
+  };
+  if (!iv.length) {
+    addWindow(f.dayStart, f.workEnd, true);
+  } else {
+    addWindow(f.dayStart, Math.min(iv[0].s, f.workEnd), true);
+    for (let i = 0; i < iv.length; i++) {
+      const winStart = iv[i].e;
+      const winEnd = (i + 1 < iv.length) ? iv[i + 1].s : f.workEnd;
+      addWindow(winStart, Math.min(winEnd, f.workEnd), false);
+    }
+  }
+  return out;
 }
 
 // Ist ein Datum fuer Schueler buchbar? Beruecksichtigt Horizont + taegliche Freigabe-Uhrzeit.
@@ -471,7 +567,8 @@ async function handleApi(req, res, url) {
           detail: `${wdShort(bk.date)} ${dmy(bk.date)} ${bk.start_time} Uhr abgesagt vom Fahrlehrer${reason ? ' – ' + reason : ''}` });
         if (bk.student_id) notify(bk.student_id, 'info',
           `Deine Fahrstunde am ${wdShort(bk.date)} ${dmy(bk.date)} um ${bk.start_time} Uhr wurde vom Fahrlehrer abgesagt${reason ? ' (' + reason + ')' : ''}.`, bk.date);
-        return ok(res);
+        const filled = autoFillGapsOnCancel(bk.date);  // Tag lueckenlos halten
+        return ok(res, { autofilled: filled });
       }
       if (requireStudent() && bk.student_id === sess.student_id) {
         if (bk.status === 'done') return bad(res, 'Bereits gefahrene Stunden koennen nicht storniert werden');
@@ -488,7 +585,8 @@ async function handleApi(req, res, url) {
         db.prepare("UPDATE bookings SET status='cancelled' WHERE id = ?").run(id);
         logEvent('cancel_student', { actor: 'student', studentId: bk.student_id, bookingId: id, date: bk.date,
           detail: `${wdShort(bk.date)} ${dmy(bk.date)} ${bk.start_time} Uhr storniert (rechtzeitig)` });
-        return ok(res);
+        const filled = autoFillGapsOnCancel(bk.date);  // Tag lueckenlos halten
+        return ok(res, { autofilled: filled });
       }
       return bad(res, 'Keine Berechtigung', 403);
     }
@@ -1044,11 +1142,11 @@ async function handleApi(req, res, url) {
     const rows = db.prepare(
       `SELECT s.id,s.name,s.first_name,s.last_name,s.email,s.phone,s.username,s.birth_year,s.birth_date,
         s.street,s.house_no,s.zip,s.city,s.allowed_durations,s.created_at,
-        s.home_label,s.home_lat,s.home_lng,s.archived_at,s.notes,
+        s.home_label,s.home_lat,s.home_lng,s.travel_min,s.archived_at,s.notes,
         (s.photo IS NOT NULL) AS has_photo,
         (SELECT COUNT(*) FROM bookings b WHERE b.student_id=s.id AND b.status='done') AS done_count
        FROM students s WHERE s.archived_at IS ${archived ? 'NOT NULL' : 'NULL'} ORDER BY s.name`
-    ).all().map((s) => ({ ...s, ...studentRank(s.id), sonder: sonderCounts(s.id) }));
+    ).all().map((s) => ({ ...s, ...studentRank(s.id), sonder: sonderCounts(s.id), travel_est: travelMin(s.id) }));
     const activeCount = db.prepare('SELECT COUNT(*) AS c FROM students WHERE archived_at IS NULL').get().c;
     const archivedCount = db.prepare('SELECT COUNT(*) AS c FROM students WHERE archived_at IS NOT NULL').get().c;
     return ok(res, { students: rows, req: sonderReq(), activeCount, archivedCount, scope: archived ? 'archived' : 'active' });
@@ -1060,7 +1158,7 @@ async function handleApi(req, res, url) {
     const b = await readBody(req);
     const sid = Number(stm[1]);
     // Stammdaten bearbeiten (Vorname/Nachname bzw. Name / Telefon / E-Mail / Jahrgang / Notiz)
-    if ('first_name' in b || 'last_name' in b || 'name' in b || 'phone' in b || 'email' in b || 'birth_year' in b || 'birth_date' in b || 'street' in b || 'house_no' in b || 'zip' in b || 'city' in b || 'notes' in b) {
+    if ('first_name' in b || 'last_name' in b || 'name' in b || 'phone' in b || 'email' in b || 'birth_year' in b || 'birth_date' in b || 'street' in b || 'house_no' in b || 'zip' in b || 'city' in b || 'notes' in b || 'travel_min' in b) {
       const st = db.prepare('SELECT id FROM students WHERE id=?').get(sid);
       if (!st) return bad(res, 'Schueler nicht gefunden', 404);
       const fields = [], vals = [];
@@ -1087,6 +1185,12 @@ async function handleApi(req, res, url) {
       for (const k of ['street', 'house_no', 'zip', 'city']) {
         if (k in b) { fields.push(`${k}=?`); vals.push(b[k] ? String(b[k]).trim() : null); }
       }
+      // Abholzeit (Minuten): leer/None -> automatisch schaetzen (NULL)
+      if ('travel_min' in b) {
+        const tv = (b.travel_min === '' || b.travel_min == null) ? null : Math.max(0, Math.round(Number(b.travel_min)));
+        fields.push('travel_min=?'); vals.push(Number.isFinite(tv) ? tv : null);
+      }
+      if (!fields.length) return bad(res, 'Nichts zu aendern');
       db.prepare(`UPDATE students SET ${fields.join(', ')} WHERE id=?`).run(...vals, sid);
       logEvent('info', { actor: 'instructor', studentId: sid, detail: 'Stammdaten bearbeitet' });
       return ok(res, { updated: true });
@@ -1378,7 +1482,8 @@ async function handleApi(req, res, url) {
       'instructor_phone', 'avg_speed_kmh', 'live_lead_min',
       'meet_default_label', 'meet_default_lat', 'meet_default_lng',
       'anonymous_swaps', 'req_ueberland', 'req_autobahn', 'req_nacht',
-      'rank2_min_lessons', 'booking_horizon_days_rank2', 'registration_open'];
+      'rank2_min_lessons', 'booking_horizon_days_rank2', 'registration_open',
+      'flow_schedule', 'auto_fill_gaps', 'school_lat', 'school_lng', 'travel_default_min'];
     const emptyOk = new Set(['instructor_phone', 'meet_default_label', 'meet_default_lat', 'meet_default_lng', 'policy_text']);
     for (const k of allowed) {
       if (!(k in b) || b[k] == null) continue;
@@ -1444,39 +1549,53 @@ function genUsername(name, year) {
   return handle;
 }
 
-// Slots eines Tages inkl. Status (frei / gebucht / geblockt)
+// Slots eines Tages inkl. Status (frei / gebucht / geblockt) – FLIESSENDER Tagesplan:
+// belegte Stunden stehen fest, dahinter waechst der naechste freie Start mit der
+// Dauer der vorigen Stunde + Pause + Abholzeit mit. So bleibt der Tag lueckenlos.
 function buildDaySlots(date, studentId = null) {
   const workdays = getSettingRaw('workdays').split(',').map(Number);
   const ov = getOverride(date);
   const isWorkday = !(ov && ov.closed) && workdays.includes(isoDow(date));
   const notOpenYet = !dateOpenForStudents(date, studentId);
-  const grid = slotGrid(date);
+  const blocks = db.prepare('SELECT * FROM blocks WHERE date = ?').all(date);
   const bookings = db.prepare(
     "SELECT * FROM bookings WHERE date = ? AND status != 'cancelled'").all(date);
-  const blocks = db.prepare('SELECT * FROM blocks WHERE date = ?').all(date);
   const isToday = date === todayStr();
-  const now = nowHHMM();
+  const nowM = toMin(nowHHMM());
+  const f = dayFrame(date);
+  const slots = [];
 
-  const slots = grid.map((g) => {
-    const gStart = toMin(g.start), gEnd = gStart + g.duration;
-    const booking = bookings.find((b) => b.start_time === g.start);
-    // auch von einer laengeren Buchung (z.B. 120 Min) ueberlappte Slots sind belegt
-    const overlapBooking = booking || bookings.find((b) => overlaps(gStart, gEnd, toMin(b.start_time), toMin(b.start_time) + b.duration_min));
-    const blocked = blocks.find((bl) => overlaps(gStart, gEnd, toMin(bl.start_time), toMin(bl.end_time)));
-    const past = isToday && gStart <= toMin(now);
-    let state = 'free';
-    if (booking) state = booking.status === 'offered' ? 'offered' : 'booked';
-    else if (overlapBooking) state = 'booked';
-    else if (blocked) state = 'blocked';
-    else if (!isWorkday) state = 'closed';
-    else if (past) state = 'past';
-    else if (notOpenYet) state = 'toofar';
-    return {
-      start: g.start, end: g.end, duration: g.duration, state,
-      blockTitle: blocked ? blocked.title : null,
-      bookedByMe: false, // wird clientseitig anhand my/bookings gesetzt
-    };
-  });
+  if (!isWorkday) return { slots, isWorkday, blocks, override: ov, shortDay: false };
+
+  // 1) Belegte Stunden (fest im Plan)
+  for (const b of bookings) {
+    const bs = toMin(b.start_time);
+    slots.push({
+      start: b.start_time, end: toHHMM(bs + b.duration_min), duration: b.duration_min,
+      state: b.status === 'offered' ? 'offered' : 'booked',
+      blockTitle: null, bookedByMe: false,
+    });
+  }
+  // 2) Bloecke (Theorie o. a.)
+  for (const bl of blocks) {
+    slots.push({
+      start: bl.start_time, end: bl.end_time,
+      duration: Math.max(0, toMin(bl.end_time) - toMin(bl.start_time)),
+      state: 'blocked', blockTitle: bl.title, bookedByMe: false,
+    });
+  }
+  // 3) Freie Startzeiten (fliessend). Jeder freie Start bietet, wie lange dort noch passt.
+  for (const w of freeStarts(date, studentId)) {
+    const past = isToday && w.start <= nowM;
+    const maxDur = w.cap - w.start;
+    const dur = Math.min(f.lessonMin || 80, maxDur);
+    slots.push({
+      start: toHHMM(w.start), end: toHHMM(w.start + dur), duration: dur,
+      maxDur, state: notOpenYet ? 'toofar' : (past ? 'past' : 'free'),
+      blockTitle: null, bookedByMe: false,
+    });
+  }
+  slots.sort((a, b) => toMin(a.start) - toMin(b.start));
   return { slots, isWorkday, blocks, override: ov, shortDay: !!(ov && ov.last_start && !ov.closed) };
 }
 
@@ -1567,19 +1686,24 @@ function packDay(date) {
   movable.sort((a, z) => a.start_time.localeCompare(z.start_time));
 
   let cursor = start;
+  let first = true;
   const moves = [];
   for (const b of movable) {
-    let t = cursor;
+    const travel = travelMin(b.student_id);   // Abholzeit vor dieser Stunde einrechnen
+    // vor der ersten Stunde nur die Abholzeit, sonst zusaetzlich die Pause
+    let t = cursor + (first ? travel : brk + travel);
     let changed = true;
-    while (changed) {   // an Hindernissen vorbeischieben (inkl. Pause)
+    while (changed) {   // an Hindernissen vorbeischieben (inkl. Pause + Abholzeit)
       changed = false;
       for (const o of obstacles) {
-        if (overlaps(t, t + b.duration_min, o.s, o.e)) { t = o.e + brk; changed = true; }
+        if (overlaps(t, t + b.duration_min, o.s, o.e)) { t = o.e + brk + travel; changed = true; }
       }
     }
+    t = Math.ceil(t / 5) * 5;
     moves.push({ id: b.id, from: b.start_time, to: toHHMM(t),
       student_name: b.student_name, student_id: b.student_id, duration: b.duration_min });
-    cursor = t + b.duration_min + brk;
+    cursor = t + b.duration_min;   // Ende dieser Stunde; Pause + Abholzeit folgen bei der naechsten
+    first = false;
   }
   return { date, moves, hasGap: moves.some((m) => m.from !== m.to) };
 }
@@ -1602,16 +1726,30 @@ function applyPack(date, label) {
   return moved;
 }
 
-// Kommende Schueler-Termine, die nicht (mehr) auf dem aktuellen Raster liegen
+// Faellt eine Fahrstunde aus, den Tag automatisch wieder lueckenlos machen:
+// die folgenden Stunden ruecken nach vorne (mit Pause + Abholzeit) und die
+// betroffenen Schueler werden benachrichtigt. Nur fuer ZUKUENFTIGE Tage und nur,
+// wenn in den Einstellungen aktiviert. Gibt die Anzahl verschobener Stunden zurueck.
+function autoFillGapsOnCancel(date) {
+  if (getSettingRaw('auto_fill_gaps') !== '1') return 0;
+  if (date < todayStr()) return 0;                 // Vergangenes nicht anfassen
+  if (!packDay(date).hasGap) return 0;             // keine Luecke -> nichts zu tun
+  const moved = applyPack(date, 'nachgerückt (Ausfall)');
+  if (moved) logEvent('shift', { actor: 'system', date,
+    detail: `Ausfall am ${wdShort(date)} ${dmy(date)}: ${moved} Stunde(n) automatisch nach vorne gerückt (lückenlos).` });
+  return moved;
+}
+
+// Kommende Tage mit einer Luecke, die sich lueckenlos schliessen liesse
+// (fliessender Tagesplan: Stunden liessen sich nach vorne ziehen).
 function misalignedDays() {
   const rows = db.prepare(
-    "SELECT DISTINCT date FROM bookings WHERE status IN ('booked','offered') AND student_id IS NOT NULL AND date >= ? ORDER BY date").all(todayStr());
+    "SELECT DISTINCT date FROM bookings WHERE status IN ('booked','offered') AND date >= ? ORDER BY date").all(todayStr());
   const days = [];
   for (const { date } of rows) {
-    const grid = new Set(slotGrid(date).map((g) => g.start));
-    const off = db.prepare("SELECT start_time FROM bookings WHERE date=? AND status IN ('booked','offered') AND student_id IS NOT NULL").all(date)
-      .filter((bk) => !grid.has(bk.start_time));
-    if (off.length) days.push({ date, count: off.length });
+    const plan = packDay(date);
+    const count = plan.moves.filter((m) => m.from !== m.to).length;
+    if (count) days.push({ date, count });
   }
   return { total: days.reduce((a, d) => a + d.count, 0), days };
 }
@@ -1785,10 +1923,12 @@ function createBooking(res, sess, body) {
       return bad(res, `Dieser Tag ist noch nicht buchbar (für dich als Rang ${rank}: bis ${horizon} Tage im Voraus, täglich ab ${rel} Uhr).`);
     }
 
-    // Passt der Start ins (tagesabhaengige) Raster?
-    const grid = slotGrid(date);
-    if (!grid.some((g) => g.start === start))
-      return bad(res, 'Ungueltige Uhrzeit');
+    // Fliessender Tagesplan: der Start muss einer der aktuell angebotenen freien
+    // Startzeiten entsprechen (lueckenlos, inkl. Pause + Abholzeit).
+    const free = freeStarts(date, sess.student_id);
+    const win = free.find((w) => toHHMM(w.start) === start);
+    if (!win)
+      return bad(res, 'Diese Startzeit ist gerade nicht (mehr) frei. Bitte lade neu und nimm den nächsten freien Start.');
 
     // Erlaubte Dauer fuer diesen Schueler?
     const stu = db.prepare('SELECT allowed_durations FROM students WHERE id = ?').get(sess.student_id);
@@ -1796,15 +1936,9 @@ function createBooking(res, sess, body) {
     if (!allowed.includes(duration))
       return bad(res, `Fuer dich sind nur ${allowed.join('/')} Minuten freigegeben.`);
 
-    // Nicht ueber das regulaere Arbeitsende hinaus (z.B. 120 Min am letzten Slot)
-    const lastSlotEnd = toMin((ov && ov.last_start) || getSettingRaw('last_start')) + s.lesson_min;
-    if (toMin(start) + duration > lastSlotEnd)
-      return bad(res, `Diese Länge passt an diesem Slot nicht mehr in den Tag (Ende spätestens ${toHHMM(lastSlotEnd)} Uhr). Wähle einen früheren Slot.`);
-
-    // Der letzte Slot des Tages nur als volle Stunde (>= 80 Min), keine 40-Min-Kurzstunde
-    const lastGridStart = grid.length ? grid[grid.length - 1].start : null;
-    if (start === lastGridStart && duration < 80)
-      return bad(res, 'Der letzte Slot des Tages ist nur als 80- oder 120-Minuten-Stunde buchbar. Wähle einen früheren Slot für eine kürzere Stunde.');
+    // Passt die gewuenschte Laenge noch in den Tag (bis zum spaetesten Stundenende)?
+    if (toMin(start) + duration > win.cap)
+      return bad(res, `Diese Länge passt an diesem Start nicht mehr in den Tag (Ende spätestens ${toHHMM(win.cap)} Uhr). Wähle eine kürzere Stunde oder einen früheren Start.`);
   }
 
   const newStart = toMin(start);
@@ -1935,6 +2069,37 @@ function sendDueReminders() {
   return sent;
 }
 
+// Naechtliche Server-Pflege: einmal pro Tag (nach 03:00) den Server sauber halten,
+// OHNE gueltige Anmeldungen anzutasten. Es werden nur ABGELAUFENE Sitzungen und
+// alte, gelesene Postfach-Eintraege entfernt; danach die WAL-Datei zusammengefuehrt
+// und der Abfrageplaner optimiert. So bleibt die DB schlank und schnell.
+let lastMaintDay = null;
+function nightlyMaintenance(force = false) {
+  const today = todayStr();
+  const hour = Number(nowHHMM().slice(0, 2));
+  if (!force) {
+    if (lastMaintDay === today) return 0;      // heute schon gelaufen
+    if (hour < 3) return 0;                     // erst ab 03:00 Uhr nachts
+  }
+  lastMaintDay = today;
+  let cleaned = 0;
+  try {
+    // Nur ABGELAUFENE Sitzungen entfernen -> niemand muss sich neu anmelden.
+    // (expires wird wie in getSession als Millisekunden gespeichert.)
+    cleaned += db.prepare('DELETE FROM sessions WHERE expires < ?').run(Date.now()).changes || 0;
+    // Gelesene Benachrichtigungen aelter als 60 Tage aufraeumen (Postfach schlank halten).
+    const cutoff = new Date(Date.now() - 60 * 864e5).toISOString();
+    db.prepare('DELETE FROM notifications WHERE read = 1 AND created_at < ?').run(cutoff);
+    // Abgelehnte Uebernahme-Angebote zu bereits erledigten/stornierten Buchungen entfernen.
+    db.prepare("DELETE FROM offer_declines WHERE booking_id IN (SELECT id FROM bookings WHERE status IN ('done','cancelled'))").run();
+    // WAL zusammenfuehren + Planer optimieren (haelt die Datei klein & Abfragen flott).
+    try { db.exec('PRAGMA wal_checkpoint(TRUNCATE);'); } catch {}
+    try { db.exec('PRAGMA optimize;'); } catch {}
+    console.log(`[maintenance] ${today}: ${cleaned} abgelaufene Sitzungen entfernt, DB optimiert.`);
+  } catch (e) { console.error('nightlyMaintenance', e); }
+  return cleaned;
+}
+
 // ---------- statische Dateien ----------
 const MIME = {
   '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8',
@@ -1986,7 +2151,11 @@ const server = createServer(async (req, res) => {
 server.listen(PORT, HOST, () => {
   console.log(`\n  ginoco laeuft auf  http://localhost:${PORT}  (Bind ${HOST}:${PORT})\n`);
   console.log(`  Fahrlehrer-Login: Standard-PIN 1234 (bitte in den Einstellungen aendern)\n`);
-  // Erinnerungen im Hintergrund pruefen (alle 5 Minuten)
+  // Erinnerungen im Hintergrund pruefen (alle 5 Minuten) + naechtliche Server-Pflege
   try { sendDueReminders(); } catch (e) { console.error(e); }
-  setInterval(() => { try { sendDueReminders(); } catch (e) { console.error(e); } }, 5 * 60 * 1000);
+  try { nightlyMaintenance(); } catch (e) { console.error(e); }
+  setInterval(() => {
+    try { sendDueReminders(); } catch (e) { console.error(e); }
+    try { nightlyMaintenance(); } catch (e) { console.error(e); }
+  }, 5 * 60 * 1000);
 });

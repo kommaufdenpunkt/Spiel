@@ -191,6 +191,9 @@ ensureColumn('bookings', 'confirmed', 'confirmed INTEGER NOT NULL DEFAULT 1');
 ensureColumn('bookings', 'delay_min', 'delay_min INTEGER NOT NULL DEFAULT 0'); // heutige Verspätung (Min), die der Fahrlehrer angesagt hat – nur für den beruhigenden Live-Status
 ensureColumn('bookings', 'ended_at', 'ended_at TEXT');       // Fahrstunde beendet (fürs Protokoll: von–bis)
 ensureColumn('bookings', 'feedback', 'feedback TEXT');       // Rückmeldung an den Schüler ("das haben wir gemacht")
+// Abholzeit (Minuten) je Schueler – vom Fahrlehrer gepflegt (z.B. Groß Schönebeck = 30).
+// NULL = automatisch aus dem Wohnort schaetzen (Luftlinie / Durchschnittstempo).
+ensureColumn('students', 'travel_min', 'travel_min INTEGER');
 
 // Live-Standort des Fahrlehrers (genau eine Zeile)
 db.exec(`CREATE TABLE IF NOT EXISTS live_location (
@@ -212,19 +215,26 @@ const DEFAULTS = {
   daily_target_h: '5.3',     // Tagesziel in Stunden (4 Slots)
   weekly_lo_h: '25',         // untere Zielspanne (gelb -> gruen)
   monthly_target_h: '80',    // Monatsziel in Stunden (mind. 80, gruen ab hier)
-  monthly_max_h: '100',      // Skala-Ende der Monats-Tachouhr (hoechstens)
+  monthly_max_h: '130',      // Skala-Ende der Monats-Tachouhr (hoechstens)
   workdays: '1,2,3,4,5,6',   // 1=Mo ... 7=So
   max_per_week: '2',         // max. Fahrstunden pro Schueler & Woche
   booking_horizon_days: '14',// so viele Tage im Voraus duerfen Schueler buchen
   cancel_hours: '48',        // bis so viele Std. vorher kostenlose Stornierung
   lock_hours: '36',          // ab so viel Std. vorher ist der Termin gesperrt (kein Absagen/Abgeben)
-  release_time: '10:00',     // Uhrzeit, zu der taeglich der neue Tag am Horizont oeffnet
+  release_time: '06:00',     // Uhrzeit, zu der taeglich der neue Tag am Horizont oeffnet (frueh: 06:00)
   short_day_last_start: '13:35', // letzter Slot an "kurzen Tagen" (frueher Feierabend)
   vacation_credit_min: '240',// Minuten, die ein Urlaubstag als Arbeitszeit zaehlt
   vacation_days_left: '30',  // verbleibende Urlaubstage (nur zur Anzeige)
   late_grace_min: '20',      // bis so viele Min Verspaetung ok; danach zaehlt die Zeit ab
   instructor_phone: '',      // Handynummer des Fahrlehrers (fuer Anruf/WhatsApp)
   avg_speed_kmh: '30',       // angenommene Durchschnittsgeschwindigkeit fuer die ETA
+  // Fliessender Tagesplan: Startzeit der naechsten Stunde wandert mit Dauer + Pause + Abholzeit
+  flow_schedule: '1',        // '1' = fliessender, lueckenloser Tagesplan (statt festem Raster)
+  auto_fill_gaps: '1',       // '1' = faellt eine Stunde aus, ruecken die folgenden automatisch nach vorne
+  // Standort der Fahrschule (Untern Buchen, Eisenbahnstr. 31, 16321 Eberswalde) – Basis fuer die Abholzeit
+  school_lat: '52.8300',
+  school_lng: '13.8160',
+  travel_default_min: '0',   // Abholzeit, falls fuer einen Schueler nichts Genaues hinterlegt ist
   live_lead_min: '20',       // so viele Min vor Beginn wird der Live-Standort geteilt
   meet_default_label: '',    // Standard-Treffpunkt (Text)
   meet_default_lat: '',      // Standard-Treffpunkt-Koordinaten (optional)
@@ -249,6 +259,19 @@ const setSetting = db.prepare(
 
 for (const [k, v] of Object.entries(DEFAULTS)) {
   if (!getSetting.get(k)) setSetting.run(k, v);
+}
+
+// Einmalige Anpassung bestehender Installationen auf die neuen Vorgaben
+// (fruehe Freigabe 06:00, Monats-Skala bis 130 h). Nur, wenn der Wert noch
+// exakt auf dem alten Standard steht – manuell geaenderte Werte bleiben unangetastet.
+if (!getSetting.get('mig_flow_v1')) {
+  const bump = (key, from, to) => {
+    const cur = getSetting.get(key);
+    if (cur && cur.value === from) setSetting.run(key, to);
+  };
+  bump('release_time', '10:00', '06:00');
+  bump('monthly_max_h', '100', '130');
+  setSetting.run('mig_flow_v1', '1');
 }
 
 // Standard-PIN nur beim allerersten Start setzen (1234). Aenderbar in den Einstellungen.

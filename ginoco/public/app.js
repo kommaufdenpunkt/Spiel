@@ -405,8 +405,14 @@ function openTour() {
 window.__openTour = openTour;
 
 // ---------- Was ist neu? (Changelog) ----------
-const CHANGELOG_VER = '3.49';
+const CHANGELOG_VER = '3.50';
 const CHANGELOG = [
+  { v: '3.50', d: '20.08.2026', title: 'Fließender Tagesplan – lückenlos', items: [
+    '🔄 Der Tag fließt: die Startzeit der nächsten Fahrstunde wächst automatisch mit der Dauer der vorigen (40/80/120 Min) – plus 15 Min Pause und deiner Abholzeit. So bleibt alles lückenlos.',
+    '🚗 Abholzeit je Fahrschüler: trag beim Schüler ein, wie lange die Fahrt dorthin dauert (z. B. Groß Schönebeck = 30 Min) – sie wird vor jeder Stunde eingerechnet.',
+    '🧩 Fällt eine Stunde aus, rücken die folgenden automatisch nach vorne – die betroffenen Schüler werden benachrichtigt.',
+    '⏰ Neue Tage öffnen jetzt früh um 06:00 Uhr; Monats-Skala bis 130 Std.',
+    '🧹 Nachts hält sich der Server selbst sauber – ganz ohne neu anzumelden. Und die App lädt immer frisch (kein Hard-Refresh mehr nötig).'] },
   { v: '3.49', d: '19.08.2026', title: 'Meine Fahrstunden & Nachtragen', items: [
     '📖 Fahrschüler sehen jetzt „Meine Fahrstunden“ – tabellarisch mit Datum & Uhrzeit, Dauer, Art, Verspätung und Vermerk.',
     '➕ Fahrlehrer kann Fahrstunden nachtragen (echtes Fahrdatum, z. B. 18.08. 20:00) – das Eintragedatum wird zusätzlich vermerkt.',
@@ -1734,6 +1740,13 @@ function renderSlots(slots, mine) {
   el.innerHTML = slots.map((s) => {
     const mineHere = mineToday.has(s.start);
     let cls = s.state, inner = '';
+    let sub = `${s.start}–${s.end} · ${s.duration} Min`;
+    // Freier (fliessender) Start: Dauer waehlt der Schüler selbst -> passende Beschriftung.
+    if (s.state === 'free' && !mineHere) {
+      const md = Number(s.maxDur || s.duration);
+      const my = String(state.user?.allowed_durations || '80').split(',').map(Number).filter((n) => n > 0 && n <= md).sort((a, b) => a - b);
+      sub = my.length > 1 ? `frei ab ${s.start} Uhr · ${my.join('/')} Min wählbar` : `frei ab ${s.start} Uhr · ${my[0] || s.duration} Min`;
+    }
     if (mineHere) {
       // Nur frei stornierbar, solange die Storno-Frist nicht erreicht ist –
       // sonst 🔒 (Verwalten/Anbieten geht oben unter „Meine Fahrstunden").
@@ -1744,7 +1757,7 @@ function renderSlots(slots, mine) {
                       : `<span class="pill">🔒 gebucht</span>`);
       cls = 'booked';
     } else if (s.state === 'free') {
-      inner = `<span class="tag g">frei</span><button class="sm" data-book="${s.start}" data-dur="${s.duration}">Buchen</button>`;
+      inner = `<span class="tag g">frei</span><button class="sm" data-book="${s.start}" data-dur="${s.duration}" data-maxdur="${s.maxDur || s.duration}">Buchen</button>`;
     } else if (s.state === 'booked') {
       inner = `<span class="tag x">belegt</span>`;
     } else if (s.state === 'offered') {
@@ -1760,7 +1773,7 @@ function renderSlots(slots, mine) {
     }
     return `<div class="slot ${cls}">
       <div class="time">${s.start}</div>
-      <div class="dur">${s.start}–${s.end} · ${s.duration} Min</div>
+      <div class="dur">${sub}</div>
       ${inner}
     </div>`;
   }).join('');
@@ -1775,27 +1788,28 @@ function renderSlots(slots, mine) {
     </div>`);
     el.querySelector('[data-find-next]').onclick = () => jumpToNextFree(addDays(state.date, 1));
   }
-  el.querySelectorAll('[data-book]').forEach((b) => b.onclick = () => bookSlot(b.dataset.book, Number(b.dataset.dur)));
+  el.querySelectorAll('[data-book]').forEach((b) => b.onclick = () => bookSlot(b.dataset.book, Number(b.dataset.dur), Number(b.dataset.maxdur || 0)));
   el.querySelectorAll('[data-cancel-time]').forEach((b) => b.onclick = () => {
     const bk = myBookingsCache.find((x) => x.date === state.date && x.start_time === b.dataset.cancelTime);
     if (bk) cancelBooking(bk.id);
   });
 }
 
-function bookSlot(start, dur) {
+function bookSlot(start, dur, maxDur) {
   const cancelH = state.settings?.cancel_hours || 48;
   const lockH = state.settings?.lock_hours || 36;
   let allowed = String(state.user?.allowed_durations || '80').split(',').map(Number).filter((n) => n > 0).sort((a, b) => a - b);
-  // Der letzte Slot des Tages ist nur als volle Stunde (>= 80 Min) buchbar.
-  const isLast = state.lastSlotStart && start === state.lastSlotStart;
-  if (isLast) allowed = allowed.filter((d) => d >= 80);
-  if (!allowed.length) {
+  // Fliessender Tagesplan: nur Dauern anbieten, die an diesem Start noch in den Tag passen.
+  const cap = Number(maxDur) > 0 ? Number(maxDur) : Infinity;
+  const fits = allowed.filter((d) => d <= cap);
+  if (!fits.length) {
     modal(`<h3>Termin buchen</h3>
-      <div class="warnbox">Der letzte Slot des Tages ist nur als 80- oder 120-Minuten-Stunde buchbar – dafür bist du nicht freigeschaltet. Bitte wähle einen früheren Slot.</div>
+      <div class="warnbox">An diesem Start passt keine deiner freigegebenen Fahrstunden-Längen mehr in den Tag${cap < Infinity ? ` (nur noch ${cap} Min bis Feierabend)` : ''}. Bitte wähle einen früheren Start.</div>
       <div class="actions"><button class="sec" onclick="window.__closeModal()">Schließen</button></div>`);
     return;
   }
-  const defDur = allowed.includes(80) ? 80 : allowed[0];
+  allowed = fits;
+  const defDur = allowed.includes(80) ? 80 : allowed[allowed.length - 1];
   const durSelect = allowed.length > 1
     ? `<div class="field"><label>Dauer wählen</label><select id="bk-dur">${allowed.map((d) => `<option value="${d}" ${d === defDur ? 'selected' : ''}>${d} Minuten</option>`).join('')}</select></div>`
     : '';
@@ -1804,7 +1818,6 @@ function bookSlot(start, dur) {
       Bist du wirklich sicher, dass du diesen Termin nehmen willst?
     </div>
     <p style="margin:.6rem 0 .2rem"><strong>${WD_LONG[isoDow(state.date) - 1]}, ${fmtShort(state.date)} um ${start} Uhr</strong>${allowed.length > 1 ? '' : ` · ${allowed[0]} Min`}</p>
-    ${isLast ? '<div class="hint" style="margin:.2rem 0 .3rem">Letzter Slot des Tages – nur als volle Stunde (80 oder 120 Min).</div>' : ''}
     ${durSelect}
     <ul class="hint" style="margin:.4rem 0 .4rem;padding-left:1.1rem">
       <li>Kostenfrei stornieren nur bis <strong>${cancelH} Std.</strong> vorher.</li>
@@ -2913,6 +2926,9 @@ function openEditStudentModal(s) {
       <div class="field" style="max-width:130px"><label>PLZ</label><input id="es-zip" inputmode="numeric" value="${esc(s.zip || '')}"></div>
       <div class="field" style="flex:2"><label>Ort</label><input id="es-city" value="${esc(s.city || '')}"></div>
     </div>
+    <div class="field"><label>🚗 Abholzeit (Min) – Fahrt Fahrschule → Abholort</label>
+      <input id="es-travel" inputmode="numeric" value="${s.travel_min != null ? s.travel_min : ''}" placeholder="z.B. 30 (Groß Schönebeck)">
+      <div class="hint" style="margin:.3rem 0 0">Wird im Tagesplan vor jeder Fahrstunde eingerechnet, damit du pünktlich da bist. Leer lassen = automatisch schätzen${s.travel_est ? ` (aktuell ≈ ${s.travel_est} Min)` : ''}.</div></div>
     <div class="field"><label>📝 Notiz / Karteikarte (nur für dich)</label>
       <textarea id="es-notes" rows="4" placeholder="z.B. Ausbildungsstand, was noch geübt werden muss, Besonderheiten …" style="resize:vertical">${esc(s.notes || '')}</textarea></div>
     <div class="actions">
@@ -2927,6 +2943,7 @@ function openEditStudentModal(s) {
         street: $('#es-street').value || null, house_no: $('#es-houseno').value || null,
         zip: $('#es-zip').value || null, city: $('#es-city').value || null,
         phone: $('#es-phone').value || null, email: $('#es-email').value || null,
+        travel_min: $('#es-travel').value.trim() === '' ? '' : $('#es-travel').value.trim(),
         notes: $('#es-notes').value || null } });
       closeModal(); toast('Gespeichert ✓', 'ok'); tabSchueler();
     } catch (e) { const el = $('#autherr'); if (el) { el.textContent = e.message; el.classList.remove('hidden'); } else toast(e.message, 'err'); }
@@ -3652,6 +3669,15 @@ function tabEinstellungen() {
         <div class="field"><label>Letzter Slot an kurzen Tagen ${helpDot('An „Kürzer“-Tagen ist das die späteste buchbare Startzeit.')}</label><input id="e-shortlast" value="${s.short_day_last_start || '13:35'}"></div></div>
       <div class="hint" id="e-preview" style="margin-top:.3rem"></div>`, true)}
 
+    ${sec('🔄', 'Fließender Tagesplan', 'Lückenlos, Pause + Abholzeit, automatisch nachrücken', `
+      <label class="ck-line"><input type="checkbox" id="e-flow" ${s.flow_schedule !== '0' ? 'checked' : ''}> Fließender, lückenloser Tagesplan (Startzeit der nächsten Stunde wächst mit Dauer + Pause + Abholzeit)</label>
+      <label class="ck-line" style="margin-top:.4rem"><input type="checkbox" id="e-autofill" ${s.auto_fill_gaps !== '0' ? 'checked' : ''}> Fällt eine Stunde aus, folgende automatisch nach vorne rücken (Schüler werden benachrichtigt)</label>
+      <div class="row" style="margin-top:.6rem">
+        <div class="field"><label>Fahrschule – Breite (lat) ${helpDot('Standort der Fahrschule als Startpunkt für die Abholzeit-Schätzung. Eisenbahnstr. 31, Eberswalde.')}</label><input id="e-schoollat" value="${esc(s.school_lat || '')}" placeholder="52.8300"></div>
+        <div class="field"><label>Fahrschule – Länge (lng)</label><input id="e-schoollng" value="${esc(s.school_lng || '')}" placeholder="13.8160"></div></div>
+      <div class="field"><label>Standard-Abholzeit (Min) ${helpDot('Wird genutzt, wenn beim Schüler keine eigene Abholzeit und kein Wohnort hinterlegt ist.')}</label><input id="e-travdef" type="number" value="${s.travel_default_min || '0'}" min="0" step="5"></div>
+      <div class="hint" style="margin:.3rem 0 0">Die Abholzeit pro Schüler stellst du direkt beim Schüler ein (Fahrschüler → bearbeiten → 🚗 Abholzeit). Ist dort nichts gesetzt, wird sie aus dem Wohnort geschätzt.</div>`)}
+
     ${sec('📅', 'Buchung & Stornierung', 'Vorausbuchung, Limits, Fristen, Aufklärungstext', `
       <div class="row"><div class="field"><label>Max. Fahrstunden pro Schüler & Woche</label><input id="e-max" type="number" value="${s.max_per_week}" min="1"></div>
         <div class="field"><label>Vorausbuchung (Tage)</label><input id="e-horizon" type="number" value="${s.booking_horizon_days}" min="1"></div></div>
@@ -3743,6 +3769,10 @@ function tabEinstellungen() {
         req_ueberland: Number($('#e-req-u').value), req_autobahn: Number($('#e-req-a').value), req_nacht: Number($('#e-req-n').value),
         rank2_min_lessons: Number($('#e-rank2').value), booking_horizon_days_rank2: Number($('#e-horizon2').value),
         registration_open: $('#e-reg-open').checked ? '1' : '0',
+        flow_schedule: $('#e-flow').checked ? '1' : '0',
+        auto_fill_gaps: $('#e-autofill').checked ? '1' : '0',
+        school_lat: $('#e-schoollat').value.trim(), school_lng: $('#e-schoollng').value.trim(),
+        travel_default_min: Number($('#e-travdef').value) || 0,
         new_pin: $('#e-pin').value || undefined } });
       state.settings = r.settings; state.user.name = r.settings.instructor_name;
       toast('Einstellungen gespeichert ✓', 'ok'); $('#e-msg').textContent = 'Gespeichert.';
