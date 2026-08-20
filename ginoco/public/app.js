@@ -3101,9 +3101,9 @@ function openEditStudentModal(s) {
       <div class="field" style="flex:2"><label>Ort</label><input id="es-city" value="${esc(s.city || '')}"></div>
     </div>
     <div class="row">
-      <div class="field"><label>🚗 Abholzeit (Min) – Fahrt Fahrschule → Abholort</label>
-        <input id="es-travel" inputmode="numeric" value="${s.travel_min != null ? s.travel_min : ''}" placeholder="z.B. 30 (Groß Schönebeck)"></div>
-      <div class="field" style="max-width:180px"><label>Standort für Schätzung</label>
+      <div class="field"><label>🚗 Abholzeit (Min)</label>
+        <input id="es-travel" inputmode="numeric" value="${s.travel_min != null ? s.travel_min : ''}" placeholder="z.B. 30"></div>
+      <div class="field" style="max-width:180px"><label>Standort</label>
         <select id="es-base">
           <option value="" ${!s.home_base ? 'selected' : ''}>Automatisch (näher)</option>
           <option value="main" ${s.home_base === 'main' ? 'selected' : ''}>Eberswalde</option>

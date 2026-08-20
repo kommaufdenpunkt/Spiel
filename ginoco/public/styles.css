@@ -31,6 +31,8 @@ button.danger{background:var(--bad)}button.danger:hover{background:#c94a49}
 button.sm{padding:.35rem .7rem;font-size:.82rem}
 input,select,textarea{font-family:inherit;font-size:.95rem;padding:.55rem .7rem;border:1px solid var(--line);
   border-radius:13px;background:#0f151d;color:var(--ink);width:100%}
+/* Radio/Checkbox nie auf 100% ziehen (sonst rutscht das Label an den Rand) */
+input[type=radio],input[type=checkbox]{width:auto;flex:0 0 auto;padding:0;accent-color:var(--brand)}
 textarea{line-height:1.4}
 input:focus,select:focus,textarea:focus{outline:2px solid rgba(77,141,255,.4);border-color:var(--brand)}
 input[type=date]{color-scheme:dark}
