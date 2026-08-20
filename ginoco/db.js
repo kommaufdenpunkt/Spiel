@@ -171,6 +171,22 @@ db.exec(`CREATE TABLE IF NOT EXISTS offer_declines (
   student_id INTEGER NOT NULL,
   PRIMARY KEY (booking_id, student_id)
 );`);
+
+// Bewertungen (Testimonials). Bleiben dauerhaft erhalten – auch wenn die Akte
+// nach bestandener Pruefung geschlossen (archiviert) oder der Zugang geloescht wird.
+db.exec(`CREATE TABLE IF NOT EXISTS reviews (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  student_id  INTEGER,                              -- kann NULL werden (Bewertung ueberlebt)
+  rating      INTEGER NOT NULL DEFAULT 5,           -- 1..5 Sterne
+  text        TEXT NOT NULL,
+  author_mode TEXT NOT NULL DEFAULT 'initials',     -- 'full' | 'initials' | 'anon'
+  show_photo  INTEGER NOT NULL DEFAULT 0,           -- Profilfoto mitzeigen?
+  published   INTEGER NOT NULL DEFAULT 1,           -- vom Fahrlehrer sichtbar geschaltet
+  reply       TEXT,                                 -- optionale Antwort des Fahrlehrers
+  author_name TEXT,                                 -- Schnappschuss des Anzeigenamens
+  created_at  TEXT NOT NULL
+);`);
+db.exec('CREATE INDEX IF NOT EXISTS idx_reviews_pub ON reviews(published, created_at)');
 ensureColumn('bookings', 'attended', 'attended INTEGER');            // 1 = da, 0 = nicht erschienen, NULL = offen
 ensureColumn('bookings', 'late_minutes', 'late_minutes INTEGER NOT NULL DEFAULT 0');
 ensureColumn('bookings', 'reason', 'reason TEXT');

@@ -405,8 +405,13 @@ function openTour() {
 window.__openTour = openTour;
 
 // ---------- Was ist neu? (Changelog) ----------
-const CHANGELOG_VER = '3.50';
+const CHANGELOG_VER = '3.51';
 const CHANGELOG = [
+  { v: '3.51', d: '20.08.2026', title: 'Bewertungen & Empfehlungen', items: [
+    '⭐ Fahrschüler können eine Bewertung abgeben – mit Sternen, freiem Text und wahlweise vollem Namen, abgekürzt (Lena M.) oder anonym, optional mit Profilfoto.',
+    '🎉 Nach bestandener Prüfung wird man freundlich um eine Bewertung gebeten – die Akte bleibt erhalten, nichts wird gelöscht.',
+    '↔️ Auf der Startseite laufen die Empfehlungen als Laufschrift durch – echte Stimmen zur Fahrschule Untern Buchen (Eberswalde).',
+    '🛠️ Der Fahrlehrer moderiert alles (sichtbar/verbergen, antworten, löschen) im neuen Bereich „Bewertungen".'] },
   { v: '3.50', d: '20.08.2026', title: 'Fließender Tagesplan – lückenlos', items: [
     '🔄 Der Tag fließt: die Startzeit der nächsten Fahrstunde wächst automatisch mit der Dauer der vorigen (40/80/120 Min) – plus 15 Min Pause und deiner Abholzeit. So bleibt alles lückenlos.',
     '🚗 Abholzeit je Fahrschüler: trag beim Schüler ein, wie lange die Fahrt dorthin dauert (z. B. Groß Schönebeck = 30 Min) – sie wird vor jeder Stunde eingerechnet.',
@@ -711,6 +716,7 @@ const INSTR_NAV = [
   ['__group', 'Planung'],
   ['arbeitszeiten', '🕒', 'Arbeitszeiten'], ['theorie', '📚', 'Theorie'],
   ['__group', 'System'],
+  ['bewertungen', '⭐', 'Bewertungen'],
   ['protokoll', '📋', 'Protokoll'], ['einstellungen', '⚙️', 'Einstellungen'],
 ];
 const STUDENT_NAV = [
@@ -719,6 +725,7 @@ const STUDENT_NAV = [
   ['lessons-card', '📖', 'Meine Fahrstunden'],
   ['__group', 'Mehr'],
   ['notif-card', '🔔', 'Mitteilungen'], ['offers-card', '🎁', 'Angebote'],
+  ['review-card', '⭐', 'Bewertung'],
 ];
 // Flache Liste (mit '__group'-Markern) -> gruppierte Kacheln
 function edgeTilesHTML(items, attr) {
@@ -842,6 +849,7 @@ function renderAuth() {
         <div id="authbody"></div>
       </div>
       <div class="center"><button class="ghost sm" onclick="window.__openThemePicker()">🎨 Aussehen</button></div>
+      ${mode !== 'admin' ? '<div class="rev-marquee" id="rev-marquee" hidden></div>' : ''}
     </div></div>`;
     app.querySelectorAll('.tabs button').forEach((b) => b.onclick = () => { tab = b.dataset.t; draw(); });
     const body = $('#authbody');
@@ -849,8 +857,29 @@ function renderAuth() {
     else if (tab === 'register') body.innerHTML = registerForm();
     else body.innerHTML = instrForm();
     wireAuth(tab);
+    if (mode !== 'admin') loadReviewMarquee();
   };
   draw();
+}
+
+// Bewertungen als Laufschrift (rechts -> links) auf der Startseite.
+async function loadReviewMarquee() {
+  const el = $('#rev-marquee');
+  if (!el) return;
+  let reviews = [];
+  try { reviews = (await api('/api/reviews')).reviews || []; } catch { return; }
+  if (!reviews.length) return;
+  const stars = (n) => '★★★★★'.slice(0, n) + '☆☆☆☆☆'.slice(0, 5 - n);
+  const card = (r) => `<div class="rev-card">
+    <div class="rev-stars">${stars(r.rating)}</div>
+    <div class="rev-text">„${esc(r.text)}"</div>
+    <div class="rev-who">${r.photo ? `<img class="rev-pic" src="${esc(r.photo)}" alt="">` : '<span class="rev-pic ph">🙂</span>'}<span>${esc(r.author)}</span></div>
+  </div>`;
+  // Inhalt doppelt fuer nahtlose Endlosschleife
+  const items = reviews.map(card).join('');
+  el.innerHTML = `<div class="rev-title">Das sagen Fahrschüler über Ginoco &amp; die Fahrschule Untern Buchen (Eberswalde)</div>
+    <div class="rev-track" style="--rev-n:${reviews.length}">${items}${items}</div>`;
+  el.hidden = false;
 }
 
 const errBox = () => `<div class="err hidden" id="autherr"></div>`;
@@ -931,6 +960,7 @@ async function renderStudent() {
     <div class="card hidden" id="profile-card"></div>
     <div class="card" id="week-card"></div>
     <div class="card hidden" id="lessons-card"></div>
+    <div class="card hidden" id="review-card"></div>
     <div class="card hidden" id="offers-card"></div>
     <div class="card">
       <h2>Termin buchen <span class="sub" id="horizon-note"></span></h2>
@@ -983,6 +1013,7 @@ async function syncStudent() {
     refreshStudentLive();
     renderWeekCard(mine.weekInfo, mine.bookings, mine.progress);
     renderMyLessons(mine.bookings);
+    renderReviewCard(mine.progress);
     { const hn = $('#horizon-note'); if (hn && mine.progress) hn.textContent = `(bis ${mine.progress.horizon} Tage im Voraus · Rang ${mine.progress.rank})`; }
     renderOffers(off.offers, mine.weekInfo);
     state.lastSlotStart = day.slots.length ? day.slots[day.slots.length - 1].start : null;
@@ -1038,6 +1069,70 @@ function renderMyLessons(bookings) {
       <tbody>${rows}</tbody>
     </table></div>`;
   const pb = $('#ml-print'); if (pb) pb.onclick = () => printLessonProof(state.user?.name || 'Fahrschüler', done);
+}
+
+// ---------- Bewertung abgeben (Schüler) ----------
+const REV_STARS = (n) => '★★★★★'.slice(0, n) + '☆☆☆☆☆'.slice(0, 5 - n);
+async function renderReviewCard(progress) {
+  const card = $('#review-card'); if (!card) return;
+  let data = {};
+  try { data = await api('/api/my/review'); } catch { card.classList.add('hidden'); return; }
+  const r = data.review;
+  const passed = data.passed;
+  card.classList.remove('hidden');
+  const modeLabel = { full: 'mit vollem Namen', initials: 'mit abgekürztem Namen', anon: 'anonym' };
+  const head = passed
+    ? `<div class="rev-pass">🎉 <div><strong>Herzlichen Glückwunsch – bestanden!</strong><br><span>Deine Akte bleibt erhalten. Magst du anderen erzählen, wie deine Ausbildung war?</span></div></div>`
+    : `<p class="hint">Wenn du magst, hinterlass eine Bewertung – sie erscheint als Empfehlung auf der Startseite von Ginoco.</p>`;
+  const body = r
+    ? `<div class="rev-mine">
+        <div class="rev-stars">${REV_STARS(r.rating)}</div>
+        <div class="rev-text">„${esc(r.text)}"</div>
+        <div class="hint" style="margin-top:.4rem">Angezeigt ${modeLabel[r.author_mode] || ''}${r.show_photo ? ' · mit Foto' : ''}${r.published ? '' : ' · wird gerade geprüft'}${r.reply ? '' : ''}</div>
+        ${r.reply ? `<div class="rev-reply">↩︎ <em>${esc(r.reply)}</em></div>` : ''}
+        <button class="sec sm" id="rev-edit" style="margin-top:.6rem">Bewertung bearbeiten</button>
+      </div>`
+    : `<button id="rev-new">⭐ Bewertung schreiben</button>`;
+  card.innerHTML = `<h2>⭐ Bewertung</h2>${head}${body}`;
+  const open = () => openReviewModal(r, !!data.hasPhoto);
+  const n = $('#rev-new'); if (n) n.onclick = open;
+  const e = $('#rev-edit'); if (e) e.onclick = open;
+}
+function openReviewModal(existing, hasPhoto) {
+  const cur = existing || { rating: 5, text: '', author_mode: 'initials', show_photo: 0 };
+  const starBtns = [1, 2, 3, 4, 5].map((i) => `<button type="button" class="rev-star" data-v="${i}">★</button>`).join('');
+  const opt = (v, l) => `<label class="rev-opt"><input type="radio" name="rev-mode" value="${v}" ${cur.author_mode === v ? 'checked' : ''}> ${l}</label>`;
+  modal(`<h3>${existing ? 'Bewertung bearbeiten' : 'Deine Bewertung'}</h3>
+    ${errBox()}
+    <div class="field"><label>Wie zufrieden warst du?</label>
+      <div class="rev-starpick" id="rev-starpick" data-v="${cur.rating}">${starBtns}</div></div>
+    <div class="field"><label>Deine Worte</label>
+      <textarea id="rev-text" rows="4" maxlength="800" placeholder="z. B. Super Fahrlehrer, sehr geduldig, hält sich an alles – Fahrschule Untern Buchen in Eberswalde. Klare Empfehlung!" style="resize:vertical">${esc(cur.text || '')}</textarea></div>
+    <div class="field"><label>Wie soll dein Name erscheinen?</label>
+      <div class="rev-opts">${opt('full', 'Voller Name')}${opt('initials', 'Abgekürzt (z. B. Lena M.)')}${opt('anon', 'Anonym')}</div></div>
+    ${hasPhoto ? `<label class="ck-line" id="rev-photo-line"><input type="checkbox" id="rev-photo" ${cur.show_photo ? 'checked' : ''}> Mein Profilfoto mit anzeigen</label>` : '<div class="hint">Tipp: Lade in deinem Profil (👤) ein Foto hoch, dann kannst du es mit anzeigen.</div>'}
+    <div class="actions">
+      <button class="sec" onclick="window.__closeModal()">Abbrechen</button>
+      <button id="rev-save">${existing ? 'Aktualisieren' : 'Bewertung abschicken'}</button>
+    </div>`);
+  const pick = $('#rev-starpick');
+  const paint = () => { const v = Number(pick.dataset.v); pick.querySelectorAll('.rev-star').forEach((b) => b.classList.toggle('on', Number(b.dataset.v) <= v)); };
+  pick.querySelectorAll('.rev-star').forEach((b) => b.onclick = () => { pick.dataset.v = b.dataset.v; paint(); });
+  paint();
+  // Anonym -> Foto ausgrauen
+  const syncPhoto = () => { const m = document.querySelector('input[name="rev-mode"]:checked')?.value; const ph = $('#rev-photo'); if (ph) { ph.disabled = m === 'anon'; if (m === 'anon') ph.checked = false; } };
+  document.querySelectorAll('input[name="rev-mode"]').forEach((el) => el.onchange = syncPhoto);
+  syncPhoto();
+  $('#rev-save').onclick = async () => {
+    const body = {
+      rating: Number(pick.dataset.v) || 5,
+      text: $('#rev-text').value.trim(),
+      author_mode: document.querySelector('input[name="rev-mode"]:checked')?.value || 'initials',
+      show_photo: $('#rev-photo') ? $('#rev-photo').checked : false,
+    };
+    try { await api('/api/my/review', { method: 'POST', body }); closeModal(); toast('Danke für deine Bewertung ✓', 'ok'); syncStudent(); }
+    catch (e) { showErr(e.message); }
+  };
 }
 // Druckbarer Fahrstunden-Nachweis (Tabelle + Unterschriften)
 function printLessonProof(name, done) {
@@ -1877,8 +1972,60 @@ function drawInstrTab() {
   if (t === 'schueler') return tabSchueler();
   if (t === 'theorie') return tabTheorie();
   if (t === 'arbeitszeiten') return tabArbeitszeiten();
+  if (t === 'bewertungen') return tabBewertungen();
   if (t === 'protokoll') return tabProtokoll();
   if (t === 'einstellungen') return tabEinstellungen();
+}
+
+// ---- Tab: Bewertungen (Moderation) ----
+async function tabBewertungen() {
+  const box = $('#itab');
+  box.innerHTML = '<div class="card"><h2>⭐ Bewertungen</h2><p class="hint">Lädt…</p></div>';
+  let reviews = [];
+  try { reviews = (await api('/api/instructor/reviews')).reviews || []; } catch (e) { box.innerHTML = `<div class="card"><p class="err">${esc(e.message)}</p></div>`; return; }
+  const stars = (n) => '★★★★★'.slice(0, n) + '☆☆☆☆☆'.slice(0, 5 - n);
+  const modeL = { full: 'voller Name', initials: 'abgekürzt', anon: 'anonym' };
+  const rows = reviews.map((r) => `<div class="rev-mod ${r.published ? '' : 'hidden-rev'}">
+    <div class="rev-mod-top">
+      <span class="rev-stars">${stars(r.rating)}</span>
+      <span class="pill">${esc(r.author_name || 'Ein Fahrschüler')}</span>
+      <span class="hint">${modeL[r.author_mode] || ''}${r.show_photo ? ' · Foto' : ''} · ${r.created_at ? r.created_at.slice(0, 10) : ''}${r.archived_at ? ' · bestanden' : ''}</span>
+      <span style="margin-left:auto">${r.published ? '<span class="tag g">sichtbar</span>' : '<span class="tag x">verborgen</span>'}</span>
+    </div>
+    <div class="rev-text">„${esc(r.text)}"</div>
+    ${r.reply ? `<div class="rev-reply">↩︎ <em>${esc(r.reply)}</em></div>` : ''}
+    <div class="inline" style="margin-top:.5rem;flex-wrap:wrap">
+      <button class="sec sm" data-pub="${r.id}" data-to="${r.published ? 0 : 1}">${r.published ? '🙈 Verbergen' : '👁️ Sichtbar machen'}</button>
+      <button class="ghost sm" data-reply="${r.id}">↩︎ Antworten</button>
+      <button class="danger sm" data-del="${r.id}">Löschen</button>
+    </div>
+  </div>`).join('');
+  box.innerHTML = `<div class="card">
+    <h2>⭐ Bewertungen <span class="sub">${reviews.length} gesamt · ${reviews.filter((r) => r.published).length} sichtbar</span></h2>
+    <p class="hint">Sichtbare Bewertungen laufen auf der Startseite als Empfehlung durch. Du kannst jede verbergen, beantworten oder löschen. Bewertungen bleiben dauerhaft erhalten – auch nach bestandener Prüfung.</p>
+    ${reviews.length ? rows : '<p class="hint">Noch keine Bewertungen. Deine Fahrschüler können in ihrem Portal unter „⭐ Bewertung" eine abgeben (z. B. nach bestandener Prüfung).</p>'}
+  </div>`;
+  box.querySelectorAll('[data-pub]').forEach((b) => b.onclick = async () => {
+    try { await api('/api/instructor/reviews/' + b.dataset.pub, { method: 'PATCH', body: { published: Number(b.dataset.to) } }); tabBewertungen(); }
+    catch (e) { toast(e.message, 'err'); }
+  });
+  box.querySelectorAll('[data-del]').forEach((b) => b.onclick = async () => {
+    if (!confirm('Diese Bewertung wirklich dauerhaft löschen?')) return;
+    try { await api('/api/instructor/reviews/' + b.dataset.del, { method: 'DELETE' }); toast('Gelöscht', 'ok'); tabBewertungen(); }
+    catch (e) { toast(e.message, 'err'); }
+  });
+  box.querySelectorAll('[data-reply]').forEach((b) => b.onclick = () => {
+    const r = reviews.find((x) => x.id === Number(b.dataset.reply));
+    modal(`<h3>Auf Bewertung antworten</h3>
+      <div class="rev-text">„${esc(r.text)}"</div>
+      <div class="field" style="margin-top:.6rem"><label>Deine Antwort (öffentlich sichtbar)</label>
+        <textarea id="rv-reply" rows="3" style="resize:vertical">${esc(r.reply || '')}</textarea></div>
+      <div class="actions"><button class="sec" onclick="window.__closeModal()">Abbrechen</button><button id="rv-reply-go">Speichern</button></div>`);
+    $('#rv-reply-go').onclick = async () => {
+      try { await api('/api/instructor/reviews/' + r.id, { method: 'PATCH', body: { reply: $('#rv-reply').value } }); closeModal(); toast('Antwort gespeichert ✓', 'ok'); tabBewertungen(); }
+      catch (e) { toast(e.message, 'err'); }
+    };
+  });
 }
 
 // ---- Tab: Heute & Ziele (Tacho) ----

@@ -15,7 +15,7 @@ const PUBLIC = join(__dirname, 'public');
 const PORT = Number(process.env.PORT || 3000);
 const HOST = process.env.HOST || '0.0.0.0'; // hinter Caddy: HOST=127.0.0.1 (nur Proxy erreicht Node)
 const SESSION_DAYS = 30;
-const APP_VERSION = "3.50.0";
+const APP_VERSION = "3.51.0";
 // Einstellungen, die Schueler/Oeffentlichkeit sehen duerfen (Rest bleibt beim Fahrlehrer)
 const PUBLIC_SETTINGS = ['instructor_name', 'instructor_phone', 'policy_text',
   'cancel_hours', 'lock_hours', 'booking_horizon_days', 'booking_horizon_days_rank2',
@@ -417,6 +417,21 @@ async function handleApi(req, res, url) {
     return ok(res, { name: 'ginoco', version: APP_VERSION, auth: ['cookie', 'bearer-token'], ok: true });
   }
 
+  // ===== Bewertungen (oeffentlich lesbar – fuer die Laufschrift auf der Startseite) =====
+  if (p === '/api/reviews' && method === 'GET') {
+    const rows = db.prepare(
+      `SELECT r.id, r.rating, r.text, r.author_mode, r.show_photo, r.reply, r.author_name, r.created_at,
+              (CASE WHEN r.show_photo=1 AND s.photo IS NOT NULL THEN s.photo ELSE NULL END) AS photo
+       FROM reviews r LEFT JOIN students s ON s.id = r.student_id
+       WHERE r.published = 1 ORDER BY r.created_at DESC LIMIT 60`).all();
+    const reviews = rows.map((r) => ({
+      id: r.id, rating: r.rating, text: r.text, reply: r.reply || null,
+      author: r.author_name || 'Ein Fahrschüler', photo: r.photo || null,
+      date: r.created_at ? r.created_at.slice(0, 10) : null,
+    }));
+    return ok(res, { reviews });
+  }
+
   // ===== STUDENT: Slots ansehen & buchen =====
   if (p === '/api/slots' && method === 'GET') {
     if (!requireStudent() && !requireInstructor()) return bad(res, 'Bitte anmelden', 401);
@@ -477,6 +492,36 @@ async function handleApi(req, res, url) {
     ).all(sess.student_id);
     return ok(res, { bookings: rows, weekInfo: weekInfoForStudent(sess.student_id),
       progress: { ...studentRank(sess.student_id), sonder: sonderCounts(sess.student_id), req: sonderReq() } });
+  }
+
+  // Eigene Bewertung ansehen / abgeben (ein Eintrag je Schueler – wird ueberschrieben)
+  if (p === '/api/my/review' && method === 'GET') {
+    if (!requireStudent()) return bad(res, 'Bitte anmelden', 401);
+    const r = db.prepare('SELECT id,rating,text,author_mode,show_photo,published,reply,created_at FROM reviews WHERE student_id = ?').get(sess.student_id) || null;
+    const st = db.prepare('SELECT archived_at,(photo IS NOT NULL) AS has_photo FROM students WHERE id = ?').get(sess.student_id) || {};
+    return ok(res, { review: r, passed: !!st.archived_at, hasPhoto: !!st.has_photo });
+  }
+  if (p === '/api/my/review' && method === 'POST') {
+    if (!requireStudent()) return bad(res, 'Bitte anmelden', 401);
+    const b = await readBody(req);
+    const text = String(b.text || '').trim();
+    if (text.length < 5) return bad(res, 'Bitte schreib ein paar Worte (mind. 5 Zeichen).');
+    if (text.length > 800) return bad(res, 'Bitte fasse dich etwas kürzer (max. 800 Zeichen).');
+    const rating = Math.max(1, Math.min(5, Math.round(Number(b.rating) || 5)));
+    const mode = ['full', 'initials', 'anon'].includes(b.author_mode) ? b.author_mode : 'initials';
+    const showPhoto = (mode !== 'anon' && (b.show_photo === true || b.show_photo === 1 || b.show_photo === '1')) ? 1 : 0;
+    const st = db.prepare('SELECT id,name,first_name,last_name FROM students WHERE id = ?').get(sess.student_id);
+    const authorName = reviewAuthorName(st, mode);
+    const existing = db.prepare('SELECT id FROM reviews WHERE student_id = ?').get(sess.student_id);
+    if (existing) {
+      db.prepare('UPDATE reviews SET rating=?, text=?, author_mode=?, show_photo=?, author_name=?, published=1 WHERE id=?')
+        .run(rating, text, mode, showPhoto, authorName, existing.id);
+    } else {
+      db.prepare('INSERT INTO reviews(student_id,rating,text,author_mode,show_photo,author_name,published,created_at) VALUES(?,?,?,?,?,?,1,?)')
+        .run(sess.student_id, rating, text, mode, showPhoto, authorName, new Date().toISOString());
+    }
+    logEvent('info', { actor: 'student', studentId: sess.student_id, detail: `Bewertung abgegeben (${rating}★)` });
+    return ok(res, { saved: true });
   }
 
   // Abwesenheit des Fahrlehrers (Urlaub / freie Tage) – nur fuer eingeloggte Nutzer
@@ -1110,6 +1155,34 @@ async function handleApi(req, res, url) {
     return ok(res, { moved, days: dates.length });
   }
 
+  // -- Bewertungen: Moderation durch den Fahrlehrer --
+  if (p === '/api/instructor/reviews' && method === 'GET') {
+    if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
+    const rows = db.prepare(
+      `SELECT r.*, s.name AS student_name, s.archived_at
+       FROM reviews r LEFT JOIN students s ON s.id = r.student_id
+       ORDER BY r.created_at DESC`).all();
+    return ok(res, { reviews: rows });
+  }
+  const rvm = p.match(/^\/api\/instructor\/reviews\/(\d+)$/);
+  if (rvm && method === 'PATCH') {
+    if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
+    const id = Number(rvm[1]);
+    const b = await readBody(req);
+    const fields = [], vals = [];
+    if ('published' in b) { fields.push('published=?'); vals.push(b.published ? 1 : 0); }
+    if ('reply' in b) { fields.push('reply=?'); vals.push(b.reply ? String(b.reply).trim() : null); }
+    if (!fields.length) return bad(res, 'Nichts zu aendern');
+    vals.push(id);
+    db.prepare(`UPDATE reviews SET ${fields.join(', ')} WHERE id=?`).run(...vals);
+    return ok(res, { updated: true });
+  }
+  if (rvm && method === 'DELETE') {
+    if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
+    db.prepare('DELETE FROM reviews WHERE id=?').run(Number(rvm[1]));
+    return ok(res, { deleted: true });
+  }
+
   // -- Codes --
   if (p === '/api/codes' && method === 'GET') {
     if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
@@ -1366,6 +1439,8 @@ async function handleApi(req, res, url) {
     const st = db.prepare('SELECT id,name,username FROM students WHERE id = ?').get(sid);
     if (!st) return bad(res, 'Schüler nicht gefunden', 404);
     db.prepare('DELETE FROM bookings WHERE student_id = ?').run(sid);
+    // Bewertung bleibt dauerhaft erhalten – nur die Verknuepfung wird geloest (Foto entfaellt dann).
+    db.prepare('UPDATE reviews SET student_id = NULL, show_photo = 0 WHERE student_id = ?').run(sid);
     db.prepare('DELETE FROM students WHERE id = ?').run(sid);
     logEvent('info', { actor: 'instructor', detail: `Fahrschüler gelöscht (${st.username || st.name})` });
     return ok(res, { deleted: true });
@@ -1535,6 +1610,16 @@ function splitName(name) {
   const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
   if (parts.length <= 1) return { first: parts[0] || '', last: '' };
   return { first: parts.slice(0, -1).join(' '), last: parts[parts.length - 1] };
+}
+// Anzeigename einer Bewertung je nach gewaehltem Modus (Schnappschuss beim Absenden).
+function reviewAuthorName(student, mode) {
+  const first = (student?.first_name || splitName(student?.name).first || '').trim();
+  const last = (student?.last_name || splitName(student?.name).last || '').trim();
+  if (mode === 'anon') return 'Anonym';
+  if (mode === 'full') return combineName(first, last) || (student?.name || 'Ein Fahrschüler');
+  // 'initials' (Standard): Vorname + erster Buchstabe des Nachnamens
+  const li = last ? ` ${last[0].toUpperCase()}.` : '';
+  return (first || (student?.name || 'Ein Fahrschüler')) + li;
 }
 function genUsername(name, year) {
   const parts = name.split(/\s+/).filter(Boolean);

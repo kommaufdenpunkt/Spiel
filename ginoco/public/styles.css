@@ -820,3 +820,41 @@ body:has(.fp-overlay) .pwa-install{display:none}
 .today-strip .ts-item span{font-size:.76rem;color:var(--muted)}
 .today-strip .ts-item.accent{background:linear-gradient(135deg,rgba(77,141,255,.18),rgba(77,141,255,.05));border-color:var(--booked-b)}
 .today-strip .ts-item.accent b{color:var(--brand)}
+
+/* ===== Bewertungen / Testimonials ===== */
+/* Laufschrift auf der Startseite (rechts -> links) */
+.rev-marquee{margin:1.4rem auto 0;max-width:760px;overflow:hidden;
+  -webkit-mask-image:linear-gradient(90deg,transparent,#000 8%,#000 92%,transparent);
+  mask-image:linear-gradient(90deg,transparent,#000 8%,#000 92%,transparent)}
+.rev-marquee .rev-title{text-align:center;font-size:.8rem;color:var(--muted);margin-bottom:.7rem;font-weight:600}
+.rev-track{display:flex;gap:.8rem;width:max-content;animation:revscroll calc(var(--rev-n,4) * 9s) linear infinite}
+.rev-marquee:hover .rev-track{animation-play-state:paused}
+@keyframes revscroll{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+@media (prefers-reduced-motion: reduce){.rev-track{animation:none;flex-wrap:wrap;width:auto;justify-content:center}}
+.rev-card{flex:0 0 auto;width:240px;background:var(--card2);border:1px solid var(--line);
+  border-radius:14px;padding:.8rem .9rem;box-shadow:var(--shadow)}
+.rev-stars{color:#f5b301;letter-spacing:1px;font-size:.95rem;line-height:1}
+.rev-card .rev-text{font-size:.86rem;color:var(--ink);margin:.45rem 0 .5rem;line-height:1.35;
+  display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
+.rev-who{display:flex;align-items:center;gap:.45rem;font-size:.8rem;color:var(--muted);font-weight:600}
+.rev-pic{width:26px;height:26px;border-radius:50%;object-fit:cover;border:1px solid var(--line);
+  display:inline-flex;align-items:center;justify-content:center;background:var(--card);font-size:.9rem}
+.rev-pic.ph{color:var(--muted)}
+/* Schüler-Karte */
+.rev-pass{display:flex;gap:.6rem;align-items:flex-start;background:var(--good-bg);border:1px solid var(--good-b);
+  border-radius:12px;padding:.7rem .8rem;margin:.2rem 0 .7rem;font-size:.9rem}
+.rev-pass span{color:var(--muted)}
+.rev-mine{background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:.7rem .8rem}
+.rev-mine .rev-text,.rev-mod .rev-text{font-size:.9rem;color:var(--ink);line-height:1.4;margin-top:.3rem}
+.rev-reply{margin-top:.5rem;padding:.4rem .6rem;border-left:3px solid var(--brand);background:var(--card);
+  border-radius:0 8px 8px 0;font-size:.85rem;color:var(--muted)}
+/* Sterne-Auswahl im Modal */
+.rev-starpick{display:flex;gap:.2rem}
+.rev-star{background:none;border:none;font-size:1.9rem;line-height:1;color:var(--line);cursor:pointer;padding:0 .1rem}
+.rev-star.on{color:#f5b301}
+.rev-opts{display:flex;flex-direction:column;gap:.35rem}
+.rev-opt{display:flex;align-items:center;gap:.5rem;font-size:.9rem;color:var(--ink)}
+/* Moderation (Fahrlehrer) */
+.rev-mod{border:1px solid var(--line);border-radius:12px;padding:.7rem .8rem;margin-bottom:.7rem;background:var(--card2)}
+.rev-mod.hidden-rev{opacity:.6}
+.rev-mod-top{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap}
