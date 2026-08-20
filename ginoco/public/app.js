@@ -1012,12 +1012,12 @@ function renderMyLessons(bookings) {
     const entryDate = b.created_at ? String(b.created_at).slice(0, 10) : null;
     const nachgetragen = entryDate && entryDate !== b.date;
     return `<tr class="${noshow ? 'ml-noshow' : ''}">
-      <td class="ml-when"><strong>${fmtDT(b.date, b.start_time)}</strong>${nachgetragen ? `<span class="ml-entry">nachgetragen · eingetragen ${fmtDT(entryDate)}</span>` : ''}</td>
-      <td>${noshow ? '—' : 'bis ' + addMinHHMM(b.start_time, b.duration_min)}</td>
-      <td>${noshow ? '🚫 nicht da' : (b.duration_min + ' Min')}</td>
-      <td>${noshow ? '' : lessonTypeLabel(b.lesson_type)}</td>
-      <td>${late ? `⏱️ ${late} Min` : ''}</td>
-      <td class="ml-note">${b.feedback ? esc(b.feedback) : ''}</td>
+      <td class="ml-when" data-label="Wann"><strong>${fmtDT(b.date, b.start_time)}</strong>${nachgetragen ? `<span class="ml-entry">nachgetragen · eingetragen ${fmtDT(entryDate)}</span>` : ''}</td>
+      <td data-label="Ende">${noshow ? '—' : 'bis ' + addMinHHMM(b.start_time, b.duration_min)}</td>
+      <td data-label="Dauer">${noshow ? '🚫 nicht da' : (b.duration_min + ' Min')}</td>
+      <td data-label="Art">${noshow ? '' : lessonTypeLabel(b.lesson_type)}</td>
+      <td data-label="Verspätung">${late ? `⏱️ ${late} Min` : ''}</td>
+      <td class="ml-note" data-label="Vermerk">${b.feedback ? esc(b.feedback) : ''}</td>
     </tr>`;
   }).join('');
   card.innerHTML = `<h2>📖 Meine Fahrstunden</h2>

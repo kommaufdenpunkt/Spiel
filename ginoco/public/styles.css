@@ -500,6 +500,22 @@ th{color:var(--muted);font-weight:600;font-size:.78rem;text-transform:uppercase;
 .ml-entry{display:block;font-size:.72rem;color:var(--warn);margin-top:.15rem}
 .ml-note{color:var(--muted);max-width:260px}
 .ml-noshow td{opacity:.7}
+/* Am Handy: keine seitliche Tabelle – jede Fahrstunde als Karte, alles untereinander */
+@media(max-width:560px){
+  .ml-wrap{overflow:visible;border:none;border-radius:0}
+  .ml-table{min-width:0}
+  .ml-table thead{display:none}
+  .ml-table,.ml-table tbody{display:block}
+  .ml-table tr{display:block;border:1px solid var(--line);border-radius:14px;background:var(--card2);
+    padding:.6rem .8rem;margin-bottom:.55rem}
+  .ml-table tr:nth-child(even) td{background:none}
+  .ml-table td{display:flex;gap:.6rem;border:none;padding:.18rem 0;font-size:.92rem}
+  .ml-table td:empty{display:none}
+  .ml-table td::before{content:attr(data-label);color:var(--muted);font-size:.7rem;text-transform:uppercase;
+    letter-spacing:.03em;min-width:92px;flex:0 0 auto;padding-top:.15rem}
+  .ml-table td.ml-when{padding-bottom:.3rem}
+  .ml-note{max-width:none}
+}
 .pickup-box{background:var(--card2);border:1px solid var(--line);border-radius:12px;
   padding:.75rem .85rem;margin:.7rem 0}
 .pickup-box .pb-line{font-size:.95rem}
