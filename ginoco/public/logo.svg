@@ -1,27 +1,36 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="-8 -8 116 116" fill="none" role="img" aria-label="Ginoco">
   <defs>
-    <linearGradient id="gc" x1="6" y1="94" x2="94" y2="6" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#f4600c"/>
-      <stop offset="0.5" stop-color="#f7920f"/>
-      <stop offset="1" stop-color="#f8cf12"/>
+    <linearGradient id="gc" x1="6" y1="96" x2="92" y2="8" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#e9530a"/>
+      <stop offset="0.32" stop-color="#f6890d"/>
+      <stop offset="0.62" stop-color="#ffc21a"/>
+      <stop offset="0.85" stop-color="#ffe27a"/>
+      <stop offset="1" stop-color="#f7c40f"/>
+    </linearGradient>
+    <linearGradient id="gsheen" x1="20" y1="6" x2="55" y2="45" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fff6da" stop-opacity="0.85"/>
+      <stop offset="1" stop-color="#fff6da" stop-opacity="0"/>
     </linearGradient>
   </defs>
-  <!-- Lenkrad-Ring (dick), oben rechts offen fuer den Speedo -->
+  <!-- Lenkrad-Ring (dick), oben rechts offen -->
   <path d="M87.6 36.3 A40 40 0 1 1 64.98 12.9" stroke="url(#gc)" stroke-width="14" stroke-linecap="round" fill="none"/>
-  <!-- Nabe (Donut) -->
+  <!-- Nabe -->
   <circle cx="50" cy="50" r="10" stroke="url(#gc)" stroke-width="10" fill="none"/>
-  <!-- Speichen: links, rechts, unten -->
+  <!-- Speichen -->
   <g stroke="url(#gc)" stroke-width="13" stroke-linecap="round">
     <line x1="35" y1="50" x2="17" y2="50"/>
     <line x1="65" y1="50" x2="83" y2="50"/>
     <line x1="50" y1="65" x2="50" y2="83"/>
   </g>
-  <!-- Speedo-Nadel nach oben rechts -->
+  <!-- Speedo-Nadel -->
   <polygon points="62.1,44.2 78.9,13 52.7,36.8" fill="url(#gc)"/>
-  <!-- 3 Speedo-Ticks -->
+  <!-- Speedo-Ticks -->
   <g stroke="url(#gc)" stroke-width="6" stroke-linecap="round">
     <line x1="73.9" y1="11.8" x2="78.1" y2="5.1"/>
     <line x1="82.4" y1="18.7" x2="88.1" y2="13.2"/>
     <line x1="89" y1="27.5" x2="95.9" y2="23.5"/>
   </g>
+  <!-- Glanz: Lichtkante oben links auf dem Ring + Highlight auf der Nabe -->
+  <path d="M56.9 10.6 A40 40 0 0 0 12.4 36.3" stroke="url(#gsheen)" stroke-width="4.5" stroke-linecap="round" fill="none"/>
+  <path d="M44.5 43 A10 10 0 0 1 50 40.2" stroke="#fff6da" stroke-opacity="0.7" stroke-width="2.4" stroke-linecap="round" fill="none"/>
 </svg>
