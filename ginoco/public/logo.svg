@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none" role="img" aria-label="Ginoco">
+  <defs>
+    <linearGradient id="gc" x1="16" y1="86" x2="86" y2="14" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ef6a12"/>
+      <stop offset="0.55" stop-color="#f59a1c"/>
+      <stop offset="1" stop-color="#f5c518"/>
+    </linearGradient>
+  </defs>
+  <g stroke="url(#gc)" stroke-width="10" stroke-linecap="round" fill="none">
+    <circle cx="50" cy="50" r="38"/>
+    <circle cx="50" cy="50" r="9" stroke-width="9"/>
+    <line x1="50" y1="64" x2="50" y2="83"/>
+    <line x1="37.9" y1="57" x2="21.4" y2="66.5"/>
+    <line x1="62.1" y1="57" x2="78.6" y2="66.5"/>
+  </g>
+  <line x1="52" y1="48" x2="74" y2="29" stroke="url(#gc)" stroke-width="6.5" stroke-linecap="round"/>
+</svg>

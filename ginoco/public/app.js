@@ -408,8 +408,11 @@ function openTour() {
 window.__openTour = openTour;
 
 // ---------- Was ist neu? (Changelog) ----------
-const CHANGELOG_VER = '3.56';
+const CHANGELOG_VER = '3.57';
 const CHANGELOG = [
+  { v: '3.57', d: '20.08.2026', title: 'Neues Ginoco-Logo & Schriftzug', items: [
+    '🎨 Beim Öffnen begrüßt dich jetzt das Ginoco-Lenkrad-Emblem in Orange-Gelb und ein klarer „ginoco"-Schriftzug.',
+    '✨ Auch oben in der Kopfzeile: Emblem + Schriftzug im Marken-Look.'] },
   { v: '3.56', d: '20.08.2026', title: 'Handy-Benachrichtigungen (Push)', items: [
     '🔔 Echte Push-Nachrichten aufs Handy – auch wenn die App zu ist: Erinnerungen, Verschiebungen, Absagen, Angebote.',
     '👉 Einschalten unter „🔔 Mitteilungen" → „Benachrichtigungen einschalten" (einmal erlauben). Mit Test-Knopf.',
@@ -705,7 +708,7 @@ function render() {
 function header() {
   const u = state.user;
   return `<header>
-    <div class="brand"><span class="logo">🚗</span> ginoco</div>
+    <div class="brand"><img class="logo" src="/logo.svg" alt="" width="24" height="24" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'logo',textContent:'🚗'}))"> <span class="brandname">ginoco</span></div>
     <div class="who">
       <span class="role">${u.role === 'instructor' ? 'Fahrlehrer' : 'Fahrschüler'}</span>
       <strong>${esc(u.name || '')}</strong>${u.username ? `<span class="pill">${esc(u.username)}</span>` : ''}
@@ -853,7 +856,7 @@ function renderAuth() {
   const draw = () => {
     app.innerHTML = `<div class="auth-wrap"><div class="auth">
       <div class="auth-hero">
-        <div class="auth-logo"><span>🚗</span></div>
+        <div class="auth-logo"><img src="/logo.svg" alt="Ginoco" width="70" height="70" onerror="this.replaceWith(Object.assign(document.createElement('span'),{textContent:'🚗'}))"></div>
         <h1 class="auth-name">ginoco</h1>
         <div class="tag">${tagline}</div>
       </div>
