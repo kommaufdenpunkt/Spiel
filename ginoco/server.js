@@ -15,7 +15,7 @@ const PUBLIC = join(__dirname, 'public');
 const PORT = Number(process.env.PORT || 3000);
 const HOST = process.env.HOST || '0.0.0.0'; // hinter Caddy: HOST=127.0.0.1 (nur Proxy erreicht Node)
 const SESSION_DAYS = 30;
-const APP_VERSION = "3.52.0";
+const APP_VERSION = "3.53.0";
 // Einstellungen, die Schueler/Oeffentlichkeit sehen duerfen (Rest bleibt beim Fahrlehrer)
 const PUBLIC_SETTINGS = ['instructor_name', 'instructor_phone', 'policy_text',
   'cancel_hours', 'lock_hours', 'booking_horizon_days', 'booking_horizon_days_rank2',
@@ -412,6 +412,24 @@ async function handleApi(req, res, url) {
     noteLoginOk(req);
     const token = createSession(res, 'student', st.id, isHttps(req));
     return ok(res, { role: 'student', id: st.id, name: st.name, token });
+  }
+
+  // "Passwort vergessen": Anfrage landet beim Fahrlehrer (der setzt ein neues und teilt es mit).
+  // Antwortet immer generisch – keine Konto-Enumeration.
+  if (p === '/api/auth/reset-request' && method === 'POST') {
+    const b = await readBody(req);
+    const handle = String(b.login || b.email || '').trim();
+    if (handle) {
+      const st = db.prepare('SELECT id,name,username FROM students WHERE username = ? COLLATE NOCASE OR email = ?').get(handle, handle.toLowerCase());
+      if (st) {
+        // Doppelte Anfragen innerhalb von 30 Min nicht mehrfach protokollieren
+        const recent = db.prepare("SELECT 1 FROM events WHERE type='reset' AND student_id=? AND at > ?")
+          .get(st.id, new Date(Date.now() - 30 * 60000).toISOString());
+        if (!recent) logEvent('reset', { actor: 'student', studentId: st.id,
+          detail: `${st.name} hat „Passwort vergessen" angefragt (Login ${st.username || '?'}). Bitte ein neues Passwort setzen und mitteilen.` });
+      }
+    }
+    return ok(res, { requested: true });
   }
 
   // ===== Einstellungen: Fahrlehrer sieht alles, andere nur eine unbedenkliche Teilmenge =====

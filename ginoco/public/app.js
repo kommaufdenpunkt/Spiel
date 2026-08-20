@@ -405,8 +405,11 @@ function openTour() {
 window.__openTour = openTour;
 
 // ---------- Was ist neu? (Changelog) ----------
-const CHANGELOG_VER = '3.52';
+const CHANGELOG_VER = '3.53';
 const CHANGELOG = [
+  { v: '3.53', d: '20.08.2026', title: 'Passwort vergessen', items: [
+    '🔑 Fahrschüler können ein neues Passwort anfordern – die Anfrage landet direkt beim Fahrlehrer (im Protokoll), der es neu setzt und mitteilt.',
+    '🔒 Sicher & ohne Konto-Verrat: die Antwort ist immer gleich, egal ob es den Login gibt.'] },
   { v: '3.52', d: '20.08.2026', title: 'Zwei Standorte (Eberswalde + Finow)', items: [
     '📍 Zweiter Standort Finow: die Abholzeit wird automatisch vom näheren Standort gerechnet.',
     '🎛️ Pro Fahrschüler wählbar, ab welchem Standort geschätzt wird (automatisch/Eberswalde/Finow) – plus feste Abholzeit in Minuten.',
@@ -894,7 +897,26 @@ function loginForm() {
     <div class="field"><label>Login-Name oder E-Mail</label><input id="l-email" autocomplete="username" placeholder="z.B. MM1997"></div>
     <div class="field"><label>Passwort</label><input id="l-pw" type="password" autocomplete="current-password"></div>
     <div class="form-actions"><button id="l-go">Anmelden</button></div>
-    <p class="hint" style="margin-top:.6rem">Passwort vergessen? Melde dich bei deinem Fahrlehrer – er setzt dir ein neues.</p>`;
+    <p class="hint" style="margin-top:.6rem">Passwort vergessen? <a href="#" id="l-forgot" class="linklike">Neues anfordern</a> – dein Fahrlehrer setzt dir dann eins.</p>`;
+}
+function openForgotModal() {
+  modal(`<h3>Passwort vergessen</h3>
+    <p class="hint">Gib deinen Login-Namen oder deine E-Mail ein. Dein Fahrlehrer bekommt Bescheid und setzt dir ein neues Passwort – er teilt es dir persönlich mit.</p>
+    ${errBox()}
+    <div class="field"><label>Login-Name oder E-Mail</label><input id="fg-login" autocomplete="username" placeholder="z.B. MM1997"></div>
+    <div class="actions">
+      <button class="sec" onclick="window.__closeModal()">Abbrechen</button>
+      <button id="fg-go">Anfordern</button>
+    </div>`);
+  $('#fg-go').onclick = async () => {
+    const login = $('#fg-login').value.trim();
+    if (!login) { showErr('Bitte Login-Name oder E-Mail eingeben.'); return; }
+    try {
+      await api('/api/auth/reset-request', { method: 'POST', body: { login } });
+      closeModal();
+      toast('Angefragt ✓ – dein Fahrlehrer meldet sich mit einem neuen Passwort.', 'ok');
+    } catch (e) { showErr(e.message); }
+  };
 }
 function registerForm() {
   return `${errBox()}
@@ -930,6 +952,7 @@ function wireAuth(tab) {
         done();
       } catch (e) { showErr(e.message); }
     };
+    const fg = $('#l-forgot'); if (fg) fg.onclick = (ev) => { ev.preventDefault(); openForgotModal(); };
   } else if (tab === 'register') {
     $('#r-go').onclick = async () => {
       const prob = pwProblem($('#r-pw').value);
@@ -3717,6 +3740,7 @@ const EV_META = {
   offer: ['🔄', 'Angeboten'], take: ['✅', 'Übernommen'], shift: ['🕐', 'Verschoben'],
   delay: ['⏱️', 'Verspätung'], done: ['🚗', 'Gefahren'], noshow: ['🚫', 'Nicht erschienen'],
   vacation: ['🌴', 'Urlaub'], reminder: ['🔔', 'Erinnerung'], info: ['ℹ️', 'Info'],
+  reset: ['🔑', 'Passwort vergessen'],
 };
 async function tabProtokoll() {
   const box = $('#itab');
