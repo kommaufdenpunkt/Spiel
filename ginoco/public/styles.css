@@ -886,3 +886,8 @@ body:has(.fp-overlay) .pwa-install{display:none}
 .rev-toptag{color:#f5b301;font-size:.7rem;font-weight:700}
 .rev-verif{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;
   background:var(--good);color:#fff;font-size:.7rem;font-weight:800;margin-left:.15rem}
+
+/* Push-Schalter in den Mitteilungen */
+.push-ctl{display:flex;flex-wrap:wrap;gap:.4rem;align-items:center;background:var(--card2);border:1px solid var(--line);
+  border-radius:12px;padding:.6rem .7rem;margin:.2rem 0 .8rem}
+.push-ctl .hint{width:100%}

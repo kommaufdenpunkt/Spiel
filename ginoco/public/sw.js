@@ -42,3 +42,24 @@ self.addEventListener('fetch', (e) => {
 
 // Erlaubt der App, ein sofortiges Update anzustoßen (skipWaiting per Nachricht).
 self.addEventListener('message', (e) => { if (e.data === 'skip-waiting') self.skipWaiting(); });
+
+// Handy-Benachrichtigung empfangen -> anzeigen.
+self.addEventListener('push', (e) => {
+  let d = {};
+  try { d = e.data ? e.data.json() : {}; } catch { d = { body: e.data ? e.data.text() : '' }; }
+  const title = d.title || 'Ginoco';
+  e.waitUntil(self.registration.showNotification(title, {
+    body: d.body || '', icon: '/icon-192.png', badge: '/icon-192.png',
+    vibrate: [80, 40, 80], tag: 'ginoco', renotify: true,
+    data: { url: d.url || '/' },
+  }));
+});
+// Tippt der Nutzer auf die Nachricht -> App öffnen/fokussieren.
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close();
+  const url = (e.notification.data && e.notification.data.url) || '/';
+  e.waitUntil(clients.matchAll({ type: 'window', includeUncontrolled: true }).then((cs) => {
+    for (const c of cs) { if ('focus' in c) { c.navigate && c.navigate(url); return c.focus(); } }
+    return clients.openWindow(url);
+  }));
+});

@@ -188,6 +188,18 @@ db.exec(`CREATE TABLE IF NOT EXISTS reviews (
 );`);
 db.exec('CREATE INDEX IF NOT EXISTS idx_reviews_pub ON reviews(published, created_at)');
 ensureColumn('reviews', 'featured', 'featured INTEGER NOT NULL DEFAULT 0'); // vom Fahrlehrer angeheftet -> zuerst
+
+// Web-Push-Abos (Handy-Benachrichtigungen). Ein Gerät = eine Zeile (endpoint eindeutig).
+db.exec(`CREATE TABLE IF NOT EXISTS push_subscriptions (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  student_id INTEGER,
+  kind       TEXT NOT NULL DEFAULT 'student',   -- 'student' | 'instructor'
+  endpoint   TEXT NOT NULL UNIQUE,
+  p256dh     TEXT NOT NULL,
+  auth       TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);`);
+db.exec('CREATE INDEX IF NOT EXISTS idx_push_student ON push_subscriptions(student_id)');
 ensureColumn('bookings', 'attended', 'attended INTEGER');            // 1 = da, 0 = nicht erschienen, NULL = offen
 ensureColumn('bookings', 'late_minutes', 'late_minutes INTEGER NOT NULL DEFAULT 0');
 ensureColumn('bookings', 'reason', 'reason TEXT');

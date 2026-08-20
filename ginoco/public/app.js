@@ -408,8 +408,12 @@ function openTour() {
 window.__openTour = openTour;
 
 // ---------- Was ist neu? (Changelog) ----------
-const CHANGELOG_VER = '3.55';
+const CHANGELOG_VER = '3.56';
 const CHANGELOG = [
+  { v: '3.56', d: '20.08.2026', title: 'Handy-Benachrichtigungen (Push)', items: [
+    '🔔 Echte Push-Nachrichten aufs Handy – auch wenn die App zu ist: Erinnerungen, Verschiebungen, Absagen, Angebote.',
+    '👉 Einschalten unter „🔔 Mitteilungen" → „Benachrichtigungen einschalten" (einmal erlauben). Mit Test-Knopf.',
+    '🔒 Datenschutzfreundlich & ohne fremde Dienste – die Schlüssel erzeugt Ginoco selbst.'] },
   { v: '3.55', d: '20.08.2026', title: 'Untern-Buchen-Look & Bewertungen ausgebaut', items: [
     '🎨 Neues Standard-Design im Look der Fahrschule Untern Buchen (Schwarz + warmes Orange). Jederzeit umstellbar unter 🎨 Aussehen.',
     '⭐ Bewertungen-Bereich stark erweitert: Durchschnitt & Sterne-Verteilung, Filter (Alle/Sichtbar/Verborgen/Top), „⭐ Top" anheften, selbst eintragen, bearbeiten, kopieren.',
@@ -1787,21 +1791,73 @@ function renderAway(away) {
   el.innerHTML = `🌴 <strong>Fahrlehrer im Urlaub:</strong> ${dates} – an diesen Tagen keine Fahrstunden.`;
 }
 
+// ---- Handy-Benachrichtigungen (Web Push) ----
+function urlB64ToUint8(b64) {
+  const pad = '='.repeat((4 - (b64.length % 4)) % 4);
+  const raw = atob((b64 + pad).replace(/-/g, '+').replace(/_/g, '/'));
+  return Uint8Array.from([...raw].map((c) => c.charCodeAt(0)));
+}
+async function pushState() {
+  try {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) return 'unsupported';
+    const reg = await navigator.serviceWorker.ready;
+    return (await reg.pushManager.getSubscription()) ? 'on' : 'off';
+  } catch { return 'unsupported'; }
+}
+async function enablePush() {
+  try {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) { toast('Dein Gerät unterstützt keine Push-Nachrichten', 'err'); return; }
+    const perm = await Notification.requestPermission();
+    if (perm !== 'granted') { toast('Ohne Erlaubnis keine Benachrichtigungen', 'err'); return; }
+    const reg = await navigator.serviceWorker.ready;
+    const { key } = await api('/api/push/key');
+    if (!key) { toast('Push ist gerade nicht bereit', 'err'); return; }
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlB64ToUint8(key) });
+    const j = sub.toJSON();
+    await api('/api/push/subscribe', { method: 'POST', body: { endpoint: j.endpoint, keys: j.keys } });
+    toast('Benachrichtigungen an 🔔', 'ok'); refreshPushCtl();
+  } catch (e) { toast('Push fehlgeschlagen: ' + e.message, 'err'); }
+}
+async function disablePush() {
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.getSubscription();
+    if (sub) { await api('/api/push/unsubscribe', { method: 'POST', body: { endpoint: sub.endpoint } }).catch(() => {}); await sub.unsubscribe(); }
+    toast('Benachrichtigungen aus', 'ok'); refreshPushCtl();
+  } catch (e) { toast(e.message, 'err'); }
+}
+async function refreshPushCtl() {
+  const el = $('#push-ctl'); if (!el) return;
+  const st = await pushState();
+  if (st === 'unsupported') { el.innerHTML = '<span class="hint">🔔 Push-Nachrichten gehen auf diesem Gerät leider nicht (Tipp: App zum Home-Bildschirm hinzufügen).</span>'; return; }
+  if (st === 'on') el.innerHTML = `<span class="pill" style="background:var(--good-bg);color:var(--good)">🔔 Benachrichtigungen an</span>
+      <button class="ghost sm" id="push-test">Test</button><button class="ghost sm" id="push-off">Ausschalten</button>`;
+  else el.innerHTML = `<div class="hint" style="margin-bottom:.4rem">Verpass keine Termin-Erinnerung, Verschiebung oder Absage – auch wenn die App zu ist.</div>
+      <button class="sm" id="push-on">🔔 Benachrichtigungen einschalten</button>`;
+  const on = $('#push-on'); if (on) on.onclick = enablePush;
+  const off = $('#push-off'); if (off) off.onclick = disablePush;
+  const test = $('#push-test'); if (test) test.onclick = async () => { try { await api('/api/push/test', { method: 'POST' }); toast('Test gesendet 🔔', 'ok'); } catch (e) { toast(e.message, 'err'); } };
+}
 function renderNotifications(notifs, unread) {
   const card = $('#notif-card');
-  if (!notifs || !notifs.length) { card.classList.add('hidden'); return; }
-  card.classList.remove('hidden');
+  card.classList.remove('hidden'); // immer sichtbar – wegen Push-Schalter
   const icon = (k) => k === 'offer' ? '🎁' : k === 'shift' ? '🕐' : k === 'reminder' ? '⏰' : 'ℹ️';
+  const list = (notifs && notifs.length)
+    ? `<div class="notif-list">${notifs.map((n) => `<div class="notif ${n.read ? '' : 'unread'}">
+        <span class="notif-ic">${icon(n.kind)}</span>
+        <div class="notif-body"><div class="notif-msg">${esc(n.message)}</div>
+          <div class="notif-time">${new Date(n.created_at).toLocaleString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</div></div>
+        ${n.read ? '' : '<span class="notif-dot"></span>'}
+      </div>`).join('')}</div>
+      ${unread ? '<div style="margin-top:.8rem"><button class="sec sm" id="notif-read">Alle als gelesen markieren</button></div>' : ''}`
+    : '<p class="hint">Keine Mitteilungen.</p>';
   card.innerHTML = `<h2>🔔 Mitteilungen ${unread ? `<span class="badge offer">${unread} neu</span>` : ''}</h2>
-    <div class="notif-list">${notifs.map((n) => `<div class="notif ${n.read ? '' : 'unread'}">
-      <span class="notif-ic">${icon(n.kind)}</span>
-      <div class="notif-body"><div class="notif-msg">${esc(n.message)}</div>
-        <div class="notif-time">${new Date(n.created_at).toLocaleString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</div></div>
-      ${n.read ? '' : '<span class="notif-dot"></span>'}
-    </div>`).join('')}</div>
-    ${unread ? '<div style="margin-top:.8rem"><button class="sec sm" id="notif-read">Alle als gelesen markieren</button></div>' : ''}`;
+    <div class="push-ctl" id="push-ctl"></div>
+    ${list}`;
   const b = $('#notif-read');
   if (b) b.onclick = async () => { try { await api('/api/my/notifications/read', { method: 'POST' }); syncStudent(); } catch (e) { toast(e.message, 'err'); } };
+  refreshPushCtl();
 }
 
 function renderOffers(offers, wi) {

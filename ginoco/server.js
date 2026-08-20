@@ -1,7 +1,8 @@
 // Fahrschulportal - HTTP-Server und API.
 // Ohne externe Pakete: nur eingebaute Node-Module.
 import { createServer } from 'node:http';
-import { randomBytes } from 'node:crypto';
+import { request as httpsRequest } from 'node:https';
+import { randomBytes, createECDH, hkdfSync, createCipheriv, createPrivateKey, sign as cryptoSign } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, extname, normalize } from 'node:path';
@@ -15,7 +16,7 @@ const PUBLIC = join(__dirname, 'public');
 const PORT = Number(process.env.PORT || 3000);
 const HOST = process.env.HOST || '0.0.0.0'; // hinter Caddy: HOST=127.0.0.1 (nur Proxy erreicht Node)
 const SESSION_DAYS = 30;
-const APP_VERSION = "3.55.0";
+const APP_VERSION = "3.56.0";
 // Einstellungen, die Schueler/Oeffentlichkeit sehen duerfen (Rest bleibt beim Fahrlehrer)
 const PUBLIC_SETTINGS = ['instructor_name', 'instructor_phone', 'policy_text',
   'cancel_hours', 'lock_hours', 'booking_horizon_days', 'booking_horizon_days_rank2',
@@ -228,6 +229,78 @@ function dayFrame(date) {
   const lastStart = toMin((ov && ov.last_start) || getSettingRaw('last_start'));
   const workEnd = lastStart + s.lesson_min; // spaetestes Stundenende des Tages
   return { closed: false, dayStart, lastStart, workEnd, brk: s.break_min, lessonMin: s.lesson_min };
+}
+
+// ===================== Web Push (Handy-Benachrichtigungen) =====================
+// Zero-Dependency nach RFC 8291 (aes128gcm) + VAPID (RFC 8292).
+const b64url = (buf) => Buffer.from(buf).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+const b64urlDecode = (str) => Buffer.from(String(str).replace(/-/g, '+').replace(/_/g, '/'), 'base64');
+
+function ensureVapidKeys() {
+  if (getSettingRaw('vapid_public') && getSettingRaw('vapid_private')) return;
+  const ec = createECDH('prime256v1'); ec.generateKeys();
+  setSettingRaw('vapid_public', b64url(ec.getPublicKey()));   // 65 Byte unkomprimiert
+  setSettingRaw('vapid_private', b64url(ec.getPrivateKey())); // 32 Byte Skalar
+}
+function vapidPrivKeyObject() {
+  const p = b64urlDecode(getSettingRaw('vapid_public'));      // 0x04 || X(32) || Y(32)
+  const jwk = { kty: 'EC', crv: 'P-256', x: b64url(p.subarray(1, 33)), y: b64url(p.subarray(33, 65)), d: b64url(b64urlDecode(getSettingRaw('vapid_private'))) };
+  return createPrivateKey({ key: jwk, format: 'jwk' });
+}
+const hkdf = (salt, ikm, info, len) => Buffer.from(hkdfSync('sha256', ikm, salt, info, len));
+
+// Payload nach RFC 8291 verschluesseln (aes128gcm, ein Record)
+function encryptPush(payload, p256dhB64, authB64) {
+  const uaPublic = b64urlDecode(p256dhB64);   // 65
+  const authSecret = b64urlDecode(authB64);   // 16
+  const as = createECDH('prime256v1'); as.generateKeys();
+  const asPublic = as.getPublicKey();         // 65
+  const shared = as.computeSecret(uaPublic);  // 32
+  const salt = randomBytes(16);
+  const authInfo = Buffer.concat([Buffer.from('WebPush: info\0'), uaPublic, asPublic]);
+  const prk = hkdf(authSecret, shared, authInfo, 32);
+  const cek = hkdf(salt, prk, Buffer.from('Content-Encoding: aes128gcm\0'), 16);
+  const nonce = hkdf(salt, prk, Buffer.from('Content-Encoding: nonce\0'), 12);
+  const record = Buffer.concat([Buffer.from(payload, 'utf8'), Buffer.from([0x02])]); // letzter Record
+  const cipher = createCipheriv('aes-128-gcm', cek, nonce);
+  const body = Buffer.concat([cipher.update(record), cipher.final(), cipher.getAuthTag()]);
+  const rs = Buffer.alloc(4); rs.writeUInt32BE(4096, 0);
+  const header = Buffer.concat([salt, rs, Buffer.from([asPublic.length]), asPublic]);
+  return Buffer.concat([header, body]);
+}
+function vapidAuth(endpoint) {
+  const u = new URL(endpoint);
+  const header = b64url(JSON.stringify({ typ: 'JWT', alg: 'ES256' }));
+  const payload = b64url(JSON.stringify({ aud: u.origin, exp: Math.floor(Date.now() / 1000) + 12 * 3600, sub: 'mailto:kontakt@ginoco.de' }));
+  const signingInput = `${header}.${payload}`;
+  const sig = cryptoSign('sha256', Buffer.from(signingInput), { key: vapidPrivKeyObject(), dsaEncoding: 'ieee-p1363' });
+  return `vapid t=${signingInput}.${b64url(sig)}, k=${getSettingRaw('vapid_public')}`;
+}
+function postPush(endpoint, body, auth) {
+  return new Promise((resolve) => {
+    const u = new URL(endpoint);
+    const req = httpsRequest({ hostname: u.hostname, port: 443, path: u.pathname + u.search, method: 'POST',
+      headers: { Authorization: auth, 'Content-Encoding': 'aes128gcm', 'Content-Type': 'application/octet-stream',
+        'Content-Length': body.length, TTL: '86400', Urgency: 'normal' } },
+      (res) => { let d = ''; res.on('data', (c) => d += c); res.on('end', () => resolve({ status: res.statusCode, body: d })); });
+    req.on('error', (e) => resolve({ status: 0, error: e.message }));
+    req.write(body); req.end();
+  });
+}
+// Push an alle Geraete eines Schuelers (fire-and-forget). Tote Abos (404/410) werden entfernt.
+function pushToStudent(studentId, message, url = '/') {
+  try {
+    if (!studentId || !getSettingRaw('vapid_public')) return;
+    const subs = db.prepare('SELECT * FROM push_subscriptions WHERE student_id = ?').all(studentId);
+    if (!subs.length) return;
+    const payload = JSON.stringify({ title: 'Ginoco', body: String(message).slice(0, 300), url });
+    for (const s of subs) {
+      let body; try { body = encryptPush(payload, s.p256dh, s.auth); } catch (e) { console.error('push enc', e); continue; }
+      postPush(s.endpoint, body, vapidAuth(s.endpoint)).then((r) => {
+        if (r.status === 404 || r.status === 410) db.prepare('DELETE FROM push_subscriptions WHERE id = ?').run(s.id);
+      }).catch(() => {});
+    }
+  } catch (e) { console.error('pushToStudent', e); }
 }
 
 // Belegte Intervalle eines Tages (Buchungen + Bloecke), sortiert.
@@ -460,6 +533,36 @@ async function handleApi(req, res, url) {
       date: r.created_at ? r.created_at.slice(0, 10) : null,
     }));
     return ok(res, { reviews });
+  }
+
+  // ===== Web Push: Handy-Benachrichtigungen =====
+  if (p === '/api/push/key' && method === 'GET') {
+    return ok(res, { key: getSettingRaw('vapid_public') || null });
+  }
+  if (p === '/api/push/subscribe' && method === 'POST') {
+    if (!requireStudent() && !requireInstructor()) return bad(res, 'Bitte anmelden', 401);
+    const b = await readBody(req);
+    const endpoint = b.endpoint && String(b.endpoint);
+    const p256dh = b.keys && b.keys.p256dh, auth = b.keys && b.keys.auth;
+    if (!endpoint || !p256dh || !auth) return bad(res, 'Ungültige Push-Daten');
+    const sid = sess.kind === 'student' ? sess.student_id : null;
+    db.prepare(`INSERT INTO push_subscriptions(student_id,kind,endpoint,p256dh,auth,created_at)
+      VALUES(?,?,?,?,?,?)
+      ON CONFLICT(endpoint) DO UPDATE SET student_id=excluded.student_id, kind=excluded.kind, p256dh=excluded.p256dh, auth=excluded.auth`)
+      .run(sid, sess.kind, endpoint, String(p256dh), String(auth), new Date().toISOString());
+    return ok(res, { subscribed: true });
+  }
+  if (p === '/api/push/unsubscribe' && method === 'POST') {
+    if (!sess) return bad(res, 'Bitte anmelden', 401);
+    const b = await readBody(req);
+    if (b.endpoint) db.prepare('DELETE FROM push_subscriptions WHERE endpoint = ?').run(String(b.endpoint));
+    return ok(res, { unsubscribed: true });
+  }
+  // Test-Push an das eigene Gerät (Button "Test")
+  if (p === '/api/push/test' && method === 'POST') {
+    if (!requireStudent()) return bad(res, 'Bitte anmelden', 401);
+    pushToStudent(sess.student_id, '🔔 Test: So sieht eine Benachrichtigung von Ginoco aus.');
+    return ok(res, { sent: true });
   }
 
   // ===== STUDENT: Slots ansehen & buchen =====
@@ -1769,6 +1872,7 @@ function notify(studentId, kind, message, date = null, refBookingId = null) {
   db.prepare(`INSERT INTO notifications(student_id,kind,message,date,ref_booking_id,created_at)
     VALUES(?,?,?,?,?,?)`).run(studentId, kind, message, date, refBookingId, new Date().toISOString());
   dispatchExternal(studentId, message);
+  pushToStudent(studentId, message); // Handy-Push (falls Gerät angemeldet)
 }
 
 // Haken fuer E-Mail / Push. Standardmaessig aus – aktivierbar ueber Umgebungs-
@@ -2293,6 +2397,7 @@ const server = createServer(async (req, res) => {
 server.listen(PORT, HOST, () => {
   console.log(`\n  ginoco laeuft auf  http://localhost:${PORT}  (Bind ${HOST}:${PORT})\n`);
   console.log(`  Fahrlehrer-Login: Standard-PIN 1234 (bitte in den Einstellungen aendern)\n`);
+  try { ensureVapidKeys(); } catch (e) { console.error('vapid', e); } // Push-Schlüssel sicherstellen
   // Erinnerungen im Hintergrund pruefen (alle 5 Minuten) + naechtliche Server-Pflege
   try { sendDueReminders(); } catch (e) { console.error(e); }
   try { nightlyMaintenance(); } catch (e) { console.error(e); }
@@ -2301,3 +2406,6 @@ server.listen(PORT, HOST, () => {
     try { nightlyMaintenance(); } catch (e) { console.error(e); }
   }, 5 * 60 * 1000);
 });
+
+// Nur für automatisierte Tests exportiert (keine Wirkung auf den laufenden Server).
+export { encryptPush, vapidAuth, b64url, b64urlDecode, ensureVapidKeys };
