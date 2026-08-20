@@ -408,8 +408,11 @@ function openTour() {
 window.__openTour = openTour;
 
 // ---------- Was ist neu? (Changelog) ----------
-const CHANGELOG_VER = '3.57';
+const CHANGELOG_VER = '3.58';
 const CHANGELOG = [
+  { v: '3.58', d: '20.08.2026', title: 'Passwort-Anfragen & App-Reif', items: [
+    '🔑 „Passwort vergessen"-Anfragen erscheinen jetzt oben im Fahrlehrer-Dashboard – mit Ein-Tipp-Zurücksetzen und fertigen Zugangsdaten zum Weitergeben.',
+    '📲 App-Reif: Digital-Asset-Links vorbereitet – Ginoco lässt sich als echte Play-Store-/App-Store-App verpacken.'] },
   { v: '3.57', d: '20.08.2026', title: 'Neues Ginoco-Logo & Schriftzug', items: [
     '🎨 Beim Öffnen begrüßt dich jetzt das Ginoco-Lenkrad-Emblem in Orange-Gelb und ein klarer „ginoco"-Schriftzug.',
     '✨ Auch oben in der Kopfzeile: Emblem + Schriftzug im Marken-Look.'] },
@@ -2207,10 +2210,28 @@ function openRevEdit(r) {
 }
 
 // ---- Tab: Heute & Ziele (Tacho) ----
+// Offene „Passwort vergessen"-Anfragen auf dem Dashboard – mit Ein-Tipp-Reset
+async function renderResetRequests() {
+  const el = $('#reset-reqs'); if (!el) return;
+  let reqs = [];
+  try { reqs = (await api('/api/instructor/reset-requests')).requests || []; } catch { return; }
+  if (!reqs.length) { el.innerHTML = ''; return; }
+  el.innerHTML = `<div class="card resetreq">
+    <h2>🔑 Passwort-Anfragen <span class="badge offer">${reqs.length}</span></h2>
+    <p class="hint">Diese Fahrschüler haben „Passwort vergessen" angetippt. Tipp auf „Zurücksetzen" – du bekommst ein neues Passwort zum Weitergeben.</p>
+    ${reqs.map((r) => `<div class="rr-item">
+      <div><strong>${esc(r.student_name)}</strong> <span class="pill">${esc(r.username || '')}</span>
+        <div class="hint">angefragt ${fmtDT(String(r.at).slice(0, 10), String(r.at).slice(11, 16))}</div></div>
+      <button class="sm" data-rr="${r.student_id}" data-rrname="${esc(r.student_name)}" data-rruser="${esc(r.username || '')}">🔑 Zurücksetzen</button>
+    </div>`).join('')}
+  </div>`;
+  el.querySelectorAll('[data-rr]').forEach((b) => b.onclick = () => openResetModal(Number(b.dataset.rr), b.dataset.rrname, b.dataset.rruser));
+}
 async function tabHeute() {
   const box = $('#itab');
   const gname = firstName(state.settings?.instructor_name || state.user?.name || '');
   box.innerHTML = `<div class="card hidden" id="live-card"></div>
+    <div id="reset-reqs"></div>
     <div class="card">
       <div class="greet-big">${greetWord()}${gname ? ', <strong>' + esc(gname) + '</strong>' : ''} 👋</div>
       <div id="today-strip"></div>
@@ -2219,6 +2240,7 @@ async function tabHeute() {
     <div class="card"><h2>Heute <span class="sub" id="today-sub"></span></h2><div id="today-list"></div></div>`;
   try {
     renderLiveInstr();
+    renderResetRequests();
     const stats = await api('/api/instructor/stats?date=' + todayStr());
     renderGauge($('#gauge'), stats);
     renderTiles($('#tiles'), stats);
@@ -3587,6 +3609,7 @@ function openResetModal(id, name, username) {
       $('#rs-save').textContent = 'Fertig'; $('#rs-save').onclick = closeModal;
       $('#rs-copy').onclick = () => { navigator.clipboard?.writeText(share); toast('Zugangsdaten kopiert', 'ok'); };
       toast('Passwort gesetzt ✓', 'ok');
+      if (document.getElementById('reset-reqs')) renderResetRequests(); // Anfrage-Banner aktualisieren
     } catch (e) { toast(e.message, 'err'); }
   };
 }

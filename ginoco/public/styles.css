@@ -899,3 +899,9 @@ body:has(.fp-overlay) .pwa-install{display:none}
 .push-ctl{display:flex;flex-wrap:wrap;gap:.4rem;align-items:center;background:var(--card2);border:1px solid var(--line);
   border-radius:12px;padding:.6rem .7rem;margin:.2rem 0 .8rem}
 .push-ctl .hint{width:100%}
+
+/* Passwort-Anfragen (Dashboard) */
+.resetreq{border:1px solid var(--brand);box-shadow:0 0 0 1px rgba(242,160,20,.25)}
+.rr-item{display:flex;align-items:center;gap:.6rem;justify-content:space-between;flex-wrap:wrap;
+  padding:.55rem 0;border-top:1px solid var(--line)}
+.rr-item:first-of-type{border-top:none}

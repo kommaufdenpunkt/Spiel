@@ -1,0 +1,11 @@
+[
+  {
+    "_anleitung": "Diese Datei macht aus Ginoco eine echte Android-App (ohne Browser-Leiste). Ersetze package_name und den SHA-256-Fingerabdruck mit den Werten, die dir PWABuilder bzw. die Google Play Console anzeigt. Danach 'git pull' auf dem Server.",
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "de.ginoco.twa",
+      "sha256_cert_fingerprints": ["HIER_DEN_SHA256_FINGERABDRUCK_VON_PWABUILDER_EINSETZEN"]
+    }
+  }
+]

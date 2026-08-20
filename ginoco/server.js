@@ -1453,7 +1453,20 @@ async function handleApi(req, res, url) {
     if (!st) return bad(res, 'Schueler nicht gefunden', 404);
     db.prepare('UPDATE students SET pass = ? WHERE id = ?').run(hashPassword(pw), st.id);
     logEvent('info', { actor: 'instructor', studentId: st.id, detail: 'Passwort zurückgesetzt' });
+    // Offene "Passwort vergessen"-Anfragen dieses Schuelers als erledigt markieren
+    db.prepare("UPDATE events SET seen = 1 WHERE type = 'reset' AND student_id = ?").run(st.id);
+    notify(st.id, 'info', 'Dein Passwort wurde zurückgesetzt. Dein Fahrlehrer teilt dir das neue Passwort mit.');
     return ok(res);
+  }
+  // Offene "Passwort vergessen"-Anfragen (fuer den Fahrlehrer, mit Ein-Tipp-Reset)
+  if (p === '/api/instructor/reset-requests' && method === 'GET') {
+    if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
+    const rows = db.prepare(
+      `SELECT e.id, e.student_id, e.at, s.name AS student_name, s.username
+       FROM events e LEFT JOIN students s ON s.id = e.student_id
+       WHERE e.type = 'reset' AND e.seen = 0 AND s.id IS NOT NULL
+       ORDER BY e.at DESC`).all();
+    return ok(res, { requests: rows });
   }
   // Test-/Demo-Schueler mit einem Klick anlegen (zum Ausprobieren der Schueler-Ansicht)
   // Fahrschüler direkt anlegen (Fahrlehrer) – erzeugt Login + Startpasswort zum Weitergeben
