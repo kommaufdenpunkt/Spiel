@@ -1256,7 +1256,7 @@ function openReviewModal(existing, hasPhoto) {
       const b = document.createElement('button');
       b.type = 'button'; b.className = 'rev-bigstar' + (i <= current ? ' on' : '');
       b.textContent = '★'; b.dataset.v = i;
-      b.onclick = () => onPick(i);
+      b.onclick = () => { onPick(i); b.blur(); };
       wrap.appendChild(b);
     }
     return wrap;
@@ -1394,9 +1394,11 @@ function openReviewModal(existing, hasPhoto) {
       const mount = $('#rev-stars-mount');
       if (mount) mount.appendChild(bigStars(S.ratings[c.k] || 0, (v) => {
         S.ratings[c.k] = v;
+        // alle Sterne bis v aufleuchten lassen
+        mount.querySelectorAll('.rev-bigstar').forEach((b) => b.classList.toggle('on', Number(b.dataset.v) <= v));
         const lbl = $('#rev-cat-val'); if (lbl) lbl.textContent = '★'.repeat(v) + ' – ' + revRatingWord(v);
         // sanft automatisch weiter (Frage-Antwort-Gefühl)
-        setTimeout(() => { if (S.step < steps.indexOf('summary')) go(1); }, 300);
+        setTimeout(() => { if (S.step < steps.indexOf('summary')) go(1); }, 340);
       }));
       const sk = $('#rev-skip'); if (sk) sk.onclick = () => go(1);
     }

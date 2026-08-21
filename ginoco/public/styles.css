@@ -952,6 +952,8 @@ body:has(.fp-overlay) .pwa-install{display:none}
 .rev-bigstar:hover{transform:scale(1.12)}
 .rev-bigstar:active{transform:scale(.94)}
 .rev-bigstar.on{color:var(--brand);text-shadow:0 0 10px rgba(242,160,20,.35)}
+.rev-bigstar:focus{outline:none}
+.rev-bigstar:focus-visible{outline:2px solid var(--brand);outline-offset:3px;border-radius:8px}
 .rev-cat-val{margin-top:.55rem;font-size:.95rem;color:var(--ink);min-height:1.2em;font-weight:600}
 /* Schritte allgemein */
 .rev-step{padding:.2rem 0}
