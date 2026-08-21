@@ -16,7 +16,7 @@ const PUBLIC = join(__dirname, 'public');
 const PORT = Number(process.env.PORT || 3000);
 const HOST = process.env.HOST || '0.0.0.0'; // hinter Caddy: HOST=127.0.0.1 (nur Proxy erreicht Node)
 const SESSION_DAYS = 30;
-const APP_VERSION = "3.60.1";
+const APP_VERSION = "3.61.0";
 // Einstellungen, die Schueler/Oeffentlichkeit sehen duerfen (Rest bleibt beim Fahrlehrer)
 const PUBLIC_SETTINGS = ['instructor_name', 'instructor_phone', 'policy_text',
   'cancel_hours', 'lock_hours', 'booking_horizon_days', 'booking_horizon_days_rank2',
@@ -67,6 +67,9 @@ const ok = (res, data = {}) => json(res, 200, data);
 const bad = (res, msg, code = 400) => json(res, code, { error: msg });
 
 // Profilfoto als data-URL pruefen (klein halten – Client verkleinert vor dem Upload)
+// Bewertungs-Kategorien (Reihenfolge = Anzeigereihenfolge). Muss mit dem
+// Frontend (REVIEW_CATS in app.js) übereinstimmen.
+const REVIEW_CATS = ['geduld', 'erklaerung', 'puenktlich', 'freundlich', 'sicher'];
 function validPhoto(dataUrl) {
   return typeof dataUrl === 'string'
     && /^data:image\/(jpeg|png|webp);base64,/.test(dataUrl)
@@ -537,16 +540,19 @@ async function handleApi(req, res, url) {
   // ===== Bewertungen (oeffentlich lesbar – fuer die Laufschrift auf der Startseite) =====
   if (p === '/api/reviews' && method === 'GET') {
     const rows = db.prepare(
-      `SELECT r.id, r.rating, r.text, r.author_mode, r.show_photo, r.reply, r.author_name, r.created_at, r.featured, r.student_id,
+      `SELECT r.id, r.rating, r.text, r.author_mode, r.show_photo, r.reply, r.author_name, r.created_at, r.featured, r.student_id, r.ratings,
               (CASE WHEN r.show_photo=1 AND s.photo IS NOT NULL THEN s.photo ELSE NULL END) AS photo
        FROM reviews r LEFT JOIN students s ON s.id = r.student_id
        WHERE r.published = 1 ORDER BY r.featured DESC, r.created_at DESC LIMIT 60`).all();
-    const reviews = rows.map((r) => ({
-      id: r.id, rating: r.rating, text: r.text, reply: r.reply || null,
-      author: r.author_name || 'Ein Fahrschüler', photo: r.photo || null,
-      verified: r.student_id != null, featured: !!r.featured,
-      date: r.created_at ? r.created_at.slice(0, 10) : null,
-    }));
+    const reviews = rows.map((r) => {
+      let ratings = null; if (r.ratings) { try { ratings = JSON.parse(r.ratings); } catch {} }
+      return {
+        id: r.id, rating: r.rating, text: r.text, reply: r.reply || null,
+        author: r.author_name || 'Ein Fahrschüler', photo: r.photo || null,
+        verified: r.student_id != null, featured: !!r.featured, ratings,
+        date: r.created_at ? r.created_at.slice(0, 10) : null,
+      };
+    });
     return ok(res, { reviews });
   }
 
@@ -645,7 +651,8 @@ async function handleApi(req, res, url) {
   // Eigene Bewertung ansehen / abgeben (ein Eintrag je Schueler – wird ueberschrieben)
   if (p === '/api/my/review' && method === 'GET') {
     if (!requireStudent()) return bad(res, 'Bitte anmelden', 401);
-    const r = db.prepare('SELECT id,rating,text,author_mode,show_photo,published,reply,created_at FROM reviews WHERE student_id = ?').get(sess.student_id) || null;
+    const r = db.prepare('SELECT id,rating,text,author_mode,show_photo,published,reply,ratings,created_at FROM reviews WHERE student_id = ?').get(sess.student_id) || null;
+    if (r && r.ratings) { try { r.ratings = JSON.parse(r.ratings); } catch { r.ratings = null; } }
     const st = db.prepare('SELECT archived_at,(photo IS NOT NULL) AS has_photo FROM students WHERE id = ?').get(sess.student_id) || {};
     return ok(res, { review: r, passed: !!st.archived_at, hasPhoto: !!st.has_photo });
   }
@@ -655,18 +662,39 @@ async function handleApi(req, res, url) {
     const text = String(b.text || '').trim();
     if (text.length < 5) return bad(res, 'Bitte schreib ein paar Worte (mind. 5 Zeichen).');
     if (text.length > 800) return bad(res, 'Bitte fasse dich etwas kürzer (max. 800 Zeichen).');
-    const rating = Math.max(1, Math.min(5, Math.round(Number(b.rating) || 5)));
     const mode = ['full', 'initials', 'anon'].includes(b.author_mode) ? b.author_mode : 'initials';
-    const showPhoto = (mode !== 'anon' && (b.show_photo === true || b.show_photo === 1 || b.show_photo === '1')) ? 1 : 0;
+    // Kategorie-Aufschlüsselung ("Durchbewerten") einsammeln + säubern.
+    let ratings = null;
+    if (b.ratings && typeof b.ratings === 'object') {
+      const o = {};
+      for (const k of REVIEW_CATS) {
+        const v = Math.round(Number(b.ratings[k]));
+        if (v >= 1 && v <= 5) o[k] = v;
+      }
+      if (Object.keys(o).length) ratings = o;
+    }
+    // Gesamtnote: ausdrücklich angegeben, sonst Durchschnitt der Kategorien, sonst 5.
+    let rating = Number(b.rating);
+    if (!(rating >= 1 && rating <= 5) && ratings) {
+      const vals = Object.values(ratings);
+      rating = vals.reduce((s, x) => s + x, 0) / vals.length;
+    }
+    rating = Math.max(1, Math.min(5, Math.round(rating || 5)));
+    // Foto direkt beim Bewerten hochgeladen? -> Profilfoto setzen und mit anzeigen.
+    const uploaded = typeof b.photo === 'string' && validPhoto(b.photo);
+    if (uploaded) db.prepare('UPDATE students SET photo=? WHERE id=?').run(b.photo, sess.student_id);
+    const wantPhoto = uploaded || b.show_photo === true || b.show_photo === 1 || b.show_photo === '1';
+    const showPhoto = (mode !== 'anon' && wantPhoto) ? 1 : 0;
     const st = db.prepare('SELECT id,name,first_name,last_name FROM students WHERE id = ?').get(sess.student_id);
     const authorName = reviewAuthorName(st, mode);
+    const ratingsJson = ratings ? JSON.stringify(ratings) : null;
     const existing = db.prepare('SELECT id FROM reviews WHERE student_id = ?').get(sess.student_id);
     if (existing) {
-      db.prepare('UPDATE reviews SET rating=?, text=?, author_mode=?, show_photo=?, author_name=?, published=1 WHERE id=?')
-        .run(rating, text, mode, showPhoto, authorName, existing.id);
+      db.prepare('UPDATE reviews SET rating=?, text=?, author_mode=?, show_photo=?, author_name=?, ratings=?, published=1 WHERE id=?')
+        .run(rating, text, mode, showPhoto, authorName, ratingsJson, existing.id);
     } else {
-      db.prepare('INSERT INTO reviews(student_id,rating,text,author_mode,show_photo,author_name,published,created_at) VALUES(?,?,?,?,?,?,1,?)')
-        .run(sess.student_id, rating, text, mode, showPhoto, authorName, new Date().toISOString());
+      db.prepare('INSERT INTO reviews(student_id,rating,text,author_mode,show_photo,author_name,ratings,published,created_at) VALUES(?,?,?,?,?,?,?,1,?)')
+        .run(sess.student_id, rating, text, mode, showPhoto, authorName, ratingsJson, new Date().toISOString());
     }
     logEvent('info', { actor: 'student', studentId: sess.student_id, detail: `Bewertung abgegeben (${rating}★)` });
     return ok(res, { saved: true });

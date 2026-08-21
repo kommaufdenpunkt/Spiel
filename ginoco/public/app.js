@@ -408,8 +408,13 @@ function openTour() {
 window.__openTour = openTour;
 
 // ---------- Was ist neu? (Changelog) ----------
-const CHANGELOG_VER = '3.60';
+const CHANGELOG_VER = '3.61';
 const CHANGELOG = [
+  { v: '3.61', d: '21.08.2026', title: '⭐ Bewertung – jetzt richtig gut', items: [
+    '🧩 Neuer geführter Ablauf: Du bewertest Schritt für Schritt – Geduld, Erklärungen, Pünktlichkeit, Freundlichkeit und dein Fahrgefühl. Einfach Stern antippen, es geht von allein weiter.',
+    '📸 Foto direkt beim Bewerten hochladen – kein Umweg mehr übers Profil. Mit Vorschau, natürlich freiwillig.',
+    '🙋 Du bestimmst, wie dein Name erscheint (voll, abgekürzt oder anonym) – mit Live-Vorschau.',
+    '✅ Am Ende siehst du deine Bewertung im Überblick, bevor du sie abschickst.'] },
   { v: '3.60', d: '20.08.2026', title: '🎉 Was gibt es Neues? – Das große Ginoco-Update', items: [
     '✉️ <strong>Schreiben in der App:</strong> Du kannst deinem Fahrlehrer jetzt direkt in Ginoco schreiben – Fragen, kurz Bescheid geben, alles an einem Ort. Wie ein Chat.',
     '🔔 <strong>Handy-Benachrichtigungen:</strong> Erinnerungen, Verschiebungen, Absagen und Angebote kommen als Push aufs Handy – auch wenn die App zu ist. Einmal erlauben unter „🔔 Mitteilungen".',
@@ -1177,6 +1182,24 @@ async function renderStudentMessages() {
 
 // ---------- Bewertung abgeben (Schüler) ----------
 const REV_STARS = (n) => '★★★★★'.slice(0, n) + '☆☆☆☆☆'.slice(0, 5 - n);
+// Kategorien fürs geführte „Durchbewerten" (Reihenfolge = Ablauf). Schlüssel
+// müssen mit REVIEW_CATS in server.js übereinstimmen.
+const REVIEW_CATS = [
+  { k: 'geduld',     icon: '🧘', q: 'Wie geduldig war dein Fahrlehrer?',            label: 'Geduld & Ruhe',        hint: 'Ruhe bewahrt, auch wenn’s mal hakt?' },
+  { k: 'erklaerung', icon: '💡', q: 'Wie verständlich waren die Erklärungen?',      label: 'Erklärungen',          hint: 'Alles gut erklärt, sodass es Klick gemacht hat?' },
+  { k: 'puenktlich', icon: '⏰', q: 'Wie zuverlässig & pünktlich war er?',          label: 'Zuverlässigkeit',      hint: 'Termine gehalten, pünktlich da?' },
+  { k: 'freundlich', icon: '😊', q: 'Wie freundlich war der Umgang?',               label: 'Freundlichkeit',       hint: 'Nett, motivierend, auf Augenhöhe?' },
+  { k: 'sicher',     icon: '🚗', q: 'Wie sicher hast du dich beim Fahren gefühlt?', label: 'Sicheres Gefühl',      hint: 'Gut aufgehoben und sicher unterwegs?' },
+];
+const revCatLabel = (k) => (REVIEW_CATS.find((c) => c.k === k) || {}).label || k;
+const revCatIcon = (k) => (REVIEW_CATS.find((c) => c.k === k) || {}).icon || '⭐';
+function revNamePreview(mode) {
+  const nm = (state.user?.name || '').trim();
+  if (mode === 'anon' || !nm) return mode === 'anon' ? 'Anonym' : 'Ein Fahrschüler';
+  if (mode === 'full') return nm;
+  const parts = nm.split(/\s+/);
+  return parts.length > 1 ? `${parts[0]} ${parts[parts.length - 1][0]}.` : parts[0];
+}
 async function renderReviewCard(progress) {
   const card = $('#review-card'); if (!card) return;
   let data = {};
@@ -1188,9 +1211,13 @@ async function renderReviewCard(progress) {
   const head = passed
     ? `<div class="rev-pass">🎉 <div><strong>Herzlichen Glückwunsch – bestanden!</strong><br><span>Deine Akte bleibt erhalten. Magst du anderen erzählen, wie deine Ausbildung war?</span></div></div>`
     : `<p class="hint">Wenn du magst, hinterlass eine Bewertung – sie erscheint als Empfehlung auf der Startseite von Ginoco.</p>`;
+  const chips = r && r.ratings
+    ? `<div class="rev-mine-chips">${REVIEW_CATS.filter((c) => r.ratings[c.k]).map((c) => `<span class="rev-chip">${c.icon} ${esc(c.label)} <b>${r.ratings[c.k]}★</b></span>`).join('')}</div>`
+    : '';
   const body = r
     ? `<div class="rev-mine">
         <div class="rev-stars">${REV_STARS(r.rating)}</div>
+        ${chips}
         <div class="rev-text">„${esc(r.text)}"</div>
         <div class="hint" style="margin-top:.4rem">Angezeigt ${modeLabel[r.author_mode] || ''}${r.show_photo ? ' · mit Foto' : ''}${r.published ? '' : ' · wird gerade geprüft'}${r.reply ? '' : ''}</div>
         ${r.reply ? `<div class="rev-reply">↩︎ <em>${esc(r.reply)}</em></div>` : ''}
@@ -1202,42 +1229,203 @@ async function renderReviewCard(progress) {
   const n = $('#rev-new'); if (n) n.onclick = open;
   const e = $('#rev-edit'); if (e) e.onclick = open;
 }
+// Geführter Bewertungs-Assistent ("Durchbewerten"): kurzer Erklärungs-Rundgang,
+// dann je eine freundliche Frage pro Kategorie mit großen Sternen, danach Worte,
+// Foto (direkt hochladbar) und Anzeige-Name – zum Schluss eine Übersicht.
+// Selbsterklärend, Schritt für Schritt, mit Fortschritt und Zurück/Weiter.
 function openReviewModal(existing, hasPhoto) {
-  const cur = existing || { rating: 5, text: '', author_mode: 'initials', show_photo: 0 };
-  const starBtns = [1, 2, 3, 4, 5].map((i) => `<button type="button" class="rev-star" data-v="${i}">★</button>`).join('');
-  const opt = (v, l) => `<label class="rev-opt"><input type="radio" name="rev-mode" value="${v}" ${cur.author_mode === v ? 'checked' : ''}> ${l}</label>`;
-  modal(`<h3>${existing ? 'Bewertung bearbeiten' : 'Deine Bewertung'}</h3>
-    ${errBox()}
-    <div class="field"><label>Wie zufrieden warst du?</label>
-      <div class="rev-starpick" id="rev-starpick" data-v="${cur.rating}">${starBtns}</div></div>
-    <div class="field"><label>Deine Worte</label>
-      <textarea id="rev-text" rows="4" maxlength="800" placeholder="z. B. Super Fahrlehrer, sehr geduldig, hält sich an alles – Fahrschule Untern Buchen in Eberswalde. Klare Empfehlung!" style="resize:vertical">${esc(cur.text || '')}</textarea></div>
-    <div class="field"><label>Wie soll dein Name erscheinen?</label>
-      <div class="rev-opts">${opt('full', 'Voller Name')}${opt('initials', 'Abgekürzt (z. B. Lena M.)')}${opt('anon', 'Anonym')}</div></div>
-    ${hasPhoto ? `<label class="ck-line" id="rev-photo-line"><input type="checkbox" id="rev-photo" ${cur.show_photo ? 'checked' : ''}> Mein Profilfoto mit anzeigen</label>` : '<div class="hint">Tipp: Lade in deinem Profil (👤) ein Foto hoch, dann kannst du es mit anzeigen.</div>'}
-    <div class="actions">
-      <button class="sec" onclick="window.__closeModal()">Abbrechen</button>
-      <button id="rev-save">${existing ? 'Aktualisieren' : 'Bewertung abschicken'}</button>
-    </div>`);
-  const pick = $('#rev-starpick');
-  const paint = () => { const v = Number(pick.dataset.v); pick.querySelectorAll('.rev-star').forEach((b) => b.classList.toggle('on', Number(b.dataset.v) <= v)); };
-  pick.querySelectorAll('.rev-star').forEach((b) => b.onclick = () => { pick.dataset.v = b.dataset.v; paint(); });
-  paint();
-  // Anonym -> Foto ausgrauen
-  const syncPhoto = () => { const m = document.querySelector('input[name="rev-mode"]:checked')?.value; const ph = $('#rev-photo'); if (ph) { ph.disabled = m === 'anon'; if (m === 'anon') ph.checked = false; } };
-  document.querySelectorAll('input[name="rev-mode"]').forEach((el) => el.onchange = syncPhoto);
-  syncPhoto();
-  $('#rev-save').onclick = async () => {
-    const body = {
-      rating: Number(pick.dataset.v) || 5,
-      text: $('#rev-text').value.trim(),
-      author_mode: document.querySelector('input[name="rev-mode"]:checked')?.value || 'initials',
-      show_photo: $('#rev-photo') ? $('#rev-photo').checked : false,
-    };
-    try { await api('/api/my/review', { method: 'POST', body }); closeModal(); toast('Danke für deine Bewertung ✓', 'ok'); syncStudent(); }
-    catch (e) { showErr(e.message); }
+  const S = {
+    step: 0,
+    ratings: Object.assign({}, existing && existing.ratings ? existing.ratings : {}),
+    text: (existing && existing.text) || '',
+    mode: (existing && existing.author_mode) || 'initials',
+    showPhoto: !!(existing && existing.show_photo),
+    hasPhoto: !!hasPhoto,     // Profilfoto bereits vorhanden?
+    photoData: null,          // neu ausgewähltes Foto (data-URL)
   };
+  const steps = ['intro', ...REVIEW_CATS.map((c) => 'cat:' + c.k), 'text', 'photo', 'name', 'summary'];
+  const catCount = REVIEW_CATS.length;
+  const go = (d) => { S.step = Math.max(0, Math.min(steps.length - 1, S.step + d)); draw(); };
+  const answered = () => REVIEW_CATS.filter((c) => S.ratings[c.k]).length;
+  const overall = () => { const v = REVIEW_CATS.map((c) => S.ratings[c.k]).filter(Boolean); return v.length ? Math.round(v.reduce((s, x) => s + x, 0) / v.length) : 0; };
+
+  function bigStars(current, onPick) {
+    const wrap = document.createElement('div');
+    wrap.className = 'rev-bigstars';
+    for (let i = 1; i <= 5; i++) {
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'rev-bigstar' + (i <= current ? ' on' : '');
+      b.textContent = '★'; b.dataset.v = i;
+      b.onclick = () => onPick(i);
+      wrap.appendChild(b);
+    }
+    return wrap;
+  }
+
+  async function submit() {
+    if ((S.text || '').trim().length < 5) { S.step = steps.indexOf('text'); draw(); toast('Bitte schreib kurz ein, zwei Sätze.', 'err'); return; }
+    const btn = $('#rev-go'); if (btn) { btn.disabled = true; btn.textContent = 'Wird gesendet …'; }
+    const body = {
+      rating: overall() || undefined,
+      ratings: S.ratings,
+      text: S.text.trim(),
+      author_mode: S.mode,
+      show_photo: S.mode !== 'anon' ? S.showPhoto : false,
+    };
+    if (S.photoData) body.photo = S.photoData;
+    try { await api('/api/my/review', { method: 'POST', body }); closeModal(); toast('Danke für deine Bewertung ⭐', 'ok'); syncStudent(); }
+    catch (e) { if (btn) { btn.disabled = false; btn.textContent = 'Bewertung abschicken'; } toast(e.message, 'err'); }
+  }
+
+  function draw() {
+    const kind = steps[S.step];
+    let html = '';
+    // Fortschritt (nur während der Kategorie-Fragen)
+    if (kind.startsWith('cat:')) {
+      const idx = REVIEW_CATS.findIndex((c) => 'cat:' + c.k === kind);
+      html += `<div class="rev-prog"><div class="rev-prog-bar" style="width:${Math.round(((idx + 1) / catCount) * 100)}%"></div></div>
+        <div class="rev-prog-tx">Frage ${idx + 1} von ${catCount}</div>`;
+    }
+
+    if (kind === 'intro') {
+      html += `<div class="rev-intro">
+        <div class="rev-intro-emoji">⭐</div>
+        <h3>${existing ? 'Bewertung bearbeiten' : 'Erzähl, wie deine Ausbildung war'}</h3>
+        <p>In ein paar kurzen Fragen bewertest du deinen Fahrlehrer – Stern antippen, fertig. Dauert unter einer Minute.</p>
+        <ul class="rev-intro-list">
+          <li>🧩 Schritt für Schritt – eine Frage nach der anderen</li>
+          <li>📸 Wenn du magst, direkt ein Foto dazu</li>
+          <li>🙈 Du bestimmst, ob dein Name erscheint (auch anonym)</li>
+        </ul>
+        <p class="rev-intro-why">Deine echte Rückmeldung hilft anderen Fahrschülern – und deinem Fahrlehrer, noch besser zu werden.</p>
+      </div>
+      <div class="actions">
+        <button class="sec" onclick="window.__closeModal()">Später</button>
+        <button id="rev-go">Los geht’s →</button>
+      </div>`;
+    } else if (kind.startsWith('cat:')) {
+      const c = REVIEW_CATS.find((x) => 'cat:' + x.k === kind);
+      const cur = S.ratings[c.k] || 0;
+      html += `<div class="rev-catq">
+        <div class="rev-cat-ic">${c.icon}</div>
+        <h3>${esc(c.q)}</h3>
+        <p class="rev-cat-hint">${esc(c.hint)}</p>
+        <div id="rev-stars-mount"></div>
+        <div class="rev-cat-val" id="rev-cat-val">${cur ? '★'.repeat(cur) + ' – ' + revRatingWord(cur) : 'Tippe einen Stern an'}</div>
+      </div>
+      <div class="actions">
+        <button class="sec" id="rev-back">← Zurück</button>
+        ${cur ? `<button id="rev-go">Weiter →</button>` : `<button class="ghost" id="rev-skip">Überspringen</button>`}
+      </div>`;
+    } else if (kind === 'text') {
+      html += `<div class="rev-step">
+        <h3>💬 Deine Worte</h3>
+        <p class="hint">Was möchtest du anderen mitgeben? Ein, zwei ehrliche Sätze reichen völlig.</p>
+        <textarea id="rev-text" rows="5" maxlength="800" placeholder="z. B. Super Fahrlehrer, sehr geduldig, erklärt alles ruhig – Fahrschule Untern Buchen in Eberswalde. Klare Empfehlung!" style="resize:vertical">${esc(S.text)}</textarea>
+        <div class="rev-count"><span id="rev-count">${(S.text || '').length}</span>/800</div>
+      </div>
+      <div class="actions">
+        <button class="sec" id="rev-back">← Zurück</button>
+        <button id="rev-go">Weiter →</button>
+      </div>`;
+    } else if (kind === 'photo') {
+      const prev = S.photoData
+        ? `<img src="${S.photoData}" alt="Vorschau">`
+        : (S.hasPhoto ? `<img src="/api/my/photo?t=${Date.now()}" alt="Dein Foto">` : `<span class="rev-photo-ph">🙂</span>`);
+      const have = S.photoData || S.hasPhoto;
+      html += `<div class="rev-step rev-photo-step">
+        <h3>📸 Foto dazu? (freiwillig)</h3>
+        <p class="hint">Mit Foto wirkt deine Empfehlung persönlicher. Ganz wie du magst.</p>
+        <div class="rev-photo-prev" id="rev-photo-prev">${prev}</div>
+        <input type="file" id="rev-file" accept="image/*" hidden>
+        <div class="rev-photo-btns">
+          <button class="sec sm" id="rev-pick">${have ? 'Anderes Foto' : '📷 Foto auswählen'}</button>
+          ${have ? `<button class="ghost sm" id="rev-photo-clear">Kein Foto</button>` : ''}
+        </div>
+        ${have ? `<label class="ck-line" id="rev-show-line"><input type="checkbox" id="rev-show" ${S.showPhoto ? 'checked' : ''}> Foto bei meiner Bewertung anzeigen</label>` : ''}
+      </div>
+      <div class="actions">
+        <button class="sec" id="rev-back">← Zurück</button>
+        <button id="rev-go">Weiter →</button>
+      </div>`;
+    } else if (kind === 'name') {
+      const card = (v, title, sub) => `<button type="button" class="rev-namecard ${S.mode === v ? 'on' : ''}" data-mode="${v}">
+        <div class="rev-nc-t">${title}</div><div class="rev-nc-s">${sub}</div></button>`;
+      html += `<div class="rev-step">
+        <h3>🙋 Wie soll dein Name erscheinen?</h3>
+        <p class="hint">Öffentlich sichtbar auf der Startseite. Du entscheidest.</p>
+        <div class="rev-namecards">
+          ${card('full', 'Voller Name', esc(revNamePreview('full')))}
+          ${card('initials', 'Abgekürzt', esc(revNamePreview('initials')))}
+          ${card('anon', 'Anonym', 'Ein Fahrschüler')}
+        </div>
+        ${S.mode === 'anon' && (S.photoData || S.hasPhoto) ? '<p class="hint">Bei „Anonym" wird kein Foto angezeigt.</p>' : ''}
+      </div>
+      <div class="actions">
+        <button class="sec" id="rev-back">← Zurück</button>
+        <button id="rev-go">Weiter →</button>
+      </div>`;
+    } else if (kind === 'summary') {
+      const ov = overall();
+      const chips = REVIEW_CATS.filter((c) => S.ratings[c.k]).map((c) =>
+        `<span class="rev-chip">${c.icon} ${esc(c.label)} <b>${S.ratings[c.k]}★</b></span>`).join('') || '<span class="hint">Keine Einzelnoten – kein Problem.</span>';
+      const showPic = S.mode !== 'anon' && S.showPhoto && (S.photoData || S.hasPhoto);
+      const pic = showPic ? (S.photoData ? `<img src="${S.photoData}" alt="">` : `<img src="/api/my/photo?t=${Date.now()}" alt="">`) : `<span class="rev-photo-ph sm">🙂</span>`;
+      html += `<div class="rev-step rev-summary">
+        <h3>✅ Passt das so?</h3>
+        <div class="rev-sum-head">
+          <div class="rev-sum-stars">${ov ? '★'.repeat(ov) + '☆'.repeat(5 - ov) : '—'}</div>
+          <div class="rev-sum-name">${pic}<span>${esc(revNamePreview(S.mode))}</span></div>
+        </div>
+        <div class="rev-sum-chips">${chips}</div>
+        <div class="rev-sum-text">„${esc(S.text.trim() || '…')}"</div>
+      </div>
+      <div class="actions">
+        <button class="sec" id="rev-back">← Zurück</button>
+        <button id="rev-go">Bewertung abschicken</button>
+      </div>`;
+    }
+
+    modal(`<div class="rev-wiz">${html}</div>`);
+
+    // Kategorie-Sterne montieren
+    if (kind.startsWith('cat:')) {
+      const c = REVIEW_CATS.find((x) => 'cat:' + x.k === kind);
+      const mount = $('#rev-stars-mount');
+      if (mount) mount.appendChild(bigStars(S.ratings[c.k] || 0, (v) => {
+        S.ratings[c.k] = v;
+        const lbl = $('#rev-cat-val'); if (lbl) lbl.textContent = '★'.repeat(v) + ' – ' + revRatingWord(v);
+        // sanft automatisch weiter (Frage-Antwort-Gefühl)
+        setTimeout(() => { if (S.step < steps.indexOf('summary')) go(1); }, 300);
+      }));
+      const sk = $('#rev-skip'); if (sk) sk.onclick = () => go(1);
+    }
+    // Text
+    const ta = $('#rev-text');
+    if (ta) { ta.oninput = () => { S.text = ta.value; const c = $('#rev-count'); if (c) c.textContent = ta.value.length; }; ta.focus(); }
+    // Foto
+    const pick = $('#rev-pick'), file = $('#rev-file');
+    if (pick && file) {
+      pick.onclick = () => file.click();
+      file.onchange = async () => {
+        const f = file.files && file.files[0]; if (!f) return;
+        try { S.photoData = await fileToResizedDataUrl(f, 400, 0.82); S.showPhoto = true; draw(); }
+        catch (e) { toast(e.message, 'err'); }
+      };
+    }
+    const clr = $('#rev-photo-clear'); if (clr) clr.onclick = () => { S.photoData = null; S.hasPhoto = false; S.showPhoto = false; draw(); };
+    const show = $('#rev-show'); if (show) show.onchange = () => { S.showPhoto = show.checked; };
+    // Anzeige-Name
+    document.querySelectorAll('.rev-namecard').forEach((b) => b.onclick = () => { S.mode = b.dataset.mode; draw(); });
+    // Navigation
+    const back = $('#rev-back'); if (back) back.onclick = () => go(-1);
+    const goBtn = $('#rev-go');
+    if (goBtn) goBtn.onclick = () => { if (steps[S.step] === 'summary') submit(); else go(1); };
+  }
+
+  draw();
 }
+function revRatingWord(n) { return ['', 'geht so', 'okay', 'gut', 'sehr gut', 'top!'][n] || ''; }
 // Druckbarer Fahrstunden-Nachweis (Tabelle + Unterschriften)
 function printLessonProof(name, done) {
   const school = esc(state.settings?.instructor_name || 'Fahrschule');
@@ -2223,10 +2411,25 @@ async function tabBewertungen() {
   box.innerHTML = '<div class="card"><h2>⭐ Bewertungen</h2><p class="hint">Lädt…</p></div>';
   let reviews = [];
   try { reviews = (await api('/api/instructor/reviews')).reviews || []; } catch (e) { box.innerHTML = `<div class="card"><p class="err">${esc(e.message)}</p></div>`; return; }
+  reviews.forEach((r) => { if (typeof r.ratings === 'string') { try { r.ratings = JSON.parse(r.ratings); } catch { r.ratings = null; } } });
   const modeL = { full: 'voller Name', initials: 'abgekürzt', anon: 'anonym' };
   const total = reviews.length;
   const visible = reviews.filter((r) => r.published).length;
   const avg = total ? (reviews.reduce((s, r) => s + r.rating, 0) / total) : 0;
+  // Durchschnitt je Kategorie ("Durchbewerten"-Auswertung) – nur aus Bewertungen mit Aufschlüsselung.
+  const catAvg = REVIEW_CATS.map((c) => {
+    const vals = reviews.map((r) => r.ratings && r.ratings[c.k]).filter((x) => x >= 1 && x <= 5);
+    return { ...c, avg: vals.length ? vals.reduce((s, x) => s + x, 0) / vals.length : null, n: vals.length };
+  });
+  const catAny = catAvg.some((c) => c.n > 0);
+  const catAvgHTML = catAny ? `<div class="rev-catavg">
+    <div class="rev-catavg-h">Durchschnitt je Kategorie</div>
+    <div class="rev-catavg-grid">${catAvg.map((c) => `<div class="rev-catavg-item ${c.avg == null ? 'empty' : ''}">
+      <span class="rev-ca-ic">${c.icon}</span>
+      <span class="rev-ca-lb">${esc(c.label)}</span>
+      <span class="rev-ca-val">${c.avg == null ? '–' : c.avg.toFixed(1) + '★'}</span>
+      <span class="rev-ca-bar"><span style="width:${c.avg == null ? 0 : Math.round(c.avg / 5 * 100)}%"></span></span>
+    </div>`).join('')}</div></div>` : '';
   // Sterne-Verteilung 5..1
   const dist = [5, 4, 3, 2, 1].map((n) => ({ n, c: reviews.filter((r) => r.rating === n).length }));
   const maxc = Math.max(1, ...dist.map((d) => d.c));
@@ -2248,6 +2451,7 @@ async function tabBewertungen() {
       <span class="hint" style="margin-left:auto">${r.created_at ? r.created_at.slice(0, 10) : ''}</span>
     </div>
     <div class="rev-text">„${esc(r.text)}"</div>
+    ${r.ratings ? `<div class="rev-mine-chips">${REVIEW_CATS.filter((c) => r.ratings[c.k]).map((c) => `<span class="rev-chip">${c.icon} ${esc(c.label)} <b>${r.ratings[c.k]}★</b></span>`).join('')}</div>` : ''}
     ${r.reply ? `<div class="rev-reply">↩︎ <em>${esc(r.reply)}</em></div>` : ''}
     <div class="rev-mod-who">
       <span class="pill">${esc(r.author_name || 'Ein Fahrschüler')}</span>
@@ -2271,6 +2475,7 @@ async function tabBewertungen() {
         <div class="hint">${total} Bewertung${total === 1 ? '' : 'en'} · ${visible} sichtbar</div></div>
       <div class="rev-dist">${distHTML}</div>
     </div>
+    ${catAvgHTML}
     <p class="hint">Sichtbare Bewertungen laufen auf der Startseite als Laufschrift. „⭐ Top" hebt eine Stimme hervor (läuft ganz vorne). Bewertungen bleiben dauerhaft erhalten – auch nach bestandener Prüfung.</p>
     <div class="rev-toolbar">
       <div class="rev-ftabs">${fTab('alle', 'Alle')}${fTab('sichtbar', 'Sichtbar')}${fTab('verborgen', 'Verborgen')}${fTab('top', '⭐ Top')}</div>

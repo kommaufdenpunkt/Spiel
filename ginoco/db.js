@@ -188,6 +188,9 @@ db.exec(`CREATE TABLE IF NOT EXISTS reviews (
 );`);
 db.exec('CREATE INDEX IF NOT EXISTS idx_reviews_pub ON reviews(published, created_at)');
 ensureColumn('reviews', 'featured', 'featured INTEGER NOT NULL DEFAULT 0'); // vom Fahrlehrer angeheftet -> zuerst
+// Aufschlüsselung je Kategorie als JSON, z.B. {"geduld":5,"erklaerung":4,...}
+// (aus dem geführten "Durchbewerten"-Ablauf). NULL bei alten Bewertungen.
+ensureColumn('reviews', 'ratings', 'ratings TEXT');
 
 // Web-Push-Abos (Handy-Benachrichtigungen). Ein Gerät = eine Zeile (endpoint eindeutig).
 db.exec(`CREATE TABLE IF NOT EXISTS push_subscriptions (
