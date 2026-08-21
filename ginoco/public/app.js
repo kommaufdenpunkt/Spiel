@@ -826,11 +826,20 @@ function mountEdgeMenus(role) {
     'notif-card': '<h2>🔔 Mitteilungen</h2><p class="muted">Keine neuen Mitteilungen. Hier landen z.B. neue Termine, Verschiebungen oder Angebote.</p>',
     'lesson-card': '<h2>🚗 Deine Fahrstunde</h2><p class="muted">Rund um deine nächste Fahrstunde erscheint hier der Start-Knopf und der Fahrzeit-Timer.</p>',
     'live-card': '<h2>📍 Treffpunkt</h2><p class="muted">Kurz vor deiner Fahrstunde siehst du hier den Treffpunkt und wo dein Fahrlehrer gerade ist.</p>',
+    'lessons-card': '<h2>📖 Meine Fahrstunden</h2><p class="muted">Sobald du deine erste Fahrstunde gefahren bist, erscheint sie hier – mit Datum, Uhrzeit, Dauer und Vermerk. Daraus kannst du dir jederzeit einen Nachweis drucken.</p>',
+    'messages-card': '<h2>✉️ Nachrichten</h2><p class="muted">Schreib deinem Fahrlehrer – z. B. eine Frage oder kurz Bescheid, wenn du dich verspätest. Der Chat lädt gleich.</p>',
+    'review-card': '<h2>⭐ Bewertung</h2><p class="muted">Hier kannst du Ginoco und deine Fahrschule bewerten. Nach bestandener Prüfung wirst du freundlich um eine Empfehlung gebeten.</p>',
   };
   root.querySelectorAll('[data-scroll]').forEach((b) => b.onclick = () => {
     close(); const id = b.dataset.scroll; const el = document.getElementById(id);
     if (!el) { toast('Dieser Bereich ist gerade nicht verfügbar', 'err'); return; }
-    if (el.classList.contains('hidden') && EMPTY_SECTION[id]) { el.innerHTML = EMPTY_SECTION[id]; el.classList.remove('hidden'); }
+    // Verstecktes/leeres Ziel: freundlichen Leer-Zustand zeigen, damit ein
+    // Menüpunkt nie ins Nichts scrollt. Beim nächsten Sync füllt/versteckt
+    // sich die Kachel wieder von selbst.
+    if (el.classList.contains('hidden')) {
+      if (EMPTY_SECTION[id]) el.innerHTML = EMPTY_SECTION[id];
+      el.classList.remove('hidden');
+    }
     el.scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
   root.querySelectorAll('[data-act]').forEach((b) => b.onclick = async () => {
