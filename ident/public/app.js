@@ -1510,6 +1510,7 @@
         + '<b>Audition vom ' + esc(new Date(a.erstelltAm).toLocaleString('de-DE')) + '</b>' + erg + '</div>'
         + '<div class="ometa">Prüfer: ' + esc(a.pruefer || '—') + ' · Nummer: ' + esc(a.zugangsnummer || '—')
         + '<br>' + esc(a.ausweisart || 'Ausweis unbekannt') + ' · Nr.: ' + esc(a.ausweisnummer || '—')
+        + (a.geburtsdatum ? ' · geb. ' + esc(a.geburtsdatum) : '')
         + (a.ablehnungsgrund ? '<br>Grund: ' + esc(a.ablehnungsgrund) : '') + '</div>'
         // Was der Prüfer während des Gesprächs notiert hat. Das lag bisher in
         // der Akte, ohne dass man es lesen konnte – gespeichert, aber unsichtbar.
@@ -1626,6 +1627,48 @@
   // ---- Ausweisdaten schon im Warteraum -------------------------------------
   // Wer wartet, kann die Zeit nutzen. Der Pruefer bekommt die Angaben beim
   // Verbinden uebertragen und muss im Gespraech nichts mehr abtippen.
+  /* ---- Geburtsdatum: verstehen, ausrechnen, pruefen ----------------------
+   * Getippt wird TT.MM.JJJJ, aber Leute schreiben auch 3.7.1999 oder
+   * 03/07/1999. Das nehmen wir alles an - abgewiesen wird nur, was wirklich
+   * kein Datum ist. Aus dem Datum kommt das Alter; damit ist "18+" eine
+   * Angabe, die man nachrechnen kann, statt einer Behauptung.
+   */
+  function gebLesen(text) {
+    const t = String(text || '').trim();
+    let m = /^(\d{1,2})[.\/-](\d{1,2})[.\/-](\d{4})$/.exec(t);
+    // Auch die Schreibweise vom Handy-Datumsfeld (JJJJ-MM-TT) annehmen.
+    if (!m) {
+      const iso = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(t);
+      if (iso) m = [t, iso[3], iso[2], iso[1]];
+    }
+    if (!m) return null;
+    const tag = +m[1], monat = +m[2], jahr = +m[3];
+    if (monat < 1 || monat > 12 || tag < 1 || tag > 31 || jahr < 1900) return null;
+    const d = new Date(jahr, monat - 1, tag);
+    if (d.getFullYear() !== jahr || d.getMonth() !== monat - 1 || d.getDate() !== tag) return null;
+    if (d > new Date()) return null;                    // in der Zukunft geboren
+    return d;
+  }
+  function alterAus(text) {
+    const d = gebLesen(text); if (!d) return null;
+    const heute = new Date();
+    let a = heute.getFullYear() - d.getFullYear();
+    const m = heute.getMonth() - d.getMonth();
+    if (m < 0 || (m === 0 && heute.getDate() < d.getDate())) a--;
+    return a;
+  }
+  /** Das Alter neben ein Geburtsdatum-Feld schreiben. */
+  function zeigeAlter(feldId, markeId) {
+    const f = $(feldId), mk = $(markeId); if (!f || !mk) return null;
+    const t = f.value.trim();
+    if (!t) { mk.textContent = ''; mk.className = 'vorab-alter'; return null; }
+    const a = alterAus(t);
+    if (a === null) { mk.textContent = '? Datum'; mk.className = 'vorab-alter'; return null; }
+    mk.textContent = a + ' Jahre';
+    mk.className = 'vorab-alter ' + (a >= 18 ? 'ok' : 'zu-jung');
+    return a;
+  }
+
   function vorabPaket() {
     const w = (id) => { const e = $(id); return e ? e.value.trim() : ''; };
     return {
@@ -1634,6 +1677,7 @@
       bigoNick: (state.profile && state.profile.bigoName) || '',
       age: (state.profile && state.profile.age) || '',
       ausweisName: w('vaName'), ausweisArt: w('vaArt'), ausweisNr: w('vaNr'),
+      ausweisGeb: w('vaGeb'),
       // Selbstauskunft des Bewerbers: volljaehrig und echter Ausweis. Ersetzt
       // die Pruefung nicht - der Pruefer sieht sie sich trotzdem an -, macht
       // aber sichtbar, was der Bewerber zugesichert hat.
@@ -1643,24 +1687,31 @@
   function vorabStand() {
     const box = document.querySelector('.vorab'); if (!box) return;
     const p = vorabPaket();
-    const fertig = !!(p.ausweisName && p.ausweisArt && p.ausweisNr && p.echtBestaetigt);
+    const alter = zeigeAlter('vaGeb', 'vaAlter');
+    const gebOk = !!p.ausweisGeb && alter !== null;
+    const fertig = !!(p.ausweisName && p.ausweisArt && p.ausweisNr && gebOk && p.echtBestaetigt);
     box.classList.toggle('fertig', fertig);
     zeigeFertig();
     merkeFortschritt();
     const st = $('vaStatus');
     if (st) st.textContent = fertig
       ? '✓ Alles da – der Prüfer bekommt es beim Gespräch automatisch.'
-      : (p.ausweisName && p.ausweisArt && p.ausweisNr && !p.echtBestaetigt)
-        ? 'Bitte noch die Erklärung zu Alter und Echtheit bestätigen.'
-        : 'Wird beim Gespräch automatisch übermittelt.';
+      : (p.ausweisGeb && !gebOk)
+        ? 'Das Geburtsdatum passt noch nicht – bitte als TT.MM.JJJJ, z. B. 03.07.1999.'
+        : (p.ausweisName && p.ausweisArt && p.ausweisNr && gebOk && !p.echtBestaetigt)
+          ? 'Bitte noch die Erklärung zu Alter und Echtheit bestätigen.'
+          : 'Wird beim Gespräch automatisch übermittelt.';
     // Sitzt schon ein Prüfer im Raum? Dann gleich nachreichen.
     dcBroadcast(p);
   }
-  ['vaName', 'vaArt', 'vaNr', 'vaEcht'].forEach((id) => {
+  ['vaName', 'vaArt', 'vaNr', 'vaGeb', 'vaEcht'].forEach((id) => {
     const el = $(id); if (!el) return;
     el.addEventListener('change', vorabStand);
     el.addEventListener('blur', vorabStand);
   });
+  // Beim Geburtsdatum schon waehrend des Tippens mitrechnen: man sieht sofort,
+  // ob man sich vertippt hat, statt es erst beim Weiterklicken zu merken.
+  if ($('vaGeb')) $('vaGeb').addEventListener('input', () => zeigeAlter('vaGeb', 'vaAlter'));
   if ($('vaBilder')) $('vaBilder').addEventListener('click', () => {
     // Fuehrt in denselben Ablauf wie im Gespraech - die Bilder warten dann
     // auf den Pruefer und gehen los, sobald er da ist.
@@ -2249,6 +2300,7 @@
         vaName: ($('vaName') || {}).value || '',
         vaArt: ($('vaArt') || {}).value || '',
         vaNr: ($('vaNr') || {}).value || '',
+        vaGeb: ($('vaGeb') || {}).value || '',
         vaEcht: !!(($('vaEcht') || {}).checked),
         akGelesen: !!state.akGelesen,
         bereit: !!state.bereitGemeldet,
@@ -2295,6 +2347,7 @@
     if ($('vaName')) $('vaName').value = r.vaName || '';
     if ($('vaArt')) $('vaArt').value = r.vaArt || '';
     if ($('vaNr')) $('vaNr').value = r.vaNr || '';
+    if ($('vaGeb')) $('vaGeb').value = r.vaGeb || '';
     if ($('vaEcht')) $('vaEcht').checked = !!r.vaEcht;
     vorabStand();
     if (r.vaName || r.vaNr) toast('Deine Ausweisdaten waren noch da.');
@@ -2315,7 +2368,7 @@
       { was: 'Aufklärung gelesen', ok: !!state.akGelesen,
         hilfe: 'Öffne oben mindestens einen der Kästen – damit du weißt, worauf du dich einlässt.' },
       { was: 'Ausweisdaten eingetragen', ok: !!(vorab && vorab.classList.contains('fertig')),
-        hilfe: 'Name, Ausweisart, Nummer – und die Erklärung abhaken.' },
+        hilfe: 'Name, Geburtsdatum, Ausweisart und Nummer – und die Erklärung abhaken.' },
       { was: 'Selfie mit Ausweis aufgenommen', ok: !!state.selfieFertig,
         hilfe: 'Ausweis neben das Gesicht halten und auf „Aufnahme starten" tippen.' },
     ];
@@ -2756,12 +2809,14 @@
         setz('vBigoNick', m.bigoNick);
         setz('vAge', m.age);
         setz('vName', m.ausweisName);
+        setz('vGeb', m.ausweisGeb);
         setz('vDocType', m.ausweisArt);
         setz('vDocNumber', m.ausweisNr);
         // Was der Bewerber selbst getippt hat, bleibt als Vergleich stehen.
         state.vorab = { vBigoName: m.bigoName || '', vBigoNick: m.bigoNick || '', vAge: m.age || '', vName: m.ausweisName || '',
-          vDocType: m.ausweisArt || '', vDocNumber: m.ausweisNr || '' };
+          vDocType: m.ausweisArt || '', vDocNumber: m.ausweisNr || '', vGeb: m.ausweisGeb || '' };
         zeigeVorab();
+        pruefAlter();
         if (m.ausweisName || m.ausweisNr) {
           const z = $('zusicherung');
           if (z) {
@@ -2877,6 +2932,7 @@
     addShot('hostShots', label, dataUrl);
     $('reviewStatus').className = 'status ok';
     $('reviewStatus').textContent = state.docs.length + ' Bild(er) vom Bewerber erhalten.';
+    akteVorschau();
     // Namensfeld noch leer? -> Hinweis
   }
   $('snapDoc').addEventListener('click', () => snapshot('Ausweis (Live)'));
@@ -2886,10 +2942,49 @@
     const c = document.createElement('canvas'); c.width = remoteVideo.videoWidth; c.height = remoteVideo.videoHeight;
     c.getContext('2d').drawImage(remoteVideo, 0, 0);
     const url = c.toDataURL('image/jpeg', 0.9); state.snaps.push({ label, dataUrl: url });
+    setTimeout(akteVorschau, 0);
     addShot('snapShots', label, url); toast(label + ' aufgenommen');
   }
   function checkBoxes() { return Array.from(document.querySelectorAll('#checklist input[data-chk]')); }
-  $('checklist').addEventListener('change', () => { $('approveBtn').disabled = state.caseDone || !checkBoxes().every((c) => c.checked); });
+  $('checklist').addEventListener('change', () => {
+    $('approveBtn').disabled = state.caseDone || !checkBoxes().every((c) => c.checked);
+    akteVorschau();
+  });
+
+  /* ---- Was landet gleich in der Akte? ------------------------------------
+   * Vor der Freigabe, nicht danach. Was hier fehlt, fehlt nachher in der Akte
+   * - und nachtragen ist die Arbeit, die dann niemand mehr macht. Es hält
+   * niemanden auf: freigeben kann man trotzdem, man weiss es nur vorher.
+   */
+  function akteVorschau() {
+    const el = $('akteVorschau'); if (!el) return;
+    const w = (id) => { const e = $(id); return e ? String(e.value || '').trim() : ''; };
+    const bilder = (state.docs || []).length + (state.snaps || []).length;
+    const punkte = [
+      ['BIGO-ID', !!w('vBigoName'), w('vBigoName')],
+      ['Name laut Ausweis', !!w('vName'), w('vName')],
+      ['Geburtsdatum', !!w('vGeb') && alterAus(w('vGeb')) !== null,
+        w('vGeb') ? w('vGeb') + (alterAus(w('vGeb')) !== null ? ' (' + alterAus(w('vGeb')) + ' Jahre)' : '') : ''],
+      ['Ausweisart', !!w('vDocType'), w('vDocType')],
+      ['Ausweis-Nummer', !!w('vDocNumber'), w('vDocNumber')],
+      ['Ausweisbilder', bilder >= 2, bilder + ' Bild(er)'],
+      ['Aufnahme', !!state.recSitzung || !!state.recFertig, state.recFertig ? 'gespeichert' : 'läuft mit'],
+    ];
+    const fehlt = punkte.filter((p) => !p[1]);
+    el.className = 'aktevorschau ' + (fehlt.length ? 'luecken' : 'voll');
+    el.innerHTML = '<div class="av-kopf">' + (fehlt.length
+      ? '⚠️ Die Akte bliebe unvollständig – ' + fehlt.length + ' von ' + punkte.length + ' fehlt'
+      : '✓ Die Akte wird vollständig – alle ' + punkte.length + ' Angaben da') + '</div>'
+      + (fehlt.length
+        ? '<div>Freigeben kannst du trotzdem. Nur: was jetzt fehlt, fehlt nachher auch.</div>'
+          + '<ul>' + fehlt.map((p) => '<li>' + esc(p[0]) + '</li>').join('') + '</ul>'
+        : '<ul>' + punkte.map((p) => '<li class="da">✓ ' + esc(p[0])
+            + (p[2] ? ' <b>' + esc(p[2]) + '</b>' : '') + '</li>').join('') + '</ul>');
+  }
+  // Eigene Liste statt VFELDER: die Konstante steht weiter unten in der Datei
+  // und waere hier oben noch nicht da.
+  ['vBigoName', 'vBigoNick', 'vAge', 'vName', 'vGeb', 'vDocType', 'vDocNumber', 'vNote']
+    .forEach((id) => { if ($(id)) $(id).addEventListener('input', akteVorschau); });
 
   // ---- Abgleich beim Ausfuellen der Akte -----------------------------------
   // Waehrend der Pruefer die Ausweisdaten eintippt, wird nachgesehen, ob es
@@ -2962,6 +3057,9 @@
       code: state.code, bigoName: $('vBigoName').value,
       bigoNick: $('vBigoNick') ? $('vBigoNick').value : '', age: $('vAge').value,
       verifiedName: $('vName').value, docNumber: $('vDocNumber').value, docType: $('vDocType').value,
+      // Das Geburtsdatum gehoert in die Akte: daraus kommt das Alter, und die
+      // Verifikation braucht es spaeter als Beleg fuer "mindestens 18".
+      geburtsdatum: $('vGeb') ? $('vGeb').value.trim() : '',
       note: $('vNote').value,
       result, rejectReason: rejectReason || '', agentName: state.name,
       checklist: checkBoxes().map((c) => ({ label: c.parentElement.textContent.trim(), checked: c.checked })),
@@ -3139,7 +3237,7 @@
   // Werte nebeneinander: unten, was der Bewerber geschrieben hat, oben im Feld,
   // was gilt. Ändern darf der Prüfer jederzeit; man sieht dann, dass er es
   // getan hat. Nichts wird still überschrieben.
-  const VFELDER = ['vBigoName', 'vBigoNick', 'vAge', 'vName', 'vDocType', 'vDocNumber'];
+  const VFELDER = ['vBigoName', 'vBigoNick', 'vAge', 'vName', 'vGeb', 'vDocType', 'vDocNumber'];
   function zeigeVorab() {
     const v = state.vorab || {};
     VFELDER.forEach((id) => {
@@ -3157,6 +3255,43 @@
     grossPruefen();
   }
   VFELDER.forEach((id) => { if ($(id)) $(id).addEventListener('input', () => { zeigeVorab(); }); });
+
+  /* ---- Alter beim Pruefer: ausgerechnet, nicht geglaubt -------------------
+   * Neben dem Geburtsdatum steht, wie alt die Person heute ist. Passt das
+   * nicht zu dem Alter, das sie selbst angegeben hat, sagen wir es - das ist
+   * genau die Stelle, an der ein falsch abgetippter Ausweis auffaellt.
+   */
+  function pruefAlter() {
+    const f = $('vGeb'); if (!f) return null;
+    let mk = $('vAlterHinweis');
+    if (!mk && f.parentNode) {
+      mk = document.createElement('small');
+      mk.id = 'vAlterHinweis'; mk.className = 'alter-hinweis';
+      f.parentNode.appendChild(mk);
+    }
+    if (!mk) return null;
+    const t = f.value.trim();
+    if (!t) { mk.textContent = ''; mk.className = 'alter-hinweis'; return null; }
+    const a = alterAus(t);
+    if (a === null) {
+      mk.textContent = '⚠️ Kein gültiges Datum – bitte TT.MM.JJJJ';
+      mk.className = 'alter-hinweis warn'; return null;
+    }
+    const gesagt = parseInt(($('vAge').value || '').trim(), 10);
+    if (a < 18) {
+      mk.textContent = '⛔ Laut Ausweis erst ' + a + ' Jahre – nicht volljährig.';
+      mk.className = 'alter-hinweis stop';
+    } else if (!isNaN(gesagt) && Math.abs(gesagt - a) > 1) {
+      mk.textContent = '⚠️ Ausweis sagt ' + a + ', angegeben war ' + gesagt + ' – bitte nachsehen.';
+      mk.className = 'alter-hinweis warn';
+    } else {
+      mk.textContent = '✓ ' + a + ' Jahre – volljährig.';
+      mk.className = 'alter-hinweis ok';
+    }
+    return a;
+  }
+  if ($('vGeb')) $('vGeb').addEventListener('input', pruefAlter);
+  if ($('vAge')) $('vAge').addEventListener('input', pruefAlter);
 
   /**
    * Großschreibung. Auf einem Handy schreiben viele alles klein – „mia
@@ -3370,8 +3505,9 @@
           sysMsg(r.body.unvollstaendig
             ? 'Aufnahme gespeichert – aber unvollständig, es fehlen Stücke.'
             : 'Aufnahme verschlüsselt gespeichert (lief schon während des Gesprächs mit).');
-          state.recSitzung = null;
+          state.recSitzung = null; state.recFertig = true;
           recCheckOeffnen(r.body.id, dur, r.body.bytes);
+          akteVorschau();
           return;
         }
       } catch { /* fällt unten auf den alten Weg zurück */ }
@@ -3438,6 +3574,7 @@
   }
   function resetForNext() {
     state.docs = []; state.snaps = []; state.pendingDocs = []; state.recChunks = []; state.recStarted = false;
+    state.recFertig = false;
     zeigeRec(false); wroomAus();
     document.querySelectorAll('.camoff').forEach((e) => e.remove());
     const cb = $('camBtn'); if (cb) { cb.textContent = '📷 Kamera an'; cb.classList.remove('danger'); }

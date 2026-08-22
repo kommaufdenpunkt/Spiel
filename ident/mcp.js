@@ -90,11 +90,13 @@ function baueNutzlast(fall, aufnahme) {
       bigoName: fall.bigoNick || '',
       name: fall.verifiedName || '',
       alter: fall.age || '',
+      geburtsdatum: fall.geburtsdatum || '',
     },
     audition: {
       id: fall.id,
       zugangsnummer: fall.code || '',
       ergebnis: fall.result,                     // approved | rejected | open
+      geburtsdatum: fall.geburtsdatum || '',
       ablehnungsgrund: fall.rejectReason || '',
       pruefer: fall.agentName || '',
       ausweisart: fall.docType || '',

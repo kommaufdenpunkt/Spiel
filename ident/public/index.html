@@ -561,6 +561,32 @@
   .vorab input,.vorab select{width:100%;margin-bottom:.5rem;font-size:.95rem;padding:.6rem .8rem;border-radius:10px;
     border:1px solid var(--line);background:#0f1728;color:var(--ink)}
   .vorab-zeile{display:flex;gap:.5rem;flex-wrap:wrap}
+  .vorab-zeile>input,.vorab-zeile>select{flex:1;min-width:0}
+  /* Das ausgerechnete Alter direkt am Geburtsdatum: man sieht sofort, ob die
+     Eingabe stimmt, und der Pruefer muss nicht im Kopf rechnen. */
+  .vorab-alter{display:inline-flex;align-items:center;padding:0 .6rem;border-radius:10px;
+    font-size:.82rem;font-weight:700;white-space:nowrap;background:#152238;border:1px solid var(--line2);color:var(--dim)}
+  .vorab-alter.ok{color:#5fe0a0;border-color:#2f6b45;background:#16281c}
+  .vorab-alter.zu-jung{color:#ff9d9d;border-color:#6b2f2f;background:#2a1616}
+  .vorab-alter:empty{display:none}
+  /* Beim Pruefer: das ausgerechnete Alter unter dem Feld, mit Ampel. */
+  .alter-hinweis{display:block;margin-top:.2rem;font-size:.75rem;line-height:1.4;color:var(--dim)}
+  .alter-hinweis.ok{color:#5fe0a0}
+  .alter-hinweis.warn{color:#ffd479}
+  .alter-hinweis.stop{color:#ff9d9d;font-weight:700}
+  .alter-hinweis:empty{display:none}
+  /* Vorschau auf die Akte, bevor freigegeben wird */
+  .aktevorschau{border:1px solid var(--line);border-radius:12px;background:#111c2e;padding:.7rem .8rem;
+    margin:.7rem 0;font-size:.82rem;line-height:1.55}
+  .aktevorschau b{color:var(--ink)}
+  .aktevorschau .av-kopf{display:flex;align-items:center;gap:.4rem;font-weight:700;margin-bottom:.35rem}
+  .aktevorschau.voll{border-color:#2f6b45;background:#12261d}
+  .aktevorschau.voll .av-kopf{color:#5fe0a0}
+  .aktevorschau.luecken .av-kopf{color:#ffd479}
+  .aktevorschau ul{margin:.3rem 0 0;padding-left:1.1rem;color:var(--dim)}
+  .aktevorschau li{margin:.12rem 0}
+  .aktevorschau li.da{color:#5fe0a0;list-style:none;margin-left:-1.1rem}
+  .aktevorschau:empty{display:none}
   .vorab-zeile select,.vorab-zeile input{flex:1;min-width:150px}
   .vorab-fuss{display:flex;gap:.6rem;align-items:center;justify-content:space-between;flex-wrap:wrap}
   .vorab-fuss .muted{font-size:.78rem;color:var(--dim);flex:1;min-width:150px}
@@ -1061,7 +1087,7 @@
           <div class="bub">
             <span class="bic">📝</span>
             <div class="btxt"><b>Daten eintippen – jetzt schon</b>
-              Name wie im Ausweis, Ausweisart, Nummer. Unten in diesem Fenster.
+              Name wie im Ausweis, Geburtsdatum, Ausweisart und Nummer. Unten in diesem Fenster.
               <em>Warum: Damit der Prüfer im Gespräch nicht tippen muss, sondern dich anschauen kann.
               Er vergleicht dann nur noch mit dem, was er im Bild sieht. Das macht das Gespräch kurz.</em>
             </div>
@@ -1152,6 +1178,14 @@
         </details>
 
         <input id="vaName" placeholder="Name, genau wie er im Ausweis steht" autocomplete="name">
+        <!-- Das Geburtsdatum stand bisher nur in der Erklaerung am Beispiel-
+             ausweis, aber es gab kein Feld dafuer. Damit blieb die Akte danach
+             unvollstaendig, und "18+" war eine Behauptung statt einer Angabe,
+             die man nachrechnen kann. -->
+        <div class="vorab-zeile">
+          <input id="vaGeb" inputmode="numeric" placeholder="Geburtsdatum (TT.MM.JJJJ)" autocomplete="bday">
+          <span id="vaAlter" class="vorab-alter"></span>
+        </div>
         <div class="vorab-zeile">
           <select id="vaArt">
             <option value="">Ausweisart wählen …</option>
@@ -1321,6 +1355,7 @@
       <div class="vfeld"><input id="vBigoNick" placeholder="Name auf BIGO (z. B. Tauchküken)"><small class="vorab-wert" data-fuer="vBigoNick"></small></div>
       <div class="vfeld"><input id="vAge" inputmode="numeric" placeholder="Alter (Jahre)"><small class="vorab-wert" data-fuer="vAge"></small></div>
       <div class="vfeld"><input id="vName" placeholder="Name laut Ausweis"><small class="vorab-wert" data-fuer="vName"></small></div>
+      <div class="vfeld"><input id="vGeb" inputmode="numeric" placeholder="Geburtsdatum (TT.MM.JJJJ)"><small class="vorab-wert" data-fuer="vGeb"></small></div>
       <div class="vfeld"><input id="vDocNumber" placeholder="Ausweis-Nr. (Altersnachweis)"><small class="vorab-wert" data-fuer="vDocNumber"></small></div>
       <div class="vfeld"><input id="vDocType" placeholder="Ausweisart (z. B. Personalausweis)"><small class="vorab-wert" data-fuer="vDocType"></small></div>
       <div class="schreib">
@@ -1336,6 +1371,10 @@
         <label><input type="checkbox" data-chk><span>Ausweis wirkt echt (Hologramm/kein Foto vom Foto)</span></label>
         <label><input type="checkbox" data-chk><span><b>Mindestens 18 Jahre</b> – Geburtsdatum im Ausweis geprüft</span></label>
       </div>
+      <!-- Was landet gleich in der Akte, und was fehlt noch? Vor der Freigabe,
+           nicht danach - hinterher nachzutragen ist die Arbeit, die niemand
+           macht. -->
+      <div class="aktevorschau" id="akteVorschau"></div>
       <button id="approveBtn" class="good" disabled>✅ Freigeben &amp; Akte anlegen</button>
       <button id="rejectBtn" class="danger">✖ Ablehnen</button>
     </div>

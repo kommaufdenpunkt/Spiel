@@ -286,6 +286,10 @@ function saveCase(data) {
     verifiedName: String(data.verifiedName || '').slice(0, 120),
     docType: String(data.docType || '').slice(0, 40),
     docNumber: String(data.docNumber || '').slice(0, 60),
+    // Das Geburtsdatum aus dem Ausweis. Daraus kommt das Alter, und die
+    // spaetere Verifikation belegt damit "mindestens 18" - vorher stand in
+    // der Akte nur das Alter, das jemand von sich behauptet hat.
+    geburtsdatum: String(data.geburtsdatum || '').slice(0, 20),
     note: String(data.note || '').slice(0, 500),
     result: data.result === 'approved' ? 'approved' : (data.result === 'rejected' ? 'rejected' : 'open'),
     rejectReason: String(data.rejectReason || '').slice(0, 200),
@@ -1059,6 +1063,7 @@ function ablegen(paket) {
     pruefer: String(a.pruefer || '').slice(0, 60),
     ausweisart: String(a.ausweisart || '').slice(0, 40),
     ausweisnummer: String(a.ausweisnummer || '').slice(0, 60),
+    geburtsdatum: String(a.geburtsdatum || '').slice(0, 20),
     notiz: String(a.notiz || '').slice(0, 500),
     erstelltAm: String(a.erstelltAm || jetzt),
     // Was der Prüfer abgehakt hat und welcher Wortlaut galt – beides gehört
@@ -1091,6 +1096,7 @@ function ablegen(paket) {
   // eintippen, und die Akte ist nach der Audition schon gepflegt.
   const rein = stammErgaenzen(ordner, {
     nameLautAusweis: (paket.streamer && paket.streamer.name) || '',
+    geburtsdatum: (paket.streamer && paket.streamer.geburtsdatum) || '',
     ausweisart: eintrag.ausweisart, ausweisnummer: eintrag.ausweisnummer,
   });
   if (rein.length) {

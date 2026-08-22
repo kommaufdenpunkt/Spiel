@@ -74,6 +74,41 @@ Zuordnung steht als Vermerk in der Akte.
 Der ungekürzte Name bleibt trotzdem eine eigene Kennung: sonst würde aus einer
 echten „Eyleen" eine „leen". Beide Wege gelten, keiner ersetzt den anderen.
 
+## Das Geburtsdatum – und warum die Akte davon lebt
+
+Der Beispielausweis erklärte es von Anfang an („3 · Geburtstag"), aber es gab
+**kein Feld dafür**. Damit blieb die Akte hinterher unvollständig, und „18+" war
+eine Behauptung statt einer Angabe, die man nachrechnen kann.
+
+Jetzt trägt die Bewerberin es im Warteraum ein, direkt unter dem Namen:
+
+- **Beim Tippen wird mitgerechnet.** Neben dem Feld steht „24 Jahre", grün ab 18,
+  rot darunter. Unmögliche Daten (31.02.) werden erkannt. Angenommen wird
+  `03.07.1999`, `3.7.1999`, `1999-07-03` und `07/03/1999` – abgewiesen nur, was
+  wirklich kein Datum ist.
+- **Der Prüfer bekommt es übertragen** und sieht darunter: „✓ 24 Jahre –
+  volljährig". Weicht es um mehr als ein Jahr von dem ab, was sie selbst
+  angegeben hat, steht dort „Ausweis sagt 24, angegeben war 27 – bitte
+  nachsehen." Genau so fällt ein falsch abgetippter Ausweis auf.
+- **Es wandert in die Akte:** an die Audition, in die Stammdaten, auf das
+  Ausweisblatt (PDF) und in die vorausgefüllte Altersverifikation.
+
+## Vor der Freigabe: was landet gleich in der Akte?
+
+Über dem Freigabe-Knopf steht, was die Akte nachher enthält – **vorher**, nicht
+hinterher. Fehlt etwas, steht da:
+
+> ⚠️ Die Akte bliebe unvollständig – 2 von 7 fehlt
+> Freigeben kannst du trotzdem. Nur: was jetzt fehlt, fehlt nachher auch.
+
+Geprüft werden BIGO-ID, Name, Geburtsdatum, Ausweisart, Nummer, mindestens zwei
+Ausweisbilder und die Aufnahme. Es hält niemanden auf – man weiss es nur
+vorher, statt es Wochen später in einer halben Akte zu entdecken.
+
+Und sobald die Akte gespeichert ist, wandelt der Server die Aufnahme **im
+Hintergrund** in MP4 und in die kleine Fassung. Wer die Akte später öffnet,
+findet beides fertig vor, statt beim Herunterladen zu warten.
+
 ## Der Ablauf: erst fertig, dann abholen
 
 Die Bewerberin bestimmt, wann es losgeht:

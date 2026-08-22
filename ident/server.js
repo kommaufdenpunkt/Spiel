@@ -851,6 +851,16 @@ async function handleApi(req, res, urlPath, ip) {
       ...body, agentName: reqName(req, ip) || body.agentName,
       skript: store.getScript(), einleitung: store.getIntro(),
     });
+    // Die Aufnahme gleich ins Handy-Format bringen - im Hintergrund, ohne dass
+    // jemand darauf wartet. Wer die Akte spaeter oeffnet, findet sie fertig
+    // vor, statt beim Herunterladen zuzusehen, wie umgewandelt wird.
+    const fertigRec = store.listRecordings().find((r) => r.code === rec.code);
+    if (fertigRec) {
+      Promise.resolve()
+        .then(() => store.mp4Fassung(fertigRec.id, 'mp4'))
+        .then(() => store.mp4Fassung(fertigRec.id, 'klein'))
+        .catch((e) => console.log('[rec] Vorab-Umwandlung fehlgeschlagen: ' + (e && e.message)));
+    }
     // Wurde die Aufnahme schon ausgewertet, bevor die Akte angelegt war?
     // Dann gehört die Einschätzung jetzt hier hinein.
     const auf = store.listRecordings().find((r) => r.code === rec.code && r.quality);
