@@ -729,7 +729,7 @@ function render() {
 function header() {
   const u = state.user;
   return `<header>
-    <div class="brand"><img class="logo" src="/logo.svg" alt="" width="24" height="24" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'logo',textContent:'🚗'}))"> <span class="brandname">ginoco</span></div>
+    <div class="brand"><img class="logo" src="/logo.svg?v=3611" alt="" width="24" height="24" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'logo',textContent:'🚗'}))"> <span class="brandname">ginoco</span></div>
     <div class="who">
       <span class="role">${u.role === 'instructor' ? 'Fahrlehrer' : 'Fahrschüler'}</span>
       <strong>${esc(u.name || '')}</strong>${u.username ? `<span class="pill">${esc(u.username)}</span>` : ''}
@@ -887,13 +887,15 @@ function renderAuth() {
   const draw = () => {
     app.innerHTML = `<div class="auth-wrap"><div class="auth">
       <div class="auth-hero">
-        <div class="auth-logo"><img src="/logo.svg" alt="Ginoco" width="70" height="70" onerror="this.replaceWith(Object.assign(document.createElement('span'),{textContent:'🚗'}))"></div>
+        <div class="auth-logo"><img src="/logo.svg?v=3611" alt="Ginoco" width="70" height="70" onerror="this.replaceWith(Object.assign(document.createElement('span'),{textContent:'🚗'}))"></div>
         <h1 class="auth-name">ginoco</h1>
         <div class="tag">${tagline}</div>
       </div>
-      ${mode !== 'admin' ? `<div class="auth-feats">
+      ${mode === 'admin' ? `<div class="auth-feats">
+        <span>📅 Tagesplan</span><span>🧑‍🎓 Fahrschüler</span><span>⭐ Bewertungen</span><span>🔔 Push</span>
+      </div>` : `<div class="auth-feats">
         <span>📅 Selbst buchen</span><span>🎁 Tauschen</span><span>📍 Live-Abholung</span>
-      </div>` : ''}
+      </div>`}
       <div class="card">
         ${TABS.length > 1 ? `<div class="tabs">
           ${TABS.map(([t, l]) => `<button data-t="${t}" class="${tab === t ? 'active' : ''}">${l}</button>`).join('')}
