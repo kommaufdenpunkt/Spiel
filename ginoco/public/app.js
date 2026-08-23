@@ -783,7 +783,7 @@ function render() {
 function header() {
   const u = state.user;
   return `<header>
-    <div class="brand"><img class="logo" src="/logo.svg?v=3611" alt="" width="24" height="24" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'logo',textContent:'🚗'}))"> <span class="brandname">ginoco</span></div>
+    <div class="brand"><img class="logo" src="/logo.svg?v=3630" alt="" width="24" height="24" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'logo',textContent:'🚗'}))"> <span class="brandname">ginoco</span></div>
     <div class="who">
       <span class="role">${u.role === 'instructor' ? 'Fahrlehrer' : 'Fahrschüler'}</span>
       ${u.role === 'instructor' ? '' : `<strong>${esc(u.name || '')}</strong>`}${u.username ? `<span class="pill">${esc(u.username)}</span>` : ''}
@@ -941,7 +941,7 @@ function renderAuth() {
   const draw = () => {
     app.innerHTML = `<div class="auth-wrap"><div class="auth">
       <div class="auth-hero">
-        <div class="auth-logo"><img src="/logo.svg?v=3611" alt="Ginoco" width="70" height="70" onerror="this.replaceWith(Object.assign(document.createElement('span'),{textContent:'🚗'}))"></div>
+        <div class="auth-logo"><img src="/logo.svg?v=3630" alt="Ginoco" width="70" height="70" onerror="this.replaceWith(Object.assign(document.createElement('span'),{textContent:'🚗'}))"></div>
         <h1 class="auth-name">ginoco</h1>
         <div class="tag">${tagline}</div>
       </div>
