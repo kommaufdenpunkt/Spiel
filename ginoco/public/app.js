@@ -454,8 +454,11 @@ function openTour() {
 window.__openTour = openTour;
 
 // ---------- Was ist neu? (Changelog) ----------
-const CHANGELOG_VER = '3.62';
+const CHANGELOG_VER = '3.63';
 const CHANGELOG = [
+  { v: '3.63', d: '23.08.2026', title: '🧾 Rechnungsdatum im Protokoll', items: [
+    '🧾 Im Protokoll siehst du jetzt bei jeder Stunde, unter welchem Datum sie auf der Rechnung erscheint – gefahren am … · auf der Rechnung am …',
+    '📄 Steht auch auf dem ausgedruckten Fahrstunden-Nachweis, damit alles zusammenpasst.'] },
   { v: '3.62', d: '23.08.2026', title: '✍️ Unterschreiben & Töne', items: [
     '✍️ Nachgetragene Fahrstunden bestätigst du jetzt selbst: Dein Fahrlehrer trägt eine Stunde nach, du bekommst eine Benachrichtigung und unterschreibst mit dem Finger direkt in der App.',
     '📄 Deine Unterschrift erscheint auf dem Fahrstunden-Nachweis („✓ vom Fahrschüler bestätigt").',
@@ -1181,7 +1184,7 @@ function renderMyLessons(bookings) {
       ? `<button class="sm ml-sign" data-sign="${b.id}">✍️ Unterschreiben</button>`
       : (b.signed_at ? `<span class="pill" style="background:var(--good-bg);color:var(--good)">✓ unterschrieben</span>` : '');
     return `<tr class="${noshow ? 'ml-noshow' : ''} ${b.needs_sign ? 'ml-tosign' : ''}">
-      <td class="ml-when" data-label="Wann"><strong>${fmtDT(b.date, b.start_time)}</strong>${nachgetragen ? `<span class="ml-entry">nachgetragen · eingetragen ${fmtDT(entryDate)}</span>` : ''}${sign ? `<div class="ml-signcell">${sign}</div>` : ''}</td>
+      <td class="ml-when" data-label="Wann"><strong>${fmtDT(b.date, b.start_time)}</strong>${nachgetragen ? `<span class="ml-entry">nachgetragen · eingetragen ${fmtDT(entryDate)}</span>` : ''}${b.invoice_date ? `<span class="ml-entry ml-inv">🧾 auf der Rechnung: ${fmtDT(b.invoice_date)}${b.invoice_time ? ' ' + b.invoice_time + ' Uhr' : ''}</span>` : ''}${sign ? `<div class="ml-signcell">${sign}</div>` : ''}</td>
       <td data-label="Ende">${noshow ? '—' : 'bis ' + addMinHHMM(b.start_time, b.duration_min)}</td>
       <td data-label="Dauer">${noshow ? '🚫 nicht da' : (b.duration_min + ' Min')}</td>
       <td data-label="Art">${noshow ? '' : lessonTypeLabel(b.lesson_type)}</td>
@@ -1556,7 +1559,7 @@ function printLessonProof(name, done) {
     const artL = { ueberland: 'Überland', autobahn: 'Autobahn', nacht: 'Nachtfahrt' }[b.lesson_type] || 'Normal';
     return `<tr>
       <td class="c">${i + 1}</td>
-      <td>${fmtDT(b.date, b.start_time)}${nachgetragen ? `<br><span class="entry">nachgetragen · eingetragen ${fmtDT(entryDate)}</span>` : ''}</td>
+      <td>${fmtDT(b.date, b.start_time)}${nachgetragen ? `<br><span class="entry">nachgetragen · eingetragen ${fmtDT(entryDate)}</span>` : ''}${b.invoice_date ? `<br><span class="entry" style="color:#b26a00">🧾 auf der Rechnung: ${fmtDT(b.invoice_date)}${b.invoice_time ? ' ' + b.invoice_time + ' Uhr' : ''}</span>` : ''}</td>
       <td class="c">${noshow ? '—' : addMinHHMM(b.start_time, b.duration_min)}</td>
       <td class="c">${noshow ? 'nicht erschienen' : b.duration_min + ' Min'}</td>
       <td class="c">${noshow ? '' : artL}</td>
@@ -3041,6 +3044,13 @@ function openLogLessonModal(sid, name) {
     <label class="ck-line"><input type="checkbox" id="lg-att" checked> Fahrschüler ist erschienen (gefahren)</label>
     <div class="field"><label>Vermerk <span class="muted">(sieht der Fahrschüler – z.B. Verlauf/Besonderes)</span></label>
       <textarea id="lg-note" rows="3" placeholder="z.B. 20 Min zu spät gekommen, restliche 60 Min gefahren – Kreisverkehr & Vorfahrt geübt." style="resize:vertical"></textarea></div>
+    <details class="lg-inv"><summary>🧾 Abweichendes Rechnungsdatum (optional)</summary>
+      <p class="hint">Falls diese Stunde auf der Rechnung an einem anderen Tag/Uhrzeit erscheint (z.B. wegen der 495-Min-Tagesgrenze deines Abrechnungsprogramms). Der Fahrschüler sieht dann im Protokoll: gefahren am … · auf der Rechnung am …</p>
+      <div class="row">
+        <div class="field"><label>Rechnungsdatum</label><input type="date" id="lg-invdate"></div>
+        <div class="field"><label>Rechnungsuhrzeit</label><input id="lg-invtime" placeholder="z.B. 09:00"></div>
+      </div>
+    </details>
     <div class="actions"><button class="sec" onclick="window.__closeModal()">Abbrechen</button><button id="lg-save">Nachtragen</button></div>`);
   $('#lg-save').onclick = async () => {
     const date = $('#lg-date').value, time = $('#lg-time').value.trim();
@@ -3050,12 +3060,64 @@ function openLogLessonModal(sid, name) {
         student_id: sid, date, start_time: time,
         duration_min: Number($('#lg-dur').value), late_minutes: Number($('#lg-late').value) || 0,
         lesson_type: $('#lg-type').value || 'normal', attended: $('#lg-att').checked,
-        feedback: $('#lg-note').value } });
+        feedback: $('#lg-note').value,
+        invoice_date: $('#lg-invdate').value || '', invoice_time: $('#lg-invtime').value.trim() } });
       closeModal(); toast('Fahrstunde nachgetragen ✓', 'ok');
       try { refreshEventBadge(); } catch {}
       if (typeof tabSchueler === 'function' && $('#itab')) { /* Liste ggf. aktuell halten */ }
     } catch (e) { toast(e.message, 'err'); }
   };
+}
+
+// Rechnungsdaten verwalten (Fahrlehrer): pro gefahrener Stunde ein abweichendes
+// Rechnungsdatum/-zeit setzen. Zeigt die Minuten je Rechnungstag (Warnung > 495).
+function openInvoiceModal(sid, name) {
+  modal(`<h3>🧾 Rechnungsdaten – ${esc(name)}</h3>
+    <p class="hint">Eine Stunde wird an ihrem <strong>Fahrdatum</strong> gefahren, kann aber auf der <strong>Rechnung</strong> an einem anderen Tag/Uhrzeit erscheinen (z.&nbsp;B. wegen der 495-Min-Tagesgrenze deines Abrechnungsprogramms). Trag hier das Rechnungsdatum ein – der Fahrschüler sieht im Protokoll <em>beides</em>.</p>
+    <div id="inv-body"><p class="hint">Lädt…</p></div>
+    <div class="actions"><button onclick="window.__closeModal()">Fertig</button></div>`, 'wide');
+  const render = async () => {
+    const box = $('#inv-body'); if (!box) return;
+    let data; try { data = await api('/api/students/' + sid + '/lessons'); } catch (e) { box.innerHTML = `<p class="err">${esc(e.message)}</p>`; return; }
+    const lessons = (data.lessons || []).filter((l) => l.attended !== 0)
+      .sort((a, z) => (a.date + a.start_time).localeCompare(z.date + z.start_time));
+    // Minuten je Rechnungstag (Rechnungsdatum, sonst Fahrdatum)
+    const byDay = {};
+    lessons.forEach((l) => { const d = l.invoice_date || l.date; byDay[d] = (byDay[d] || 0) + (l.duration_min || 0); });
+    const dayRows = Object.keys(byDay).sort().map((d) => {
+      const m = byDay[d];
+      return `<div class="inv-day"><span>${fmtDT(d)}</span><span>${m} Min (${(m / 60).toFixed(1).replace('.', ',')} h)</span></div>`;
+    }).join('');
+    const rows = lessons.map((l) => {
+      const art = (l.lesson_type && l.lesson_type !== 'normal') ? ' · ' + lessonTypeLabel(l.lesson_type) : '';
+      return `<div class="inv-row" data-id="${l.id}">
+        <div class="inv-drove">🚗 <strong>${fmtDT(l.date, l.start_time)}</strong> · ${l.duration_min} Min${art}${l.invoice_date ? ` <span class="pill" style="background:var(--good-bg);color:var(--good)">🧾 ${fmtDT(l.invoice_date)}${l.invoice_time ? ' ' + l.invoice_time : ''}</span>` : ''}</div>
+        <div class="inv-fields">
+          <input type="date" class="inv-d" value="${l.invoice_date || ''}" aria-label="Rechnungsdatum">
+          <input class="inv-t" placeholder="HH:MM" value="${l.invoice_time || ''}" aria-label="Rechnungsuhrzeit">
+          <button class="sm inv-save">Speichern</button>
+          ${l.invoice_date ? '<button class="ghost sm inv-clr" title="Zurücksetzen">✕</button>' : ''}
+        </div>
+      </div>`;
+    }).join('');
+    box.innerHTML = `<div class="inv-days"><div class="inv-days-h">Minuten je Rechnungstag</div>${dayRows || '<span class="hint">–</span>'}</div>
+      <div class="inv-list">${rows || '<p class="hint">Noch keine gefahrenen Stunden zum Abrechnen.</p>'}</div>`;
+    box.querySelectorAll('.inv-row').forEach((row) => {
+      const id = row.dataset.id;
+      row.querySelector('.inv-save').onclick = async () => {
+        try {
+          await api('/api/bookings/' + id, { method: 'PATCH', body: { invoice_date: row.querySelector('.inv-d').value, invoice_time: row.querySelector('.inv-t').value.trim() } });
+          toast('Gespeichert ✓', 'ok'); render();
+        } catch (e) { toast(e.message, 'err'); }
+      };
+      const clr = row.querySelector('.inv-clr');
+      if (clr) clr.onclick = async () => {
+        try { await api('/api/bookings/' + id, { method: 'PATCH', body: { invoice_date: '', invoice_time: '' } }); toast('Zurückgesetzt', 'ok'); render(); }
+        catch (e) { toast(e.message, 'err'); }
+      };
+    });
+  };
+  render();
 }
 
 async function instrCancel(id) {
@@ -3563,6 +3625,7 @@ async function tabSchueler(scope) {
           <div class="stu-actions">
             <button class="iconbtn" data-edit="${s.id}" title="Bearbeiten" aria-label="Bearbeiten"><span class="ib-ic">✏️</span><span class="ib-lb">Bearbeiten</span></button>
             <button class="iconbtn" data-log="${s.id}" data-lname="${esc(s.name)}" title="Fahrstunde nachtragen" aria-label="Fahrstunde nachtragen"><span class="ib-ic">➕</span><span class="ib-lb">Nachtragen</span></button>
+            <button class="iconbtn" data-invoice="${s.id}" data-iname="${esc(s.name)}" title="Rechnungsdaten" aria-label="Rechnungsdaten"><span class="ib-ic">🧾</span><span class="ib-lb">Rechnung</span></button>
             <button class="iconbtn" data-proof="${s.id}" data-pname="${esc(s.name)}" title="Nachweis drucken" aria-label="Nachweis drucken"><span class="ib-ic">📄</span><span class="ib-lb">Nachweis</span></button>
             <button class="iconbtn" data-card="${s.id}" data-cname="${esc(s.name)}" title="Ausbildungskarte" aria-label="Ausbildungskarte"><span class="ib-ic">📋</span><span class="ib-lb">Karte</span></button>
             <button class="iconbtn" data-reset="${s.id}" data-uname="${esc(s.username || '')}" data-sname="${esc(s.name)}" title="Zugangsdaten" aria-label="Zugangsdaten"><span class="ib-ic">🔑</span><span class="ib-lb">Zugang</span></button>
@@ -3594,6 +3657,8 @@ async function tabSchueler(scope) {
       openTrainingCard(btn.dataset.card, btn.dataset.cname));
     $('#s-list').querySelectorAll('[data-log]').forEach((btn) => btn.onclick = () =>
       openLogLessonModal(Number(btn.dataset.log), btn.dataset.lname));
+    $('#s-list').querySelectorAll('[data-invoice]').forEach((btn) => btn.onclick = () =>
+      openInvoiceModal(Number(btn.dataset.invoice), btn.dataset.iname));
     $('#s-list').querySelectorAll('[data-proof]').forEach((btn) => btn.onclick = async () => {
       try { const r = await api('/api/students/' + btn.dataset.proof + '/lessons');
         if (!r.lessons.length) { toast('Noch keine gefahrenen Stunden für den Nachweis.', 'err'); return; }

@@ -192,6 +192,10 @@ ensureColumn('reviews', 'featured', 'featured INTEGER NOT NULL DEFAULT 0'); // v
 ensureColumn('bookings', 'needs_sign', 'needs_sign INTEGER NOT NULL DEFAULT 0'); // 1 = wartet auf Unterschrift des Schülers
 ensureColumn('bookings', 'signed_at', 'signed_at TEXT');   // Zeitpunkt der Unterschrift/Bestätigung
 ensureColumn('bookings', 'signature', 'signature TEXT');   // gezeichnete Unterschrift (data-URL, optional)
+// Rechnungsdatum: die Stunde wird an X gefahren, erscheint aber auf der Rechnung
+// (paralleles Abrechnungsprogramm) unter Y – z.B. wegen der 495-Min-Tagesgrenze.
+ensureColumn('bookings', 'invoice_date', 'invoice_date TEXT'); // YYYY-MM-DD (abweichendes Rechnungsdatum)
+ensureColumn('bookings', 'invoice_time', 'invoice_time TEXT'); // HH:MM (abweichende Rechnungsuhrzeit)
 // Aufschlüsselung je Kategorie als JSON, z.B. {"geduld":5,"erklaerung":4,...}
 // (aus dem geführten "Durchbewerten"-Ablauf). NULL bei alten Bewertungen.
 ensureColumn('reviews', 'ratings', 'ratings TEXT');

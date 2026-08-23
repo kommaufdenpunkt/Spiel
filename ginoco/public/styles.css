@@ -1025,3 +1025,19 @@ body:has(.fp-overlay) .pwa-install{display:none}
 .sign-pad-wrap{position:relative;margin-bottom:.6rem}
 .sign-pad{width:100%;height:150px;background:#fff;border:2px dashed var(--line);border-radius:12px;touch-action:none;display:block;cursor:crosshair}
 .sign-clear{position:absolute;top:.4rem;right:.4rem}
+
+/* ===== Rechnungsdaten (abweichendes Rechnungsdatum) ===== */
+.lg-inv{margin:.2rem 0 .6rem;border:1px solid var(--line);border-radius:12px;padding:.5rem .7rem;background:var(--card2)}
+.lg-inv summary{cursor:pointer;font-weight:600;font-size:.9rem}
+.lg-inv[open] summary{margin-bottom:.4rem}
+.inv-days{background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:.6rem .75rem;margin-bottom:.7rem}
+.inv-days-h{font-weight:700;font-size:.85rem;margin-bottom:.4rem}
+.inv-day{display:flex;justify-content:space-between;font-size:.88rem;padding:.15rem 0;border-top:1px solid var(--line)}
+.inv-day:first-of-type{border-top:none}
+.inv-day.over{color:var(--bad);font-weight:600}
+.inv-list{display:flex;flex-direction:column;gap:.55rem}
+.inv-row{background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:.55rem .7rem}
+.inv-drove{font-size:.9rem;margin-bottom:.4rem;display:flex;flex-wrap:wrap;gap:.4rem;align-items:center}
+.inv-fields{display:flex;flex-wrap:wrap;gap:.4rem;align-items:center}
+.inv-fields .inv-d{max-width:150px}.inv-fields .inv-t{max-width:90px}
+.ml-inv{color:var(--brand)}

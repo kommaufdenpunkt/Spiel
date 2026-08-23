@@ -16,7 +16,7 @@ const PUBLIC = join(__dirname, 'public');
 const PORT = Number(process.env.PORT || 3000);
 const HOST = process.env.HOST || '0.0.0.0'; // hinter Caddy: HOST=127.0.0.1 (nur Proxy erreicht Node)
 const SESSION_DAYS = 30;
-const APP_VERSION = "3.62.0";
+const APP_VERSION = "3.63.0";
 // Einstellungen, die Schueler/Oeffentlichkeit sehen duerfen (Rest bleibt beim Fahrlehrer)
 const PUBLIC_SETTINGS = ['instructor_name', 'instructor_phone', 'policy_text',
   'cancel_hours', 'lock_hours', 'booking_horizon_days', 'booking_horizon_days_rank2',
@@ -641,7 +641,7 @@ async function handleApi(req, res, url) {
   if (p === '/api/my/bookings' && method === 'GET') {
     if (!requireStudent()) return bad(res, 'Bitte anmelden', 401);
     const rows = db.prepare(
-      `SELECT id,date,start_time,duration_min,status,gearbox,plate,note,started_at,ended_at,confirmed,feedback,lesson_type,late_minutes,attended,needs_sign,signed_at,created_at
+      `SELECT id,date,start_time,duration_min,status,gearbox,plate,note,started_at,ended_at,confirmed,feedback,lesson_type,late_minutes,attended,needs_sign,signed_at,invoice_date,invoice_time,created_at
        FROM bookings WHERE student_id = ? AND status != 'cancelled' ORDER BY date, start_time`
     ).all(sess.student_id);
     return ok(res, { bookings: rows, weekInfo: weekInfoForStudent(sess.student_id),
@@ -791,12 +791,15 @@ async function handleApi(req, res, url) {
     const attended = (b.attended === false || b.attended === 0 || b.attended === '0') ? 0 : 1;
     const gear = ['schalt', 'automatik'].includes(b.gearbox) ? b.gearbox : null;
     const vermerk = b.feedback ? String(b.feedback).trim() : null;
+    // Abweichendes Rechnungsdatum (optional): gefahren an X, auf der Rechnung an Y.
+    const invDate = /^\d{4}-\d{2}-\d{2}$/.test(b.invoice_date || '') ? b.invoice_date : null;
+    const invTime = /^([01]?\d|2[0-3]):[0-5]\d$/.test(b.invoice_time || '') ? b.invoice_time : null;
     // Nachgetragene, tatsächlich gefahrene Stunden müssen vom Schüler unterschrieben werden.
     const needsSign = attended ? 1 : 0;
     const info = db.prepare(
-      `INSERT INTO bookings(student_id,date,start_time,duration_min,status,gearbox,lesson_type,late_minutes,attended,feedback,confirmed,needs_sign,created_at)
-       VALUES(?,?,?,?,'done',?,?,?,?,?,1,?,?)`
-    ).run(sid, date, start, dur, gear, type, late, attended, vermerk, needsSign, new Date().toISOString());
+      `INSERT INTO bookings(student_id,date,start_time,duration_min,status,gearbox,lesson_type,late_minutes,attended,feedback,confirmed,needs_sign,invoice_date,invoice_time,created_at)
+       VALUES(?,?,?,?,'done',?,?,?,?,?,1,?,?,?,?)`
+    ).run(sid, date, start, dur, gear, type, late, attended, vermerk, needsSign, invDate, invTime, new Date().toISOString());
     const bid = Number(info.lastInsertRowid);
     const typeLbl = { ueberland: 'Überland', autobahn: 'Autobahn', nacht: 'Nachtfahrt' }[type];
     const detail = attended
@@ -898,6 +901,9 @@ async function handleApi(req, res, url) {
       if ('meet_lng' in b) { fields.push('meet_lng=?'); vals.push(b.meet_lng == null || b.meet_lng === '' ? null : Number(b.meet_lng)); }
       if ('attended' in b) { fields.push('attended=?'); vals.push(b.attended == null ? null : (b.attended ? 1 : 0)); }
       if ('late_minutes' in b) { fields.push('late_minutes=?'); vals.push(Math.max(0, Number(b.late_minutes) || 0)); }
+      // Abweichendes Rechnungsdatum/-zeit (leer = löschen)
+      if ('invoice_date' in b) { fields.push('invoice_date=?'); vals.push(/^\d{4}-\d{2}-\d{2}$/.test(b.invoice_date || '') ? b.invoice_date : null); }
+      if ('invoice_time' in b) { fields.push('invoice_time=?'); vals.push(/^([01]?\d|2[0-3]):[0-5]\d$/.test(b.invoice_time || '') ? b.invoice_time : null); }
       if ('duration_min' in b && Number(b.duration_min) > 0) { fields.push('duration_min=?'); vals.push(newDur); }
       if (!fields.length) return bad(res, 'Nichts zu aendern');
       vals.push(id);
@@ -1688,7 +1694,7 @@ async function handleApi(req, res, url) {
     const st = db.prepare('SELECT name FROM students WHERE id=?').get(sid);
     if (!st) return bad(res, 'Schüler nicht gefunden', 404);
     const lessons = db.prepare(
-      `SELECT id,date,start_time,duration_min,status,gearbox,lesson_type,late_minutes,attended,feedback,needs_sign,signed_at,created_at
+      `SELECT id,date,start_time,duration_min,status,gearbox,lesson_type,late_minutes,attended,feedback,needs_sign,signed_at,invoice_date,invoice_time,created_at
        FROM bookings WHERE student_id=? AND status='done' ORDER BY date,start_time`).all(sid);
     return ok(res, { lessons, name: st.name });
   }
