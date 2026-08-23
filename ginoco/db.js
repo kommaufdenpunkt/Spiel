@@ -344,6 +344,10 @@ export function getSettings() {
   const out = {};
   for (const r of rows) out[r.key] = r.value;
   delete out.instructor_pin; // niemals nach aussen geben
+  // Authenticator-Geheimnis & Wiederherstellungs-Hashes nie ausliefern – nur Status.
+  out.totp_enabled = !!out.instructor_totp;
+  out.two_factor = out.instructor_2fa === '1';
+  delete out.instructor_totp; delete out.instructor_totp_pending; delete out.instructor_recovery;
   // Zahlen als Zahlen liefern
   for (const n of ['lesson_min', 'break_min', 'weekly_target_h', 'daily_target_h', 'weekly_lo_h',
     'monthly_target_h', 'monthly_max_h',

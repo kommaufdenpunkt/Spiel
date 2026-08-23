@@ -468,10 +468,12 @@ function openTour() {
 window.__openTour = openTour;
 
 // ---------- Was ist neu? (Changelog) ----------
-const CHANGELOG_VER = '3.64';
+const CHANGELOG_VER = '3.65';
 const CHANGELOG = [
-  { v: '3.64', d: '23.08.2026', title: '🔐 Sicherer Fahrlehrer-Zugang', items: [
-    '🔑 Fahrlehrer-Login jetzt mit PIN oder richtigem Passwort, „Angemeldet bleiben" und Zugang-Wiederherstellung über Codes.',
+  { v: '3.65', d: '23.08.2026', title: '🔐 Sicherer Fahrlehrer-Zugang', items: [
+    '🔑 Login mit PIN oder richtigem Passwort und „Angemeldet bleiben".',
+    '📲 Authenticator (2-Faktor): optional bei jeder Anmeldung ein 6-stelliger Code – einrichten in den Einstellungen (per Knopf oder Schlüssel).',
+    '🆘 „Passwort vergessen": mit dem Authenticator-Code setzt du dir selbst ein neues Passwort – ganz ohne E-Mail.',
     '🎡 Tab-Icon (Lenkrad-Emblem) wird verlässlich geladen – auch wenn der Browser das alte Symbol gecacht hatte.'] },
   { v: '3.63', d: '23.08.2026', title: '🧾 Rechnungsdatum im Protokoll', items: [
     '🧾 Im Protokoll siehst du jetzt bei jeder Stunde, unter welchem Datum sie auf der Rechnung erscheint – gefahren am … · auf der Rechnung am …',
@@ -1056,38 +1058,83 @@ function instrForm() {
   return `${errBox()}
     <p class="hint">Zugang nur für den Fahrlehrer.</p>
     <div class="field"><label>PIN oder Passwort</label><input id="i-pin" type="password" autocomplete="current-password"></div>
+    <div class="field hidden" id="i-2fa-wrap"><label>Authenticator-Code</label><input id="i-code" inputmode="numeric" autocomplete="one-time-code" placeholder="6-stelliger Code"></div>
     <label class="ck-line" style="justify-content:flex-start;margin:.1rem 0 .3rem"><input type="checkbox" id="i-remember" checked> Angemeldet bleiben</label>
     <div class="form-actions"><button id="i-go">Anmelden</button></div>
-    <p class="hint" style="margin-top:.6rem">Zugang verloren? <a href="#" id="i-recover" class="linklike">Mit Wiederherstellungs-Code neu setzen</a></p>`;
+    <p class="hint" style="margin-top:.6rem"><a href="#" id="i-recover" class="linklike">Passwort vergessen?</a></p>`;
 }
-// Wiederherstellungs-Codes einmalig anzeigen (nach dem Setzen eines neuen Passworts).
-function showRecoveryCodes(codes) {
-  modal(`<h3>🔐 Deine Wiederherstellungs-Codes</h3>
-    <p class="hint">Bewahre diese Codes sicher auf (abschreiben oder ausdrucken). Falls du dein Passwort vergisst, kommst du damit wieder in den Fahrlehrer-Bereich. Jeder Code funktioniert <strong>nur einmal</strong> – und sie werden <strong>nur jetzt</strong> angezeigt.</p>
-    <div class="rec-codes">${codes.map((c) => `<code>${esc(c)}</code>`).join('')}</div>
-    <div class="actions"><button class="sec" id="rec-copy">📋 Kopieren</button><button onclick="window.__closeModal()">Erledigt</button></div>`);
-  $('#rec-copy').onclick = () => navigator.clipboard.writeText(codes.join('\n')).then(() => toast('Kopiert ✓', 'ok')).catch(() => toast('Kopieren nicht möglich', 'err'));
+// Authenticator-Bereich in den Einstellungen (Status + Aktionen).
+function renderAuthSection() {
+  const box = $('#e-auth-body'); if (!box) return;
+  const enabled = !!state.settings?.totp_enabled;
+  const twofa = !!state.settings?.two_factor;
+  if (!enabled) {
+    box.innerHTML = `<p class="hint">Richte einen Authenticator ein (z.&nbsp;B. Google/Microsoft Authenticator). Damit kannst du dein Passwort selbst zurücksetzen („Passwort vergessen") und optional bei jeder Anmeldung einen Code verlangen.</p>
+      <button class="sm" id="au-setup">🔐 Authenticator einrichten</button>`;
+    $('#au-setup').onclick = openTotpSetup;
+  } else {
+    box.innerHTML = `<p class="hint" style="color:var(--good)">✓ Authenticator ist eingerichtet – „Passwort vergessen" läuft darüber.</p>
+      <label class="ck-line" style="justify-content:flex-start"><input type="checkbox" id="au-2fa" ${twofa ? 'checked' : ''}> Bei jeder Anmeldung einen Code verlangen (2-Faktor)</label>
+      <button class="ghost sm" id="au-disable" style="margin-top:.5rem;color:var(--bad)">Authenticator entfernen</button>`;
+    $('#au-2fa').onchange = async () => {
+      const cb = $('#au-2fa');
+      try { const r = await api('/api/instructor/totp/2fa', { method: 'POST', body: { on: cb.checked } }); state.settings.two_factor = r.two_factor; toast('Gespeichert ✓', 'ok'); }
+      catch (e) { toast(e.message, 'err'); cb.checked = !cb.checked; }
+    };
+    $('#au-disable').onclick = openTotpDisable;
+  }
 }
-// Fahrlehrer-Zugang wiederherstellen (mit einem der Wiederherstellungs-Codes).
-function openInstrRecoverModal() {
-  modal(`<h3>🔑 Zugang wiederherstellen</h3>
-    <p class="hint">Gib einen deiner <strong>Wiederherstellungs-Codes</strong> ein (die du beim Setzen des Passworts notiert hast) und wähle ein neues Passwort. Jeder Code funktioniert nur einmal.</p>
+async function openTotpSetup() {
+  let d; try { d = await api('/api/instructor/totp/setup', { method: 'POST' }); } catch (e) { toast(e.message, 'err'); return; }
+  const keyPretty = d.secret.replace(/(.{4})/g, '$1 ').trim();
+  modal(`<h3>🔐 Authenticator einrichten</h3>
+    <p class="hint">Öffne deine Authenticator-App und füge ein Konto hinzu – am schnellsten per Knopf, sonst „Schlüssel manuell eingeben".</p>
+    <div class="center" style="margin:.4rem 0"><a class="btn-like" href="${esc(d.otpauth)}">📲 In Authenticator-App öffnen</a></div>
+    <div class="au-key"><span class="hint">Oder Schlüssel manuell eintippen (Typ: zeitbasiert / TOTP):</span><code id="au-secret">${keyPretty}</code>
+      <button class="ghost sm" id="au-copy">📋 Kopieren</button></div>
     ${errBox()}
-    <div class="field"><label>Wiederherstellungs-Code</label><input id="rc-code" placeholder="z.B. AB2CD-EF3GH" style="text-transform:uppercase" autocomplete="off"></div>
-    <div class="field"><label>Neues Passwort</label><input id="rc-pw" type="password" autocomplete="new-password"><div class="hint" style="margin:.3rem 0 0">Mind. 8 Zeichen, mit Buchstabe, Zahl und Sonderzeichen.</div></div>
-    <div class="actions"><button class="sec" onclick="window.__closeModal()">Abbrechen</button><button id="rc-go">Neu setzen & anmelden</button></div>`);
-  $('#rc-go').onclick = async () => {
-    const code = $('#rc-code').value.trim(), np = $('#rc-pw').value;
+    <div class="field" style="margin-top:.5rem"><label>Zur Bestätigung: 6-stelliger Code aus der App</label><input id="au-code" inputmode="numeric" autocomplete="one-time-code" placeholder="6-stelliger Code"></div>
+    <label class="ck-line" style="justify-content:flex-start"><input type="checkbox" id="au-req"> Bei jeder Anmeldung einen Code verlangen (2-Faktor)</label>
+    <div class="actions"><button class="sec" onclick="window.__closeModal()">Abbrechen</button><button id="au-go">Aktivieren</button></div>`);
+  $('#au-copy').onclick = () => navigator.clipboard.writeText(d.secret).then(() => toast('Schlüssel kopiert ✓', 'ok')).catch(() => toast('Kopieren nicht möglich', 'err'));
+  $('#au-go').onclick = async () => {
+    try {
+      const r = await api('/api/instructor/totp/confirm', { method: 'POST', body: { code: $('#au-code').value.trim(), require_login: $('#au-req').checked } });
+      state.settings.totp_enabled = true; state.settings.two_factor = r.two_factor;
+      closeModal(); toast('Authenticator aktiviert ✓', 'ok'); renderAuthSection();
+    } catch (e) { showErr(e.message); }
+  };
+}
+function openTotpDisable() {
+  modal(`<h3>Authenticator entfernen</h3>
+    <p class="hint">Zur Sicherheit brauche ich dein <strong>Passwort</strong> oder einen <strong>aktuellen Code</strong>.</p>${errBox()}
+    <div class="field"><label>Passwort oder aktueller Code</label><input id="ad-pw" type="password" autocomplete="off"></div>
+    <div class="actions"><button class="sec" onclick="window.__closeModal()">Abbrechen</button><button id="ad-go" class="danger">Entfernen</button></div>`);
+  $('#ad-go').onclick = async () => {
+    const v = $('#ad-pw').value;
+    try { await api('/api/instructor/totp/disable', { method: 'POST', body: { password: v, code: v } }); state.settings.totp_enabled = false; state.settings.two_factor = false; closeModal(); toast('Authenticator entfernt', 'ok'); renderAuthSection(); }
+    catch (e) { showErr(e.message); }
+  };
+}
+// Passwort vergessen (Fahrlehrer): mit dem Authenticator-Code ein neues Passwort setzen.
+function openInstrForgotModal() {
+  modal(`<h3>🔑 Passwort vergessen</h3>
+    <p class="hint">Gib den aktuellen <strong>6-stelligen Code</strong> aus deiner Authenticator-App ein und wähle ein neues Passwort. (Funktioniert nur, wenn du vorher einen Authenticator eingerichtet hast.)</p>
+    ${errBox()}
+    <div class="field"><label>Authenticator-Code</label><input id="fp-code" inputmode="numeric" autocomplete="one-time-code" placeholder="6-stelliger Code"></div>
+    <div class="field"><label>Neues Passwort</label><input id="fp-pw" type="password" autocomplete="new-password"><div class="hint" style="margin:.3rem 0 0">Mind. 8 Zeichen, mit Buchstabe, Zahl und Sonderzeichen.</div></div>
+    <div class="actions"><button class="sec" onclick="window.__closeModal()">Abbrechen</button><button id="fp-go">Neu setzen & anmelden</button></div>`);
+  $('#fp-go').onclick = async () => {
+    const code = $('#fp-code').value.trim(), np = $('#fp-pw').value;
     const prob = pwProblem(np);
     if (prob) { showErr('Neues Passwort braucht ' + prob + '.'); return; }
     try {
-      await api('/api/auth/instructor/recover', { method: 'POST', body: { code, new_password: np } });
-      // direkt anmelden mit dem neuen Passwort
-      await api('/api/auth/instructor', { method: 'POST', body: { pin: np, remember: true } });
+      await api('/api/auth/instructor/forgot', { method: 'POST', body: { code, new_password: np } });
+      await api('/api/auth/instructor', { method: 'POST', body: { pin: np, remember: true, code } });
       closeModal();
       const [me, s] = await Promise.all([api('/api/auth/me'), api('/api/settings')]);
       state.user = me.user; state.settings = s.settings; render();
-      toast('Zugang wiederhergestellt ✓', 'ok');
+      toast('Passwort neu gesetzt ✓', 'ok');
     } catch (e) { showErr(e.message); }
   };
 }
@@ -1120,11 +1167,19 @@ function wireAuth(tab) {
   } else {
     $('#i-go').onclick = async () => {
       try {
-        await api('/api/auth/instructor', { method: 'POST', body: { pin: $('#i-pin').value, remember: $('#i-remember')?.checked !== false } });
+        const body = { pin: $('#i-pin').value, remember: $('#i-remember')?.checked !== false };
+        const code = $('#i-code'); if (code && code.value.trim()) body.code = code.value.trim();
+        const r = await api('/api/auth/instructor', { method: 'POST', body });
+        if (r && r.need2fa) {                       // Authenticator-Code nachfordern
+          $('#i-2fa-wrap')?.classList.remove('hidden');
+          const c = $('#i-code'); if (c) c.focus();
+          showErr('Bitte gib den 6-stelligen Code aus deiner Authenticator-App ein.');
+          return;
+        }
         done();
       } catch (e) { showErr(e.message); }
     };
-    const rc = $('#i-recover'); if (rc) rc.onclick = (ev) => { ev.preventDefault(); openInstrRecoverModal(); };
+    const rc = $('#i-recover'); if (rc) rc.onclick = (ev) => { ev.preventDefault(); openInstrForgotModal(); };
   }
   app.querySelectorAll('input').forEach((i) => i.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') { const b = app.querySelector('.form-actions button'); if (b) b.click(); }
@@ -4657,7 +4712,9 @@ function tabEinstellungen() {
     ${sec('👤', 'Zugang & Kontakt', 'Name, Handynummer, Passwort', `
       <div class="field"><label>Angezeigter Name</label><input id="e-name" value="${esc(s.instructor_name)}"></div>
       <div class="field"><label>Deine Handynummer (Schüler können anrufen/schreiben)</label><input id="e-phone" value="${esc(s.instructor_phone || '')}" placeholder="z.B. 0151 23456789"></div>
-      <div class="field" style="margin-bottom:0"><label>Neues Fahrlehrer-Passwort (leer = unverändert)</label><input id="e-pin" type="password" autocomplete="new-password" placeholder="mind. 8 Zeichen, mit Zahl & Sonderzeichen"><div class="hint" style="margin:.3rem 0 0">Beim Ändern bekommst du <strong>Wiederherstellungs-Codes</strong> zum Notieren – damit kommst du wieder rein, falls du das Passwort vergisst.</div></div>`)}
+      <div class="field"><label>Neues Fahrlehrer-Passwort (leer = unverändert)</label><input id="e-pin" type="password" autocomplete="new-password" placeholder="mind. 8 Zeichen, mit Zahl & Sonderzeichen"></div>
+      <div class="sec-auth" id="e-auth"><div class="sec-auth-h">🔐 Authenticator (2-Faktor & „Passwort vergessen")</div>
+        <div id="e-auth-body"><span class="hint">Lädt…</span></div></div>`)}
 
     <div class="actions" style="justify-content:flex-start"><button id="e-save">💾 Alles speichern</button><span id="e-msg" class="muted"></span></div>
   </div>`;
@@ -4673,6 +4730,7 @@ function tabEinstellungen() {
   };
   ['e-start', 'e-last', 'e-lesson', 'e-break'].forEach((id) => $('#' + id).oninput = updatePreview);
   updatePreview();
+  renderAuthSection();
   // Arbeitstage-Chips optisch mitschalten
   box.querySelectorAll('#e-days [data-day]').forEach((cb) => cb.onchange = () =>
     cb.closest('.dur-chip')?.classList.toggle('on', cb.checked));
@@ -4715,7 +4773,6 @@ function tabEinstellungen() {
         new_pin: $('#e-pin').value || undefined } });
       state.settings = r.settings; state.user.name = r.settings.instructor_name;
       toast('Einstellungen gespeichert ✓', 'ok'); $('#e-msg').textContent = 'Gespeichert.';
-      if (r.recovery_codes && r.recovery_codes.length) showRecoveryCodes(r.recovery_codes);
       if (r.misaligned && r.misaligned.total > 0) promptRealign(r.misaligned);
     } catch (e) { toast(e.message, 'err'); }
   };

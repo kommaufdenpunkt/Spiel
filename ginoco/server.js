@@ -2,7 +2,7 @@
 // Ohne externe Pakete: nur eingebaute Node-Module.
 import { createServer } from 'node:http';
 import { request as httpsRequest } from 'node:https';
-import { randomBytes, createECDH, hkdfSync, createCipheriv, createPrivateKey, sign as cryptoSign } from 'node:crypto';
+import { randomBytes, createECDH, hkdfSync, createCipheriv, createPrivateKey, sign as cryptoSign, createHmac } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, extname, normalize } from 'node:path';
@@ -16,7 +16,7 @@ const PUBLIC = join(__dirname, 'public');
 const PORT = Number(process.env.PORT || 3000);
 const HOST = process.env.HOST || '0.0.0.0'; // hinter Caddy: HOST=127.0.0.1 (nur Proxy erreicht Node)
 const SESSION_DAYS = 30;
-const APP_VERSION = "3.64.0";
+const APP_VERSION = "3.65.0";
 // Einstellungen, die Schueler/Oeffentlichkeit sehen duerfen (Rest bleibt beim Fahrlehrer)
 const PUBLIC_SETTINGS = ['instructor_name', 'instructor_phone', 'policy_text',
   'cancel_hours', 'lock_hours', 'booking_horizon_days', 'booking_horizon_days_rank2',
@@ -120,6 +120,43 @@ function createSession(res, kind, studentId = null, secure = false, remember = t
     `fsp=${token}; HttpOnly; Path=/${maxAge}; SameSite=Lax${secure ? '; Secure' : ''}`);
   return token;
 }
+// ---- Authenticator (TOTP, RFC 6238) – zero-dependency ----
+const B32_ALPHA = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+function base32Encode(buf) {
+  let bits = 0, val = 0, out = '';
+  for (const b of buf) { val = (val << 8) | b; bits += 8; while (bits >= 5) { out += B32_ALPHA[(val >>> (bits - 5)) & 31]; bits -= 5; } }
+  if (bits > 0) out += B32_ALPHA[(val << (5 - bits)) & 31];
+  return out;
+}
+function base32Decode(str) {
+  const clean = String(str || '').toUpperCase().replace(/[^A-Z2-7]/g, '');
+  let bits = 0, val = 0; const out = [];
+  for (const ch of clean) { const idx = B32_ALPHA.indexOf(ch); if (idx < 0) continue; val = (val << 5) | idx; bits += 5; if (bits >= 8) { out.push((val >>> (bits - 8)) & 0xff); bits -= 8; } }
+  return Buffer.from(out);
+}
+function hotp(secretBuf, counter) {
+  const c = Buffer.alloc(8);
+  c.writeUInt32BE(Math.floor(counter / 4294967296), 0);
+  c.writeUInt32BE(counter >>> 0, 4);
+  const h = createHmac('sha1', secretBuf).update(c).digest();
+  const o = h[h.length - 1] & 0x0f;
+  const n = ((h[o] & 0x7f) << 24) | ((h[o + 1] & 0xff) << 16) | ((h[o + 2] & 0xff) << 8) | (h[o + 3] & 0xff);
+  return String(n % 1000000).padStart(6, '0');
+}
+function totpVerify(secretB32, code, t = Date.now(), window = 1) {
+  const c = String(code || '').replace(/\s/g, '');
+  if (!secretB32 || !/^\d{6}$/.test(c)) return false;
+  const buf = base32Decode(secretB32); if (!buf.length) return false;
+  const step = Math.floor(t / 1000 / 30);
+  for (let w = -window; w <= window; w++) if (hotp(buf, step + w) === c) return true;
+  return false;
+}
+function newTotpSecret() { return base32Encode(randomBytes(20)); } // 160-bit
+function otpauthURL(secretB32, label, issuer) {
+  return `otpauth://totp/${encodeURIComponent(issuer)}:${encodeURIComponent(label)}`
+    + `?secret=${secretB32}&issuer=${encodeURIComponent(issuer)}&algorithm=SHA1&digits=6&period=30`;
+}
+
 // Wiederherstellungs-Codes für den Fahrlehrer erzeugen (Klartext zurück, Hashes speichern).
 function genInstructorRecovery(n = 8) {
   const AL = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -475,10 +512,72 @@ async function handleApi(req, res, url) {
     const b = await readBody(req);
     const secret = String(b.pin || b.password || '');
     if (!verifyPassword(secret, getSettingRaw('instructor_pin'))) { noteLoginFail(req); return bad(res, 'Falsche PIN oder falsches Passwort', 401); }
+    // Optionaler zweiter Faktor (Authenticator): wenn aktiviert, Code verlangen.
+    const totp = getSettingRaw('instructor_totp');
+    if (getSettingRaw('instructor_2fa') === '1' && totp) {
+      const code = String(b.code || '').replace(/\s/g, '');
+      if (!code) return ok(res, { need2fa: true });        // Client blendet das Code-Feld ein
+      if (!totpVerify(totp, code)) { noteLoginFail(req); return bad(res, 'Authenticator-Code stimmt nicht.', 401); }
+    }
     noteLoginOk(req);
     const remember = !(b.remember === false || b.remember === 0 || b.remember === '0');
     const token = createSession(res, 'instructor', null, isHttps(req), remember);
     return ok(res, { role: 'instructor', name: getSettingRaw('instructor_name'), token });
+  }
+  // Passwort vergessen (Fahrlehrer): mit einem gültigen Authenticator-Code ein neues Passwort setzen.
+  if (p === '/api/auth/instructor/forgot' && method === 'POST') {
+    if (loginBlocked(req)) return bad(res, 'Zu viele Versuche. Bitte in ein paar Minuten erneut.', 429);
+    const b = await readBody(req);
+    const totp = getSettingRaw('instructor_totp');
+    if (!totp) return bad(res, 'Es ist noch kein Authenticator eingerichtet. Bitte richte ihn zuerst in den Einstellungen ein.', 400);
+    if (!totpVerify(totp, b.code)) { noteLoginFail(req); return bad(res, 'Authenticator-Code stimmt nicht. Uhrzeit am Handy automatisch stellen lassen.', 401); }
+    const np = String(b.new_password || '');
+    const prob = passwordProblem(np);
+    if (prob) return bad(res, 'Neues Passwort braucht ' + prob + '.');
+    setSettingRaw('instructor_pin', hashPassword(np));
+    noteLoginOk(req);
+    logEvent('info', { actor: 'instructor', detail: 'Passwort per Authenticator zurückgesetzt' });
+    return ok(res, { reset: true });
+  }
+  // Authenticator einrichten: neues (noch nicht bestätigtes) Geheimnis + QR-Link.
+  if (p === '/api/instructor/totp/setup' && method === 'POST') {
+    if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
+    const secret = newTotpSecret();
+    setSettingRaw('instructor_totp_pending', secret);
+    const label = getSettingRaw('instructor_name') || 'Fahrlehrer';
+    return ok(res, { secret, otpauth: otpauthURL(secret, label, 'Ginoco') });
+  }
+  // Authenticator bestätigen: Code prüfen und aktivieren (optional 2FA beim Login).
+  if (p === '/api/instructor/totp/confirm' && method === 'POST') {
+    if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
+    const b = await readBody(req);
+    const pending = getSettingRaw('instructor_totp_pending');
+    if (!pending) return bad(res, 'Bitte zuerst „Einrichten" antippen.');
+    if (!totpVerify(pending, b.code)) return bad(res, 'Code stimmt nicht. Stimmt die Uhrzeit am Handy (automatisch stellen)?');
+    setSettingRaw('instructor_totp', pending);
+    setSettingRaw('instructor_totp_pending', '');
+    setSettingRaw('instructor_2fa', b.require_login ? '1' : '0');
+    logEvent('info', { actor: 'instructor', detail: 'Authenticator eingerichtet' });
+    return ok(res, { enabled: true, two_factor: b.require_login ? true : false });
+  }
+  // 2FA beim Login an/aus (Authenticator muss eingerichtet sein).
+  if (p === '/api/instructor/totp/2fa' && method === 'POST') {
+    if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
+    const b = await readBody(req);
+    if (!getSettingRaw('instructor_totp')) return bad(res, 'Erst den Authenticator einrichten.');
+    setSettingRaw('instructor_2fa', b.on ? '1' : '0');
+    return ok(res, { two_factor: !!b.on });
+  }
+  // Authenticator entfernen (Passwort ODER aktueller Code zur Bestätigung).
+  if (p === '/api/instructor/totp/disable' && method === 'POST') {
+    if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
+    const b = await readBody(req);
+    const okAuth = verifyPassword(String(b.password || ''), getSettingRaw('instructor_pin'))
+      || totpVerify(getSettingRaw('instructor_totp'), b.code);
+    if (!okAuth) return bad(res, 'Bitte Passwort oder aktuellen Code zur Bestätigung.', 401);
+    setSettingRaw('instructor_totp', ''); setSettingRaw('instructor_totp_pending', ''); setSettingRaw('instructor_2fa', '0');
+    logEvent('info', { actor: 'instructor', detail: 'Authenticator entfernt' });
+    return ok(res, { disabled: true });
   }
   // Zugang wiederherstellen: mit einem Wiederherstellungs-Code ein neues Passwort setzen.
   if (p === '/api/auth/instructor/recover' && method === 'POST') {
@@ -1912,14 +2011,12 @@ async function handleApi(req, res, url) {
       if (b[k] === '' && !emptyOk.has(k)) continue;
       setSettingRaw(k, b[k]);
     }
-    let recovery_codes;
     if (b.new_pin) {
       const prob = passwordProblem(b.new_pin);
       if (prob) return bad(res, 'Fahrlehrer-Passwort braucht ' + prob + '.');
       setSettingRaw('instructor_pin', hashPassword(String(b.new_pin)));
-      recovery_codes = genInstructorRecovery();   // neue Wiederherstellungs-Codes (einmalig anzeigen)
     }
-    return ok(res, { settings: getSettings(), misaligned: misalignedDays(), recovery_codes });
+    return ok(res, { settings: getSettings(), misaligned: misalignedDays() });
   }
 
   return bad(res, 'Unbekannter Endpunkt', 404);
