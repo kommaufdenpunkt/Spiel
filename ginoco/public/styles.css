@@ -1056,3 +1056,8 @@ body:has(.fp-overlay) .pwa-install{display:none}
 a.btn-like{display:inline-block;background:var(--brand);color:#1a1205;font-weight:700;border-radius:12px;
   padding:.6rem 1rem;text-decoration:none;border:none}
 a.btn-like:hover{background:var(--brand-dark)}
+
+/* QR-Code im Authenticator-Fenster */
+.au-qr{display:flex;justify-content:center;margin:.5rem auto}
+.au-qr svg{background:#fff;border-radius:12px;padding:10px;box-shadow:0 4px 18px rgba(0,0,0,.25);max-width:100%;height:auto}
+.au-manual{margin:.3rem 0}.au-manual summary{cursor:pointer;font-size:.88rem;color:var(--muted)}

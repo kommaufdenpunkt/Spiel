@@ -472,7 +472,7 @@ const CHANGELOG_VER = '3.65';
 const CHANGELOG = [
   { v: '3.65', d: '23.08.2026', title: '🔐 Sicherer Fahrlehrer-Zugang', items: [
     '🔑 Login mit PIN oder richtigem Passwort und „Angemeldet bleiben".',
-    '📲 Authenticator (2-Faktor): optional bei jeder Anmeldung ein 6-stelliger Code – einrichten in den Einstellungen (per Knopf oder Schlüssel).',
+    '📷 Authenticator (2-Faktor) per QR-Code einrichten – einfach mit der Authenticator-App abscannen (oder Schlüssel manuell). Optional bei jeder Anmeldung ein 6-stelliger Code.',
     '🆘 „Passwort vergessen": mit dem Authenticator-Code setzt du dir selbst ein neues Passwort – ganz ohne E-Mail.',
     '🎡 Tab-Icon (Lenkrad-Emblem) wird verlässlich geladen – auch wenn der Browser das alte Symbol gecacht hatte.'] },
   { v: '3.63', d: '23.08.2026', title: '🧾 Rechnungsdatum im Protokoll', items: [
@@ -1084,18 +1084,31 @@ function renderAuthSection() {
     $('#au-disable').onclick = openTotpDisable;
   }
 }
+// QR-Code (dunkel auf weiß) als scharfes SVG in ein Element zeichnen.
+function renderQR(el, text) {
+  if (!el) return;
+  if (!window.qrEncode) { el.innerHTML = '<span class="hint">QR-Code nicht verfügbar – bitte Schlüssel manuell eingeben.</span>'; return; }
+  let m; try { m = window.qrEncode(text); } catch { el.innerHTML = '<span class="hint">QR-Code konnte nicht erzeugt werden.</span>'; return; }
+  const q = 4, size = m.size + q * 2; let rects = '';
+  for (let y = 0; y < m.size; y++) for (let x = 0; x < m.size; x++) if (m.get(x, y)) rects += `<rect x="${x + q}" y="${y + q}" width="1" height="1"/>`;
+  el.innerHTML = `<svg viewBox="0 0 ${size} ${size}" width="230" height="230" shape-rendering="crispEdges" role="img" aria-label="QR-Code für Authenticator"><rect width="${size}" height="${size}" fill="#fff"/><g fill="#000">${rects}</g></svg>`;
+}
 async function openTotpSetup() {
   let d; try { d = await api('/api/instructor/totp/setup', { method: 'POST' }); } catch (e) { toast(e.message, 'err'); return; }
   const keyPretty = d.secret.replace(/(.{4})/g, '$1 ').trim();
   modal(`<h3>🔐 Authenticator einrichten</h3>
-    <p class="hint">Öffne deine Authenticator-App und füge ein Konto hinzu – am schnellsten per Knopf, sonst „Schlüssel manuell eingeben".</p>
-    <div class="center" style="margin:.4rem 0"><a class="btn-like" href="${esc(d.otpauth)}">📲 In Authenticator-App öffnen</a></div>
-    <div class="au-key"><span class="hint">Oder Schlüssel manuell eintippen (Typ: zeitbasiert / TOTP):</span><code id="au-secret">${keyPretty}</code>
-      <button class="ghost sm" id="au-copy">📋 Kopieren</button></div>
+    <p class="hint">Scanne den QR-Code mit deiner Authenticator-App (z.&nbsp;B. Google/Microsoft Authenticator) – „Konto hinzufügen" → „QR-Code scannen".</p>
+    <div class="au-qr" id="au-qr"></div>
+    <p class="hint center" style="margin:.4rem 0">Am Handy stattdessen: <a class="linklike" href="${esc(d.otpauth)}">📲 direkt in die App übernehmen</a></p>
+    <details class="au-manual"><summary>QR geht nicht? Schlüssel manuell eingeben</summary>
+      <div class="au-key"><span class="hint">Typ: zeitbasiert / TOTP:</span><code id="au-secret">${keyPretty}</code>
+        <button class="ghost sm" id="au-copy">📋 Kopieren</button></div>
+    </details>
     ${errBox()}
     <div class="field" style="margin-top:.5rem"><label>Zur Bestätigung: 6-stelliger Code aus der App</label><input id="au-code" inputmode="numeric" autocomplete="one-time-code" placeholder="6-stelliger Code"></div>
     <label class="ck-line" style="justify-content:flex-start"><input type="checkbox" id="au-req"> Bei jeder Anmeldung einen Code verlangen (2-Faktor)</label>
     <div class="actions"><button class="sec" onclick="window.__closeModal()">Abbrechen</button><button id="au-go">Aktivieren</button></div>`);
+  renderQR($('#au-qr'), d.otpauth);
   $('#au-copy').onclick = () => navigator.clipboard.writeText(d.secret).then(() => toast('Schlüssel kopiert ✓', 'ok')).catch(() => toast('Kopieren nicht möglich', 'err'));
   $('#au-go').onclick = async () => {
     try {
