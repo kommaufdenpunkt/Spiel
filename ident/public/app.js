@@ -1986,6 +1986,50 @@
   });
   $('waitLogout').addEventListener('click', () => { clearInterval(state.waitingTimer); state.token = ''; state.name = ''; state.isAdmin = false; $('waitingView').style.display = 'none'; $('lobby').style.display = ''; $('passInput').value = ''; $('totpInput').value = ''; });
 
+  /* ---- Aufs Telefon legen -------------------------------------------------
+   * Beide Bereiche sind installierbar: eigenes Symbol, eigener Startbildschirm,
+   * Vollbild ohne Browserleiste. Android fragt der Browser selbst - dieses
+   * Angebot fangen wir ab und bieten es dort an, wo man es sucht.
+   *
+   * Auf dem iPhone gibt es dieses Angebot nicht; dort geht es nur ueber
+   * "Teilen -> Zum Home-Bildschirm". Also sagen wir das dort auch so, statt
+   * einen Knopf zu zeigen, der nichts tut.
+   */
+  let installAngebot = null;
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault(); installAngebot = e;
+    const b = $('appInstall'); if (b) b.style.display = '';
+  });
+  window.addEventListener('appinstalled', () => {
+    installAngebot = null;
+    const b = $('appInstall'); if (b) b.style.display = 'none';
+    toast('Liegt jetzt auf deinem Telefon ✓');
+  });
+  if ($('appInstall')) $('appInstall').addEventListener('click', async () => {
+    if (!installAngebot) return;
+    installAngebot.prompt();
+    try { await installAngebot.userChoice; } catch {}
+    installAngebot = null;
+    $('appInstall').style.display = 'none';
+  });
+  // iPhone/iPad: kein Angebot vom Browser, aber der Weg existiert. Einmal
+  // sagen, nicht bei jedem Besuch.
+  (function iphoneHinweis() {
+    const b = $('appInstall'); if (!b) return;
+    const istApple = /iPhone|iPad|iPod/.test(navigator.userAgent) && !window.MSStream;
+    const schonDrin = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone;
+    if (!istApple || schonDrin) return;
+    let gesagt = false;
+    try { gesagt = localStorage.getItem('ident.installHinweis') === 'ja'; } catch {}
+    if (gesagt) return;
+    b.style.display = '';
+    setzeBeschriftung(b, 'Aufs iPhone legen', 'App');
+    b.addEventListener('click', () => {
+      toast('Unten auf „Teilen" tippen und dann „Zum Home-Bildschirm" wählen.');
+      try { localStorage.setItem('ident.installHinweis', 'ja'); } catch {}
+    });
+  })();
+
   // ================= PASSKEY (Face ID / Fingerabdruck, WebAuthn) =================
   const b64urlToBuf = (s) => { s = String(s).replace(/-/g, '+').replace(/_/g, '/'); while (s.length % 4) s += '='; const bin = atob(s); const u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return u.buffer; };
   const bufToB64url = (buf) => { const u = new Uint8Array(buf); let s = ''; for (const x of u) s += String.fromCharCode(x); return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); };
@@ -2127,7 +2171,14 @@
       knopf.textContent = an ? '✕ Kleiner' : '⛶ Groß';
       knopf.title = an ? 'Zurück zur normalen Ansicht' : 'Text über den ganzen Bildschirm – am besten zum Ablesen';
     }
+    // Wie hoch ist die Bedienleiste wirklich? Sie bricht je nach Geraet auf
+    // zwei Zeilen um. Ein fester Wert schneidet dann den Weiter-Knopf an -
+    // also nachmessen, statt zu raten.
     requestAnimationFrame(() => {
+      if (ctrl) {
+        const h = an ? Math.ceil(ctrl.getBoundingClientRect().height) : 0;
+        document.documentElement.style.setProperty('--leiste', h ? h + 'px' : '');
+      }
       box.scrollTop = anteil * Math.max(0, box.scrollHeight - box.clientHeight);
       promptPos = box.scrollTop;
     });
@@ -2198,11 +2249,15 @@
     const ctrl = $('prompterCtrl'); if (ctrl) ctrl.style.display = '';
     state.karteNr = 0;
     kartenAn(kartenModus());
+    // Am Telefon gleich gross aufmachen. Genau dafuer ist der Moment da: sie
+    // will jetzt ablesen, und im Kasten unter dem Video steht der Satz zu
+    // klein und zu weit vom Objektiv weg. Zurueck kommt sie mit "✕ Kleiner".
+    if (window.innerWidth < 700 && kartenModus()) setTimeout(() => vorleseGross(true), 250);
     if ($('guideStatus')) {
       $('guideStatus').className = 'status ok';
       $('guideStatus').textContent = kartenModus()
         ? 'Ein Satz nach dem anderen. Lies ihn in die Kamera und tippe dann auf „Weiter" – '
-          + 'du bestimmst das Tempo. ⛶ Groß macht die Schrift noch größer.'
+          + 'du bestimmst das Tempo. Mit „✕ Kleiner" kommst du zurück zum Videobild.'
         : 'Lies den Text in die Kamera – ▶ Start lässt ihn mitlaufen, '
           + 'das Tempo stellst du mit dem Regler ein. Pausieren jederzeit.';
     }
@@ -2239,13 +2294,21 @@
     }
     return teile;
   }
-  function zeigeKarte() {
+  function zeigeKarte(richtung) {
     const k = $('prompterKarte'); if (!k) return;
     const saetze = state.karten || [];
     const i = Math.min(state.karteNr || 0, saetze.length);
     const fertig = i >= saetze.length;
     k.classList.toggle('fertig', fertig);
-    $('pkSatz').textContent = fertig ? '✓ Das war’s – vielen Dank!' : saetze[i];
+    const satzEl = $('pkSatz');
+    // Kurz einblenden, damit man sieht, DASS gewechselt wurde. Die Klasse muss
+    // erst weg und neu gesetzt werden, sonst laeuft die Bewegung nur einmal.
+    if (richtung) {
+      satzEl.classList.remove('neu', 'zurueck');
+      void satzEl.offsetWidth;
+      satzEl.classList.add(richtung < 0 ? 'zurueck' : 'neu');
+    }
+    satzEl.textContent = fertig ? '✓ Das war’s – vielen Dank!' : saetze[i];
     $('pkNaechster').textContent = (!fertig && saetze[i + 1]) ? saetze[i + 1] : '';
     $('pkZahl').textContent = fertig ? 'fertig' : (i + 1) + ' / ' + saetze.length;
     $('pkBalken').style.width = saetze.length ? Math.round(((fertig ? saetze.length : i) / saetze.length) * 100) + '%' : '0%';
@@ -2259,9 +2322,11 @@
   function karteWeiter(schritt) {
     const saetze = state.karten || [];
     const jetzt = state.karteNr || 0;
-    if (jetzt >= saetze.length && schritt > 0) { state.karteNr = 0; zeigeKarte(); return; }
-    state.karteNr = Math.max(0, Math.min(saetze.length, jetzt + schritt));
-    zeigeKarte();
+    if (jetzt >= saetze.length && schritt > 0) { state.karteNr = 0; zeigeKarte(1); return; }
+    const neuNr = Math.max(0, Math.min(saetze.length, jetzt + schritt));
+    if (neuNr === jetzt) return;
+    state.karteNr = neuNr;
+    zeigeKarte(schritt);
   }
   function kartenAn(an) {
     const k = $('prompterKarte'), box = $('prompterBox'), um = $('modusUm');

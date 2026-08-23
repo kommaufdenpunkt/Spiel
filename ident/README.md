@@ -351,6 +351,33 @@ jetzt der Normalfall:
 - **`📜 Als Fließtext`** schaltet auf die alte Darstellung mit Selbstlauf und
   Tempo-Regler. Die Wahl bleibt gemerkt.
 
+**Am Telefon geht der Text gleich gross auf.** Genau dafür ist der Moment da:
+sie will jetzt ablesen, und im Kasten unter dem Video steht der Satz zu klein
+und zu weit vom Objektiv weg. Zurück zum Videobild kommt sie mit `✕ Kleiner`.
+
+**Der Satz steht oben, nicht in der Mitte.** Die Kamera sitzt am oberen Rand des
+Telefons – je näher der Text am Objektiv steht, desto mehr schaut sie beim
+Vorlesen hinein statt daran vorbei. Eine kleine Marke `▲ Kamera` sagt, wohin.
+Die Höhe der Bedienleiste wird gemessen, nicht geschätzt: sie bricht je nach
+Gerät auf zwei Zeilen um, und ein fester Wert schnitt den Weiter-Knopf an.
+
+## Als App auf dem Telefon
+
+`ident` und `mcp` sind installierbar – **ohne Store, ohne Gebühr, ohne
+Prüfung**: eigenes Symbol, eigener Startbildschirm, Vollbild ohne Browserleiste.
+
+- **Android:** im Menü steht `📲 Aufs Telefon legen`. Der Knopf erscheint nur,
+  wenn der Browser es auch anbietet – ein Knopf, der nichts tut, ist schlimmer
+  als keiner.
+- **iPhone:** dort gibt es dieses Angebot nicht. Der Eintrag sagt deshalb den
+  echten Weg: *Teilen → Zum Home-Bildschirm*. Einmal, nicht bei jedem Besuch.
+- **Das Symbol** ist ein Ausweis mit Gesicht und rotem Aufnahmepunkt auf
+  blauem Verlauf – das sagt in einem Bild, worum es geht. Schrift wäre bei
+  60 px unlesbar. Gezeichnet als HTML und mit dem Browser in die Grössen
+  gerendert, die Android und iOS wollen (`icon/zeichnen.js` im Testordner),
+  dazu eine `maskable`-Fassung mit Rand, damit Android beim Zuschneiden nichts
+  abschneidet.
+
 - **Standardgrösse 1,9 rem** (rund 30 px am Telefon), einstellbar über `A−` /
   `A+` bis 3,4 rem. Die Einstellung bleibt für das nächste Mal gemerkt.
 - **`⛶ Groß`** legt den Text über den ganzen Bildschirm und vergrössert ihn noch
