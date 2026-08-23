@@ -1,4 +1,18 @@
 'use strict';
+// Tab-Icon hart erzwingen: manche Browser (v.a. Safari) halten ein altes
+// Favicon extrem zäh. Wir entfernen alle Icon-Links und setzen frische mit
+// neuer Version – so wird das aktuelle Emblem verlässlich geladen.
+(function forceFavicon() {
+  try {
+    const v = '?v=3631';
+    document.querySelectorAll('link[rel~="icon"],link[rel="shortcut icon"],link[rel="apple-touch-icon"]').forEach((l) => l.remove());
+    const add = (rel, href, type, sizes) => { const l = document.createElement('link'); l.rel = rel; l.href = href; if (type) l.type = type; if (sizes) l.sizes = sizes; document.head.appendChild(l); };
+    add('shortcut icon', '/favicon.ico' + v);
+    add('icon', '/favicon.ico' + v, 'image/x-icon', 'any');
+    add('icon', '/favicon.svg' + v, 'image/svg+xml');
+    add('apple-touch-icon', '/apple-touch-icon.png' + v);
+  } catch {}
+})();
 // ====================== Fahrschulportal – Frontend ======================
 const $ = (s, r = document) => r.querySelector(s);
 const app = $('#app');
