@@ -16,7 +16,7 @@ const PUBLIC = join(__dirname, 'public');
 const PORT = Number(process.env.PORT || 3000);
 const HOST = process.env.HOST || '0.0.0.0'; // hinter Caddy: HOST=127.0.0.1 (nur Proxy erreicht Node)
 const SESSION_DAYS = 30;
-const APP_VERSION = "3.61.0";
+const APP_VERSION = "3.62.0";
 // Einstellungen, die Schueler/Oeffentlichkeit sehen duerfen (Rest bleibt beim Fahrlehrer)
 const PUBLIC_SETTINGS = ['instructor_name', 'instructor_phone', 'policy_text',
   'cancel_hours', 'lock_hours', 'booking_horizon_days', 'booking_horizon_days_rank2',
@@ -641,11 +641,28 @@ async function handleApi(req, res, url) {
   if (p === '/api/my/bookings' && method === 'GET') {
     if (!requireStudent()) return bad(res, 'Bitte anmelden', 401);
     const rows = db.prepare(
-      `SELECT id,date,start_time,duration_min,status,gearbox,plate,note,started_at,ended_at,confirmed,feedback,lesson_type,late_minutes,attended,created_at
+      `SELECT id,date,start_time,duration_min,status,gearbox,plate,note,started_at,ended_at,confirmed,feedback,lesson_type,late_minutes,attended,needs_sign,signed_at,created_at
        FROM bookings WHERE student_id = ? AND status != 'cancelled' ORDER BY date, start_time`
     ).all(sess.student_id);
     return ok(res, { bookings: rows, weekInfo: weekInfoForStudent(sess.student_id),
       progress: { ...studentRank(sess.student_id), sonder: sonderCounts(sess.student_id), req: sonderReq() } });
+  }
+  // Fahrschüler unterschreibt/bestätigt eine nachgetragene Fahrstunde.
+  const signM = p.match(/^\/api\/my\/bookings\/(\d+)\/sign$/);
+  if (signM && method === 'POST') {
+    if (!requireStudent()) return bad(res, 'Bitte anmelden', 401);
+    const id = Number(signM[1]);
+    const bk = db.prepare('SELECT id,student_id,needs_sign,status FROM bookings WHERE id = ?').get(id);
+    if (!bk || bk.student_id !== sess.student_id) return bad(res, 'Fahrstunde nicht gefunden', 404);
+    const b = await readBody(req);
+    const sig = (typeof b.signature === 'string' && validPhoto(b.signature)) ? b.signature : null;
+    db.prepare('UPDATE bookings SET signed_at = ?, signature = ?, needs_sign = 0 WHERE id = ?')
+      .run(new Date().toISOString(), sig, id);
+    // zugehörige „bitte unterschreiben"-Benachrichtigung als gelesen markieren
+    db.prepare("UPDATE notifications SET read = 1 WHERE student_id = ? AND kind = 'sign' AND ref_booking_id = ?").run(sess.student_id, id);
+    const st = db.prepare('SELECT name FROM students WHERE id = ?').get(sess.student_id);
+    logEvent('info', { actor: 'student', studentId: sess.student_id, bookingId: id, detail: `Fahrstunde unterschrieben${st ? ' von ' + st.name : ''}` });
+    return ok(res, { signed: true });
   }
 
   // Eigene Bewertung ansehen / abgeben (ein Eintrag je Schueler – wird ueberschrieben)
@@ -774,17 +791,22 @@ async function handleApi(req, res, url) {
     const attended = (b.attended === false || b.attended === 0 || b.attended === '0') ? 0 : 1;
     const gear = ['schalt', 'automatik'].includes(b.gearbox) ? b.gearbox : null;
     const vermerk = b.feedback ? String(b.feedback).trim() : null;
+    // Nachgetragene, tatsächlich gefahrene Stunden müssen vom Schüler unterschrieben werden.
+    const needsSign = attended ? 1 : 0;
     const info = db.prepare(
-      `INSERT INTO bookings(student_id,date,start_time,duration_min,status,gearbox,lesson_type,late_minutes,attended,feedback,confirmed,created_at)
-       VALUES(?,?,?,?,'done',?,?,?,?,?,1,?)`
-    ).run(sid, date, start, dur, gear, type, late, attended, vermerk, new Date().toISOString());
+      `INSERT INTO bookings(student_id,date,start_time,duration_min,status,gearbox,lesson_type,late_minutes,attended,feedback,confirmed,needs_sign,created_at)
+       VALUES(?,?,?,?,'done',?,?,?,?,?,1,?,?)`
+    ).run(sid, date, start, dur, gear, type, late, attended, vermerk, needsSign, new Date().toISOString());
     const bid = Number(info.lastInsertRowid);
     const typeLbl = { ueberland: 'Überland', autobahn: 'Autobahn', nacht: 'Nachtfahrt' }[type];
     const detail = attended
       ? `nachgetragen: ${wdShort(date)} ${dmy(date)} ${start} Uhr (${dur} Min${late ? `, ${late} Min zu spät` : ''})${typeLbl ? ' – ' + typeLbl : ''}${vermerk ? ' – ' + vermerk : ''}`
       : `nachgetragen (nicht erschienen): ${wdShort(date)} ${dmy(date)} ${start} Uhr${vermerk ? ' – ' + vermerk : ''}`;
     logEvent(attended ? 'done' : 'noshow', { actor: 'instructor', studentId: sid, bookingId: bid, date, detail });
-    if (vermerk && attended) notify(sid, 'info',
+    // Benachrichtigung an den Schüler: bitte unterschreiben (Push + in der App).
+    if (needsSign) notify(sid, 'sign',
+      `✍️ Bitte bestätige deine Fahrstunde vom ${wdShort(date)} ${dmy(date)} um ${start} Uhr (${dur} Min)${vermerk ? ` – ${vermerk}` : ''}.`, date, bid);
+    else if (vermerk) notify(sid, 'info',
       `📝 Fahrstunde nachgetragen (${wdShort(date)} ${dmy(date)} ${start} Uhr): ${vermerk}`, date, bid);
     return ok(res, { id: bid });
   }
@@ -1666,7 +1688,7 @@ async function handleApi(req, res, url) {
     const st = db.prepare('SELECT name FROM students WHERE id=?').get(sid);
     if (!st) return bad(res, 'Schüler nicht gefunden', 404);
     const lessons = db.prepare(
-      `SELECT id,date,start_time,duration_min,status,gearbox,lesson_type,late_minutes,attended,feedback,created_at
+      `SELECT id,date,start_time,duration_min,status,gearbox,lesson_type,late_minutes,attended,feedback,needs_sign,signed_at,created_at
        FROM bookings WHERE student_id=? AND status='done' ORDER BY date,start_time`).all(sid);
     return ok(res, { lessons, name: st.name });
   }

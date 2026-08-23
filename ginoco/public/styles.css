@@ -121,8 +121,20 @@ main{max-width:1080px;margin:0 auto;padding:1.4rem 1.2rem 4rem}
 .dur-chip input{display:none}
 .linklike{background:none;border:none;color:var(--brand);font-weight:700;font-size:.82rem;padding:.1rem .2rem;cursor:pointer;width:auto}
 .linklike:hover{text-decoration:underline;background:none}
-.stu-actions{display:flex;flex-wrap:wrap;gap:.35rem;border-top:1px solid var(--line);padding-top:.6rem}
-.stu-actions .stu-del{margin-left:auto}
+.stu-actions{display:grid;grid-template-columns:repeat(auto-fit,minmax(66px,1fr));gap:.4rem;border-top:1px solid var(--line);padding-top:.7rem}
+/* Kompakte Icon-Buttons (Icon oben, kleines Label darunter) – aufgeräumte Werkzeugleiste */
+.iconbtn{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.18rem;
+  background:var(--card);border:1px solid var(--line);border-radius:12px;padding:.5rem .2rem;cursor:pointer;
+  color:var(--ink);min-height:58px;overflow:hidden;transition:transform .1s ease,border-color .12s ease,background .12s ease}
+.iconbtn:hover{border-color:var(--brand);background:var(--card2);transform:translateY(-1px)}
+.iconbtn:active{transform:translateY(0) scale(.97)}
+.iconbtn .ib-ic{font-size:1.2rem;line-height:1}
+.iconbtn .ib-lb{font-size:.63rem;color:var(--muted);font-weight:600;letter-spacing:.005em;text-align:center;line-height:1.05;
+  max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.iconbtn.ok{background:var(--card)}.iconbtn.ok:hover{border-color:var(--good);background:var(--good-bg)}
+.iconbtn.danger{background:var(--card)}.iconbtn.danger:hover{border-color:var(--bad);background:var(--bad-bg)}
+.iconbtn.ok .ib-lb{color:var(--good)}.iconbtn.danger .ib-lb{color:var(--bad)}
+.stu-actions .stu-del{margin-left:0}
 /* ---- Einstellungen: aufklappbare Abschnitte ---- */
 .sset{background:var(--card2);border:1px solid var(--line);border-radius:12px;margin-bottom:.6rem;overflow:hidden}
 .sset>summary{display:flex;align-items:center;gap:.7rem;padding:.8rem .85rem;cursor:pointer;list-style:none;user-select:none}
@@ -998,3 +1010,18 @@ body:has(.fp-overlay) .pwa-install{display:none}
 .rev-ca-val{grid-area:val;font-weight:700;color:var(--brand);font-size:.9rem}
 .rev-ca-bar{grid-area:bar;height:6px;background:var(--bg2);border-radius:99px;overflow:hidden}
 .rev-ca-bar>span{display:block;height:100%;background:linear-gradient(90deg,var(--brand-dark),var(--brand));border-radius:99px}
+
+/* ===== Unterschrift nachgetragener Fahrstunden ===== */
+.sign-banner{display:flex;align-items:center;gap:.7rem;background:linear-gradient(135deg,rgba(242,160,20,.16),rgba(242,160,20,.05));
+  border:1px solid rgba(242,160,20,.4);border-radius:14px;padding:.75rem .85rem;margin:.2rem 0 .8rem;font-size:1.4rem}
+.sign-banner div{flex:1;font-size:.9rem}.sign-banner strong{font-size:.95rem}
+.sign-banner span{color:var(--muted);font-size:.85rem}
+.sign-banner button{flex:0 0 auto;font-size:.85rem}
+.ml-tosign td{background:rgba(242,160,20,.06)}
+.ml-signcell{margin-top:.35rem}
+.sign-lesson{background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:.6rem .75rem;margin:.2rem 0 .7rem}
+.sign-note{color:var(--muted);font-style:italic;margin-top:.3rem;font-size:.9rem}
+.sign-lb{display:block;font-size:.9rem;font-weight:600;margin:.2rem 0 .35rem}
+.sign-pad-wrap{position:relative;margin-bottom:.6rem}
+.sign-pad{width:100%;height:150px;background:#fff;border:2px dashed var(--line);border-radius:12px;touch-action:none;display:block;cursor:crosshair}
+.sign-clear{position:absolute;top:.4rem;right:.4rem}

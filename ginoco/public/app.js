@@ -103,6 +103,46 @@ function loadAppearance() {
 }
 loadAppearance();
 
+// ---------- Benachrichtigungston (kurzer Zwei-Ton-Klang, ohne externe Datei) ----------
+let _audioCtx = null;
+let _soundOn = true;
+try { _soundOn = localStorage.getItem('fsp-sound') !== '0'; } catch {}
+function setSoundOn(on) { _soundOn = !!on; try { localStorage.setItem('fsp-sound', on ? '1' : '0'); } catch {} if (on) { unlockAudio(); playChime(); } }
+function unlockAudio() {
+  try {
+    if (!_audioCtx) { const AC = window.AudioContext || window.webkitAudioContext; if (AC) _audioCtx = new AC(); }
+    if (_audioCtx && _audioCtx.state === 'suspended') _audioCtx.resume();
+  } catch {}
+}
+// Audio erst nach der ersten Nutzer-Interaktion freischalten (Browser-Vorgabe).
+window.addEventListener('pointerdown', unlockAudio, { passive: true });
+window.addEventListener('keydown', unlockAudio, { passive: true });
+function playChime() {
+  if (!_soundOn) return;
+  unlockAudio();
+  if (!_audioCtx) return;
+  try {
+    const t = _audioCtx.currentTime;
+    [880, 1174.66].forEach((f, i) => {
+      const o = _audioCtx.createOscillator(), g = _audioCtx.createGain();
+      o.type = 'sine'; o.frequency.value = f;
+      o.connect(g); g.connect(_audioCtx.destination);
+      const s = t + i * 0.13;
+      g.gain.setValueAtTime(0.0001, s);
+      g.gain.exponentialRampToValueAtTime(0.2, s + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, s + 0.34);
+      o.start(s); o.stop(s + 0.36);
+    });
+  } catch {}
+}
+// Merkt sich die letzten Zähler, um „neu eingegangen" zu erkennen.
+let _lastNotifUnread = null, _lastMsgUnread = null;
+function chimeOnIncrease(kind, value) {
+  const prev = kind === 'notif' ? _lastNotifUnread : _lastMsgUnread;
+  if (prev != null && value > prev) playChime();
+  if (kind === 'notif') _lastNotifUnread = value; else _lastMsgUnread = value;
+}
+
 function setTheme(key) { state.theme = THEMES[key] ? key : 'unternbuchen'; try { localStorage.setItem('fsp-theme', state.theme); } catch {} applyAppearance(); }
 function savePref(k, v) {
   state.prefs = state.prefs || {};
@@ -164,6 +204,10 @@ function openThemePicker() {
       </div>
     </div>
 
+    <div class="ap-sec"><div class="ap-label">Benachrichtigungston</div>
+      <label class="ck-line" style="justify-content:flex-start"><input type="checkbox" id="ap-sound" ${_soundOn ? 'checked' : ''}> 🔊 Ton bei neuen Benachrichtigungen</label>
+    </div>
+
     <div class="actions" style="justify-content:space-between">
       <button class="ghost sm" id="ap-reset">Zurücksetzen</button>
       <button class="sec" onclick="window.__closeModal()">Fertig</button>
@@ -186,6 +230,8 @@ function openThemePicker() {
     efree.oninput = () => { state.prefs.edge = efree.value; applyAppearance(); };            // live-Vorschau
     efree.onchange = () => { savePref('edge', efree.value); reopen(); };                     // festhalten
   }
+  const snd = $('#ap-sound');
+  if (snd) snd.onchange = () => setSoundOn(snd.checked);
   const rst = $('#ap-reset');
   if (rst) rst.onclick = () => { resetAppearance(); toast('Auf Standard zurückgesetzt', 'ok'); reopen(); };
 }
@@ -408,8 +454,13 @@ function openTour() {
 window.__openTour = openTour;
 
 // ---------- Was ist neu? (Changelog) ----------
-const CHANGELOG_VER = '3.61';
+const CHANGELOG_VER = '3.62';
 const CHANGELOG = [
+  { v: '3.62', d: '23.08.2026', title: '✍️ Unterschreiben & Töne', items: [
+    '✍️ Nachgetragene Fahrstunden bestätigst du jetzt selbst: Dein Fahrlehrer trägt eine Stunde nach, du bekommst eine Benachrichtigung und unterschreibst mit dem Finger direkt in der App.',
+    '📄 Deine Unterschrift erscheint auf dem Fahrstunden-Nachweis („✓ vom Fahrschüler bestätigt").',
+    '🔊 Neuer Benachrichtigungston bei neuen Mitteilungen – an/aus unter 🎨 Aussehen.',
+    '✨ Fahrlehrer-Bereich aufgeräumt: übersichtlichere Fahrschüler-Karten mit klaren Symbol-Schaltflächen.'] },
   { v: '3.61', d: '21.08.2026', title: '⭐ Bewertung – jetzt richtig gut', items: [
     '🧩 Neuer geführter Ablauf: Du bewertest Schritt für Schritt – Geduld, Erklärungen, Pünktlichkeit, Freundlichkeit und dein Fahrgefühl. Einfach Stern antippen, es geht von allein weiter.',
     '📸 Foto direkt beim Bewerten hochladen – kein Umweg mehr übers Profil. Mit Vorschau, natürlich freiwillig.',
@@ -732,7 +783,7 @@ function header() {
     <div class="brand"><img class="logo" src="/logo.svg?v=3611" alt="" width="24" height="24" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'logo',textContent:'🚗'}))"> <span class="brandname">ginoco</span></div>
     <div class="who">
       <span class="role">${u.role === 'instructor' ? 'Fahrlehrer' : 'Fahrschüler'}</span>
-      <strong>${esc(u.name || '')}</strong>${u.username ? `<span class="pill">${esc(u.username)}</span>` : ''}
+      ${u.role === 'instructor' ? '' : `<strong>${esc(u.name || '')}</strong>`}${u.username ? `<span class="pill">${esc(u.username)}</span>` : ''}
       ${state.liveSharing ? '<button class="ghost sm" onclick="window.__stopLive()" title="Standort-Teilen beenden" style="color:var(--good)">🛰️ Live · Stopp</button>' : ''}
       ${u.role === 'student' ? '<button class="ghost sm" onclick="window.__openTour()" title="Kurze Einführung">❓</button>' : ''}
       ${u.role === 'student' ? '<button class="ghost sm" onclick="window.__openProfile()" title="Mein Profil">👤</button>' : ''}
@@ -1120,13 +1171,17 @@ function renderMyLessons(bookings) {
   card.classList.remove('hidden');
   const driven = done.filter((b) => b.attended !== 0);
   const totalMin = driven.reduce((s, b) => s + (b.duration_min || 0), 0);
+  const toSign = done.filter((b) => b.needs_sign);
   const rows = done.map((b) => {
     const noshow = b.attended === 0;
     const late = b.late_minutes || 0;
     const entryDate = b.created_at ? String(b.created_at).slice(0, 10) : null;
     const nachgetragen = entryDate && entryDate !== b.date;
-    return `<tr class="${noshow ? 'ml-noshow' : ''}">
-      <td class="ml-when" data-label="Wann"><strong>${fmtDT(b.date, b.start_time)}</strong>${nachgetragen ? `<span class="ml-entry">nachgetragen · eingetragen ${fmtDT(entryDate)}</span>` : ''}</td>
+    const sign = b.needs_sign
+      ? `<button class="sm ml-sign" data-sign="${b.id}">✍️ Unterschreiben</button>`
+      : (b.signed_at ? `<span class="pill" style="background:var(--good-bg);color:var(--good)">✓ unterschrieben</span>` : '');
+    return `<tr class="${noshow ? 'ml-noshow' : ''} ${b.needs_sign ? 'ml-tosign' : ''}">
+      <td class="ml-when" data-label="Wann"><strong>${fmtDT(b.date, b.start_time)}</strong>${nachgetragen ? `<span class="ml-entry">nachgetragen · eingetragen ${fmtDT(entryDate)}</span>` : ''}${sign ? `<div class="ml-signcell">${sign}</div>` : ''}</td>
       <td data-label="Ende">${noshow ? '—' : 'bis ' + addMinHHMM(b.start_time, b.duration_min)}</td>
       <td data-label="Dauer">${noshow ? '🚫 nicht da' : (b.duration_min + ' Min')}</td>
       <td data-label="Art">${noshow ? '' : lessonTypeLabel(b.lesson_type)}</td>
@@ -1134,8 +1189,12 @@ function renderMyLessons(bookings) {
       <td class="ml-note" data-label="Vermerk">${b.feedback ? esc(b.feedback) : ''}</td>
     </tr>`;
   }).join('');
+  const banner = toSign.length
+    ? `<div class="sign-banner">✍️ <div><strong>${toSign.length} Fahrstunde${toSign.length === 1 ? '' : 'n'} warten auf deine Unterschrift.</strong><br><span>Dein Fahrlehrer hat sie nachgetragen – bitte kurz bestätigen.</span></div><button class="sm" id="ml-sign-first">Jetzt unterschreiben</button></div>`
+    : '';
   card.innerHTML = `<h2>📖 Meine Fahrstunden</h2>
     <p class="hint">Alle deine gefahrenen Stunden – mit Datum &amp; Uhrzeit, Dauer, Art und Vermerk.</p>
+    ${banner}
     <div class="inline" style="margin-bottom:.6rem;flex-wrap:wrap">
       <span class="pill">🚗 ${driven.length} gefahren</span>
       <span class="pill">⏱️ ${hLabel(totalMin)} gesamt</span>
@@ -1146,6 +1205,58 @@ function renderMyLessons(bookings) {
       <tbody>${rows}</tbody>
     </table></div>`;
   const pb = $('#ml-print'); if (pb) pb.onclick = () => printLessonProof(state.user?.name || 'Fahrschüler', done);
+  card.querySelectorAll('[data-sign]').forEach((btn) => btn.onclick = () => {
+    const bk = done.find((x) => x.id === Number(btn.dataset.sign)); if (bk) openSignModal(bk);
+  });
+  const sf = $('#ml-sign-first'); if (sf) sf.onclick = () => openSignModal(toSign[0]);
+}
+
+// Unterschrift-Fenster: der Fahrschüler bestätigt & unterschreibt eine nachgetragene Fahrstunde.
+function openSignModal(l) {
+  if (!l) return;
+  const art = (l.lesson_type && l.lesson_type !== 'normal') ? ' · ' + lessonTypeLabel(l.lesson_type) : '';
+  modal(`<h3>✍️ Fahrstunde bestätigen</h3>
+    <p class="hint">Bestätige, dass diese Fahrstunde stattgefunden hat. Deine Unterschrift kommt auf deinen Fahrstunden-Nachweis.</p>
+    <div class="sign-lesson">📅 <strong>${fmtDT(l.date, l.start_time)}</strong> · ${l.duration_min} Min${art}${l.late_minutes ? ` · ⏱️ ${l.late_minutes} Min zu spät` : ''}${l.feedback ? `<div class="sign-note">„${esc(l.feedback)}"</div>` : ''}</div>
+    <label class="sign-lb">Deine Unterschrift <span class="muted">(mit dem Finger malen)</span></label>
+    <div class="sign-pad-wrap">
+      <canvas id="sign-pad" class="sign-pad"></canvas>
+      <button type="button" class="ghost sm sign-clear" id="sign-clear">Löschen</button>
+    </div>
+    <label class="ck-line" style="justify-content:flex-start"><input type="checkbox" id="sign-ok"> Ich bestätige, dass ich diese Fahrstunde gefahren bin.</label>
+    <div class="actions"><button class="sec" onclick="window.__closeModal()">Später</button><button id="sign-go" disabled>Bestätigen ✍️</button></div>`);
+  const canvas = $('#sign-pad');
+  const ctx = canvas.getContext('2d');
+  let drawn = false, drawing = false, last = null;
+  // Auflösung an Anzeige anpassen (scharfe Linie)
+  const fit = () => {
+    const r = canvas.getBoundingClientRect();
+    const dpr = Math.min(3, window.devicePixelRatio || 1);
+    canvas.width = Math.max(1, Math.round(r.width * dpr));
+    canvas.height = Math.max(1, Math.round(r.height * dpr));
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, r.width, r.height);
+    ctx.strokeStyle = '#111'; ctx.lineWidth = 2.4; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  };
+  setTimeout(fit, 30);
+  const pos = (e) => { const r = canvas.getBoundingClientRect(); const t = e.touches ? e.touches[0] : e; return { x: t.clientX - r.left, y: t.clientY - r.top }; };
+  const start = (e) => { e.preventDefault(); drawing = true; last = pos(e); };
+  const move = (e) => { if (!drawing) return; e.preventDefault(); const p = pos(e); ctx.beginPath(); ctx.moveTo(last.x, last.y); ctx.lineTo(p.x, p.y); ctx.stroke(); last = p; drawn = true; };
+  const end = () => { drawing = false; };
+  canvas.addEventListener('pointerdown', start); canvas.addEventListener('pointermove', move);
+  window.addEventListener('pointerup', end);
+  $('#sign-clear').onclick = () => { fit(); drawn = false; };
+  const ok = $('#sign-ok'), go = $('#sign-go');
+  ok.onchange = () => { go.disabled = !ok.checked; };
+  go.onclick = async () => {
+    go.disabled = true; go.textContent = 'Wird gespeichert …';
+    const body = {};
+    if (drawn) { try { body.signature = canvas.toDataURL('image/png'); } catch {} }
+    try {
+      await api('/api/my/bookings/' + l.id + '/sign', { method: 'POST', body });
+      closeModal(); toast('Unterschrieben – danke! ✓', 'ok'); syncStudent();
+    } catch (e) { go.disabled = false; go.textContent = 'Bestätigen ✍️'; toast(e.message, 'err'); }
+  };
 }
 
 // ---------- Nachrichten an den Fahrlehrer (Schüler) ----------
@@ -1450,7 +1561,7 @@ function printLessonProof(name, done) {
       <td class="c">${noshow ? 'nicht erschienen' : b.duration_min + ' Min'}</td>
       <td class="c">${noshow ? '' : artL}</td>
       <td class="c">${late ? late + ' Min' : ''}</td>
-      <td>${esc(b.feedback || '')}</td>
+      <td>${esc(b.feedback || '')}${b.signed_at ? `<br><span class="entry" style="color:#0a7d3b">✔ vom Fahrschüler bestätigt ${fmtDT(String(b.signed_at).slice(0, 10))}</span>` : ''}</td>
     </tr>`;
   }).join('');
   const doc = `<!doctype html><html lang="de"><head><meta charset="utf-8"><title>Fahrstunden-Nachweis – ${esc(name)}</title>
@@ -2115,14 +2226,18 @@ async function refreshPushCtl() {
 function renderNotifications(notifs, unread) {
   const card = $('#notif-card');
   card.classList.remove('hidden'); // immer sichtbar – wegen Push-Schalter
-  const icon = (k) => k === 'offer' ? '🎁' : k === 'shift' ? '🕐' : k === 'reminder' ? '⏰' : 'ℹ️';
+  chimeOnIncrease('notif', unread || 0); // Ton, wenn neue Mitteilungen dazugekommen sind
+  const icon = (k) => k === 'offer' ? '🎁' : k === 'shift' ? '🕐' : k === 'reminder' ? '⏰' : k === 'sign' ? '✍️' : 'ℹ️';
   const list = (notifs && notifs.length)
-    ? `<div class="notif-list">${notifs.map((n) => `<div class="notif ${n.read ? '' : 'unread'}">
+    ? `<div class="notif-list">${notifs.map((n) => {
+        const needsSign = n.kind === 'sign' && n.ref_booking_id && (myBookingsCache || []).some((b) => b.id === n.ref_booking_id && b.needs_sign);
+        return `<div class="notif ${n.read ? '' : 'unread'}">
         <span class="notif-ic">${icon(n.kind)}</span>
         <div class="notif-body"><div class="notif-msg">${esc(n.message)}</div>
-          <div class="notif-time">${new Date(n.created_at).toLocaleString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</div></div>
+          <div class="notif-time">${new Date(n.created_at).toLocaleString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</div>
+          ${needsSign ? `<button class="sm notif-sign" data-sign="${n.ref_booking_id}" style="margin-top:.5rem">✍️ Jetzt unterschreiben</button>` : ''}</div>
         ${n.read ? '' : '<span class="notif-dot"></span>'}
-      </div>`).join('')}</div>
+      </div>`; }).join('')}</div>
       ${unread ? '<div style="margin-top:.8rem"><button class="sec sm" id="notif-read">Alle als gelesen markieren</button></div>' : ''}`
     : '<p class="hint">Keine Mitteilungen.</p>';
   card.innerHTML = `<h2>🔔 Mitteilungen ${unread ? `<span class="badge offer">${unread} neu</span>` : ''}</h2>
@@ -2130,6 +2245,10 @@ function renderNotifications(notifs, unread) {
     ${list}`;
   const b = $('#notif-read');
   if (b) b.onclick = async () => { try { await api('/api/my/notifications/read', { method: 'POST' }); syncStudent(); } catch (e) { toast(e.message, 'err'); } };
+  card.querySelectorAll('[data-sign]').forEach((btn) => btn.onclick = () => {
+    const bk = (myBookingsCache || []).find((x) => x.id === Number(btn.dataset.sign));
+    if (bk) openSignModal(bk); else toast('Fahrstunde nicht gefunden', 'err');
+  });
   refreshPushCtl();
 }
 
@@ -3442,15 +3561,15 @@ async function tabSchueler(scope) {
             <div class="sir"><span class="sil">⏱️</span><span class="siv stu-lengths">${boxes}<button class="linklike" data-savedur="${s.id}">speichern</button></span></div>
           </div>
           <div class="stu-actions">
-            <button class="ghost sm" data-edit="${s.id}">✏️ Bearbeiten</button>
-            <button class="ghost sm" data-log="${s.id}" data-lname="${esc(s.name)}">➕ Fahrstunde nachtragen</button>
-            <button class="ghost sm" data-proof="${s.id}" data-pname="${esc(s.name)}">📄 Nachweis</button>
-            <button class="ghost sm" data-card="${s.id}" data-cname="${esc(s.name)}">📋 Ausbildungskarte</button>
-            <button class="ghost sm" data-reset="${s.id}" data-uname="${esc(s.username || '')}" data-sname="${esc(s.name)}">🔑 Zugangsdaten</button>
+            <button class="iconbtn" data-edit="${s.id}" title="Bearbeiten" aria-label="Bearbeiten"><span class="ib-ic">✏️</span><span class="ib-lb">Bearbeiten</span></button>
+            <button class="iconbtn" data-log="${s.id}" data-lname="${esc(s.name)}" title="Fahrstunde nachtragen" aria-label="Fahrstunde nachtragen"><span class="ib-ic">➕</span><span class="ib-lb">Nachtragen</span></button>
+            <button class="iconbtn" data-proof="${s.id}" data-pname="${esc(s.name)}" title="Nachweis drucken" aria-label="Nachweis drucken"><span class="ib-ic">📄</span><span class="ib-lb">Nachweis</span></button>
+            <button class="iconbtn" data-card="${s.id}" data-cname="${esc(s.name)}" title="Ausbildungskarte" aria-label="Ausbildungskarte"><span class="ib-ic">📋</span><span class="ib-lb">Karte</span></button>
+            <button class="iconbtn" data-reset="${s.id}" data-uname="${esc(s.username || '')}" data-sname="${esc(s.name)}" title="Zugangsdaten" aria-label="Zugangsdaten"><span class="ib-ic">🔑</span><span class="ib-lb">Zugang</span></button>
             ${isArch
-              ? `<button class="ghost sm" data-react="${s.id}" style="color:var(--brand)">↩︎ Reaktivieren</button>`
-              : `<button class="ghost sm" data-arch="${s.id}" data-aname="${esc(s.name)}" style="color:var(--good)">✅ Bestanden</button>`}
-            <button class="ghost sm stu-del" data-del="${s.id}" data-dname="${esc(s.name)}" style="color:var(--bad)">🗑️</button>
+              ? `<button class="iconbtn ok" data-react="${s.id}" title="Reaktivieren" aria-label="Reaktivieren"><span class="ib-ic">↩︎</span><span class="ib-lb">Zurück</span></button>`
+              : `<button class="iconbtn ok" data-arch="${s.id}" data-aname="${esc(s.name)}" title="Als bestanden ins Archiv" aria-label="Bestanden"><span class="ib-ic">✅</span><span class="ib-lb">Bestanden</span></button>`}
+            <button class="iconbtn danger stu-del" data-del="${s.id}" data-dname="${esc(s.name)}" title="Löschen" aria-label="Löschen"><span class="ib-ic">🗑️</span><span class="ib-lb">Löschen</span></button>
           </div>
         </div>`;
       }).join('')}

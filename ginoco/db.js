@@ -188,6 +188,10 @@ db.exec(`CREATE TABLE IF NOT EXISTS reviews (
 );`);
 db.exec('CREATE INDEX IF NOT EXISTS idx_reviews_pub ON reviews(published, created_at)');
 ensureColumn('reviews', 'featured', 'featured INTEGER NOT NULL DEFAULT 0'); // vom Fahrlehrer angeheftet -> zuerst
+// Nachgetragene Fahrstunden: der Fahrschüler bestätigt/unterschreibt sie in der App.
+ensureColumn('bookings', 'needs_sign', 'needs_sign INTEGER NOT NULL DEFAULT 0'); // 1 = wartet auf Unterschrift des Schülers
+ensureColumn('bookings', 'signed_at', 'signed_at TEXT');   // Zeitpunkt der Unterschrift/Bestätigung
+ensureColumn('bookings', 'signature', 'signature TEXT');   // gezeichnete Unterschrift (data-URL, optional)
 // Aufschlüsselung je Kategorie als JSON, z.B. {"geduld":5,"erklaerung":4,...}
 // (aus dem geführten "Durchbewerten"-Ablauf). NULL bei alten Bewertungen.
 ensureColumn('reviews', 'ratings', 'ratings TEXT');
