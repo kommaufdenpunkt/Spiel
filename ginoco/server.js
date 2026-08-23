@@ -16,7 +16,7 @@ const PUBLIC = join(__dirname, 'public');
 const PORT = Number(process.env.PORT || 3000);
 const HOST = process.env.HOST || '0.0.0.0'; // hinter Caddy: HOST=127.0.0.1 (nur Proxy erreicht Node)
 const SESSION_DAYS = 30;
-const APP_VERSION = "3.63.2";
+const APP_VERSION = "3.64.0";
 // Einstellungen, die Schueler/Oeffentlichkeit sehen duerfen (Rest bleibt beim Fahrlehrer)
 const PUBLIC_SETTINGS = ['instructor_name', 'instructor_phone', 'policy_text',
   'cancel_hours', 'lock_hours', 'booking_horizon_days', 'booking_horizon_days_rank2',
@@ -108,14 +108,26 @@ function parseCookies(req) {
 
 function newToken() { return randomBytes(24).toString('hex'); }
 
-function createSession(res, kind, studentId = null, secure = false) {
+function createSession(res, kind, studentId = null, secure = false, remember = true) {
   const token = newToken();
   const expires = Date.now() + SESSION_DAYS * 864e5;
   db.prepare('INSERT INTO sessions(token,kind,student_id,expires) VALUES(?,?,?,?)')
     .run(token, kind, studentId, expires);
+  // „Angemeldet bleiben": persistentes Cookie (Max-Age). Sonst Sitzungs-Cookie,
+  // das der Browser beim Schließen verwirft (Serverseitig bleibt die Sitzung gültig).
+  const maxAge = remember ? `; Max-Age=${SESSION_DAYS * 86400}` : '';
   res.setHeader('Set-Cookie',
-    `fsp=${token}; HttpOnly; Path=/; Max-Age=${SESSION_DAYS * 86400}; SameSite=Lax${secure ? '; Secure' : ''}`);
+    `fsp=${token}; HttpOnly; Path=/${maxAge}; SameSite=Lax${secure ? '; Secure' : ''}`);
   return token;
+}
+// Wiederherstellungs-Codes für den Fahrlehrer erzeugen (Klartext zurück, Hashes speichern).
+function genInstructorRecovery(n = 8) {
+  const AL = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const grp = () => { let s = ''; const r = randomBytes(5); for (let i = 0; i < 5; i++) s += AL[r[i] % AL.length]; return s; };
+  const codes = [];
+  for (let i = 0; i < n; i++) codes.push(grp() + '-' + grp());
+  setSettingRaw('instructor_recovery', JSON.stringify(codes.map((c) => hashPassword(c))));
+  return codes;
 }
 
 function getSession(req) {
@@ -460,11 +472,31 @@ async function handleApi(req, res, url) {
 
   if (p === '/api/auth/instructor' && method === 'POST') {
     if (loginBlocked(req)) return bad(res, 'Zu viele Fehlversuche. Bitte in ein paar Minuten erneut versuchen.', 429);
-    const { pin } = await readBody(req);
-    if (!verifyPassword(pin || '', getSettingRaw('instructor_pin'))) { noteLoginFail(req); return bad(res, 'Falsche PIN', 401); }
+    const b = await readBody(req);
+    const secret = String(b.pin || b.password || '');
+    if (!verifyPassword(secret, getSettingRaw('instructor_pin'))) { noteLoginFail(req); return bad(res, 'Falsche PIN oder falsches Passwort', 401); }
     noteLoginOk(req);
-    const token = createSession(res, 'instructor', null, isHttps(req));
+    const remember = !(b.remember === false || b.remember === 0 || b.remember === '0');
+    const token = createSession(res, 'instructor', null, isHttps(req), remember);
     return ok(res, { role: 'instructor', name: getSettingRaw('instructor_name'), token });
+  }
+  // Zugang wiederherstellen: mit einem Wiederherstellungs-Code ein neues Passwort setzen.
+  if (p === '/api/auth/instructor/recover' && method === 'POST') {
+    if (loginBlocked(req)) return bad(res, 'Zu viele Versuche. Bitte in ein paar Minuten erneut.', 429);
+    const b = await readBody(req);
+    const code = String(b.code || '').trim().toUpperCase();
+    const np = String(b.new_password || '');
+    let list; try { list = JSON.parse(getSettingRaw('instructor_recovery') || '[]'); } catch { list = []; }
+    const idx = list.findIndex((h) => verifyPassword(code, h));
+    if (idx < 0) { noteLoginFail(req); return bad(res, 'Code ungültig oder bereits verwendet.', 401); }
+    const prob = passwordProblem(np);
+    if (prob) return bad(res, 'Neues Passwort braucht ' + prob + '.');
+    setSettingRaw('instructor_pin', hashPassword(np));
+    list.splice(idx, 1);                                   // Code verbrauchen (einmalig)
+    setSettingRaw('instructor_recovery', JSON.stringify(list));
+    noteLoginOk(req);
+    logEvent('info', { actor: 'instructor', detail: 'Zugang per Wiederherstellungs-Code neu gesetzt' });
+    return ok(res, { recovered: true, remaining: list.length });
   }
 
   if (p === '/api/auth/register' && method === 'POST') {
@@ -1880,12 +1912,14 @@ async function handleApi(req, res, url) {
       if (b[k] === '' && !emptyOk.has(k)) continue;
       setSettingRaw(k, b[k]);
     }
+    let recovery_codes;
     if (b.new_pin) {
       const prob = passwordProblem(b.new_pin);
       if (prob) return bad(res, 'Fahrlehrer-Passwort braucht ' + prob + '.');
       setSettingRaw('instructor_pin', hashPassword(String(b.new_pin)));
+      recovery_codes = genInstructorRecovery();   // neue Wiederherstellungs-Codes (einmalig anzeigen)
     }
-    return ok(res, { settings: getSettings(), misaligned: misalignedDays() });
+    return ok(res, { settings: getSettings(), misaligned: misalignedDays(), recovery_codes });
   }
 
   return bad(res, 'Unbekannter Endpunkt', 404);

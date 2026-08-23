@@ -468,8 +468,11 @@ function openTour() {
 window.__openTour = openTour;
 
 // ---------- Was ist neu? (Changelog) ----------
-const CHANGELOG_VER = '3.63';
+const CHANGELOG_VER = '3.64';
 const CHANGELOG = [
+  { v: '3.64', d: '23.08.2026', title: '🔐 Sicherer Fahrlehrer-Zugang', items: [
+    '🔑 Fahrlehrer-Login jetzt mit PIN oder richtigem Passwort, „Angemeldet bleiben" und Zugang-Wiederherstellung über Codes.',
+    '🎡 Tab-Icon (Lenkrad-Emblem) wird verlässlich geladen – auch wenn der Browser das alte Symbol gecacht hatte.'] },
   { v: '3.63', d: '23.08.2026', title: '🧾 Rechnungsdatum im Protokoll', items: [
     '🧾 Im Protokoll siehst du jetzt bei jeder Stunde, unter welchem Datum sie auf der Rechnung erscheint – gefahren am … · auf der Rechnung am …',
     '📄 Steht auch auf dem ausgedruckten Fahrstunden-Nachweis, damit alles zusammenpasst.'] },
@@ -1052,8 +1055,41 @@ function registerForm() {
 function instrForm() {
   return `${errBox()}
     <p class="hint">Zugang nur für den Fahrlehrer.</p>
-    <div class="field"><label>PIN</label><input id="i-pin" type="password" autocomplete="current-password"></div>
-    <div class="form-actions"><button id="i-go">Anmelden</button></div>`;
+    <div class="field"><label>PIN oder Passwort</label><input id="i-pin" type="password" autocomplete="current-password"></div>
+    <label class="ck-line" style="justify-content:flex-start;margin:.1rem 0 .3rem"><input type="checkbox" id="i-remember" checked> Angemeldet bleiben</label>
+    <div class="form-actions"><button id="i-go">Anmelden</button></div>
+    <p class="hint" style="margin-top:.6rem">Zugang verloren? <a href="#" id="i-recover" class="linklike">Mit Wiederherstellungs-Code neu setzen</a></p>`;
+}
+// Wiederherstellungs-Codes einmalig anzeigen (nach dem Setzen eines neuen Passworts).
+function showRecoveryCodes(codes) {
+  modal(`<h3>🔐 Deine Wiederherstellungs-Codes</h3>
+    <p class="hint">Bewahre diese Codes sicher auf (abschreiben oder ausdrucken). Falls du dein Passwort vergisst, kommst du damit wieder in den Fahrlehrer-Bereich. Jeder Code funktioniert <strong>nur einmal</strong> – und sie werden <strong>nur jetzt</strong> angezeigt.</p>
+    <div class="rec-codes">${codes.map((c) => `<code>${esc(c)}</code>`).join('')}</div>
+    <div class="actions"><button class="sec" id="rec-copy">📋 Kopieren</button><button onclick="window.__closeModal()">Erledigt</button></div>`);
+  $('#rec-copy').onclick = () => navigator.clipboard.writeText(codes.join('\n')).then(() => toast('Kopiert ✓', 'ok')).catch(() => toast('Kopieren nicht möglich', 'err'));
+}
+// Fahrlehrer-Zugang wiederherstellen (mit einem der Wiederherstellungs-Codes).
+function openInstrRecoverModal() {
+  modal(`<h3>🔑 Zugang wiederherstellen</h3>
+    <p class="hint">Gib einen deiner <strong>Wiederherstellungs-Codes</strong> ein (die du beim Setzen des Passworts notiert hast) und wähle ein neues Passwort. Jeder Code funktioniert nur einmal.</p>
+    ${errBox()}
+    <div class="field"><label>Wiederherstellungs-Code</label><input id="rc-code" placeholder="z.B. AB2CD-EF3GH" style="text-transform:uppercase" autocomplete="off"></div>
+    <div class="field"><label>Neues Passwort</label><input id="rc-pw" type="password" autocomplete="new-password"><div class="hint" style="margin:.3rem 0 0">Mind. 8 Zeichen, mit Buchstabe, Zahl und Sonderzeichen.</div></div>
+    <div class="actions"><button class="sec" onclick="window.__closeModal()">Abbrechen</button><button id="rc-go">Neu setzen & anmelden</button></div>`);
+  $('#rc-go').onclick = async () => {
+    const code = $('#rc-code').value.trim(), np = $('#rc-pw').value;
+    const prob = pwProblem(np);
+    if (prob) { showErr('Neues Passwort braucht ' + prob + '.'); return; }
+    try {
+      await api('/api/auth/instructor/recover', { method: 'POST', body: { code, new_password: np } });
+      // direkt anmelden mit dem neuen Passwort
+      await api('/api/auth/instructor', { method: 'POST', body: { pin: np, remember: true } });
+      closeModal();
+      const [me, s] = await Promise.all([api('/api/auth/me'), api('/api/settings')]);
+      state.user = me.user; state.settings = s.settings; render();
+      toast('Zugang wiederhergestellt ✓', 'ok');
+    } catch (e) { showErr(e.message); }
+  };
 }
 
 function wireAuth(tab) {
@@ -1084,10 +1120,11 @@ function wireAuth(tab) {
   } else {
     $('#i-go').onclick = async () => {
       try {
-        await api('/api/auth/instructor', { method: 'POST', body: { pin: $('#i-pin').value } });
+        await api('/api/auth/instructor', { method: 'POST', body: { pin: $('#i-pin').value, remember: $('#i-remember')?.checked !== false } });
         done();
       } catch (e) { showErr(e.message); }
     };
+    const rc = $('#i-recover'); if (rc) rc.onclick = (ev) => { ev.preventDefault(); openInstrRecoverModal(); };
   }
   app.querySelectorAll('input').forEach((i) => i.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') { const b = app.querySelector('.form-actions button'); if (b) b.click(); }
@@ -4620,7 +4657,7 @@ function tabEinstellungen() {
     ${sec('👤', 'Zugang & Kontakt', 'Name, Handynummer, Passwort', `
       <div class="field"><label>Angezeigter Name</label><input id="e-name" value="${esc(s.instructor_name)}"></div>
       <div class="field"><label>Deine Handynummer (Schüler können anrufen/schreiben)</label><input id="e-phone" value="${esc(s.instructor_phone || '')}" placeholder="z.B. 0151 23456789"></div>
-      <div class="field" style="margin-bottom:0"><label>Neues Fahrlehrer-Passwort (leer = unverändert)</label><input id="e-pin" type="password" placeholder="mind. 8 Zeichen, mit Zahl & Sonderzeichen"></div>`)}
+      <div class="field" style="margin-bottom:0"><label>Neues Fahrlehrer-Passwort (leer = unverändert)</label><input id="e-pin" type="password" autocomplete="new-password" placeholder="mind. 8 Zeichen, mit Zahl & Sonderzeichen"><div class="hint" style="margin:.3rem 0 0">Beim Ändern bekommst du <strong>Wiederherstellungs-Codes</strong> zum Notieren – damit kommst du wieder rein, falls du das Passwort vergisst.</div></div>`)}
 
     <div class="actions" style="justify-content:flex-start"><button id="e-save">💾 Alles speichern</button><span id="e-msg" class="muted"></span></div>
   </div>`;
@@ -4678,6 +4715,7 @@ function tabEinstellungen() {
         new_pin: $('#e-pin').value || undefined } });
       state.settings = r.settings; state.user.name = r.settings.instructor_name;
       toast('Einstellungen gespeichert ✓', 'ok'); $('#e-msg').textContent = 'Gespeichert.';
+      if (r.recovery_codes && r.recovery_codes.length) showRecoveryCodes(r.recovery_codes);
       if (r.misaligned && r.misaligned.total > 0) promptRealign(r.misaligned);
     } catch (e) { toast(e.message, 'err'); }
   };

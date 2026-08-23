@@ -1041,3 +1041,8 @@ body:has(.fp-overlay) .pwa-install{display:none}
 .inv-fields{display:flex;flex-wrap:wrap;gap:.4rem;align-items:center}
 .inv-fields .inv-d{max-width:150px}.inv-fields .inv-t{max-width:90px}
 .ml-inv{color:var(--brand)}
+
+/* ===== Wiederherstellungs-Codes ===== */
+.rec-codes{display:grid;grid-template-columns:1fr 1fr;gap:.45rem;margin:.6rem 0}
+.rec-codes code{background:var(--card2);border:1px solid var(--line);border-radius:8px;padding:.45rem .5rem;
+  font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.95rem;letter-spacing:.04em;text-align:center;color:var(--ink)}
