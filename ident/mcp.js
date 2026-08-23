@@ -98,7 +98,10 @@ function baueNutzlast(fall, aufnahme) {
       ergebnis: fall.result,                     // approved | rejected | open
       geburtsdatum: fall.geburtsdatum || '',
       ablehnungsgrund: fall.rejectReason || '',
-      pruefer: fall.agentName || '',
+      // Der Prüfer ist der, der abgeholt hat - nicht der, der zufaellig den
+      // Knopf gedrueckt hat.
+      pruefer: fall.durchgefuehrtVon || fall.agentName || '',
+      aufnahmeAb: fall.aufnahmeAb || '',
       ausweisart: fall.docType || '',
       ausweisnummer: fall.docNumber || '',
       notiz: fall.note || '',

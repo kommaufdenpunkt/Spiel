@@ -1511,6 +1511,8 @@
         + '<div class="ometa">Prüfer: ' + esc(a.pruefer || '—') + ' · Nummer: ' + esc(a.zugangsnummer || '—')
         + '<br>' + esc(a.ausweisart || 'Ausweis unbekannt') + ' · Nr.: ' + esc(a.ausweisnummer || '—')
         + (a.geburtsdatum ? ' · geb. ' + esc(a.geburtsdatum) : '')
+        + (a.aufnahmeAb ? '<br>Aufzeichnung ab '
+          + esc(new Date(a.aufnahmeAb).toLocaleString('de-DE')) : '')
         + (a.ablehnungsgrund ? '<br>Grund: ' + esc(a.ablehnungsgrund) : '') + '</div>'
         // Was der Prüfer während des Gesprächs notiert hat. Das lag bisher in
         // der Akte, ohne dass man es lesen konnte – gespeichert, aber unsichtbar.
@@ -1897,6 +1899,9 @@
     running.forEach((w) => {
       const div = document.createElement('div'); div.className = 'deck-card busy';
       const wer = (w.hosts && w.hosts.length) ? w.hosts.join(', ') : (w.claimedBy || 'wird geholt');
+      // Fuer den Fall, dass jemand dazugeht: wer fuehrt dieses Gespraech?
+      state.letzteLaufende = state.letzteLaufende || {};
+      state.letzteLaufende[w.code] = w.claimedBy || (w.hosts && w.hosts[0]) || '';
       div.innerHTML = '<div class="who"><b>' + esc(w.code) + '</b> '
         + (w.live ? '<span class="wait-pill live">● läuft</span>' : '<span class="wait-pill">wird geholt</span>')
         + '<div class="meta">Prüfer: ' + esc(wer) + '</div></div>';
@@ -1951,9 +1956,18 @@
     $('waitingView').style.display = 'none';
     // Wer zu einem laufenden Gespräch dazukommt, startet stumm – so wird der
     // Bewerber nicht unterbrochen. Freischalten jederzeit über „Mikro an".
-    if (alreadyRunning) { setMic(false); toast('Du bist stumm beigetreten – tippe auf „Mikro an", wenn du sprechen willst.'); }
-    else setMic(true);
+    // Merken, ob ich diese Audition fuehre oder nur dazugekommen bin.
+    state.dazugeschaltet = !!alreadyRunning;
+    if (alreadyRunning) {
+      state.fuehrtDurch = (state.letzteLaufende && state.letzteLaufende[code]) || '';
+      setMic(false); toast('Du bist stumm beigetreten – ' + (state.fuehrtDurch || 'wer abgeholt hat')
+        + ' führt die Audition. Tippe auf „Mikro an", wenn du sprechen willst.');
+    } else {
+      state.fuehrtDurch = state.name;
+      setMic(true);
+    }
     startRoom();
+    zeigeFuehrung();
   }
   // Bewerber-Link: IMMER auf die Bewerber-Seite zeigen – nie auf die Prüfer-
   // Subdomain/den Prüfer-Pfad (sonst landet der Bewerber im Mitarbeiter-Login).
@@ -2717,13 +2731,77 @@
     setTimeout(pruefeLicht, 4000);
   }
 
-  function zeigeRec(an) { const el = $('recInfo'); if (el) el.classList.toggle('on', !!an); }
+  /**
+   * "Ab wann wird aufgezeichnet?" – darauf muss man jederzeit zeigen können.
+   * Der Hinweis nennt deshalb die Uhrzeit, ab der die Aufnahme läuft, und
+   * zwar auf beiden Seiten. Vorher stand dort nur, DASS aufgezeichnet wird.
+   */
+  function zeigeRec(an, seit) {
+    const el = $('recInfo'); if (!el) return;
+    el.classList.toggle('on', !!an);
+    if (an && seit) state.recAb = seit;
+    if (!an) state.recAb = null;
+    // Kommt eine Meldung ohne Uhrzeit herein, waehrend wir eine kennen, bleibt
+    // die bekannte stehen. Sonst faellt der Hinweis auf den allgemeinen Satz
+    // zurueck, sobald sich jemand dazuschaltet.
+    const txt = el.querySelector('.rectxt') || el;
+    const uhr = state.recAb
+      ? new Date(state.recAb).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })
+      : '';
+    if (txt !== el) {
+      txt.textContent = an
+        ? (uhr ? 'Aufzeichnung läuft seit ' + uhr + ' Uhr' : 'Dieses Gespräch wird aufgezeichnet')
+        : 'Dieses Gespräch wird aufgezeichnet';
+    }
+  }
 
   // Aufnahme läuft von selbst los, sobald der Bewerber im Bild ist.
+  //
+  // Aber nur bei dem, der abgeholt hat. Wer sich dazuschaltet, nahm bisher
+  // dasselbe Gespräch ein zweites Mal auf: zwei Videos, zwei Uploads - und
+  // beim Verlassen schaltete seine Aufnahme den Hinweis beim Bewerber ab,
+  // obwohl weiter aufgezeichnet wurde.
   function autoRec() {
+    if (state.dazugeschaltet) return;
     if (state.recorder || state.recStarted) return;
     state.recStarted = true;
     setTimeout(() => { if (!state.recorder) { try { startRec(); } catch {} } }, 1200);
+  }
+
+  /**
+   * Wer abgeholt hat, führt die Audition – und schliesst sie ab.
+   *
+   * Dazugeschaltete Prüfer sehen alles, reden mit und können Bilder ansehen.
+   * Freigeben oder ablehnen können sie nicht: sonst stünde am Ende ein Name in
+   * der Akte, der das Gespräch nicht geführt hat. Der Server weist es ohnehin
+   * ab – hier steht nur, warum, damit niemand vergeblich klickt.
+   */
+  function zeigeFuehrung() {
+    if (state.role !== 'host') return;
+    const dazu = !!state.dazugeschaltet;
+    const box = $('reviewPane'); if (!box) return;
+    let hinweis = $('fuehrungHinweis');
+    if (!hinweis) {
+      hinweis = document.createElement('div');
+      hinweis.id = 'fuehrungHinweis'; hinweis.className = 'fuehrung';
+      const ziel = $('akteVorschau') || $('approveBtn');
+      if (ziel && ziel.parentNode) ziel.parentNode.insertBefore(hinweis, ziel);
+    }
+    if (dazu) {
+      hinweis.className = 'fuehrung dazu';
+      hinweis.innerHTML = '👥 <b>Du bist dazugeschaltet.</b> '
+        + esc(state.fuehrtDurch || 'Wer abgeholt hat') + ' führt diese Audition und schließt sie ab. '
+        + 'Du siehst alles und kannst mitreden – entscheiden tut sie oder er.';
+    } else {
+      hinweis.className = 'fuehrung ich';
+      hinweis.innerHTML = '✋ <b>Du führst diese Audition.</b> Du hast sie abgeholt – also '
+        + 'entscheidest du am Ende auch.';
+    }
+    ['approveBtn', 'rejectBtn'].forEach((id) => {
+      const b = $(id); if (!b) return;
+      b.style.display = dazu ? 'none' : '';
+    });
+    const av = $('akteVorschau'); if (av) av.style.display = dazu ? 'none' : '';
   }
 
   function setupRoleUI() {
@@ -2950,7 +3028,7 @@
       // und ob aufgezeichnet wird – sonst sieht er ein schwarzes Bild ohne Grund.
       if (!camAn()) dcSendTo(dc, { kind: 'cam', on: false });
       if (!micAn()) dcSendTo(dc, { kind: 'mic', on: false });
-      if (state.recorder) dcSendTo(dc, { kind: 'rec', on: true });
+      if (state.recorder) dcSendTo(dc, { kind: 'rec', on: true, seit: state.recAb || '' });
     };
     dc.onmessage = (e) => {
       let m; try { m = JSON.parse(e.data); } catch { return; }
@@ -3001,7 +3079,7 @@
       }
       // Der Bewerber soll sehen, wenn aufgezeichnet wird – er hat zugestimmt,
       // also darf er es auch jederzeit erkennen.
-      else if (m.kind === 'rec') zeigeRec(!!m.on);
+      else if (m.kind === 'rec') zeigeRec(!!m.on, m.seit || '');
       // Die Zeile, die der Bewerber gerade vorliest – wird unten in die
       // Aufnahme geschrieben, damit man später mitlesen kann.
       // Sie hat den Text eingeblendet – es geht los.
@@ -3237,6 +3315,18 @@
     if (state.caseDone) return; // im Gruppengespräch bereits abgeschlossen
     $('approveBtn').disabled = true; $('rejectBtn').disabled = true;
     const r = await api('POST', '/api/case', body);
+    // Der Server laesst nur den abschliessen, der abgeholt hat. Hier steht,
+    // warum - statt eines allgemeinen "hat nicht geklappt".
+    if (r.status === 409 && r.body && r.body.reason === 'nicht-dein-termin') {
+      $('reviewStatus').className = 'status bad';
+      $('reviewStatus').textContent = (r.body.durchgefuehrtVon || 'Wer abgeholt hat')
+        + ' führt diese Audition und schließt sie ab – du bist dazugeschaltet.';
+      $('rejectBtn').disabled = false;
+      $('approveBtn').disabled = !checkBoxes().every((c) => c.checked);
+      state.dazugeschaltet = true; state.fuehrtDurch = r.body.durchgefuehrtVon || '';
+      zeigeFuehrung();
+      return;
+    }
     if (r.status === 200) {
       state.caseDone = true;
       dcBroadcast({ kind: 'result', result }); // Bewerber + andere Prüfer informieren
@@ -3538,13 +3628,19 @@
     rec.onstop = finalizeRec; rec.start(1000); draw();
     state.recStart = Date.now(); $('recBadge').classList.add('on'); state.recTimer = setInterval(() => { const s = Math.floor((Date.now() - state.recStart) / 1000); $('recTime').textContent = pad(Math.floor(s / 60)) + ':' + pad(s % 60); }, 500);
     $('recBtn').disabled = true; $('stopRecBtn').disabled = false; toast('Aufnahme läuft');
-    zeigeRec(true); dcBroadcast({ kind: 'rec', on: true });
+    // Den Startzeitpunkt mitschicken: die Bewerberin soll nicht nur wissen,
+    // DASS aufgezeichnet wird, sondern ab wann.
+    const recAb = new Date().toISOString();
+    zeigeRec(true, recAb); dcBroadcast({ kind: 'rec', on: true, seit: recAb });
   }
   function stopRec() {
     if (state.recorder && state.recorder.state !== 'inactive') state.recorder.stop();
     state.recorder = null; clearInterval(state.recTimer);
     $('recBadge').classList.remove('on'); $('recBtn').disabled = false; $('stopRecBtn').disabled = true;
-    zeigeRec(false); dcBroadcast({ kind: 'rec', on: false });
+    zeigeRec(false);
+    // Nur der Aufnehmende meldet das Ende - sonst nimmt der Bewerber den
+    // Hinweis weg, obwohl der fuehrende Pruefer weiter aufzeichnet.
+    if (!state.dazugeschaltet) dcBroadcast({ kind: 'rec', on: false });
   }
   /**
    * Der Vorlese-Text unten in der Aufnahme – wie ein Untertitel.

@@ -587,6 +587,11 @@
   .aktevorschau li{margin:.12rem 0}
   .aktevorschau li.da{color:#5fe0a0;list-style:none;margin-left:-1.1rem}
   .aktevorschau:empty{display:none}
+  /* Wer fuehrt? Steht ueber der Entscheidung, damit niemand vergeblich klickt. */
+  .fuehrung{border-radius:10px;padding:.55rem .7rem;margin:.6rem 0;font-size:.8rem;line-height:1.5}
+  .fuehrung.ich{background:#12261d;border:1px solid #2f6b45;color:#bfe9d2}
+  .fuehrung.dazu{background:#221a0d;border:1px solid #5a4520;color:#ffd479}
+  .fuehrung b{color:var(--ink)}
   .vorab-zeile select,.vorab-zeile input{flex:1;min-width:150px}
   .vorab-fuss{display:flex;gap:.6rem;align-items:center;justify-content:space-between;flex-wrap:wrap}
   .vorab-fuss .muted{font-size:.78rem;color:var(--dim);flex:1;min-width:150px}
@@ -1315,7 +1320,7 @@
       <button id="micBtn">🎤 Mikro an</button>
       <button id="camBtn">📷 Kamera an</button>
       <button id="leaveBtn" style="display:none">⤺ Zurück zum Warteraum</button>
-      <span class="recinfo" id="recInfo"><i></i> Dieses Gespräch wird aufgezeichnet</span>
+      <span class="recinfo" id="recInfo"><i></i> <span class="rectxt">Dieses Gespräch wird aufgezeichnet</span></span>
       <span class="spacer"></span>
       <button id="recBtn" class="primary" style="display:none">⏺ Aufnahme starten</button>
       <button id="stopRecBtn" class="danger" style="display:none" disabled title="Aufnahme beenden, speichern und den Fall abschließen">⏹ Stoppen &amp; abschließen</button>

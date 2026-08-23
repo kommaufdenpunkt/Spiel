@@ -681,7 +681,14 @@ async function handleApi(req, res, urlPath, ip) {
       sec.recordEvent('audit', ip, 'Einladung von ' + entry.eingeladenVon + ' übernommen (' + wer + '): ' + code);
     }
     entry.claimedBy = wer; entry.claimedAt = Date.now();
-    sendJson(res, 200, { ok: true, eingeladenVon: entry.eingeladenVon || '' }); return true;
+    // Wer abholt, führt die Audition. Das wird am Zugangscode festgehalten –
+    // die Warteschlange lebt nur im Arbeitsspeicher, die Zuständigkeit muss
+    // aber bis zur Freigabe stehen.
+    const kEintrag = store.codeAbholen(code, wer);
+    if (kEintrag && kEintrag.frueherDurch && kEintrag.frueherDurch !== wer) {
+      sec.recordEvent('audit', ip, 'Audition übernommen von ' + kEintrag.frueherDurch + ' auf ' + wer + ': ' + code);
+    }
+    sendJson(res, 200, { ok: true, eingeladenVon: entry.eingeladenVon || '', durchgefuehrtVon: wer }); return true;
   }
 
   if (urlPath === '/api/waiting/release' && req.method === 'POST') {
@@ -843,12 +850,27 @@ async function handleApi(req, res, urlPath, ip) {
   if (urlPath === '/api/case' && req.method === 'POST') {
     let body; try { body = await readJson(req); } catch { sendJson(res, 413, { reason: 'too-large' }); return true; }
     if (!body.code || !store.isCodeUsable(body.code)) { sendJson(res, 400, { reason: 'bad-code' }); return true; }
+    // Wer abgeholt hat, führt die Audition – und schliesst sie auch ab. Wer
+    // sich dazugeschaltet hat, sieht zu und redet mit, entscheidet aber nicht.
+    // Sonst steht am Ende ein Name in der Akte, der das Gespräch gar nicht
+    // geführt hat.
+    const kk = store.getCode(body.code);
+    const ich = reqName(req, ip) || '';
+    if (kk && kk.durchgefuehrtVon && kk.durchgefuehrtVon !== ich) {
+      sec.recordEvent('audit', ip, 'Freigabe abgewiesen: ' + (ich || '?') + ' wollte die Audition von '
+        + kk.durchgefuehrtVon + ' abschliessen (' + body.code + ')');
+      sendJson(res, 409, { reason: 'nicht-dein-termin', durchgefuehrtVon: kk.durchgefuehrtVon }); return true;
+    }
     // Die beiden Texte kommen vom Server, nicht vom Browser: Sie sind die
     // Einwilligung, die der Bewerber abgegeben hat, und gehören unverändert
     // in die Akte. Wird der Text später geändert, bleibt hier stehen, was
     // an diesem Tag galt.
     const rec = store.saveCase({
       ...body, agentName: reqName(req, ip) || body.agentName,
+      // Beides kommt vom Server, nicht aus dem Browser: wer abgeholt hat und
+      // ab wann aufgezeichnet wurde, sind Angaben, die nicht verhandelbar sind.
+      durchgefuehrtVon: (kk && kk.durchgefuehrtVon) || reqName(req, ip) || '',
+      aufnahmeAb: (kk && kk.aufnahmeAb) || '',
       skript: store.getScript(), einleitung: store.getIntro(),
     });
     // Die Aufnahme gleich ins Handy-Format bringen - im Hintergrund, ohne dass
@@ -926,6 +948,10 @@ async function handleApi(req, res, urlPath, ip) {
     });
     if (!kopf) { sendJson(res, 500, { reason: 'kein-lauf' }); return true; }
     sec.recordEvent('audit', ip, 'Aufnahme begonnen (' + kopf.agentName + ') zu ' + (kopf.code || '—'));
+    // Ab wann wird aufgezeichnet? Das ist keine Nebensache, sondern der Kern
+    // der Einwilligung. Der Zeitpunkt wird festgehalten und wandert später in
+    // die Akte – nachprüfbar, statt "irgendwann im Gespräch".
+    if (kopf.code) store.codeAufnahmeStart(kopf.code, kopf.begonnenAm || new Date().toISOString());
     // Im Log mitschreiben. Sonst sieht man von aussen nicht, ob überhaupt
     // eine Aufnahme angekommen ist – und rät dann herum.
     console.log('[rec] begonnen ' + kopf.sitzung + ' nummer=' + (kopf.code || '-')

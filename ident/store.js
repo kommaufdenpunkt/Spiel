@@ -230,6 +230,34 @@ function createCode({ createdBy, note }) {
   codes.push(rec); save('codes.json', codes); return rec;
 }
 function getCode(code) { return codes.find((c) => c.code === String(code || '').toUpperCase()) || null; }
+/**
+ * Wer hat die Bewerberin abgeholt – und führt damit diese Audition.
+ *
+ * Das steht bewusst am Zugangscode und nicht nur in der Warteschlange: die
+ * Schlange lebt im Arbeitsspeicher und ist nach einem Neustart weg. Wer
+ * abgeholt hat, muss aber bis zur Freigabe feststehen, auch wenn dazwischen
+ * etwas passiert.
+ *
+ * Springt jemand ein und holt sie erneut ab, geht die Audition an ihn über –
+ * sonst käme niemand mehr weiter, wenn dem ersten Prüfer der Browser abstürzt.
+ */
+function codeAbholen(code, wer) {
+  const r = getCode(code); if (!r) return null;
+  const name = String(wer || '').slice(0, 60);
+  if (r.durchgefuehrtVon !== name) {
+    r.frueherDurch = r.durchgefuehrtVon || '';
+    r.durchgefuehrtVon = name;
+    r.abgeholtAm = new Date().toISOString();
+    save('codes.json', codes);
+  }
+  return r;
+}
+/** Startzeitpunkt der Aufnahme festhalten – gehört zum Nachweis dazu. */
+function codeAufnahmeStart(code, wann) {
+  const r = getCode(code); if (!r) return null;
+  if (!r.aufnahmeAb) { r.aufnahmeAb = wann || new Date().toISOString(); save('codes.json', codes); }
+  return r;
+}
 function isCodeUsable(code) { const r = getCode(code); return !!r && r.status === 'open'; }
 function consumeCode(code) {
   const r = getCode(code);
@@ -290,6 +318,9 @@ function saveCase(data) {
     // spaetere Verifikation belegt damit "mindestens 18" - vorher stand in
     // der Akte nur das Alter, das jemand von sich behauptet hat.
     geburtsdatum: String(data.geburtsdatum || '').slice(0, 20),
+    // Wer die Audition geführt hat, und ab wann aufgezeichnet wurde.
+    durchgefuehrtVon: String(data.durchgefuehrtVon || '').slice(0, 60),
+    aufnahmeAb: String(data.aufnahmeAb || '').slice(0, 40),
     note: String(data.note || '').slice(0, 500),
     result: data.result === 'approved' ? 'approved' : (data.result === 'rejected' ? 'rejected' : 'open'),
     rejectReason: String(data.rejectReason || '').slice(0, 200),
@@ -1064,6 +1095,7 @@ function ablegen(paket) {
     ausweisart: String(a.ausweisart || '').slice(0, 40),
     ausweisnummer: String(a.ausweisnummer || '').slice(0, 60),
     geburtsdatum: String(a.geburtsdatum || '').slice(0, 20),
+    aufnahmeAb: String(a.aufnahmeAb || '').slice(0, 40),
     notiz: String(a.notiz || '').slice(0, 500),
     erstelltAm: String(a.erstelltAm || jetzt),
     // Was der Prüfer abgehakt hat und welcher Wortlaut galt – beides gehört
@@ -1738,6 +1770,7 @@ module.exports = {
   setAgentPassword, changeOwnPassword, lockAgent, unlockAgent, deleteAgent, agentCount,
   addPasskey, getAgentByPasskeyId, setPasskeyCounter, agentPasskeys,
   createCode, getCode, isCodeUsable, consumeCode, revokeCode, listCodes,
+  codeAbholen, codeAufnahmeStart,
   suchePerson, ordnerAnlegen, ordnerFinden, ordnerZuordnen, idSchluessel, namSchluessel, listStreamersKurz, protokolliereZugriff, verifikationEintragen,
   stammPflegen, stammAusAkte, doppelteAkten, aktenZusammenfuehren,
   saveCase, listCases, getCase, deleteCase, readDoc, purgeOlderThan,

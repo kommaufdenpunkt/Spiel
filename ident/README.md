@@ -129,6 +129,41 @@ ausgegraut. „Nächsten annehmen" überspringt sie. Nach drei Minuten erscheint
 zusätzlich „⚠ Trotzdem holen", damit niemand festhängt, der nicht weiterkommt;
 dieser Griff wird protokolliert.
 
+## Wer abholt, führt – und schliesst ab
+
+**Ganz einfach: der Prüfer, der die Person im Warteraum abholt, macht die
+Audition.** Das steht nicht nur da, es wird durchgesetzt:
+
+- Beim Abholen wird am Zugangscode festgehalten, **wer** sie geholt hat. Am
+  Code und nicht in der Warteschlange: die lebt im Arbeitsspeicher und ist nach
+  einem Neustart weg – die Zuständigkeit muss bis zur Freigabe stehen.
+- **Der Server weist die Freigabe eines anderen ab** (`409 nicht-dein-termin`),
+  nicht nur der Knopf verschwindet. Sonst stünde am Ende ein Name in der Akte,
+  der das Gespräch gar nicht geführt hat.
+- **Dazugeschaltete** sehen alles, reden mit, sehen die Bilder – und lesen über
+  dem Entscheidungsbereich: *„Du bist dazugeschaltet. Dennis führt diese
+  Audition und schließt sie ab."* Der Führende liest: *„Du führst diese
+  Audition."*
+- **Sie nehmen auch nicht mit auf.** Vorher startete jeder Dazugeschaltete eine
+  zweite Aufnahme desselben Gesprächs – zwei Videos, zwei Uploads –, und beim
+  Verlassen schaltete seine Aufnahme den Hinweis beim Bewerber ab, obwohl
+  weiter aufgezeichnet wurde.
+- Springt jemand ein und holt sie **erneut** ab, geht die Audition an ihn über.
+  Sonst käme niemand mehr weiter, wenn dem ersten Prüfer der Browser abstürzt.
+  Der Wechsel steht im Protokoll.
+
+## Ab wann wird aufgezeichnet?
+
+Darauf muss man jederzeit zeigen können. Der Hinweis nennt deshalb die
+**Uhrzeit**, und zwar auf beiden Seiten:
+
+> ● Aufzeichnung läuft seit 14:32 Uhr
+
+Der Zeitpunkt wird beim Start am Zugangscode festgehalten, wandert in die Akte
+(*„Aufzeichnung ab 23.8.2026, 14:32:05"*) und steht im Sicherheitsprotokoll.
+Vorher stand dort nur, **dass** aufgezeichnet wird – „irgendwann im Gespräch"
+ist bei einer Einwilligung zu wenig.
+
 ## Abgebrochene Auditions – die Aufnahme geht nicht verloren
 
 Bricht ein Gespräch ab – Leitung weg, Browser zu, niemand klickt auf
