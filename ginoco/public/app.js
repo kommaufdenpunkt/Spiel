@@ -1559,7 +1559,8 @@ function printLessonProof(name, done) {
     const artL = { ueberland: 'Überland', autobahn: 'Autobahn', nacht: 'Nachtfahrt' }[b.lesson_type] || 'Normal';
     return `<tr>
       <td class="c">${i + 1}</td>
-      <td>${fmtDT(b.date, b.start_time)}${nachgetragen ? `<br><span class="entry">nachgetragen · eingetragen ${fmtDT(entryDate)}</span>` : ''}${b.invoice_date ? `<br><span class="entry" style="color:#b26a00">🧾 auf der Rechnung: ${fmtDT(b.invoice_date)}${b.invoice_time ? ' ' + b.invoice_time + ' Uhr' : ''}</span>` : ''}</td>
+      <td>${fmtDT(b.date, b.start_time)}${nachgetragen ? `<br><span class="entry">nachgetragen · eingetragen ${fmtDT(entryDate)}</span>` : ''}</td>
+      <td class="c inv-col">${b.invoice_date ? `<strong>${fmtDT(b.invoice_date)}</strong>${b.invoice_time ? '<br>' + b.invoice_time + ' Uhr' : ''}` : '<span class="wg">wie gefahren</span>'}</td>
       <td class="c">${noshow ? '—' : addMinHHMM(b.start_time, b.duration_min)}</td>
       <td class="c">${noshow ? 'nicht erschienen' : b.duration_min + ' Min'}</td>
       <td class="c">${noshow ? '' : artL}</td>
@@ -1576,6 +1577,7 @@ function printLessonProof(name, done) {
       th,td{border:1px solid #bbb;padding:5px 7px;text-align:left;vertical-align:top}
       th{background:#f0f0f0;font-size:11px;text-transform:uppercase;letter-spacing:.03em}
       td.c{text-align:center;white-space:nowrap} .entry{font-size:10px;color:#777}
+      td.inv-col{color:#b26a00;font-weight:600} td.inv-col .wg{color:#aaa;font-weight:400;font-style:italic}
       tr{break-inside:avoid}
       .sign{margin-top:40px;display:flex;gap:48px}.sign div{flex:1;border-top:1px solid #111;padding-top:5px;font-size:11px;color:#444}
       .foot{margin-top:16px;font-size:11px;color:#666;border-top:1px solid #ccc;padding-top:8px}
@@ -1583,10 +1585,10 @@ function printLessonProof(name, done) {
     <div class="head"><div><h1>Fahrstunden-Nachweis</h1><div style="font-size:13px;margin-top:2px">${esc(name)}</div></div>
       <div class="meta">${school}<br>Stand: ${today}</div></div>
     <div class="sum"><strong>${driven.length} gefahrene Fahrstunden · ${hLabel(totalMin)} gesamt</strong></div>
-    <table><thead><tr><th>#</th><th>Datum &amp; Uhrzeit (gefahren)</th><th>Ende</th><th>Dauer</th><th>Art</th><th>Verspätung</th><th>Vermerk</th></tr></thead>
+    <table><thead><tr><th>#</th><th>Datum &amp; Uhrzeit (gefahren)</th><th>Auf der Rechnung</th><th>Ende</th><th>Dauer</th><th>Art</th><th>Verspätung</th><th>Vermerk</th></tr></thead>
       <tbody>${rows}</tbody></table>
     <div class="sign"><div>Unterschrift Fahrlehrer</div><div>Unterschrift Fahrschüler</div></div>
-    <div class="foot">Erstellt mit ginoco · ${today}. „Nachgetragen" = später eingetragene Fahrstunde; maßgeblich ist das angegebene Fahrdatum.</div>
+    <div class="foot">Erstellt mit ginoco · ${today}. „Nachgetragen" = später eingetragene Fahrstunde; maßgeblich ist das angegebene Fahrdatum. „Auf der Rechnung" = Datum/Uhrzeit, unter dem die Stunde in der Abrechnung geführt wird (kann vom Fahrdatum abweichen); „wie gefahren" = identisch zum Fahrdatum.</div>
     <script>window.onload=function(){setTimeout(function(){window.print()},250)}<\/script></body></html>`;
   const w = window.open('', '_blank');
   if (!w) { toast('Bitte Pop-ups erlauben, um den Nachweis zu drucken.', 'err'); return; }

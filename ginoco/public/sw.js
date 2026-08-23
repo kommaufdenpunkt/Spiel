@@ -6,7 +6,7 @@
    API-Aufrufe (/api/...) laufen ohnehin immer direkt übers Netz – nie aus dem Cache. */
 const CACHE = 'ginoco-shell-v6';
 const SHELL = ['/', '/index.html', '/app.js', '/styles.css', '/manifest.webmanifest',
-  '/logo.svg', '/favicon.svg', '/icon-192.png', '/icon-512.png', '/apple-touch-icon.png'];
+  '/logo.svg', '/favicon.svg', '/favicon.ico', '/icon-192.png', '/icon-512.png', '/apple-touch-icon.png'];
 
 self.addEventListener('install', (e) => {
   // Sofort aktiv werden – neue Version wartet nicht auf Schließen aller Tabs.
