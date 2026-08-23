@@ -330,6 +330,27 @@ zwischen einem Video und einem Nachweis der Einwilligung.
 Wer ablesen und dabei in die Kamera schauen soll, braucht grosse Schrift und
 kurze Sätze. Also:
 
+### Satz für Satz statt scrollender Block
+
+Der laufende Textblock war das falsche Werkzeug. Wer **in die Kamera** sprechen
+soll, schaut zwischendurch hoch – und findet die Stelle nicht wieder, weil der
+Text inzwischen weitergelaufen ist. Also die Karten-Darstellung, und die ist
+jetzt der Normalfall:
+
+- **Ein Satz, gross, in der Mitte.** Der nächste klein und blass darunter, damit
+  man weiss, was kommt, ohne den aktuellen aus den Augen zu verlieren.
+- **Weiter geht es, wenn sie weiter ist** – Knopf, Tippen auf den Satz, oder
+  Leertaste/Pfeiltaste. Kein Regler bestimmt das Tempo.
+- **Oben „4 / 18" und ein Balken.** Wer weiss, dass noch vier Sätze kommen,
+  liest ruhiger.
+- Der Text ist ohnehin so geschrieben – ein Satz pro Zeile, leere Zeilen sind
+  Pausen –, die Karten fallen also von selbst richtig.
+- Der Satz, der gerade dransteht, wird **ins Video gebrannt** und dem Prüfer als
+  „Liest gerade" gezeigt. Im Kartenmodus ist das exakt, statt aus der Scrollhöhe
+  geschätzt.
+- **`📜 Als Fließtext`** schaltet auf die alte Darstellung mit Selbstlauf und
+  Tempo-Regler. Die Wahl bleibt gemerkt.
+
 - **Standardgrösse 1,9 rem** (rund 30 px am Telefon), einstellbar über `A−` /
   `A+` bis 3,4 rem. Die Einstellung bleibt für das nächste Mal gemerkt.
 - **`⛶ Groß`** legt den Text über den ganzen Bildschirm und vergrössert ihn noch

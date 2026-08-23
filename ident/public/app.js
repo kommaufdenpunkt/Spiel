@@ -2042,7 +2042,18 @@
   // ================= TELEPROMPTER (Bewerber liest den Audition-Text ab) =================
   // Bewerber bestimmt das Tempo selbst – flüssiges Scrollen per requestAnimationFrame.
   let promptRAF = null, promptPos = 0, promptLast = 0;
-  async function loadScript() { try { const r = await api('GET', '/api/script'); if (r.status === 200 && $('prompterText')) $('prompterText').textContent = r.body.script || ''; } catch {} }
+  async function loadScript() {
+    try {
+      const r = await api('GET', '/api/script');
+      if (r.status === 200 && $('prompterText')) {
+        $('prompterText').textContent = r.body.script || '';
+        // Die Karten haengen am Text - kommt er spaeter an, muessen sie neu
+        // geschnitten werden, sonst bleibt die Karte leer.
+        state.karten = saetzeAusText();
+        if ($('prompterKarte') && $('prompterKarte').style.display !== 'none') zeigeKarte();
+      }
+    } catch { /* ohne Text bleibt der Deckel zu */ }
+  }
   function prompterStop() { if (promptRAF) cancelAnimationFrame(promptRAF); promptRAF = null; if ($('prompterToggle')) $('prompterToggle').textContent = '▶ Start'; }
   function prompterStart() {
     const box = $('prompterBox'); if (promptRAF || !box) return;
@@ -2060,7 +2071,10 @@
     promptRAF = requestAnimationFrame(step);
   }
   if ($('prompterToggle')) $('prompterToggle').addEventListener('click', () => (promptRAF ? prompterStop() : prompterStart()));
-  if ($('prompterReset')) $('prompterReset').addEventListener('click', () => { prompterStop(); promptPos = 0; $('prompterBox').scrollTop = 0; });
+  if ($('prompterReset')) $('prompterReset').addEventListener('click', () => {
+    prompterStop(); promptPos = 0; $('prompterBox').scrollTop = 0;
+    state.karteNr = 0; if ($('prompterKarte') && $('prompterKarte').style.display !== 'none') zeigeKarte();
+  });
   if ($('prompterSpeed')) {
     try { const sv = localStorage.getItem('ident.prompterSpeed'); if (sv) $('prompterSpeed').value = sv; } catch {}
     const showSpeed = () => { if ($('prompterSpeedVal')) $('prompterSpeedVal').textContent = $('prompterSpeed').value; };
@@ -2105,6 +2119,8 @@
     const anteil = box.scrollHeight > box.clientHeight
       ? box.scrollTop / (box.scrollHeight - box.clientHeight) : 0;
     box.classList.toggle('gross', an);
+    const karte = $('prompterKarte');
+    if (karte) karte.classList.toggle('gross', an);
     if (ctrl) ctrl.classList.toggle('gross', an);
     document.body.classList.toggle('vorlesen-gross', an);
     if (knopf) {
@@ -2180,10 +2196,15 @@
     const deckel = $('prompterDeckel'); if (deckel) deckel.style.display = 'none';
     const box = $('prompterBox'); if (box) box.style.display = '';
     const ctrl = $('prompterCtrl'); if (ctrl) ctrl.style.display = '';
+    state.karteNr = 0;
+    kartenAn(kartenModus());
     if ($('guideStatus')) {
       $('guideStatus').className = 'status ok';
-      $('guideStatus').textContent = 'Lies den Text in die Kamera – ▶ Start lässt ihn mitlaufen, '
-        + 'das Tempo stellst du mit dem Regler ein. Pausieren jederzeit.';
+      $('guideStatus').textContent = kartenModus()
+        ? 'Ein Satz nach dem anderen. Lies ihn in die Kamera und tippe dann auf „Weiter" – '
+          + 'du bestimmst das Tempo. ⛶ Groß macht die Schrift noch größer.'
+        : 'Lies den Text in die Kamera – ▶ Start lässt ihn mitlaufen, '
+          + 'das Tempo stellst du mit dem Regler ein. Pausieren jederzeit.';
     }
     // Den Prüfern sagen, dass es losgeht - sonst reden sie weiter, während sie
     // schon liest.
@@ -2192,6 +2213,85 @@
     toast('📖 Der Text ist da – lies ihn den Prüfern vor.');
   }
   if ($('textJetztBtn')) $('textJetztBtn').addEventListener('click', textJetzt);
+
+  /* ================= Satz für Satz =========================================
+   *
+   * Der scrollende Block war das falsche Werkzeug. Wer in die Kamera sprechen
+   * soll, schaut zwischendurch hoch – und findet die Stelle nicht wieder, weil
+   * der Text inzwischen weitergelaufen ist. Also: ein Satz, gross, in der
+   * Mitte. Der nächste klein darunter, damit man weiss, was kommt. Weiter geht
+   * es, wenn SIE weiter ist, nicht wenn ein Regler es sagt.
+   *
+   * Der Text ist ohnehin so geschrieben: ein Satz pro Zeile, leere Zeilen sind
+   * Pausen. Die Karten fallen also von selbst richtig.
+   */
+  const KARTEN_MERKER = 'ident.vorleseModus';
+  function kartenModus() {
+    try { return localStorage.getItem(KARTEN_MERKER) !== 'fluss'; } catch { return true; }
+  }
+  function saetzeAusText() {
+    const roh = ($('prompterText') || {}).textContent || '';
+    // Zeilen zuerst: so ist der Text geschrieben. Steht doch einmal alles in
+    // einem Absatz, wird zusätzlich an Satzzeichen getrennt.
+    let teile = roh.split('\n').map((z) => z.trim()).filter((z) => z.length > 1);
+    if (teile.length < 3) {
+      teile = roh.replace(/\s+/g, ' ').split(/(?<=[.!?])\s+/).map((z) => z.trim()).filter((z) => z.length > 1);
+    }
+    return teile;
+  }
+  function zeigeKarte() {
+    const k = $('prompterKarte'); if (!k) return;
+    const saetze = state.karten || [];
+    const i = Math.min(state.karteNr || 0, saetze.length);
+    const fertig = i >= saetze.length;
+    k.classList.toggle('fertig', fertig);
+    $('pkSatz').textContent = fertig ? '✓ Das war’s – vielen Dank!' : saetze[i];
+    $('pkNaechster').textContent = (!fertig && saetze[i + 1]) ? saetze[i + 1] : '';
+    $('pkZahl').textContent = fertig ? 'fertig' : (i + 1) + ' / ' + saetze.length;
+    $('pkBalken').style.width = saetze.length ? Math.round(((fertig ? saetze.length : i) / saetze.length) * 100) + '%' : '0%';
+    $('pkZurueck').disabled = i === 0;
+    $('pkWeiter').textContent = fertig ? '↺ Von vorn' : (i + 1 >= saetze.length ? 'Fertig ✓' : 'Weiter →');
+    $('pkTippHinweis') && ($('pkTippHinweis').style.display = fertig ? 'none' : '');
+    // Der Prüfer sieht mit, und die Zeile wird ins Video gebrannt: hier ist es
+    // genau, statt aus der Scrollhöhe geschätzt.
+    if (!fertig && state.role === 'guest') dcBroadcast({ kind: 'vorlese', text: String(saetze[i]).slice(0, 200) });
+  }
+  function karteWeiter(schritt) {
+    const saetze = state.karten || [];
+    const jetzt = state.karteNr || 0;
+    if (jetzt >= saetze.length && schritt > 0) { state.karteNr = 0; zeigeKarte(); return; }
+    state.karteNr = Math.max(0, Math.min(saetze.length, jetzt + schritt));
+    zeigeKarte();
+  }
+  function kartenAn(an) {
+    const k = $('prompterKarte'), box = $('prompterBox'), um = $('modusUm');
+    if (!k || !box) return;
+    try { localStorage.setItem(KARTEN_MERKER, an ? 'karte' : 'fluss'); } catch {}
+    if (an) { prompterStop(); }
+    state.karten = saetzeAusText();
+    if (typeof state.karteNr !== 'number') state.karteNr = 0;
+    k.style.display = an ? '' : 'none';
+    box.style.display = an ? 'none' : '';
+    // Start/Tempo gehören zum Fließtext – im Kartenmodus wären sie ohne Wirkung.
+    ['prompterToggle', 'prompterReset'].forEach((id) => { if ($(id)) $(id).style.display = an ? 'none' : ''; });
+    const tempo = document.querySelector('.prompter-ctrl label');
+    if (tempo) tempo.style.display = an ? 'none' : '';
+    if (um) um.textContent = an ? '📜 Als Fließtext' : '🃏 Satz für Satz';
+    // Die Großansicht gilt für beide Darstellungen.
+    if (box.classList.contains('gross')) { k.classList.add('gross'); } else { k.classList.remove('gross'); }
+    if (an) zeigeKarte();
+  }
+  if ($('pkWeiter')) $('pkWeiter').addEventListener('click', () => karteWeiter(1));
+  if ($('pkZurueck')) $('pkZurueck').addEventListener('click', () => karteWeiter(-1));
+  if ($('pkBuehne')) $('pkBuehne').addEventListener('click', () => karteWeiter(1));
+  if ($('modusUm')) $('modusUm').addEventListener('click', () => kartenAn(!kartenModus()));
+  document.addEventListener('keydown', (e) => {
+    const k = $('prompterKarte');
+    if (!k || k.style.display === 'none' || !state.textFrei) return;
+    if (e.key === ' ' || e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === 'Enter') {
+      e.preventDefault(); karteWeiter(1);
+    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { e.preventDefault(); karteWeiter(-1); }
+  });
 
   // ---- Was liest er gerade? Das gehört in die Aufnahme ---------------------
   // Der Vorlese-Text ist die Einwilligung, die der Bewerber in die Kamera
@@ -2202,6 +2302,10 @@
   let letzteZeile = '';
   function meldeZeile() {
     if (state.role !== 'guest') return;
+    // Im Kartenmodus weiss die Karte genau, welcher Satz dran ist - dann muss
+    // hier nichts aus der Scrollhoehe geschaetzt werden.
+    const k = $('prompterKarte');
+    if (k && k.style.display !== 'none') return;
     const box = $('prompterBox'), txt = $('prompterText');
     if (!box || !txt) return;
     const zeile = sichtbareZeile(box, txt);

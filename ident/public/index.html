@@ -793,6 +793,33 @@
   .prompter::after{content:"";position:absolute;left:0;right:0;bottom:0;height:40px;background:linear-gradient(transparent,#0b1220);pointer-events:none}
   .prompter-ctrl{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;margin-top:.5rem;font-size:.82rem;color:var(--dim)}
   .prompter-ctrl input[type=range]{width:120px}
+  /* ---- Satz fuer Satz ---------------------------------------------------
+     Ein Satz gross in der Mitte, der naechste klein darunter - damit man weiss,
+     was kommt, ohne den aktuellen aus den Augen zu verlieren. Oben die Zahl und
+     ein Balken: wer weiss, dass noch vier Saetze kommen, liest ruhiger. */
+  .prompter-karte{display:flex;flex-direction:column;gap:.55rem;border:1px solid var(--line);
+    border-radius:12px;background:#0b1220;padding:.85rem .95rem;min-height:clamp(210px,34vh,340px)}
+  .pk-oben{display:flex;align-items:center;gap:.6rem}
+  .pk-zahl{font-size:.75rem;font-weight:700;color:var(--dim);font-variant-numeric:tabular-nums;white-space:nowrap}
+  .pk-bar{flex:1;height:4px;border-radius:99px;background:#1b2740;overflow:hidden}
+  .pk-bar i{display:block;height:100%;width:0;border-radius:99px;background:var(--accent);transition:width .25s ease}
+  .pk-buehne{flex:1;display:flex;flex-direction:column;justify-content:center;gap:.5rem;cursor:pointer;
+    -webkit-tap-highlight-color:transparent}
+  .pk-satz{margin:0;font-size:var(--vorlese,1.9rem);line-height:1.4;font-weight:700;color:#eef3ff;
+    letter-spacing:.01em;text-wrap:balance}
+  .pk-naechster{margin:0;font-size:calc(var(--vorlese,1.9rem) * .5);line-height:1.4;color:var(--dim);opacity:.75}
+  .pk-naechster:empty{display:none}
+  .pk-akt{display:flex;gap:.5rem;align-items:center}
+  .pk-akt button{padding:.6rem .9rem;font-size:.9rem}
+  .pk-akt #pkWeiter{flex:1;font-weight:700}
+  .pk-tipp{font-size:.72rem;color:var(--dim);opacity:.8;text-align:center}
+  .prompter-karte.fertig .pk-satz{color:#5fe0a0}
+  /* In der Grossansicht nimmt die Karte den ganzen Bildschirm ein. */
+  .prompter-karte.gross{position:fixed;inset:0;z-index:60;border-radius:0;border:0;background:#080d16;
+    padding:max(1.1rem,env(safe-area-inset-top)) 1.3rem calc(1.1rem + env(safe-area-inset-bottom));min-height:0}
+  .prompter-karte.gross .pk-satz{font-size:calc(var(--vorlese,1.9rem) * 1.35);max-width:22em;margin:0 auto}
+  .prompter-karte.gross .pk-naechster{max-width:26em;margin:0 auto}
+  .prompter-karte.gross .pk-akt{max-width:34em;margin:0 auto;width:100%}
   .schriftgroesse{display:inline-flex;align-items:center;gap:.3rem}
   .schriftgroesse button{padding:.25rem .5rem;font-size:.85rem;font-weight:700;min-width:2.2rem}
   /* Grossansicht: der Text ueber den ganzen Bildschirm. Zum Ablesen ist das der
@@ -1290,8 +1317,28 @@
         <button id="textJetztBtn" class="primary">📖 Text einblenden – dann lese ich vor</button>
         <small>Nimm dir Zeit. Es ist kein Test, den man bestehen muss.</small>
       </div>
+      <!-- Zwei Arten, denselben Text zu zeigen. Satz fuer Satz ist der
+           Normalfall: wer in die Kamera sprechen soll, darf nicht einen
+           laufenden Block verfolgen muessen - man verliert die Stelle, sobald
+           man einmal hochschaut. Eine Karte, ein Satz, ein Tipper weiter. -->
+      <div class="prompter-karte" id="prompterKarte" style="display:none">
+        <div class="pk-oben">
+          <span class="pk-zahl" id="pkZahl">1 / 1</span>
+          <div class="pk-bar"><i id="pkBalken"></i></div>
+        </div>
+        <div class="pk-buehne" id="pkBuehne">
+          <p class="pk-satz" id="pkSatz"></p>
+          <p class="pk-naechster" id="pkNaechster"></p>
+        </div>
+        <div class="pk-akt">
+          <button id="pkZurueck" type="button" title="einen Satz zurück">←</button>
+          <button id="pkWeiter" type="button" class="primary">Weiter →</button>
+        </div>
+        <small class="pk-tipp">Tippe irgendwo auf den Satz, um weiterzugehen.</small>
+      </div>
       <div class="prompter" id="prompterBox" style="display:none"><div id="prompterText"></div></div>
       <div class="prompter-ctrl" id="prompterCtrl" style="display:none">
+        <button id="modusUm" type="button" title="Zwischen Satz-für-Satz und Fließtext wechseln">📜 Als Fließtext</button>
         <button id="prompterToggle" class="primary">▶ Start</button>
         <button id="prompterReset" title="Von vorn">↺</button>
         <label>🏃 Ablese-Tempo <input type="range" id="prompterSpeed" min="1" max="12" value="4"><b id="prompterSpeedVal" style="min-width:1.6em;text-align:center;color:var(--ink)">4</b></label>
