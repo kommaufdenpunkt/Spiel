@@ -51,6 +51,7 @@ sage "2. Was steht vor dem Dienst?"
 NGINX_ORTE="/etc/nginx/sites-enabled /etc/nginx/conf.d /etc/nginx/http.d /etc/nginx/sites-available"
 KONFIG="$(grep -rl "proxy_pass" $NGINX_ORTE /etc/nginx/nginx.conf 2>/dev/null | head -10)"
 NGINX_DA=0
+AUS=""
 if command -v nginx >/dev/null 2>&1 || pgrep -x nginx >/dev/null 2>&1; then NGINX_DA=1; fi
 
 if [ -z "$KONFIG" ]; then
@@ -74,9 +75,26 @@ if [ -z "$KONFIG" ]; then
   fi
   [ "$GEFUNDEN" = "1" ] || echo "    nichts gefunden – das waere ein Grund, warum von aussen nichts geht."
 else
-  echo "  Eingerichtete Namen:"
-  grep -rhoP 'server_name\s+\K[^;]+' $NGINX_ORTE 2>/dev/null \
-    | tr ' ' '\n' | grep -v '^$' | sort -u | sed 's/^/    /'
+  # Eine Datei in sites-available ist noch nicht eingeschaltet. Genau daran
+  # scheitert es oft: die Datei ist da, der Verweis in sites-enabled fehlt -
+  # und die Adresse antwortet nicht, obwohl "alles eingerichtet" aussieht.
+  echo "  Eingerichtete Namen (● = eingeschaltet, ○ = liegt nur bereit):"
+  for f in $(grep -rl "server_name" $NGINX_ORTE 2>/dev/null | sort -u); do
+    NAMEN_DRIN="$(grep -hoP 'server_name\s+\K[^;]+' "$f" 2>/dev/null | tr ' ' '\n' | grep -v '^$' | grep -v '^_$' | sort -u | tr '\n' ' ')"
+    [ -n "$NAMEN_DRIN" ] || continue
+    BASISNAME="$(basename "$f")"
+    if [ -e "/etc/nginx/sites-enabled/$BASISNAME" ] || echo "$f" | grep -q 'sites-enabled\|conf.d\|http.d'; then
+      printf '    ● %s\n' "$NAMEN_DRIN"
+    else
+      printf '    ○ %s   (nur in %s)\n' "$NAMEN_DRIN" "$(dirname "$f")"
+      AUS="$AUS $NAMEN_DRIN"
+    fi
+  done
+  if [ -n "${AUS// /}" ]; then
+    warn "Nicht eingeschaltet:$AUS"
+    warn "Einschalten mit:  ln -s /etc/nginx/sites-available/<datei> /etc/nginx/sites-enabled/"
+    warn "danach:           nginx -t && systemctl reload nginx"
+  fi
   for f in $KONFIG; do
     echo "  Datei: $f"
     zaehl() { grep -ci "$1" "$f" 2>/dev/null | head -1; }
@@ -108,7 +126,7 @@ fi
 
 # ---- 3. WebSocket direkt beim Dienst ------------------------------------
 sage "3. WebSocket direkt beim Dienst (ohne Proxy)"
-ANTWORT="$(curl -s -i --max-time 5 \
+ANTWORT="$(curl -s -i --max-time 5 --http1.1 \
   -H 'Connection: Upgrade' -H 'Upgrade: websocket' \
   -H 'Sec-WebSocket-Version: 13' -H 'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==' \
   "http://127.0.0.1:$PORT/" 2>/dev/null | head -1 | tr -d '\r')"
@@ -146,7 +164,22 @@ else
     echo "  ── https://$DOMAIN"
     HZ2="$(curl -fsS --max-time 8 "https://$DOMAIN/healthz" 2>/dev/null | head -1)"
     if [ -z "$HZ2" ]; then
-      bad "Antwortet nicht. Von aussen ist die Seite nicht erreichbar."; merke
+      # Zwei ganz verschiedene Faelle, die gleich aussehen: die Seite ist
+      # wirklich unten - oder der Server erreicht nur seine EIGENE oeffentliche
+      # Adresse nicht (das passiert bei vielen Routern). Also nachfassen.
+      IPS="$(getent ahostsv4 "$DOMAIN" 2>/dev/null | awk '{print $1}' | sort -u | tr '\n' ' ')"
+      echo "     DNS: ${IPS:-nichts gefunden}"
+      HZ3="$(curl -fsS --max-time 8 --resolve "$DOMAIN:443:127.0.0.1" "https://$DOMAIN/healthz" 2>/dev/null | head -1)"
+      if [ -n "$HZ3" ]; then
+        warn "Von aussen nicht erreichbar, ueber den eigenen Rechner aber schon:"
+        warn "$HZ3"
+        warn "Das heisst meist: DNS zeigt woanders hin, oder eine Firewall/Cloudflare"
+        warn "laesst den Server nicht auf seine eigene Adresse. Fuer Besucher kann"
+        warn "es trotzdem funktionieren - im Browser nachsehen."; merke
+      else
+        bad "Antwortet weder von aussen noch ueber den eigenen Rechner."
+        bad "Fuer diese Adresse ist hier kein Zugang eingerichtet."; merke
+      fi
       continue
     fi
     FASSUNG="$(echo "$HZ2" | awk '{print $2}')"
@@ -156,9 +189,14 @@ else
       bad "erreichbar, aber es antwortet eine ANDERE Fassung: $FASSUNG statt $LAEUFT_HIER"
       bad "Da steht noch etwas anderes davor – ein alter Container oder ein zweiter Proxy."; merke
     fi
+    # --http1.1 ist Pflicht: in HTTP/2 gibt es keine WebSocket-Umschaltung, die
+    # Upgrade-Zeilen werden unterwegs verworfen und die Anfrage kommt als
+    # gewoehnlicher Aufruf an. Ohne das misst man etwas anderes, als der
+    # Browser tut - und schickt jemanden los, nginx zu reparieren, das in
+    # Ordnung ist.
     DURCH=0
     for PF in /api/ws /; do
-      A2="$(curl -s -i --max-time 8 \
+      A2="$(curl -s -i --max-time 8 --http1.1 \
         -H 'Connection: Upgrade' -H 'Upgrade: websocket' \
         -H 'Sec-WebSocket-Version: 13' -H 'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==' \
         "https://$DOMAIN$PF" 2>/dev/null | head -1 | tr -d '\r')"
@@ -231,6 +269,11 @@ cat <<'ENDE'
   HINWEIS: Wenn oben bei /api/ws eine 101 steht, ist alles gut – die App nimmt
   diesen Weg von selbst. Die Meldung "im Block für / stehen sie nicht" ist dann
   kein Problem, nur eine Feststellung.
+
+  Steht dort 401 oder 200 statt 101, obwohl der Browser einwandfrei arbeitet:
+  Das kam frueher davon, dass der Test HTTP/2 benutzt hat – dort gibt es die
+  WebSocket-Umschaltung gar nicht. Der Test erzwingt jetzt HTTP/1.1, so wie es
+  ein Browser auch macht.
 
   Kommt KEIN Weg durch, gehören diese Zeilen in den location-Block für /:
 
