@@ -1692,7 +1692,8 @@ function printLessonProof(name, done) {
       <td class="c">${noshow ? 'nicht erschienen' : b.duration_min + ' Min'}</td>
       <td class="c">${noshow ? '' : artL}</td>
       <td class="c">${late ? late + ' Min' : ''}</td>
-      <td>${esc(b.feedback || '')}${b.signed_at ? `<br><span class="entry" style="color:#0a7d3b">✔ vom Fahrschüler bestätigt ${fmtDT(String(b.signed_at).slice(0, 10))}</span>` : ''}</td>
+      <td>${esc(b.feedback || '')}</td>
+      <td class="c sig-col">${b.signature ? `<img class="sig-img" src="${b.signature}" alt="Unterschrift">` : (b.signed_at ? `<span class="sig-ok">✔</span><br><span class="entry">${fmtDT(String(b.signed_at).slice(0, 10))}</span>` : '')}</td>
     </tr>`;
   }).join('');
   const addr = esc(state.settings?.school_label || '');
@@ -1717,6 +1718,9 @@ function printLessonProof(name, done) {
       tbody tr:nth-child(even){background:#fbfaf7}
       td.c{text-align:center;white-space:nowrap} .entry{font-size:10px;color:#777}
       td.inv-col{color:#b26a00;font-weight:600} td.inv-col .wg{color:#aaa;font-weight:400;font-style:italic}
+      td.sig-col{text-align:center;vertical-align:middle}
+      .sig-img{height:36px;max-width:150px;object-fit:contain;display:block;margin:0 auto}
+      .sig-ok{color:#0a7d3b;font-weight:700;font-size:14px}
       tr{break-inside:avoid}
       .sign{margin-top:32px;display:flex;gap:64px}
       .sign div{flex:1;border-top:1px solid #333;padding-top:6px;font-size:11px;color:#444}
@@ -1727,7 +1731,7 @@ function printLessonProof(name, done) {
       <div class="titleblock"><h1>Fahrstunden-Nachweis</h1><div class="stud">${esc(name)}</div><div class="meta">Stand: ${today}</div></div>
     </div>
     <div class="sum"><b>${driven.length} gefahrene Fahrstunden · ${hLabel(totalMin)} gesamt</b></div>
-    <table><thead><tr><th>#</th><th>Datum &amp; Uhrzeit (gefahren)</th><th>Auf der Rechnung</th><th>Ende</th><th>Dauer</th><th>Art</th><th>Verspätung</th><th>Vermerk</th></tr></thead>
+    <table><thead><tr><th>#</th><th>Datum &amp; Uhrzeit (gefahren)</th><th>Auf der Rechnung</th><th>Ende</th><th>Dauer</th><th>Art</th><th>Verspätung</th><th>Vermerk</th><th>Unterschrift</th></tr></thead>
       <tbody>${rows}</tbody></table>
     <div class="sign"><div>Unterschrift Fahrlehrer</div><div>Unterschrift Fahrschüler</div></div>
     <div class="foot">Erstellt mit ginoco · ${today}. „Nachgetragen" = später eingetragene Fahrstunde; maßgeblich ist das angegebene Fahrdatum. „Auf der Rechnung" = Datum/Uhrzeit, unter dem die Stunde in der Abrechnung geführt wird (kann vom Fahrdatum abweichen); „wie gefahren" = identisch zum Fahrdatum. Mit ✔ markierte Stunden hat der Fahrschüler in der App bestätigt.</div>
