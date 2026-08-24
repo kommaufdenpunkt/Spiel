@@ -468,8 +468,12 @@ function openTour() {
 window.__openTour = openTour;
 
 // ---------- Was ist neu? (Changelog) ----------
-const CHANGELOG_VER = '3.65';
+const CHANGELOG_VER = '3.66';
 const CHANGELOG = [
+  { v: '3.66', d: '24.08.2026', title: '📄 Nachweis & Unterschrift beim Abschließen', items: [
+    '📄 Fahrstunden-Nachweis neu: Querformat, Ginoco-Logo & Fahrschul-Kopf, aufgeräumte Tabelle.',
+    '✍️ Beim Abschließen einer Fahrstunde kann der Fahrlehrer direkt deine Unterschrift anfordern – du bekommst sie ins Postfach und unterschreibst per Touch.',
+    '🧑‍🎓 Fahrschüler-Karten aufgeräumt: Login klar als 🔑-Zeile, lange Namen brechen sauber um.'] },
   { v: '3.65', d: '23.08.2026', title: '🔐 Sicherer Fahrlehrer-Zugang', items: [
     '🔑 Login mit PIN oder richtigem Passwort und „Angemeldet bleiben".',
     '📷 Authenticator (2-Faktor) per QR-Code einrichten – einfach mit der Authenticator-App abscannen (oder Schlüssel manuell). Optional bei jeder Anmeldung ein 6-stelliger Code.',
@@ -1687,27 +1691,42 @@ function printLessonProof(name, done) {
       <td>${esc(b.feedback || '')}${b.signed_at ? `<br><span class="entry" style="color:#0a7d3b">✔ vom Fahrschüler bestätigt ${fmtDT(String(b.signed_at).slice(0, 10))}</span>` : ''}</td>
     </tr>`;
   }).join('');
+  const addr = esc(state.settings?.school_label || '');
+  const LOGO = `<svg width="48" height="48" viewBox="-8 -8 116 116" fill="none" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="gc" x1="6" y1="96" x2="92" y2="8" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#e9530a"/><stop offset=".32" stop-color="#f6890d"/><stop offset=".62" stop-color="#ffc21a"/><stop offset=".85" stop-color="#ffe27a"/><stop offset="1" stop-color="#f7c40f"/></linearGradient></defs><path d="M87.6 36.3 A40 40 0 1 1 64.98 12.9" stroke="url(#gc)" stroke-width="14" stroke-linecap="round"/><circle cx="50" cy="50" r="10" stroke="url(#gc)" stroke-width="10"/><g stroke="url(#gc)" stroke-width="13" stroke-linecap="round"><line x1="35" y1="50" x2="17" y2="50"/><line x1="65" y1="50" x2="83" y2="50"/><line x1="50" y1="65" x2="50" y2="83"/></g><polygon points="62.1,44.2 78.9,13 52.7,36.8" fill="url(#gc)"/><g stroke="url(#gc)" stroke-width="6" stroke-linecap="round"><line x1="73.9" y1="11.8" x2="78.1" y2="5.1"/><line x1="82.4" y1="18.7" x2="88.1" y2="13.2"/><line x1="89" y1="27.5" x2="95.9" y2="23.5"/></g></svg>`;
   const doc = `<!doctype html><html lang="de"><head><meta charset="utf-8"><title>Fahrstunden-Nachweis – ${esc(name)}</title>
-    <style>*{box-sizing:border-box}body{font-family:Arial,Helvetica,sans-serif;color:#111;margin:0;padding:26px 30px;max-width:900px}
-      .head{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #111;padding-bottom:10px;margin-bottom:12px}
-      .head h1{font-size:20px;margin:0}.head .meta{font-size:12px;color:#444;text-align:right;line-height:1.5}
-      .sum{font-size:13px;margin:6px 0 14px}
+    <style>
+      @page{size:A4 landscape;margin:12mm 14mm}
+      *{box-sizing:border-box}
+      body{font-family:Arial,Helvetica,sans-serif;color:#1a1a1a;margin:0;padding:20px 24px}
+      .head{display:flex;align-items:center;gap:16px;border-bottom:3px solid #f2a01a;padding-bottom:12px;margin-bottom:14px}
+      .brand{display:flex;align-items:center;gap:12px;flex:1}
+      .brand .school{font-size:18px;font-weight:800;line-height:1.15}
+      .brand .addr{font-size:11px;color:#666;margin-top:2px}
+      .titleblock{text-align:right}
+      .titleblock h1{font-size:21px;margin:0;color:#111;letter-spacing:.01em}
+      .titleblock .stud{font-size:14px;margin-top:3px;font-weight:600}
+      .titleblock .meta{font-size:11px;color:#666;margin-top:2px}
+      .sum{font-size:13px;margin:2px 0 12px;color:#333}.sum b{color:#111}
       table{width:100%;border-collapse:collapse;font-size:12px}
-      th,td{border:1px solid #bbb;padding:5px 7px;text-align:left;vertical-align:top}
-      th{background:#f0f0f0;font-size:11px;text-transform:uppercase;letter-spacing:.03em}
+      th,td{border:1px solid #ccc;padding:6px 8px;text-align:left;vertical-align:top}
+      th{background:#faf3e2;color:#7a5300;font-size:10.5px;text-transform:uppercase;letter-spacing:.03em}
+      tbody tr:nth-child(even){background:#fbfaf7}
       td.c{text-align:center;white-space:nowrap} .entry{font-size:10px;color:#777}
       td.inv-col{color:#b26a00;font-weight:600} td.inv-col .wg{color:#aaa;font-weight:400;font-style:italic}
       tr{break-inside:avoid}
-      .sign{margin-top:40px;display:flex;gap:48px}.sign div{flex:1;border-top:1px solid #111;padding-top:5px;font-size:11px;color:#444}
-      .foot{margin-top:16px;font-size:11px;color:#666;border-top:1px solid #ccc;padding-top:8px}
-      @media print{body{padding:0}}</style></head><body>
-    <div class="head"><div><h1>Fahrstunden-Nachweis</h1><div style="font-size:13px;margin-top:2px">${esc(name)}</div></div>
-      <div class="meta">${school}<br>Stand: ${today}</div></div>
-    <div class="sum"><strong>${driven.length} gefahrene Fahrstunden · ${hLabel(totalMin)} gesamt</strong></div>
+      .sign{margin-top:32px;display:flex;gap:64px}
+      .sign div{flex:1;border-top:1px solid #333;padding-top:6px;font-size:11px;color:#444}
+      .foot{margin-top:14px;font-size:10px;color:#777;border-top:1px solid #ddd;padding-top:8px;line-height:1.55}
+    </style></head><body>
+    <div class="head">
+      <div class="brand">${LOGO}<div><div class="school">${school}</div>${addr ? `<div class="addr">${addr}</div>` : ''}</div></div>
+      <div class="titleblock"><h1>Fahrstunden-Nachweis</h1><div class="stud">${esc(name)}</div><div class="meta">Stand: ${today}</div></div>
+    </div>
+    <div class="sum"><b>${driven.length} gefahrene Fahrstunden · ${hLabel(totalMin)} gesamt</b></div>
     <table><thead><tr><th>#</th><th>Datum &amp; Uhrzeit (gefahren)</th><th>Auf der Rechnung</th><th>Ende</th><th>Dauer</th><th>Art</th><th>Verspätung</th><th>Vermerk</th></tr></thead>
       <tbody>${rows}</tbody></table>
     <div class="sign"><div>Unterschrift Fahrlehrer</div><div>Unterschrift Fahrschüler</div></div>
-    <div class="foot">Erstellt mit ginoco · ${today}. „Nachgetragen" = später eingetragene Fahrstunde; maßgeblich ist das angegebene Fahrdatum. „Auf der Rechnung" = Datum/Uhrzeit, unter dem die Stunde in der Abrechnung geführt wird (kann vom Fahrdatum abweichen); „wie gefahren" = identisch zum Fahrdatum.</div>
+    <div class="foot">Erstellt mit ginoco · ${today}. „Nachgetragen" = später eingetragene Fahrstunde; maßgeblich ist das angegebene Fahrdatum. „Auf der Rechnung" = Datum/Uhrzeit, unter dem die Stunde in der Abrechnung geführt wird (kann vom Fahrdatum abweichen); „wie gefahren" = identisch zum Fahrdatum. Mit ✔ markierte Stunden hat der Fahrschüler in der App bestätigt.</div>
     <script>window.onload=function(){setTimeout(function(){window.print()},250)}<\/script></body></html>`;
   const w = window.open('', '_blank');
   if (!w) { toast('Bitte Pop-ups erlauben, um den Nachweis zu drucken.', 'err'); return; }
@@ -3096,6 +3115,7 @@ function openMarkModal(id) {
     </div>
     <div class="field"><label>📝 Rückmeldung an den Schüler <span class="muted">(sieht der Schüler – „das haben wir gemacht")</span></label>
       <textarea id="m-feedback" rows="3" placeholder="z.B. Heute Kreisverkehr & Vorfahrt geübt – nächstes Mal Einparken." style="resize:vertical">${esc(b.feedback || '')}</textarea></div>
+    ${b.student_id ? `<label class="ck-line" style="justify-content:flex-start" id="m-sign-line"><input type="checkbox" id="m-sign" ${b.signed_at ? '' : 'checked'}> ✍️ Beim Abschließen Unterschrift vom Fahrschüler anfordern <span class="muted">(landet per Push im Postfach)</span></label>${b.signed_at ? '<div class="hint" style="margin:.1rem 0 .4rem">✓ Diese Stunde ist bereits unterschrieben.</div>' : ''}` : ''}
     ${b.student_id ? `<button class="adk-open" id="m-adk" type="button">📋 Ausbildungskarte abhaken (Vollbild)</button>` : ''}
     <div class="field"><label>Grund (bei Absage/Nichterscheinen, optional)</label><input id="m-reason" value="${esc(b.reason || '')}"></div>
     <div class="field"><label>Interne Notiz (nur für dich)</label><input id="m-note" value="${esc(b.note || '')}"></div>
@@ -3140,8 +3160,10 @@ function openMarkModal(id) {
         meet_label: $('#m-meet').value, meet_lat: meetLat ?? '', meet_lng: meetLng ?? '' };
       if ($('#m-date').value !== b.date) body.date = $('#m-date').value;
       if ($('#m-time').value !== b.start_time) body.start_time = $('#m-time').value;
+      const sign = $('#m-sign');
+      if (sign && sign.checked && $('#m-status').value === 'done' && att !== '0') body.request_sign = true;
       await api('/api/bookings/' + id, { method: 'PATCH', body });
-      closeModal(); toast('Gespeichert ✓', 'ok'); refreshEventBadge(); drawInstrTab();
+      closeModal(); toast(body.request_sign ? 'Abgeschlossen ✓ – Unterschrift angefordert' : 'Gespeichert ✓', 'ok'); refreshEventBadge(); drawInstrTab();
     } catch (e) { toast(e.message, 'err'); }
   };
 }
@@ -3727,11 +3749,13 @@ async function tabSchueler(scope) {
         return `<div class="stu-card" data-search="${esc(searchStr)}">
           <div class="stu-head">
             <span class="stu-av">${av}</span>
-            <div class="stu-name">${esc(s.name)}${s.birth_year ? ` <span class="muted">(${s.birth_year})</span>` : ''}</div>
+            <div class="stu-namewrap">
+              <div class="stu-name">${esc(s.name)}${s.birth_year ? ` <span class="muted">(${s.birth_year})</span>` : ''}</div>
+              <div class="stu-login">🔑 <span class="codechip">${esc(s.username || '–')}</span></div>
+            </div>
             <div class="stu-hours"><b>${s.done_count}</b><span>Std.</span></div>
           </div>
           <div class="stu-chips">
-            <span class="codechip">${esc(s.username || '–')}</span>
             <span class="pill" style="${s.rank >= 2 ? 'background:var(--good-bg);color:var(--good)' : ''}">🏆 Rang ${s.rank} · ${s.horizon} T</span>
             ${isArch ? '<span class="pill" style="background:var(--good-bg);color:var(--good)">✅ bestanden</span>' : ''}
           </div>

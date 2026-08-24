@@ -16,7 +16,7 @@ const PUBLIC = join(__dirname, 'public');
 const PORT = Number(process.env.PORT || 3000);
 const HOST = process.env.HOST || '0.0.0.0'; // hinter Caddy: HOST=127.0.0.1 (nur Proxy erreicht Node)
 const SESSION_DAYS = 30;
-const APP_VERSION = "3.65.1";
+const APP_VERSION = "3.66.0";
 // Einstellungen, die Schueler/Oeffentlichkeit sehen duerfen (Rest bleibt beim Fahrlehrer)
 const PUBLIC_SETTINGS = ['instructor_name', 'instructor_phone', 'policy_text',
   'cancel_hours', 'lock_hours', 'booking_horizon_days', 'booking_horizon_days_rank2',
@@ -1046,6 +1046,15 @@ async function handleApi(req, res, url) {
       if (b.status === 'done') {
         const f0 = db.prepare('SELECT ended_at FROM bookings WHERE id=?').get(id);
         if (!f0.ended_at) db.prepare('UPDATE bookings SET ended_at=? WHERE id=?').run(new Date().toISOString(), id);
+      }
+      // Beim Abschließen optional Unterschrift anfordern (Push ins Postfach).
+      if (b.request_sign && bk.student_id) {
+        const fr = db.prepare('SELECT status,attended,signed_at,date,start_time,duration_min,feedback FROM bookings WHERE id=?').get(id);
+        if (fr.status === 'done' && fr.attended !== 0 && !fr.signed_at) {
+          db.prepare('UPDATE bookings SET needs_sign=1 WHERE id=?').run(id);
+          notify(bk.student_id, 'sign',
+            `✍️ Bitte bestätige deine Fahrstunde vom ${wdShort(fr.date)} ${dmy(fr.date)} um ${fr.start_time} Uhr (${fr.duration_min} Min)${fr.feedback ? ` – ${fr.feedback}` : ''}.`, fr.date, id);
+        }
       }
       // Rückmeldung/Vermerk an den Schüler (nur wenn neu/geändert und nicht leer)
       if ('feedback' in b && String(b.feedback || '').trim()
