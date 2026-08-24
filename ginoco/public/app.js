@@ -468,8 +468,12 @@ function openTour() {
 window.__openTour = openTour;
 
 // ---------- Was ist neu? (Changelog) ----------
-const CHANGELOG_VER = '3.66';
+const CHANGELOG_VER = '3.67';
 const CHANGELOG = [
+  { v: '3.67', d: '24.08.2026', title: '📋 „Was habt ihr heute gemacht?"', items: [
+    '📋 Beim Abschließen einer Fahrstunde hakt der Fahrlehrer direkt ab, welche Themen der Ausbildungskarte (Klasse B) heute dran waren – mit Suche.',
+    '🗓️ Das wird pro Tag protokolliert: In deiner Ausbildungskarte steht bei jedem Punkt das Datum, an dem ihr es gemacht habt.',
+    '✍️ Danach Unterschrift anfordern → du bestätigst per Touch → alles gespeichert.'] },
   { v: '3.66', d: '24.08.2026', title: '📄 Nachweis & Unterschrift beim Abschließen', items: [
     '📄 Fahrstunden-Nachweis neu: Querformat, Ginoco-Logo & Fahrschul-Kopf, aufgeräumte Tabelle.',
     '✍️ Beim Abschließen einer Fahrstunde kann der Fahrlehrer direkt deine Unterschrift anfordern – du bekommst sie ins Postfach und unterschreibst per Touch.',
@@ -3116,6 +3120,10 @@ function openMarkModal(id) {
     <div class="field"><label>📝 Rückmeldung an den Schüler <span class="muted">(sieht der Schüler – „das haben wir gemacht")</span></label>
       <textarea id="m-feedback" rows="3" placeholder="z.B. Heute Kreisverkehr & Vorfahrt geübt – nächstes Mal Einparken." style="resize:vertical">${esc(b.feedback || '')}</textarea></div>
     ${b.student_id ? `<label class="ck-line" style="justify-content:flex-start" id="m-sign-line"><input type="checkbox" id="m-sign" ${b.signed_at ? '' : 'checked'}> ✍️ Beim Abschließen Unterschrift vom Fahrschüler anfordern <span class="muted">(landet per Push im Postfach)</span></label>${b.signed_at ? '<div class="hint" style="margin:.1rem 0 .4rem">✓ Diese Stunde ist bereits unterschrieben.</div>' : ''}` : ''}
+    ${b.student_id ? `<details class="mk-curr" id="m-curr-wrap"><summary>📋 Was habt ihr heute gemacht? <span class="muted">(Ausbildungskarte Klasse B)</span></summary>
+      <input id="m-curr-search" placeholder="🔎 suchen (z. B. Kreisverkehr)" autocomplete="off" style="margin:.5rem 0">
+      <div id="m-curr-list" class="mk-curr-list"><span class="hint">Lädt…</span></div>
+    </details>` : ''}
     ${b.student_id ? `<button class="adk-open" id="m-adk" type="button">📋 Ausbildungskarte abhaken (Vollbild)</button>` : ''}
     <div class="field"><label>Grund (bei Absage/Nichterscheinen, optional)</label><input id="m-reason" value="${esc(b.reason || '')}"></div>
     <div class="field"><label>Interne Notiz (nur für dich)</label><input id="m-note" value="${esc(b.note || '')}"></div>
@@ -3132,6 +3140,22 @@ function openMarkModal(id) {
   let meetLat = b.meet_lat, meetLng = b.meet_lng;
   const adkBtn = $('#m-adk');
   if (adkBtn) adkBtn.onclick = () => { closeModal(); openTrainingCard(b.student_id, b.student_name || ''); };
+  // „Was habt ihr heute gemacht?" – Ausbildungskarte pro Fahrstunde abhaken
+  let currDone = {};
+  const renderCurr = () => {
+    const list = $('#m-curr-list'); if (!list) return;
+    list.innerHTML = CURRICULUM.map((sec) => `<div class="mk-sec"><div class="mk-sec-t">${esc(sec.title)}</div>${sec.items.map((it, i) => {
+      const k = currKey(sec.key, i); const val = currDone[k]; const done = !!val;
+      const dt = (typeof val === 'number' && val > 1e12) ? ` · ${new Date(val).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' })}` : '';
+      return `<label class="mk-item ${done ? 'is-done' : ''}"><input type="checkbox" data-cc="${k}" data-txt="${esc((sec.title + ' ' + it).toLowerCase())}" ${done ? 'checked disabled' : ''}> <span>${esc(it)}${done ? ' ✓' + dt : ''}</span></label>`;
+    }).join('')}</div>`).join('');
+  };
+  if (b.student_id) {
+    api('/api/students/' + b.student_id + '/training').then((r) => { currDone = r.training || {}; renderCurr(); })
+      .catch(() => { const el = $('#m-curr-list'); if (el) el.innerHTML = '<span class="hint">Ausbildungskarte nicht ladbar.</span>'; });
+    const cs = $('#m-curr-search');
+    if (cs) cs.oninput = () => { const q = cs.value.trim().toLowerCase(); document.querySelectorAll('#m-curr-list .mk-item').forEach((l) => { const cb = l.querySelector('input'); l.style.display = (!q || (cb && cb.dataset.txt.includes(q))) ? '' : 'none'; }); };
+  }
   $('#m-meet-here').onclick = async () => {
     try { const c = await getPosOnce(); meetLat = c.latitude; meetLng = c.longitude;
       $('#m-meet-info').innerHTML = `✓ Koordinaten übernommen (${meetLat.toFixed(4)}, ${meetLng.toFixed(4)})`; toast('Treffpunkt gesetzt', 'ok'); }
@@ -3162,6 +3186,9 @@ function openMarkModal(id) {
       if ($('#m-time').value !== b.start_time) body.start_time = $('#m-time').value;
       const sign = $('#m-sign');
       if (sign && sign.checked && $('#m-status').value === 'done' && att !== '0') body.request_sign = true;
+      // heute neu abgehakte Ausbildungs-Themen mitschicken (bereits erledigte sind gesperrt)
+      const curr = [...document.querySelectorAll('#m-curr-list input[data-cc]:checked:not(:disabled)')].map((x) => x.dataset.cc);
+      if (curr.length) body.curriculum = curr;
       await api('/api/bookings/' + id, { method: 'PATCH', body });
       closeModal(); toast(body.request_sign ? 'Abgeschlossen ✓ – Unterschrift angefordert' : 'Gespeichert ✓', 'ok'); refreshEventBadge(); drawInstrTab();
     } catch (e) { toast(e.message, 'err'); }
@@ -4027,8 +4054,9 @@ async function openTrainingCard(id, name) {
     return `<details class="tc-sec" open>
       <summary>${esc(s.title)} <span class="pill" data-secpill="${s.key}">${done}/${s.items.length}</span></summary>
       <div class="tc-items">${s.items.map((it, i) => {
-        const k = currKey(s.key, i);
-        return `<label class="tc-item"><input type="checkbox" data-tc="${k}" data-sk="${s.key}" ${training[k] ? 'checked' : ''}> ${esc(it)}</label>`;
+        const k = currKey(s.key, i); const v = training[k];
+        const dt = (typeof v === 'number' && v > 1e12) ? `<span class="tc-date">${new Date(v).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' })}</span>` : '';
+        return `<label class="tc-item"><input type="checkbox" data-tc="${k}" data-sk="${s.key}" ${v ? 'checked' : ''}> <span>${esc(it)}</span>${dt}</label>`;
       }).join('')}</div>
     </details>`;
   }).join('');

@@ -196,6 +196,8 @@ ensureColumn('bookings', 'signature', 'signature TEXT');   // gezeichnete Unters
 // (paralleles Abrechnungsprogramm) unter Y – z.B. wegen der 495-Min-Tagesgrenze.
 ensureColumn('bookings', 'invoice_date', 'invoice_date TEXT'); // YYYY-MM-DD (abweichendes Rechnungsdatum)
 ensureColumn('bookings', 'invoice_time', 'invoice_time TEXT'); // HH:MM (abweichende Rechnungsuhrzeit)
+// An diesem Tag behandelte Ausbildungs-Themen (JSON-Array von Curriculum-Schlüsseln).
+ensureColumn('bookings', 'curriculum', 'curriculum TEXT');
 // Aufschlüsselung je Kategorie als JSON, z.B. {"geduld":5,"erklaerung":4,...}
 // (aus dem geführten "Durchbewerten"-Ablauf). NULL bei alten Bewertungen.
 ensureColumn('reviews', 'ratings', 'ratings TEXT');

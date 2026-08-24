@@ -1063,3 +1063,17 @@ a.btn-like:hover{background:var(--brand-dark)}
 .au-qr{display:flex;justify-content:center;margin:.5rem auto}
 .au-qr svg{background:#fff;border-radius:12px;padding:10px;box-shadow:0 4px 18px rgba(0,0,0,.25);max-width:100%;height:auto}
 .au-manual{margin:.3rem 0}.au-manual summary{cursor:pointer;font-size:.88rem;color:var(--muted)}
+
+/* „Was habt ihr heute gemacht?" – Ausbildungskarte im Abschließen-Fenster */
+.mk-curr{margin:.2rem 0 .6rem;border:1px solid var(--line);border-radius:12px;padding:.5rem .7rem;background:var(--card2)}
+.mk-curr summary{cursor:pointer;font-weight:600;font-size:.92rem}
+.mk-curr-list{max-height:300px;overflow:auto;margin-top:.3rem}
+.mk-sec{margin:.4rem 0}
+.mk-sec-t{font-size:.78rem;font-weight:700;color:var(--brand);text-transform:uppercase;letter-spacing:.02em;margin:.3rem 0 .2rem}
+.mk-item{display:flex;align-items:flex-start;gap:.5rem;padding:.28rem .3rem;border-radius:8px;font-size:.9rem;cursor:pointer}
+.mk-item:hover{background:var(--card)}
+.mk-item.is-done{color:var(--good);opacity:.85}
+.mk-item input{margin-top:.15rem}
+.tc-item{display:flex;align-items:center;gap:.5rem}
+.tc-item>span{flex:1}
+.tc-date{font-size:.72rem;color:var(--good);font-weight:600;white-space:nowrap}

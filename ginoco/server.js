@@ -16,7 +16,7 @@ const PUBLIC = join(__dirname, 'public');
 const PORT = Number(process.env.PORT || 3000);
 const HOST = process.env.HOST || '0.0.0.0'; // hinter Caddy: HOST=127.0.0.1 (nur Proxy erreicht Node)
 const SESSION_DAYS = 30;
-const APP_VERSION = "3.66.0";
+const APP_VERSION = "3.67.0";
 // Einstellungen, die Schueler/Oeffentlichkeit sehen duerfen (Rest bleibt beim Fahrlehrer)
 const PUBLIC_SETTINGS = ['instructor_name', 'instructor_phone', 'policy_text',
   'cancel_hours', 'lock_hours', 'booking_horizon_days', 'booking_horizon_days_rank2',
@@ -1046,6 +1046,19 @@ async function handleApi(req, res, url) {
       if (b.status === 'done') {
         const f0 = db.prepare('SELECT ended_at FROM bookings WHERE id=?').get(id);
         if (!f0.ended_at) db.prepare('UPDATE bookings SET ended_at=? WHERE id=?').run(new Date().toISOString(), id);
+      }
+      // An diesem Tag behandelte Ausbildungs-Themen protokollieren (mit Fahrdatum in der Karte).
+      if (Array.isArray(b.curriculum) && bk.student_id) {
+        const keys = b.curriculum.filter((k) => typeof k === 'string' && /^[a-z]+:\d+$/.test(k)).slice(0, 300);
+        db.prepare('UPDATE bookings SET curriculum=? WHERE id=?').run(JSON.stringify(keys), id);
+        if (keys.length) {
+          const stu = db.prepare('SELECT training FROM students WHERE id=?').get(bk.student_id);
+          let tr = {}; try { tr = stu && stu.training ? JSON.parse(stu.training) : {}; } catch {}
+          const ds = b.date || bk.date;
+          const tsMs = Date.parse(ds + 'T12:00:00') || Date.now();
+          for (const k of keys) { if (!tr[k]) tr[k] = tsMs; }   // vorhandene Daten nicht überschreiben
+          db.prepare('UPDATE students SET training=? WHERE id=?').run(JSON.stringify(tr), bk.student_id);
+        }
       }
       // Beim Abschließen optional Unterschrift anfordern (Push ins Postfach).
       if (b.request_sign && bk.student_id) {
