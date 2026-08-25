@@ -468,8 +468,13 @@ function openTour() {
 window.__openTour = openTour;
 
 // ---------- Was ist neu? (Changelog) ----------
-const CHANGELOG_VER = '3.69';
+const CHANGELOG_VER = '3.70';
 const CHANGELOG = [
+  { v: '3.70', d: '25.08.2026', title: '🎓 Prüfungsreife, Übersicht & mehr Nachweis', items: [
+    '🎓 <strong>Prüfungsreife-Check:</strong> „Bin ich bald so weit?" – zeigt dir auf einen Blick, was noch fehlt: offene Sonderfahrten, rote ADK-Punkte und Ausbildungsabschnitte.',
+    '🌄 <strong>Sonderfahrten korrekt gezählt:</strong> Eine Überlandfahrt (225 Min) zählt jetzt als 5 von 5 Einheiten – nicht mehr als „1".',
+    '📄 <strong>Nachweis mit Ausbildungsstand:</strong> Der gedruckte Fahrstunden-Nachweis enthält jetzt eine Zusammenfassung – welche Aufgabe wie oft geübt wurde und wie sie sitzt.',
+    '🧑‍🏫 <strong>Für den Fahrlehrer:</strong> Gesamtübersicht aller Fahrschüler – wer hat rote Punkte, wer ist fast prüfungsreif.'] },
   { v: '3.69', d: '25.08.2026', title: '🌄 Sonderfahrten selbst buchen (ab Rang 2)', items: [
     '🌄 Ab <strong>Rang 2</strong> (15 Fahrstunden) buchst du deine Pflicht-Sonderfahrten selbst: Überland (225 Min), Autobahn (180 Min) und Nachtfahrt (135 Min).',
     '🗓️ Eigener Bereich in „Meine Woche": Tag wählen – Ginoco zeigt dir nur die Startzeiten, an denen die lange Fahrt noch komplett in den Tag passt.',
@@ -1266,7 +1271,7 @@ async function renderStudent() {
 }
 
 let myBookingsCache = [];
-let myStats = null, myAdk = null;
+let myStats = null, myAdk = null, myProgress = null;
 async function syncStudent() {
   $('#dlabel').textContent = fmtDay(state.date);
   $('#dpick').value = state.date;
@@ -1275,7 +1280,7 @@ async function syncStudent() {
       api('/api/my/bookings'), api('/api/slots?date=' + state.date),
       api('/api/offers'), api('/api/my/notifications'), api('/api/away')]);
     myBookingsCache = mine.bookings;
-    myStats = mine.stats || null; myAdk = mine.adk || null;
+    myStats = mine.stats || null; myAdk = mine.adk || null; myProgress = mine.progress || null;
     renderAway(away.away);
     renderNotifications(notif.notifications, notif.unread);
     renderLessonTimer(mine.bookings);
@@ -1348,7 +1353,7 @@ function renderMyLessons(bookings) {
       <thead><tr><th>Datum &amp; Uhrzeit</th><th>Ende</th><th>Dauer</th><th>Art</th><th>Verspät.</th><th>Vermerk / Ausbildungskarte</th></tr></thead>
       <tbody>${rows}</tbody>
     </table></div>`;
-  const pb = $('#ml-print'); if (pb) pb.onclick = () => printLessonProof(state.user?.name || 'Fahrschüler', done);
+  const pb = $('#ml-print'); if (pb) pb.onclick = () => printLessonProof(state.user?.name || 'Fahrschüler', done, myAdk, myStats);
   const ab = $('#ml-adk-all'); if (ab) ab.onclick = () => openMyTraining();
   card.querySelectorAll('[data-sign]').forEach((btn) => btn.onclick = () => {
     const bk = done.find((x) => x.id === Number(btn.dataset.sign)); if (bk) openSignModal(bk);
@@ -1689,8 +1694,8 @@ function openReviewModal(existing, hasPhoto) {
   draw();
 }
 function revRatingWord(n) { return ['', 'geht so', 'okay', 'gut', 'sehr gut', 'top!'][n] || ''; }
-// Druckbarer Fahrstunden-Nachweis (Tabelle + Unterschriften)
-function printLessonProof(name, done) {
+// Druckbarer Fahrstunden-Nachweis (Tabelle + Unterschriften) + optional ADK-Zusammenfassung
+function printLessonProof(name, done, adk, stats) {
   const school = esc(state.settings?.instructor_name || 'Fahrschule');
   const today = new Date().toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
   const list = (done || []).slice().sort((a, z) => (a.date + a.start_time).localeCompare(z.date + z.start_time));
@@ -1715,6 +1720,25 @@ function printLessonProof(name, done) {
     </tr>`;
   }).join('');
   const addr = esc(state.settings?.school_label || '');
+  // Optionale zweite Seite: Ausbildungsstand (Häufigkeit je Aufgabe + letzter Stand)
+  const statLine = stats ? `${fmtUnits(stats.units)} Fahrstunden (à ${stats.unit || 80} Min) · ${fmtUnits(stats.schalt.units)} Schalt · ${fmtUnits(stats.automatik.units)} Automatik · ${fmtUnits(stats.hours)} h gefahren` : '';
+  const adkSection = (adk && adk.distinct) ? `
+    <div class="adk-page">
+      <h2 class="adk-h">Ausbildungsstand – was wurde geübt (${adk.distinct} Aufgaben)</h2>
+      ${statLine ? `<div class="sum2">${statLine}</div>` : ''}
+      <table class="adk-t"><thead><tr><th>Aufgabe</th><th class="c">Termine</th><th class="c">Stand</th></tr></thead><tbody>
+      ${CURRICULUM.map((sec) => {
+        const its = sec.items.map((it, i) => {
+          const k = currKey(sec.key, i); const agg = adk.items[k]; if (!agg) return '';
+          const m = agg.lastStatus ? currStatusMeta(agg.lastStatus) : null;
+          const days = Object.entries(agg.days || {}).sort((a, z) => a[0].localeCompare(z[0])).map(([d, n]) => `${fmtDMY2(d)}${n > 1 ? ` (${n}×)` : ''}`).join(', ');
+          return `<tr><td>${esc(it)}${days ? `<div class="adk-days">${days}</div>` : ''}</td><td class="c">${agg.count}×</td><td class="c">${m ? m.tiny : ''}</td></tr>`;
+        }).filter(Boolean).join('');
+        return its ? `<tr class="adk-sec"><td colspan="3">${esc(sec.title)}</td></tr>${its}` : '';
+      }).filter(Boolean).join('')}
+      </tbody></table>
+      ${adk.needWork && adk.needWork.length ? `<div class="adk-red"><strong>Das üben wir noch:</strong> ${adk.needWork.map(currLabel).filter(Boolean).map(esc).join(' · ')}</div>` : ''}
+    </div>` : '';
   const LOGO = `<svg width="48" height="48" viewBox="-8 -8 116 116" fill="none" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="gc" x1="6" y1="96" x2="92" y2="8" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#e9530a"/><stop offset=".32" stop-color="#f6890d"/><stop offset=".62" stop-color="#ffc21a"/><stop offset=".85" stop-color="#ffe27a"/><stop offset="1" stop-color="#f7c40f"/></linearGradient></defs><path d="M87.6 36.3 A40 40 0 1 1 64.98 12.9" stroke="url(#gc)" stroke-width="14" stroke-linecap="round"/><circle cx="50" cy="50" r="10" stroke="url(#gc)" stroke-width="10"/><g stroke="url(#gc)" stroke-width="13" stroke-linecap="round"><line x1="35" y1="50" x2="17" y2="50"/><line x1="65" y1="50" x2="83" y2="50"/><line x1="50" y1="65" x2="50" y2="83"/></g><polygon points="62.1,44.2 78.9,13 52.7,36.8" fill="url(#gc)"/><g stroke="url(#gc)" stroke-width="6" stroke-linecap="round"><line x1="73.9" y1="11.8" x2="78.1" y2="5.1"/><line x1="82.4" y1="18.7" x2="88.1" y2="13.2"/><line x1="89" y1="27.5" x2="95.9" y2="23.5"/></g></svg>`;
   const doc = `<!doctype html><html lang="de"><head><meta charset="utf-8"><title>Fahrstunden-Nachweis – ${esc(name)}</title>
     <style>
@@ -1743,6 +1767,16 @@ function printLessonProof(name, done) {
       .sign{margin-top:32px;display:flex;gap:64px}
       .sign div{flex:1;border-top:1px solid #333;padding-top:6px;font-size:11px;color:#444}
       .foot{margin-top:14px;font-size:10px;color:#777;border-top:1px solid #ddd;padding-top:8px;line-height:1.55}
+      .adk-page{page-break-before:always;padding-top:4px}
+      .adk-h{font-size:16px;margin:0 0 6px;color:#111;border-bottom:2px solid #f2a01a;padding-bottom:6px}
+      .sum2{font-size:12px;color:#333;margin:6px 0 10px;font-weight:600}
+      .adk-t{width:100%;border-collapse:collapse;font-size:11.5px}
+      .adk-t th,.adk-t td{border:1px solid #ccc;padding:4px 8px;text-align:left;vertical-align:top}
+      .adk-t th{background:#faf3e2;color:#7a5300;font-size:10px;text-transform:uppercase}
+      .adk-t td.c{text-align:center;white-space:nowrap}
+      .adk-t tr.adk-sec td{background:#f3f3f0;font-weight:700;color:#333}
+      .adk-days{font-size:9.5px;color:#888;margin-top:2px}
+      .adk-red{margin-top:12px;font-size:11.5px;padding:8px 10px;border:1px solid #e0a;border-left:4px solid #d0306a;border-radius:6px;background:#fdf0f5;color:#8a1c46}
     </style></head><body>
     <div class="head">
       <div class="brand">${LOGO}<div><div class="school">${school}</div>${addr ? `<div class="addr">${addr}</div>` : ''}</div></div>
@@ -1752,6 +1786,7 @@ function printLessonProof(name, done) {
     <table><thead><tr><th>#</th><th>Datum &amp; Uhrzeit (gefahren)</th><th>Auf der Rechnung</th><th>Ende</th><th>Dauer</th><th>Art</th><th>Verspätung</th><th>Vermerk</th><th>Unterschrift</th></tr></thead>
       <tbody>${rows}</tbody></table>
     <div class="sign"><div>Unterschrift Fahrlehrer</div><div>Unterschrift Fahrschüler</div></div>
+    ${adkSection}
     <div class="foot">Erstellt mit ginoco · ${today}. „Nachgetragen" = später eingetragene Fahrstunde; maßgeblich ist das angegebene Fahrdatum. „Auf der Rechnung" = Datum/Uhrzeit, unter dem die Stunde in der Abrechnung geführt wird (kann vom Fahrdatum abweichen); „wie gefahren" = identisch zum Fahrdatum. Mit ✔ markierte Stunden hat der Fahrschüler in der App bestätigt.</div>
     <script>window.onload=function(){setTimeout(function(){window.print()},250)}<\/script></body></html>`;
   const w = window.open('', '_blank');
@@ -1899,7 +1934,10 @@ function studentProgress(p) {
       </div>
       ${p.rank < 2 ? `<div class="hint" style="margin:.3rem 0 0">Sonderfahrten kannst du ab <strong>Rang 2</strong> (${p.rank2Min} Fahrstunden) selbst buchen.</div>` : ''}
     </div>
-    <button class="pc-adk" onclick="window.__openMyTraining()">📋 Meine Ausbildungskarte ansehen</button>
+    <div class="pc-actions">
+      <button class="pc-adk" onclick="window.__openMyTraining()">📋 Ausbildungskarte</button>
+      <button class="pc-adk" onclick="window.__openExamReadiness()">🎓 Prüfungsreife</button>
+    </div>
   </div>`;
 }
 
@@ -3838,7 +3876,20 @@ async function tabSchueler(scope) {
       const have = s.sonder?.[k] || 0, need = req[k]; const done = have >= need;
       return `<span class="pill" style="${done ? 'background:var(--good-bg);color:var(--good)' : ''}">${TYPE_ICON[k]} ${have}/${need}</span>`;
     }).join(' ');
+    const sonderDone = (s) => ['ueberland', 'autobahn', 'nacht'].every((k) => (s.sonder?.[k] || 0) >= req[k]);
+    const nearReady = (s) => sonderDone(s) && !s.redCount && (s.adkDistinct || 0) >= CURR_TOTAL * 0.8;
+    // Gesamtübersicht: Kennzahlen über alle (angezeigten) Fahrschüler
+    const nRed = students.filter((s) => s.redCount > 0).length;
+    const nNear = students.filter(nearReady).length;
+    const nR2 = students.filter((s) => s.rank >= 2).length;
+    const ovBar = scope === 'archived' ? '' : `<div class="ov-bar">
+      <div class="ov-tile"><b>${students.length}</b><span>Fahrschüler</span></div>
+      <div class="ov-tile ${nRed ? 'warn' : ''}"><b>${nRed}</b><span>mit 🔴 offen</span></div>
+      <div class="ov-tile"><b>${nR2}</b><span>Rang 2</span></div>
+      <div class="ov-tile ${nNear ? 'good' : ''}"><b>${nNear}</b><span>fast prüfungsreif</span></div>
+    </div>`;
     $('#s-list').innerHTML = `
+      ${ovBar}
       <div class="inline" style="margin-bottom:.7rem;gap:.5rem">
         <input id="s-search" placeholder="🔍 Suchen: Name, Login-Name, Telefon oder E-Mail …" style="flex:1" autocomplete="off">
         <span class="pill" id="s-count">${students.length}</span>
@@ -3869,6 +3920,9 @@ async function tabSchueler(scope) {
           </div>
           <div class="stu-chips">
             <span class="pill" style="${s.rank >= 2 ? 'background:var(--good-bg);color:var(--good)' : ''}">🏆 Rang ${s.rank} · ${s.horizon} T</span>
+            ${s.units ? `<span class="pill">🚗 ${fmtUnits(s.units)} FS${s.schaltUnits ? ' · ' + fmtUnits(s.schaltUnits) + ' Schalt' : ''}</span>` : ''}
+            ${s.redCount ? `<span class="pill" style="background:rgba(255,70,70,.16);color:#ff6b6b">🔴 ${s.redCount} offen</span>` : ''}
+            ${!isArch && nearReady(s) ? '<span class="pill" style="background:var(--good-bg);color:var(--good)">🎓 fast prüfungsreif</span>' : ''}
             ${isArch ? '<span class="pill" style="background:var(--good-bg);color:var(--good)">✅ bestanden</span>' : ''}
           </div>
           ${s.notes ? `<div class="stu-note" title="${esc(s.notes)}">📝 ${esc(s.notes.length > 80 ? s.notes.slice(0, 80) + '…' : s.notes)}</div>` : ''}
@@ -3919,7 +3973,7 @@ async function tabSchueler(scope) {
     $('#s-list').querySelectorAll('[data-proof]').forEach((btn) => btn.onclick = async () => {
       try { const r = await api('/api/students/' + btn.dataset.proof + '/lessons');
         if (!r.lessons.length) { toast('Noch keine gefahrenen Stunden für den Nachweis.', 'err'); return; }
-        printLessonProof(r.name || btn.dataset.pname, r.lessons);
+        printLessonProof(r.name || btn.dataset.pname, r.lessons, r.adk, r.stats);
       } catch (e) { toast(e.message, 'err'); }
     });
     $('#s-list').querySelectorAll('[data-del]').forEach((btn) => btn.onclick = () =>
@@ -4395,6 +4449,46 @@ async function openMyTraining() {
     <div class="actions"><button onclick="window.__closeModal()">Schließen</button></div>`, 'wide');
 }
 window.__openMyTraining = openMyTraining;
+
+// Prüfungsreife-Check: was fehlt noch bis zur Prüfung? (Sonderfahrten, rote ADK-Punkte,
+// Ausbildungsabschnitte, Fahrstunden). Die endgültige Entscheidung trifft der Fahrlehrer.
+async function openExamReadiness() {
+  const prog = myProgress; const adk = myAdk; const stats = myStats;
+  let training = {};
+  try { const r = await api('/api/my/training'); training = r.training || {}; } catch {}
+  if ((!adk || !stats) ) { try { const m = await api('/api/my/bookings'); adk = m.adk; stats = m.stats; myAdk = adk; myStats = stats; myProgress = m.progress; } catch {} }
+  const req = (prog && prog.req) || { ueberland: 5, autobahn: 4, nacht: 3 };
+  const have = (prog && prog.sonder) || { ueberland: 0, autobahn: 0, nacht: 0 };
+  const sonderRows = ['ueberland', 'autobahn', 'nacht'].map((k) => ({ k, have: have[k] || 0, need: req[k] || 0, ok: (have[k] || 0) >= (req[k] || 0) }));
+  const sonderOpen = sonderRows.filter((r) => !r.ok);
+  const red = ((adk && adk.needWork) || []).map(currLabel).filter(Boolean);
+  const sections = CURRICULUM.map((s) => { const done = s.items.filter((_, i) => training[currKey(s.key, i)]).length; return { title: s.title, done, total: s.items.length }; });
+  const openSections = sections.filter((s) => s.done === 0);
+  const coveredItems = sections.reduce((n, s) => n + s.done, 0);
+  const covPct = CURR_TOTAL ? Math.round(coveredItems / CURR_TOTAL * 100) : 0;
+  const units = (stats && stats.units) || 0;
+  const ready = sonderOpen.length === 0 && red.length === 0 && openSections.length === 0 && coveredItems > 0;
+  const line = (ok, txt, sub) => `<div class="er-line ${ok ? 'ok' : 'todo'}"><span class="er-ic">${ok ? '✅' : '⬜'}</span><div><div>${txt}</div>${sub ? `<div class="er-sub">${sub}</div>` : ''}</div></div>`;
+  const sonderSub = sonderOpen.length
+    ? 'Noch offen: ' + sonderOpen.map((r) => `${TYPE_LABEL[r.k]} ${r.have}/${r.need} UE`).join(' · ')
+    : `Alle Pflichtfahrten komplett (${sonderRows.map((r) => `${r.have}/${r.need}`).join(' · ')})`;
+  const redSub = red.length ? red.slice(0, 8).map(esc).join(' · ') + (red.length > 8 ? ' …' : '') : 'Nichts steht mehr auf 🔴.';
+  const secSub = openSections.length ? 'Noch nicht begonnen: ' + openSections.map((s) => esc(s.title.replace(/^[^ ]+ /, ''))).slice(0, 6).join(' · ') : `Alle Abschnitte begonnen · ${coveredItems}/${CURR_TOTAL} Punkte (${covPct}%)`;
+  modal(`<h3>🎓 Bin ich bald prüfungsreif?</h3>
+    <div class="er-verdict ${ready ? 'ok' : ''}">${ready
+      ? '🎉 Sieht stark aus! Sprich deinen Fahrlehrer auf den Prüfungstermin an.'
+      : 'Fast geschafft – das fehlt noch. Deinen Prüfungstermin bespricht am Ende dein Fahrlehrer.'}</div>
+    ${statStripHtml(stats)}
+    <div class="er-list">
+      ${line(sonderOpen.length === 0, '🌄 Sonderfahrten', sonderSub)}
+      ${line(red.length === 0, '🚦 Nichts steht mehr auf „muss noch geübt werden"', redSub)}
+      ${line(openSections.length === 0, '📋 Alle Ausbildungsabschnitte begonnen', secSub)}
+      ${line(units > 0, '🚗 Fahrstunden gesammelt', `${fmtUnits(units)} Fahrstunden (à 80 Min)`)}
+    </div>
+    <p class="hint" style="margin-top:.5rem">Das ist eine Selbsteinschätzung aus deinem Ausbildungsstand. Ob du wirklich zur Prüfung angemeldet wirst, entscheidet dein Fahrlehrer.</p>
+    <div class="actions"><button class="sec" onclick="window.__openMyTraining()">📋 Ausbildungskarte</button><button onclick="window.__closeModal()">Schließen</button></div>`, 'wide');
+}
+window.__openExamReadiness = openExamReadiness;
 
 // Zugangsdaten-Anzeige mit Kopier-Funktion (nach Anlegen)
 function showCredentials(r, title) {

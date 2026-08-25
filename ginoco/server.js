@@ -16,7 +16,7 @@ const PUBLIC = join(__dirname, 'public');
 const PORT = Number(process.env.PORT || 3000);
 const HOST = process.env.HOST || '0.0.0.0'; // hinter Caddy: HOST=127.0.0.1 (nur Proxy erreicht Node)
 const SESSION_DAYS = 30;
-const APP_VERSION = "3.69.0";
+const APP_VERSION = "3.70.0";
 // Einstellungen, die Schueler/Oeffentlichkeit sehen duerfen (Rest bleibt beim Fahrlehrer)
 const PUBLIC_SETTINGS = ['instructor_name', 'instructor_phone', 'policy_text',
   'cancel_hours', 'lock_hours', 'booking_horizon_days', 'booking_horizon_days_rank2',
@@ -483,12 +483,14 @@ function studentRank(studentId) {
     : Number(getSettingRaw('booking_horizon_days'));
   return { rank, horizon, doneCount: dc, rank2Min };
 }
-// Gefahrene Sonderfahrten je Art
+// Gefahrene Sonderfahrten je Art – in UNTERRICHTSEINHEITEN (UE, 45 Min).
+// So zaehlt eine 225-Min-Ueberlandfahrt korrekt als 5 UE (= 5/5), nicht als 1 Termin.
 function sonderCounts(studentId) {
+  const UE = 45;
   const rows = db.prepare(
-    "SELECT lesson_type AS t, COUNT(*) AS n FROM bookings WHERE student_id=? AND status='done' AND (attended IS NULL OR attended=1) AND lesson_type IN ('ueberland','autobahn','nacht') GROUP BY lesson_type").all(studentId);
+    "SELECT lesson_type AS t, COALESCE(SUM(duration_min),0) AS m FROM bookings WHERE student_id=? AND status='done' AND (attended IS NULL OR attended=1) AND lesson_type IN ('ueberland','autobahn','nacht') GROUP BY lesson_type").all(studentId);
   const m = { ueberland: 0, autobahn: 0, nacht: 0 };
-  for (const r of rows) m[r.t] = r.n;
+  for (const r of rows) m[r.t] = Math.round((r.m || 0) / UE);
   return m;
 }
 function sonderReq() {
@@ -1724,7 +1726,11 @@ async function handleApi(req, res, url) {
         (s.photo IS NOT NULL) AS has_photo,
         (SELECT COUNT(*) FROM bookings b WHERE b.student_id=s.id AND b.status='done') AS done_count
        FROM students s WHERE s.archived_at IS ${archived ? 'NOT NULL' : 'NULL'} ORDER BY s.name`
-    ).all().map((s) => ({ ...s, ...studentRank(s.id), sonder: sonderCounts(s.id), travel_est: travelMin(s.id) }));
+    ).all().map((s) => {
+      const adk = adkSummary(s.id); const st = lessonStats(s.id);
+      return { ...s, ...studentRank(s.id), sonder: sonderCounts(s.id), travel_est: travelMin(s.id),
+        redCount: adk.needWork.length, adkDistinct: adk.distinct, units: st.units, schaltUnits: st.schalt.units };
+    });
     const activeCount = db.prepare('SELECT COUNT(*) AS c FROM students WHERE archived_at IS NULL').get().c;
     const archivedCount = db.prepare('SELECT COUNT(*) AS c FROM students WHERE archived_at IS NOT NULL').get().c;
     return ok(res, { students: rows, req: sonderReq(), activeCount, archivedCount, scope: archived ? 'archived' : 'active' });

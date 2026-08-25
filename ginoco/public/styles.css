@@ -1111,3 +1111,21 @@ a.btn-like:hover{background:var(--brand-dark)}
 .sf-slots{margin:.4rem 0}
 .sf-list{display:flex;flex-direction:column;gap:.4rem}
 .sf-pick{text-align:left;justify-content:flex-start}
+.pc-actions{display:flex;gap:.5rem;flex-wrap:wrap}
+.pc-actions .pc-adk{flex:1;min-width:130px}
+/* Prüfungsreife-Check */
+.er-verdict{background:var(--warn-bg);border:1px solid var(--warn);border-radius:12px;padding:.6rem .8rem;font-weight:600;font-size:.9rem;margin:.2rem 0 .6rem}
+.er-verdict.ok{background:var(--good-bg);border-color:var(--good);color:var(--good)}
+.er-list{display:flex;flex-direction:column;gap:.5rem;margin:.4rem 0}
+.er-line{display:flex;gap:.55rem;align-items:flex-start;padding:.5rem .6rem;border:1px solid var(--line);border-radius:11px;background:var(--card2);font-size:.9rem;font-weight:600}
+.er-line.ok{border-color:rgba(53,192,125,.4)}
+.er-line.todo{border-color:rgba(230,178,58,.4)}
+.er-ic{font-size:1.05rem;line-height:1.2}
+.er-sub{font-size:.78rem;font-weight:400;color:var(--muted);margin-top:.15rem;line-height:1.4}
+/* Fahrlehrer-Gesamtübersicht */
+.ov-bar{display:flex;gap:.5rem;flex-wrap:wrap;margin:0 0 .8rem}
+.ov-tile{flex:1;min-width:90px;background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:.5rem .7rem;text-align:center}
+.ov-tile b{display:block;font-size:1.35rem;line-height:1.1}
+.ov-tile span{font-size:.72rem;color:var(--muted)}
+.ov-tile.warn{border-color:rgba(255,70,70,.45)}
+.ov-tile.good{border-color:rgba(53,192,125,.5)}
