@@ -302,10 +302,13 @@ const DEFAULTS = {
   meet_default_lat: '',      // Standard-Treffpunkt-Koordinaten (optional)
   meet_default_lng: '',
   anonymous_swaps: '1',      // Tausch anonym (Schueler sehen sich untereinander nicht)
-  req_ueberland: '5',        // Soll-Sonderfahrten: Ueberland
-  req_autobahn: '4',         // Soll-Sonderfahrten: Autobahn
-  req_nacht: '3',            // Soll-Sonderfahrten: Nachtfahrt
-  rank2_min_lessons: '15',   // ab so vielen gefahrenen Stunden -> Rang 2
+  req_ueberland: '5',        // Soll-Sonderfahrten: Ueberland (5 UE)
+  req_autobahn: '4',         // Soll-Sonderfahrten: Autobahn (4 UE)
+  req_nacht: '3',            // Soll-Sonderfahrten: Nachtfahrt (3 UE)
+  sonder_min_ueberland: '225',// Dauer je Ueberland-Sonderfahrt (Minuten) – 5 UE
+  sonder_min_autobahn: '180', // Dauer je Autobahn-Sonderfahrt (Minuten) – 4 UE
+  sonder_min_nacht: '135',    // Dauer je Nachtfahrt (Minuten) – 3 UE
+  rank2_min_lessons: '15',   // ab so vielen gefahrenen Stunden -> Rang 2 (Sonderfahrten frei)
   booking_horizon_days_rank2: '21', // Rang 2 darf so viele Tage im Voraus buchen
   registration_open: '0',    // '1' = neue Fahrschüler dürfen sich mit Code registrieren, '0' = geschlossen (privat)
   policy_text: 'Gebuchte Termine sind verbindlich. Kostenfrei stornieren nur bis '
@@ -355,7 +358,8 @@ export function getSettings() {
     'monthly_target_h', 'monthly_max_h',
     'max_per_week', 'booking_horizon_days', 'cancel_hours', 'lock_hours',
     'vacation_credit_min', 'vacation_days_left', 'late_grace_min', 'avg_speed_kmh', 'live_lead_min',
-    'req_ueberland', 'req_autobahn', 'req_nacht', 'rank2_min_lessons', 'booking_horizon_days_rank2']) {
+    'req_ueberland', 'req_autobahn', 'req_nacht', 'rank2_min_lessons', 'booking_horizon_days_rank2',
+    'sonder_min_ueberland', 'sonder_min_autobahn', 'sonder_min_nacht']) {
     out[n] = Number(out[n]);
   }
   return out;

@@ -468,8 +468,12 @@ function openTour() {
 window.__openTour = openTour;
 
 // ---------- Was ist neu? (Changelog) ----------
-const CHANGELOG_VER = '3.68';
+const CHANGELOG_VER = '3.69';
 const CHANGELOG = [
+  { v: '3.69', d: '25.08.2026', title: '🌄 Sonderfahrten selbst buchen (ab Rang 2)', items: [
+    '🌄 Ab <strong>Rang 2</strong> (15 Fahrstunden) buchst du deine Pflicht-Sonderfahrten selbst: Überland (225 Min), Autobahn (180 Min) und Nachtfahrt (135 Min).',
+    '🗓️ Eigener Bereich in „Meine Woche": Tag wählen – Ginoco zeigt dir nur die Startzeiten, an denen die lange Fahrt noch komplett in den Tag passt.',
+    '🚦 Rang 1 sieht 10 Tage im Voraus; ab Rang 2 mehr – und eben die Sonderfahrten.'] },
   { v: '3.68', d: '25.08.2026', title: '📊 Fortschritt im Detail & freie Wunschzeit', items: [
     '🕒 <strong>Freie Wunschzeit:</strong> An freien Tagen wählst du deine Startzeit selbst (z. B. 15:00). Sobald jemand bucht, öffnen sich die Slots davor & danach lückenlos – wer zuerst bucht, gibt den Takt vor.',
     '🚦 <strong>Stand je Aufgabe:</strong> Dein Fahrlehrer bewertet beim Abschließen jede Übung – 🔴 muss noch geübt · 🟡 geübt · 🟢 sitzt ganz gut.',
@@ -1878,22 +1882,66 @@ function studentProgress(p) {
         </div>`
       : `<div class="pc-block"><span class="pill" style="background:var(--good-bg);color:var(--good)">✅ Rang 2 – du siehst ${p.horizon} Tage im Voraus</span></div>`}
     <div class="pc-sonder">
-      <div class="pc-sonder-title">Sonderfahrten ${helpDot('Pflichtfahrten für die Führerscheinprüfung: Überlandfahrten, Autobahn und Nachtfahrt. Die Zahlen zeigen, wie viele du schon hast.')}</div>
+      <div class="pc-sonder-title">Sonderfahrten ${helpDot('Pflichtfahrten für die Führerscheinprüfung: Überlandfahrten, Autobahn und Nachtfahrt. Die Zahlen zeigen, wie viele du schon hast.')}
+        ${p.rank >= 2 ? '<span class="pill" style="background:var(--good-bg);color:var(--good);margin-left:.3rem">ab Rang 2 buchbar</span>' : ''}</div>
       <div class="pc-tiles">
       ${sonder.map(([k, have, need]) => {
         const done = have >= need;
+        const dur = Number(state.settings?.['sonder_min_' + k]) || { ueberland: 225, autobahn: 180, nacht: 135 }[k];
         return `<div class="pc-tile ${done ? 'done' : ''}" style="--tc:${TYPE_COLORS[k]}">
           <span class="pc-tile-ic">${TYPE_ICON[k]}</span>
           <span class="pc-tile-lb">${TYPE_LABEL[k]}</span>
           <span class="pc-tile-count">${done ? '✓ ' : ''}${have}/${need}</span>
           ${pbar(have, need, done ? 'var(--good)' : TYPE_COLORS[k])}
+          ${p.rank >= 2 && !done ? `<button class="sf-book" onclick="window.__openSonderBooking('${k}')">+ ${dur} Min buchen</button>` : ''}
         </div>`;
       }).join('')}
       </div>
+      ${p.rank < 2 ? `<div class="hint" style="margin:.3rem 0 0">Sonderfahrten kannst du ab <strong>Rang 2</strong> (${p.rank2Min} Fahrstunden) selbst buchen.</div>` : ''}
     </div>
     <button class="pc-adk" onclick="window.__openMyTraining()">📋 Meine Ausbildungskarte ansehen</button>
   </div>`;
 }
+
+// Sonderfahrt buchen (nur Rang 2): feste, lange Dauer – Tag wählen, passenden Start nehmen.
+function openSonderBooking(type) {
+  const dur = Number(state.settings?.['sonder_min_' + type]) || { ueberland: 225, autobahn: 180, nacht: 135 }[type];
+  const label = TYPE_LABEL[type], icon = TYPE_ICON[type];
+  modal(`<h3>${icon} ${label} buchen</h3>
+    <p class="hint">Sonderfahrt mit fester Länge: <strong>${dur} Min</strong>. Wähle einen Tag – ich zeige dir die freien Startzeiten, an denen die ${label} noch komplett in den Tag passt.</p>
+    <div class="field"><label>Tag</label><input type="date" id="sf-date" value="${state.date}" min="${todayStr()}"></div>
+    <div id="sf-slots" class="sf-slots"><span class="hint">Wähle einen Tag …</span></div>
+    <div class="actions"><button onclick="window.__closeModal()">Schließen</button></div>`);
+  const load = async () => {
+    const d = $('#sf-date').value; const box = $('#sf-slots');
+    if (!d) return;
+    box.innerHTML = '<span class="hint">Lädt…</span>';
+    try {
+      const r = await api('/api/slots?date=' + d);
+      const fits = (r.slots || []).filter((s) => s.state === 'free' && Number(s.maxDur || s.duration) >= dur);
+      if (!fits.length) {
+        box.innerHTML = `<div class="warnbox">An diesem Tag passt die ${esc(label)} (${dur} Min) nicht mehr in den Tagesplan. Wähle einen anderen, freieren Tag – am besten früh am Tag, damit der lange Block Platz hat.</div>`;
+        return;
+      }
+      box.innerHTML = `<div class="sf-list">${fits.map((s) => `<button class="sec sf-pick" data-start="${s.start}">🕒 ${s.start} Uhr <span class="muted">– endet ${addMinHHMM(s.start, dur)}</span></button>`).join('')}</div>`;
+      box.querySelectorAll('[data-start]').forEach((b) => b.onclick = () => confirmSonder(type, dur, d, b.dataset.start));
+    } catch (e) { box.innerHTML = `<div class="warnbox">${esc(e.message)}</div>`; }
+  };
+  $('#sf-date').onchange = load; load();
+}
+function confirmSonder(type, dur, date, start) {
+  modal(`<h3>${TYPE_ICON[type]} ${TYPE_LABEL[type]} verbindlich buchen?</h3>
+    <p style="margin:.5rem 0"><strong>${WD_LONG[isoDow(date) - 1]}, ${fmtShort(date)} um ${start} Uhr</strong><br>${dur} Min · endet ${addMinHHMM(start, dur)} Uhr</p>
+    <div class="warnbox">Sonderfahrten sind Pflichtfahrten für die Prüfung. Die Buchung ist verbindlich.</div>
+    <div class="actions"><button class="sec" onclick="window.__closeModal()">Abbrechen</button><button id="sf-go">Ja, verbindlich buchen</button></div>`);
+  $('#sf-go').onclick = async () => {
+    try {
+      await api('/api/bookings', { method: 'POST', body: { date, start_time: start, sonder: type } });
+      closeModal(); toast(TYPE_LABEL[type] + ' gebucht ✓', 'ok'); syncStudent();
+    } catch (e) { toast(e.message, 'err'); }
+  };
+}
+window.__openSonderBooking = openSonderBooking;
 
 function countdownLabel(date, start) {
   const h = hoursUntil(date, start);

@@ -16,12 +16,13 @@ const PUBLIC = join(__dirname, 'public');
 const PORT = Number(process.env.PORT || 3000);
 const HOST = process.env.HOST || '0.0.0.0'; // hinter Caddy: HOST=127.0.0.1 (nur Proxy erreicht Node)
 const SESSION_DAYS = 30;
-const APP_VERSION = "3.68.0";
+const APP_VERSION = "3.69.0";
 // Einstellungen, die Schueler/Oeffentlichkeit sehen duerfen (Rest bleibt beim Fahrlehrer)
 const PUBLIC_SETTINGS = ['instructor_name', 'instructor_phone', 'policy_text',
   'cancel_hours', 'lock_hours', 'booking_horizon_days', 'booking_horizon_days_rank2',
   'live_lead_min', 'lesson_min', 'break_min', 'start_time', 'last_start', 'max_per_week', 'release_time',
-  'registration_open'];
+  'registration_open', 'sonder_min_ueberland', 'sonder_min_autobahn', 'sonder_min_nacht',
+  'req_ueberland', 'req_autobahn', 'req_nacht', 'rank2_min_lessons'];
 
 // ---------- Passwort-Richtlinie (stark, mit Sonderzeichen) ----------
 // Gibt null zurueck, wenn ok, sonst die fehlende Anforderung.
@@ -492,6 +493,13 @@ function sonderCounts(studentId) {
 }
 function sonderReq() {
   return { ueberland: Number(getSettingRaw('req_ueberland')), autobahn: Number(getSettingRaw('req_autobahn')), nacht: Number(getSettingRaw('req_nacht')) };
+}
+// Feste Dauer je Sonderfahrt (Minuten): Ueberland 225 · Autobahn 180 · Nacht 135
+function sonderMin(type) {
+  const d = { ueberland: Number(getSettingRaw('sonder_min_ueberland')) || 225,
+    autobahn: Number(getSettingRaw('sonder_min_autobahn')) || 180,
+    nacht: Number(getSettingRaw('sonder_min_nacht')) || 135 };
+  return d[type] || 0;
 }
 
 // Fahrstunden-Statistik: Einheiten (Doppelstunde = 80 Min = 1; 40=0,5; 120=1,5; 160=2),
@@ -2120,6 +2128,7 @@ async function handleApi(req, res, url) {
       'instructor_phone', 'avg_speed_kmh', 'live_lead_min',
       'meet_default_label', 'meet_default_lat', 'meet_default_lng',
       'anonymous_swaps', 'req_ueberland', 'req_autobahn', 'req_nacht',
+      'sonder_min_ueberland', 'sonder_min_autobahn', 'sonder_min_nacht',
       'rank2_min_lessons', 'booking_horizon_days_rank2', 'registration_open',
       'flow_schedule', 'auto_fill_gaps', 'school_lat', 'school_lng', 'travel_default_min',
       'school_label', 'school2_label', 'school2_lat', 'school2_lng'];
@@ -2552,7 +2561,11 @@ function createBooking(res, sess, body) {
   if (!date || !start) return bad(res, 'Datum und Uhrzeit noetig');
 
   const isInstructor = sess.kind === 'instructor';
-  const duration = Number(body.duration_min) > 0 ? Number(body.duration_min) : s.lesson_min;
+  // Sonderfahrt (feste, lange Dauer je Art) – nur Rang 2 darf sie selbst buchen.
+  const sonderType = ['ueberland', 'autobahn', 'nacht'].includes(body.sonder) ? body.sonder : null;
+  const duration = sonderType ? sonderMin(sonderType)
+    : (Number(body.duration_min) > 0 ? Number(body.duration_min) : s.lesson_min);
+  if (sonderType && duration <= 0) return bad(res, 'Sonderfahrt-Dauer ist nicht eingestellt.');
 
   // Vergangenheit?
   if (date < todayStr() || (date === todayStr() && toMin(start) <= toMin(nowHHMM())))
@@ -2580,15 +2593,24 @@ function createBooking(res, sess, body) {
     if (!win)
       return bad(res, 'Diese Startzeit ist gerade nicht (mehr) frei. Bitte lade neu und nimm den nächsten freien Start.');
 
-    // Erlaubte Dauer fuer diesen Schueler?
-    const stu = db.prepare('SELECT allowed_durations FROM students WHERE id = ?').get(sess.student_id);
-    const allowed = (stu?.allowed_durations || '80').split(',').map(Number);
-    if (!allowed.includes(duration))
-      return bad(res, `Fuer dich sind nur ${allowed.join('/')} Minuten freigegeben.`);
+    if (sonderType) {
+      // Sonderfahrten erst ab Rang 2 – feste Dauer, keine allowed_durations-Pruefung.
+      const { rank } = studentRank(sess.student_id);
+      if (rank < 2)
+        return bad(res, `Sonderfahrten kannst du erst ab Rang 2 buchen (ab ${Number(getSettingRaw('rank2_min_lessons'))} gefahrenen Fahrstunden).`);
+    } else {
+      // Erlaubte Dauer fuer diesen Schueler?
+      const stu = db.prepare('SELECT allowed_durations FROM students WHERE id = ?').get(sess.student_id);
+      const allowed = (stu?.allowed_durations || '80').split(',').map(Number);
+      if (!allowed.includes(duration))
+        return bad(res, `Fuer dich sind nur ${allowed.join('/')} Minuten freigegeben.`);
+    }
 
     // Passt die gewuenschte Laenge noch in den Tag (bis zum spaetesten Stundenende)?
     if (toMin(start) + duration > win.cap)
-      return bad(res, `Diese Länge passt an diesem Start nicht mehr in den Tag (Ende spätestens ${toHHMM(win.cap)} Uhr). Wähle eine kürzere Stunde oder einen früheren Start.`);
+      return bad(res, sonderType
+        ? `Diese Sonderfahrt (${duration} Min) passt an diesem Start nicht mehr in den Tag (Ende spätestens ${toHHMM(win.cap)} Uhr). Wähle einen früheren Start oder einen anderen Tag.`
+        : `Diese Länge passt an diesem Start nicht mehr in den Tag (Ende spätestens ${toHHMM(win.cap)} Uhr). Wähle eine kürzere Stunde oder einen früheren Start.`);
   }
 
   const newStart = toMin(start);
@@ -2624,14 +2646,16 @@ function createBooking(res, sess, body) {
   // Schüler bestätigt. Selbst gebucht oder Fahrlehrer-eigener Block -> gleich bestätigt (1).
   const confirmed = (isInstructor && studentId) ? 0 : 1;
   const info = db.prepare(
-    `INSERT INTO bookings(student_id,date,start_time,duration_min,status,title,note,confirmed,created_at)
-     VALUES(?,?,?,?,?,?,?,?,?)`
+    `INSERT INTO bookings(student_id,date,start_time,duration_min,status,title,note,lesson_type,confirmed,created_at)
+     VALUES(?,?,?,?,?,?,?,?,?,?)`
   ).run(studentId, date, start, duration, 'booked',
     body.title ? String(body.title).trim() : null,
-    body.note ? String(body.note).trim() : null, confirmed, new Date().toISOString());
+    body.note ? String(body.note).trim() : null,
+    sonderType || null, confirmed, new Date().toISOString());
   const bid = Number(info.lastInsertRowid);
+  const sonderLbl = sonderType ? { ueberland: 'Überland', autobahn: 'Autobahn', nacht: 'Nachtfahrt' }[sonderType] + '-Sonderfahrt · ' : '';
   logEvent('book', { actor: isInstructor ? 'instructor' : 'student', studentId, bookingId: bid, date,
-    detail: `${wdShort(date)} ${dmy(date)} ${start} Uhr (${duration} Min)${isInstructor ? ' – vom Fahrlehrer eingetragen' + (studentId ? ' (reserviert)' : '') : ''}` });
+    detail: `${sonderLbl}${wdShort(date)} ${dmy(date)} ${start} Uhr (${duration} Min)${isInstructor ? ' – vom Fahrlehrer eingetragen' + (studentId ? ' (reserviert)' : '') : ''}` });
   if (isInstructor && studentId) notify(studentId, 'info',
     `Neuer Termin für dich reserviert: ${wdShort(date)} ${dmy(date)} um ${start} Uhr (${duration} Min). Bitte in der App bestätigen.`, date, bid);
   return ok(res, { id: bid });
