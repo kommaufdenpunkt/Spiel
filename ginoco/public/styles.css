@@ -1077,3 +1077,31 @@ a.btn-like:hover{background:var(--brand-dark)}
 .tc-item{display:flex;align-items:center;gap:.5rem}
 .tc-item>span{flex:1}
 .tc-date{font-size:.72rem;color:var(--good);font-weight:600;white-space:nowrap}
+/* Ausbildungskarte je Fahrstunde: Punkt + 3-Stufen-Stand */
+.mk-item2{display:flex;align-items:center;gap:.5rem;padding:.28rem .3rem;border-radius:8px;font-size:.9rem}
+.mk-item2:hover{background:var(--card)}
+.mk-item2 .mk-lbl{flex:1;line-height:1.25}
+.mk-prev{display:block;font-style:normal;font-size:.72rem;color:var(--muted);margin-top:.05rem}
+.mk-seg{display:inline-flex;gap:.2rem;flex-shrink:0}
+.mk-seg button{width:34px;height:32px;padding:0;border:1px solid var(--line);background:var(--card2);border-radius:9px;font-size:1rem;line-height:1;opacity:.45;filter:grayscale(.5);cursor:pointer;transition:.12s}
+.mk-seg button:hover{opacity:.8;filter:none}
+.mk-seg button.on{opacity:1;filter:none;border-color:var(--brand);box-shadow:0 0 0 2px var(--brand-weak,rgba(255,140,0,.25)) inset;transform:scale(1.05)}
+/* ADK-Zusammenfassung (Häufigkeit + Stand) */
+.adk-stats{display:flex;flex-wrap:wrap;gap:.4rem;margin:.4rem 0}
+.adk-stat{background:var(--card2);border:1px solid var(--line);border-radius:11px;padding:.4rem .6rem;min-width:78px}
+.adk-stat b{display:block;font-size:1.15rem;line-height:1.1}
+.adk-stat span{font-size:.7rem;color:var(--muted)}
+.adk-need{background:var(--warn-bg,rgba(255,170,0,.12));border:1px solid var(--warn,rgba(255,170,0,.5));border-radius:12px;padding:.5rem .7rem;margin:.5rem 0}
+.adk-need .adk-need-t{font-weight:700;font-size:.86rem;margin-bottom:.25rem}
+.adk-need ul{margin:.2rem 0 0;padding-left:1.1rem;font-size:.86rem;line-height:1.5}
+.adk-freq{width:100%;border-collapse:collapse;font-size:.84rem;margin-top:.3rem}
+.adk-freq td{padding:.24rem .3rem;border-bottom:1px solid var(--line);vertical-align:top}
+.adk-freq td.n{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;color:var(--muted)}
+.adk-freq .st{white-space:nowrap;font-size:.78rem}
+.adk-lessadk{margin-top:.35rem}
+.adk-day{font-size:.76rem;color:var(--muted)}
+.badge.st-mehr{background:rgba(255,70,70,.16);color:#ff6b6b}
+.badge.st-ok{background:rgba(60,200,120,.16);color:#3ac878}
+.badge.st-geuebt{background:rgba(255,190,60,.16);color:#ffbe3c}
+.linkbtn{display:inline-block;margin-top:.25rem;padding:.15rem .1rem;background:none;border:none;color:var(--brand);font:inherit;font-size:.82rem;font-weight:600;cursor:pointer;text-decoration:underline;text-underline-offset:2px}
+.linkbtn:hover{opacity:.8}

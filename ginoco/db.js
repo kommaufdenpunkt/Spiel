@@ -275,7 +275,7 @@ const DEFAULTS = {
   monthly_max_h: '130',      // Skala-Ende der Monats-Tachouhr (hoechstens)
   workdays: '1,2,3,4,5,6',   // 1=Mo ... 7=So
   max_per_week: '2',         // max. Fahrstunden pro Schueler & Woche
-  booking_horizon_days: '14',// so viele Tage im Voraus duerfen Schueler buchen
+  booking_horizon_days: '10',// so viele Tage im Voraus duerfen Schueler buchen (Rang 1)
   cancel_hours: '48',        // bis so viele Std. vorher kostenlose Stornierung
   lock_hours: '36',          // ab so viel Std. vorher ist der Termin gesperrt (kein Absagen/Abgeben)
   release_time: '06:00',     // Uhrzeit, zu der taeglich der neue Tag am Horizont oeffnet (frueh: 06:00)

@@ -468,8 +468,14 @@ function openTour() {
 window.__openTour = openTour;
 
 // ---------- Was ist neu? (Changelog) ----------
-const CHANGELOG_VER = '3.67';
+const CHANGELOG_VER = '3.68';
 const CHANGELOG = [
+  { v: '3.68', d: '25.08.2026', title: '📊 Fortschritt im Detail & freie Wunschzeit', items: [
+    '🕒 <strong>Freie Wunschzeit:</strong> An freien Tagen wählst du deine Startzeit selbst (z. B. 15:00). Sobald jemand bucht, öffnen sich die Slots davor & danach lückenlos – wer zuerst bucht, gibt den Takt vor.',
+    '🚦 <strong>Stand je Aufgabe:</strong> Dein Fahrlehrer bewertet beim Abschließen jede Übung – 🔴 muss noch geübt · 🟡 geübt · 🟢 sitzt ganz gut.',
+    '📋 <strong>Ausbildungskarte je Fahrstunde:</strong> Bei jeder Stunde siehst (und lädst) du, was ihr gemacht habt – als sauberes PDF.',
+    '📈 <strong>Zusammenfassung:</strong> Wie oft hast du z. B. eingeparkt – je Tag und insgesamt? Alles in „Ausbildungs-Übersicht", inkl. „das üben wir noch".',
+    '🔢 <strong>Statistik:</strong> Fahrstunden gesamt (à 80 Min zählt 1, 120 Min = 1,5), davon Schaltstunden, und deine gefahrene Zeit.'] },
   { v: '3.67', d: '24.08.2026', title: '📋 „Was habt ihr heute gemacht?"', items: [
     '📋 Beim Abschließen einer Fahrstunde hakt der Fahrlehrer direkt ab, welche Themen der Ausbildungskarte (Klasse B) heute dran waren – mit Suche.',
     '🗓️ Das wird pro Tag protokolliert: In deiner Ausbildungskarte steht bei jedem Punkt das Datum, an dem ihr es gemacht habt.',
@@ -1256,6 +1262,7 @@ async function renderStudent() {
 }
 
 let myBookingsCache = [];
+let myStats = null, myAdk = null;
 async function syncStudent() {
   $('#dlabel').textContent = fmtDay(state.date);
   $('#dpick').value = state.date;
@@ -1264,6 +1271,7 @@ async function syncStudent() {
       api('/api/my/bookings'), api('/api/slots?date=' + state.date),
       api('/api/offers'), api('/api/my/notifications'), api('/api/away')]);
     myBookingsCache = mine.bookings;
+    myStats = mine.stats || null; myAdk = mine.adk || null;
     renderAway(away.away);
     renderNotifications(notif.notifications, notif.unread);
     renderLessonTimer(mine.bookings);
@@ -1307,6 +1315,7 @@ function renderMyLessons(bookings) {
     const late = b.late_minutes || 0;
     const entryDate = b.created_at ? String(b.created_at).slice(0, 10) : null;
     const nachgetragen = entryDate && entryDate !== b.date;
+    const adkN = lessonAdkParse(b.curriculum).length;
     const sign = b.needs_sign
       ? `<button class="sm ml-sign" data-sign="${b.id}">✍️ Unterschreiben</button>`
       : (b.signed_at ? `<span class="pill" style="background:var(--good-bg);color:var(--good)">✓ unterschrieben</span>` : '');
@@ -1316,27 +1325,32 @@ function renderMyLessons(bookings) {
       <td data-label="Dauer">${noshow ? '🚫 nicht da' : (b.duration_min + ' Min')}</td>
       <td data-label="Art">${noshow ? '' : lessonTypeLabel(b.lesson_type)}</td>
       <td data-label="Verspätung">${late ? `⏱️ ${late} Min` : ''}</td>
-      <td class="ml-note" data-label="Vermerk">${b.feedback ? esc(b.feedback) : ''}</td>
+      <td class="ml-note" data-label="Vermerk">${b.feedback ? esc(b.feedback) : ''}${adkN ? `<button class="linkbtn ml-adk" data-adk="${b.id}">📋 Ausbildungskarte (${adkN})</button>` : ''}</td>
     </tr>`;
   }).join('');
   const banner = toSign.length
     ? `<div class="sign-banner">✍️ <div><strong>${toSign.length} Fahrstunde${toSign.length === 1 ? '' : 'n'} warten auf deine Unterschrift.</strong><br><span>Dein Fahrlehrer hat sie nachgetragen – bitte kurz bestätigen.</span></div><button class="sm" id="ml-sign-first">Jetzt unterschreiben</button></div>`
     : '';
   card.innerHTML = `<h2>📖 Meine Fahrstunden</h2>
-    <p class="hint">Alle deine gefahrenen Stunden – mit Datum &amp; Uhrzeit, Dauer, Art und Vermerk.</p>
+    <p class="hint">Alle deine gefahrenen Stunden – mit Datum &amp; Uhrzeit, Dauer, Art und Vermerk. Bei jeder Stunde kannst du die Ausbildungskarte öffnen: <em>was</em> ihr geübt habt und wie es sitzt.</p>
     ${banner}
-    <div class="inline" style="margin-bottom:.6rem;flex-wrap:wrap">
-      <span class="pill">🚗 ${driven.length} gefahren</span>
-      <span class="pill">⏱️ ${hLabel(totalMin)} gesamt</span>
+    ${statStripHtml(myStats)}
+    ${adkNeedWorkHtml(myAdk)}
+    <div class="inline" style="margin:.4rem 0 .6rem;flex-wrap:wrap">
+      <button class="sec sm" id="ml-adk-all">📋 Ausbildungs-Übersicht</button>
       <button class="sec sm" id="ml-print" style="margin-left:auto">📄 Nachweis drucken</button>
     </div>
     <div class="ml-wrap"><table class="ml-table">
-      <thead><tr><th>Datum &amp; Uhrzeit</th><th>Ende</th><th>Dauer</th><th>Art</th><th>Verspät.</th><th>Vermerk</th></tr></thead>
+      <thead><tr><th>Datum &amp; Uhrzeit</th><th>Ende</th><th>Dauer</th><th>Art</th><th>Verspät.</th><th>Vermerk / Ausbildungskarte</th></tr></thead>
       <tbody>${rows}</tbody>
     </table></div>`;
   const pb = $('#ml-print'); if (pb) pb.onclick = () => printLessonProof(state.user?.name || 'Fahrschüler', done);
+  const ab = $('#ml-adk-all'); if (ab) ab.onclick = () => openMyTraining();
   card.querySelectorAll('[data-sign]').forEach((btn) => btn.onclick = () => {
     const bk = done.find((x) => x.id === Number(btn.dataset.sign)); if (bk) openSignModal(bk);
+  });
+  card.querySelectorAll('[data-adk]').forEach((btn) => btn.onclick = () => {
+    const bk = done.find((x) => x.id === Number(btn.dataset.adk)); if (bk) openLessonAdk(bk, state.user?.name || 'Fahrschüler');
   });
   const sf = $('#ml-sign-first'); if (sf) sf.onclick = () => openSignModal(toSign[0]);
 }
@@ -3144,21 +3158,37 @@ function openMarkModal(id) {
   let meetLat = b.meet_lat, meetLng = b.meet_lng;
   const adkBtn = $('#m-adk');
   if (adkBtn) adkBtn.onclick = () => { closeModal(); openTrainingCard(b.student_id, b.student_name || ''); };
-  // „Was habt ihr heute gemacht?" – Ausbildungskarte pro Fahrstunde abhaken
-  let currDone = {};
+  // „Was habt ihr heute gemacht?" – Ausbildungskarte pro Fahrstunde abhaken,
+  // je Punkt mit Stand: 🔴 muss noch geübt · 🟡 geübt · 🟢 sitzt ganz gut.
+  let currDone = {};            // Zeitstempel je Punkt (früher erledigt)
+  let currAdk = { items: {} };  // Gesamt-Häufigkeit + letzter Stand je Punkt
   const renderCurr = () => {
     const list = $('#m-curr-list'); if (!list) return;
     list.innerHTML = CURRICULUM.map((sec) => `<div class="mk-sec"><div class="mk-sec-t">${esc(sec.title)}</div>${sec.items.map((it, i) => {
-      const k = currKey(sec.key, i); const val = currDone[k]; const done = !!val;
-      const dt = (typeof val === 'number' && val > 1e12) ? ` · ${new Date(val).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' })}` : '';
-      return `<label class="mk-item ${done ? 'is-done' : ''}"><input type="checkbox" data-cc="${k}" data-txt="${esc((sec.title + ' ' + it).toLowerCase())}" ${done ? 'checked disabled' : ''}> <span>${esc(it)}${done ? ' ✓' + dt : ''}</span></label>`;
+      const k = currKey(sec.key, i);
+      const agg = currAdk.items[k];
+      const prev = agg && agg.count
+        ? `<em class="mk-prev">schon ${agg.count}×${agg.lastStatus ? ' · ' + currStatusMeta(agg.lastStatus).dot + ' ' + currStatusMeta(agg.lastStatus).tiny : ''}</em>`
+        : (currDone[k] ? '<em class="mk-prev">schon geübt</em>' : '');
+      return `<div class="mk-item2" data-txt="${esc((sec.title + ' ' + it).toLowerCase())}">
+        <span class="mk-lbl">${esc(it)} ${prev}</span>
+        <div class="mk-seg" data-cc="${k}">
+          <button type="button" class="st-mehr" data-s="mehr" title="muss noch geübt werden">🔴</button>
+          <button type="button" class="st-geuebt" data-s="geuebt" title="geübt">🟡</button>
+          <button type="button" class="st-ok" data-s="ok" title="sitzt ganz gut">🟢</button>
+        </div></div>`;
     }).join('')}</div>`).join('');
+    list.querySelectorAll('.mk-seg').forEach((seg) => seg.querySelectorAll('button').forEach((btn) => btn.onclick = () => {
+      const wasOn = btn.classList.contains('on');
+      seg.querySelectorAll('button').forEach((b2) => b2.classList.remove('on'));
+      if (!wasOn) btn.classList.add('on');
+    }));
   };
   if (b.student_id) {
-    api('/api/students/' + b.student_id + '/training').then((r) => { currDone = r.training || {}; renderCurr(); })
+    api('/api/students/' + b.student_id + '/training').then((r) => { currDone = r.training || {}; currAdk = r.adk || { items: {} }; renderCurr(); })
       .catch(() => { const el = $('#m-curr-list'); if (el) el.innerHTML = '<span class="hint">Ausbildungskarte nicht ladbar.</span>'; });
     const cs = $('#m-curr-search');
-    if (cs) cs.oninput = () => { const q = cs.value.trim().toLowerCase(); document.querySelectorAll('#m-curr-list .mk-item').forEach((l) => { const cb = l.querySelector('input'); l.style.display = (!q || (cb && cb.dataset.txt.includes(q))) ? '' : 'none'; }); };
+    if (cs) cs.oninput = () => { const q = cs.value.trim().toLowerCase(); document.querySelectorAll('#m-curr-list .mk-item2').forEach((l) => { l.style.display = (!q || l.dataset.txt.includes(q)) ? '' : 'none'; }); };
   }
   $('#m-meet-here').onclick = async () => {
     try { const c = await getPosOnce(); meetLat = c.latitude; meetLng = c.longitude;
@@ -3190,8 +3220,11 @@ function openMarkModal(id) {
       if ($('#m-time').value !== b.start_time) body.start_time = $('#m-time').value;
       const sign = $('#m-sign');
       if (sign && sign.checked && $('#m-status').value === 'done' && att !== '0') body.request_sign = true;
-      // heute neu abgehakte Ausbildungs-Themen mitschicken (bereits erledigte sind gesperrt)
-      const curr = [...document.querySelectorAll('#m-curr-list input[data-cc]:checked:not(:disabled)')].map((x) => x.dataset.cc);
+      // heute behandelte Ausbildungs-Themen mit Stand mitschicken ({k, s})
+      const curr = [...document.querySelectorAll('#m-curr-list .mk-seg')].map((seg) => {
+        const on = seg.querySelector('button.on');
+        return on ? { k: seg.dataset.cc, s: on.dataset.s } : null;
+      }).filter(Boolean);
       if (curr.length) body.curriculum = curr;
       await api('/api/bookings/' + id, { method: 'PATCH', body });
       closeModal(); toast(body.request_sign ? 'Abgeschlossen ✓ – Unterschrift angefordert' : 'Gespeichert ✓', 'ok'); refreshEventBadge(); drawInstrTab();
@@ -4043,10 +4076,126 @@ const CURRICULUM = [
 const CURR_TOTAL = CURRICULUM.reduce((n, s) => n + s.items.length, 0);
 const currKey = (sk, i) => `${sk}:${i}`;
 function currLabel(key) { const [sk, i] = String(key).split(':'); const s = CURRICULUM.find((x) => x.key === sk); return s ? s.items[Number(i)] : null; }
+function currSection(key) { const sk = String(key).split(':')[0]; return CURRICULUM.find((x) => x.key === sk); }
+// Stand einer Aufgabe nach einer Fahrstunde
+const CURR_STATUS = {
+  mehr:   { short: 'muss noch geübt werden', tiny: 'muss noch', dot: '🔴', cls: 'st-mehr' },
+  geuebt: { short: 'geübt',                  tiny: 'geübt',     dot: '🟡', cls: 'st-geuebt' },
+  ok:     { short: 'sitzt ganz gut',         tiny: 'sitzt',     dot: '🟢', cls: 'st-ok' },
+};
+const currStatusMeta = (s) => CURR_STATUS[s] || CURR_STATUS.geuebt;
+// Zahl mit deutschem Komma, „,0" weglassen (14, 14,5)
+function fmtUnits(u) { const n = Math.round((Number(u) || 0) * 10) / 10; return (Number.isInteger(n) ? String(n) : n.toFixed(1)).replace('.', ','); }
+function fmtDMY2(d) { try { return parseD(d).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' }); } catch { return d; } }
+// Statistik-Kacheln: Fahrstunden (à 80 Min), Termine, Schalt/Automatik, Zeit
+function statStripHtml(stats) {
+  if (!stats) return '';
+  const s = stats;
+  const cell = (val, lbl) => `<div class="adk-stat"><b>${val}</b><span>${lbl}</span></div>`;
+  const parts = [
+    cell(fmtUnits(s.units), `Fahrstunden<br>à ${s.unit || 80} Min`),
+    cell(s.sessions || 0, 'Termine'),
+  ];
+  if (s.schalt && s.schalt.sessions) parts.push(cell(fmtUnits(s.schalt.units), 'Schaltstunden'));
+  if (s.automatik && s.automatik.sessions) parts.push(cell(fmtUnits(s.automatik.units), 'Automatik'));
+  parts.push(cell(fmtUnits(s.hours) + ' h', 'gefahrene Zeit'));
+  return `<div class="adk-stats">${parts.join('')}</div>`;
+}
+// „Muss noch geübt werden" – Punkte, deren letzter Stand 🔴 war
+function adkNeedWorkHtml(adk) {
+  if (!adk || !adk.needWork || !adk.needWork.length) return '';
+  const items = adk.needWork.map((k) => currLabel(k)).filter(Boolean);
+  if (!items.length) return '';
+  return `<div class="adk-need"><div class="adk-need-t">🔴 Das üben wir noch (${items.length})</div>
+    <ul>${items.map((it) => `<li>${esc(it)}</li>`).join('')}</ul></div>`;
+}
+// Häufigkeits-Übersicht: je geübte Aufgabe wie oft gesamt (+ letzter Stand, + je Tag)
+function adkFreqHtml(adk) {
+  if (!adk || !adk.items || !adk.distinct) return '<p class="hint">Noch keine Ausbildungspunkte protokolliert. Der Fahrlehrer hakt sie beim Abschließen einer Fahrstunde ab.</p>';
+  const rows = CURRICULUM.map((sec) => {
+    const its = sec.items.map((it, i) => {
+      const k = currKey(sec.key, i); const agg = adk.items[k];
+      if (!agg) return '';
+      const days = Object.entries(agg.days || {}).sort((a, z) => a[0].localeCompare(z[0]))
+        .map(([d, n]) => `${fmtDMY2(d)}${n > 1 ? ` (${n}×)` : ''}`).join(' · ');
+      const m = agg.lastStatus ? currStatusMeta(agg.lastStatus) : null;
+      return `<tr><td>${esc(it)}${days ? `<div class="adk-day">${days}</div>` : ''}</td>
+        <td class="st">${m ? `<span class="badge ${m.cls}">${m.dot} ${m.tiny}</span>` : ''}</td>
+        <td class="n"><strong>${agg.count}×</strong></td></tr>`;
+    }).filter(Boolean).join('');
+    if (!its) return '';
+    return `<tr class="adk-sec-row"><td colspan="3" style="padding-top:.5rem"><strong>${esc(sec.title)}</strong></td></tr>${its}`;
+  }).filter(Boolean).join('');
+  return `<table class="adk-freq"><tbody>${rows}</tbody></table>`;
+}
+// Ausbildungspunkte, die in EINER Fahrstunde behandelt wurden (aus bookings.curriculum)
+function lessonAdkParse(cur) {
+  if (!cur) return [];
+  let arr = []; try { arr = typeof cur === 'string' ? JSON.parse(cur) : cur; } catch { return []; }
+  if (!Array.isArray(arr)) return [];
+  return arr.map((raw) => {
+    const k = typeof raw === 'string' ? raw : (raw && raw.k);
+    if (!k) return null;
+    let s = (raw && typeof raw === 'object' && raw.s) ? raw.s : 'geuebt';
+    return { k, s, label: currLabel(k), section: currSection(k)?.title || '' };
+  }).filter((x) => x && x.label);
+}
+// Fenster: was wurde in dieser Fahrstunde gemacht (+ Download-PDF)
+function openLessonAdk(lesson, name) {
+  const items = lessonAdkParse(lesson.curriculum);
+  const when = fmtDT(lesson.date, lesson.start_time);
+  if (!items.length) {
+    modal(`<h3>📋 Ausbildungskarte</h3><p class="hint">Für die Fahrstunde am ${when} wurden keine Ausbildungspunkte protokolliert.</p>
+      <div class="actions"><button onclick="window.__closeModal()">Schließen</button></div>`);
+    return;
+  }
+  // nach Abschnitt gruppieren
+  const bySec = {};
+  for (const it of items) (bySec[it.section] = bySec[it.section] || []).push(it);
+  const body = Object.entries(bySec).map(([sec, its]) => `<div class="mk-sec"><div class="mk-sec-t">${esc(sec)}</div>
+    ${its.map((it) => { const m = currStatusMeta(it.s); return `<div class="tc-item ro on">${m.dot} ${esc(it.label)} <span class="badge ${m.cls}" style="margin-left:auto">${m.tiny}</span></div>`; }).join('')}</div>`).join('');
+  modal(`<h3>📋 Diese Fahrstunde</h3>
+    <p class="hint"><strong>${when}</strong> · ${lesson.duration_min} Min${lesson.gearbox ? ' · ' + (lesson.gearbox === 'schalt' ? 'Schalter' : 'Automatik') : ''}${lesson.plate ? ' · 🚘 ' + esc(lesson.plate) : ''}<br>${items.length} Ausbildungspunkt${items.length === 1 ? '' : 'e'} bearbeitet.</p>
+    <div style="max-height:52vh;overflow:auto;margin:.2rem -.1rem;padding:0 .1rem">${body}</div>
+    <div class="actions"><button class="sec" id="la-pdf">📄 Als PDF</button><button onclick="window.__closeModal()">Schließen</button></div>`, 'wide');
+  const pb = $('#la-pdf'); if (pb) pb.onclick = () => printLessonAdk(lesson, name || state.user?.name || 'Fahrschüler');
+}
+// Eine Fahrstunden-ADK als sauberes weißes PDF (Browser-Druck -> „Als PDF sichern")
+function printLessonAdk(lesson, name) {
+  const items = lessonAdkParse(lesson.curriculum);
+  const when = fmtDT(lesson.date, lesson.start_time);
+  const school = esc(state.settings?.instructor_name || 'Fahrschule');
+  const bySec = {};
+  for (const it of items) (bySec[it.section] = bySec[it.section] || []).push(it);
+  const secs = Object.entries(bySec).map(([sec, its]) => `<section><h2>${esc(sec)}</h2><div class="items">${its.map((it) => {
+    const m = currStatusMeta(it.s);
+    return `<div class="it"><span class="bx">☑</span> <span>${esc(it.label)}</span> <em class="st ${m.cls}">${m.tiny}</em></div>`;
+  }).join('')}</div></section>`).join('');
+  const doc = `<!doctype html><html lang="de"><head><meta charset="utf-8"><title>Fahrstunde ${esc(when)} – ${esc(name)}</title>
+    <style>*{box-sizing:border-box}body{font-family:Arial,Helvetica,sans-serif;color:#111;margin:0;padding:26px 30px;max-width:760px}
+    .head{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #111;padding-bottom:10px;margin-bottom:14px}
+    .head h1{font-size:19px;margin:0}.head .meta{font-size:12px;color:#444;text-align:right;line-height:1.5}
+    section{break-inside:avoid;margin:0 0 12px}h2{font-size:14px;margin:0 0 6px;border-bottom:1px solid #ccc;padding-bottom:3px}
+    .it{font-size:12.5px;line-height:1.9;display:flex;align-items:center;gap:6px}.bx{font-size:14px}
+    .st{margin-left:auto;font-style:normal;font-size:11px;border:1px solid #bbb;border-radius:6px;padding:1px 7px}
+    .st.st-mehr{color:#c0392b;border-color:#e6a}.st.st-ok{color:#1e8449;border-color:#9d9}.st.st-geuebt{color:#9a6b00;border-color:#eca}
+    .foot{margin-top:20px;font-size:11px;color:#666;border-top:1px solid #ccc;padding-top:8px}
+    .sign{margin-top:30px;display:flex;gap:40px}.sign div{flex:1;border-top:1px solid #111;padding-top:4px;font-size:11px;color:#444}
+    @media print{body{padding:0}}</style></head><body>
+    <div class="head"><div><h1>Ausbildungsnachweis – Fahrstunde</h1><div style="font-size:13px;margin-top:2px">${esc(name)} · ${esc(when)} · ${lesson.duration_min} Min${lesson.gearbox ? ' · ' + (lesson.gearbox === 'schalt' ? 'Schalter' : 'Automatik') : ''}</div></div>
+      <div class="meta">${school}</div></div>
+    ${secs || '<p>Keine Punkte.</p>'}
+    <div class="sign"><div>Unterschrift Fahrlehrer</div><div>Unterschrift Fahrschüler</div></div>
+    <div class="foot">Erstellt mit ginoco</div>
+    <script>window.onload=function(){setTimeout(function(){window.print()},200)}<\/script></body></html>`;
+  const w = window.open('', '_blank');
+  if (!w) { toast('Bitte Pop-ups erlauben, um das PDF zu erzeugen.', 'err'); return; }
+  w.document.open(); w.document.write(doc); w.document.close();
+}
 
 async function openTrainingCard(id, name) {
-  let training = {};
-  try { const r = await api('/api/students/' + id + '/training'); training = r.training || {}; } catch (e) { toast(e.message, 'err'); return; }
+  let training = {}, adk = null, stats = null;
+  try { const r = await api('/api/students/' + id + '/training'); training = r.training || {}; adk = r.adk; stats = r.stats; } catch (e) { toast(e.message, 'err'); return; }
   const doneCount = () => Object.values(training).filter(Boolean).length;
   const barInner = () => {
     const d = doneCount(), pct = Math.round((d / CURR_TOTAL) * 100);
@@ -4073,10 +4222,14 @@ async function openTrainingCard(id, name) {
       <div class="fp-title">📋 Ausbildungskarte <span>${esc(name)}</span></div>
       <button class="sec sm" id="tc-pdf">📄 PDF</button>
     </div>
-    <div class="fp-sub">Hake ab, was ${esc((name || '').split(' ')[0])} schon geübt/beherrscht hat. Speichert automatisch – nur für dich sichtbar.</div>
+    <div class="fp-sub">Hake ab, was ${esc((name || '').split(' ')[0])} schon geübt/beherrscht hat. Den Stand je Punkt (🔴🟡🟢) und die Häufigkeit setzt du beim Abschließen der Fahrstunde. Speichert automatisch.</div>
+    ${statStripHtml(stats)}
+    ${adkNeedWorkHtml(adk)}
     <div class="fp-progwrap"><div id="tc-bar">${barInner()}</div>
       <input id="tc-search" class="fp-search" placeholder="🔍 Punkt suchen … (z.B. Kreisverkehr, Einparken)" autocomplete="off"></div>
-    <div class="fp-body">${sections}</div>
+    <div class="fp-body">
+      <details class="tc-sec"><summary>📊 Häufigkeit – wie oft was geübt wurde (${adk ? adk.distinct : 0})</summary><div style="padding:0 .1rem">${adkFreqHtml(adk)}</div></details>
+      ${sections}</div>
     <div class="fp-noresult hidden" id="tc-noresult">Kein Punkt gefunden.</div>
   </div>`;
   document.body.appendChild(ov);
@@ -4159,34 +4312,38 @@ function printTrainingCard(name, training) {
   w.document.open(); w.document.write(doc); w.document.close();
 }
 
-// Schüler sieht seine eigene Ausbildungskarte (nur Lesen)
+// Schüler sieht seine eigene Ausbildungskarte (nur Lesen) – mit Stand, Häufigkeit & Statistik
 async function openMyTraining() {
-  let training = {};
+  let training = {}, adk = myAdk, stats = myStats;
   try { const r = await api('/api/my/training'); training = r.training || {}; } catch (e) { toast(e.message, 'err'); return; }
+  // adk/stats ggf. frisch holen, falls noch nicht geladen
+  if (!adk || !stats) { try { const m = await api('/api/my/bookings'); adk = m.adk; stats = m.stats; myAdk = adk; myStats = stats; } catch {} }
   const done = Object.values(training).filter(Boolean).length;
   const pct = CURR_TOTAL ? Math.round((done / CURR_TOTAL) * 100) : 0;
-  // Zuletzt abgehakte Punkte (nach Zeitstempel), neueste zuerst
-  const recent = Object.entries(training)
-    .filter(([, v]) => typeof v === 'number' && v > 1e12)
-    .sort((a, b) => b[1] - a[1]).slice(0, 3)
-    .map(([k]) => currLabel(k)).filter(Boolean);
   const sections = CURRICULUM.map((s) => {
     const dn = s.items.filter((_, i) => training[currKey(s.key, i)]).length;
     const items = s.items.map((it, i) => {
-      const on = !!training[currKey(s.key, i)];
-      return `<div class="tc-item ro${on ? ' on' : ''}">${on ? '✅' : '⬜'} ${esc(it)}</div>`;
+      const k = currKey(s.key, i); const on = !!training[k];
+      const agg = adk && adk.items && adk.items[k];
+      const m = agg && agg.lastStatus ? currStatusMeta(agg.lastStatus) : null;
+      const extra = agg ? `<span class="tc-date">${agg.count}×${m ? ' · ' + m.dot : ''}</span>` : '';
+      return `<div class="tc-item ro${on ? ' on' : ''}"><span>${on ? '✅' : '⬜'} ${esc(it)}</span>${extra}</div>`;
     }).join('');
     return `<details class="tc-sec"${dn ? ' open' : ''}><summary>${esc(s.title)} <span class="pill">${dn}/${s.items.length}</span></summary>
       <div class="tc-items">${items}</div></details>`;
   }).join('');
   modal(`<h3>📋 Deine Ausbildungskarte</h3>
-    <p class="hint">Das hat dein Fahrlehrer schon abgehakt. Nur zum Ansehen – die Häkchen setzt dein Fahrlehrer.</p>
-    <div style="margin:.2rem 0 .6rem">
+    <p class="hint">Dein Ausbildungsstand: <em>was</em> ihr geübt habt, wie oft und wie gut es sitzt. Die Häkchen &amp; Bewertung setzt dein Fahrlehrer.</p>
+    ${statStripHtml(stats)}
+    <div style="margin:.3rem 0 .5rem">
       <div style="display:flex;justify-content:space-between;font-size:.82rem;color:var(--muted)"><span>Ausbildungsfortschritt</span><span>${done}/${CURR_TOTAL} · ${pct}%</span></div>
       <div style="height:9px;background:#0f151d;border-radius:6px;overflow:hidden;margin-top:.25rem"><div style="height:100%;width:${pct}%;background:var(--brand)"></div></div>
     </div>
-    ${recent.length ? `<div class="adk-next"><span class="adk-next-t">🆕 Zuletzt abgehakt</span><ul>${recent.map((it) => `<li>${esc(it)}</li>`).join('')}</ul></div>` : ''}
-    <div style="max-height:${recent.length ? '52vh' : '56vh'};overflow:auto;margin:.2rem -.2rem 0;padding:0 .2rem">${sections}</div>
+    ${adkNeedWorkHtml(adk)}
+    <div style="max-height:52vh;overflow:auto;margin:.2rem -.2rem 0;padding:0 .2rem">
+      <details class="tc-sec"><summary>📊 Häufigkeit – wie oft was geübt wurde</summary><div style="padding:0 .1rem">${adkFreqHtml(adk)}</div></details>
+      ${sections}
+    </div>
     <div class="actions"><button onclick="window.__closeModal()">Schließen</button></div>`, 'wide');
 }
 window.__openMyTraining = openMyTraining;

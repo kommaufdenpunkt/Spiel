@@ -16,7 +16,7 @@ const PUBLIC = join(__dirname, 'public');
 const PORT = Number(process.env.PORT || 3000);
 const HOST = process.env.HOST || '0.0.0.0'; // hinter Caddy: HOST=127.0.0.1 (nur Proxy erreicht Node)
 const SESSION_DAYS = 30;
-const APP_VERSION = "3.67.1";
+const APP_VERSION = "3.68.0";
 // Einstellungen, die Schueler/Oeffentlichkeit sehen duerfen (Rest bleibt beim Fahrlehrer)
 const PUBLIC_SETTINGS = ['instructor_name', 'instructor_phone', 'policy_text',
   'cancel_hours', 'lock_hours', 'booking_horizon_days', 'booking_horizon_days_rank2',
@@ -414,10 +414,10 @@ function freeStarts(date, studentId) {
   }
   // Heute: keine Startzeiten in der Vergangenheit anbieten (auf jetzt vorziehen).
   const nowClamp = (date === todayStr()) ? Math.ceil(toMin(nowHHMM()) / 5) * 5 : -1;
-  const addWindow = (winStart, winEnd, isFirst) => {
+  // „danach": lueckenlos NACH einer Buchung (Pause + Abholzeit), Fenster ggf. nach rechts begrenzt.
+  const addAfter = (winStart, winEnd) => {
     if (winEnd <= winStart) return;
-    // fruehester Start: erste Stunde -> nur Abholzeit; sonst Pause + Abholzeit
-    let start = winStart + (isFirst ? 0 : brk) + travel;
+    let start = winStart + brk + travel;
     start = Math.ceil(start / 5) * 5; // auf 5 Min aufrunden
     if (nowClamp >= 0) start = Math.max(start, nowClamp);
     // Ende dieses Fensters: bei einer Belegung dahinter muss noch die Pause passen
@@ -425,14 +425,43 @@ function freeStarts(date, studentId) {
     const cap = interior ? winEnd - brk : winEnd;
     if (start + minDur <= cap) out.push({ start, cap });
   };
+  // „davor": lueckenlos VOR der ersten Buchung. Die Stunde endet buendig, danach
+  // Pause + Abholzeit bis zur Buchung. Die erste Stunde des Tages braucht Abholzeit voraus.
+  const addBefore = (winStart, bookingStart) => {
+    const cap = bookingStart - brk;               // Vor-Stunde endet spaetestens hier (dann Pause bis zur Buchung)
+    const earliest = Math.ceil((winStart + travel) / 5) * 5; // Abholung vor der ersten Stunde des Tages
+    if (cap - earliest < minDur) return;
+    const room = cap - earliest;
+    const anchor = Math.min(f.lessonMin, room);   // Standardstunde endet buendig (lueckenlos) an der Buchung
+    let start = cap - anchor;
+    if (start < earliest) start = earliest;
+    start = Math.round(start / 5) * 5;
+    if (nowClamp >= 0) start = Math.max(start, nowClamp);
+    if (start + minDur <= cap) out.push({ start, cap });
+  };
   if (!iv.length) {
-    addWindow(f.dayStart, f.workEnd, true);
+    // Leerer Tag: freie Wunschzeit – mehrere Startzeiten im 30-Min-Raster anbieten.
+    // Sobald der Schueler eine bucht, fliesst der Rest lueckenlos davor & danach.
+    const WISH = 30;
+    const first = Math.ceil((f.dayStart + travel) / WISH) * WISH; // Abholung vor der 1. Stunde
+    const seen = new Set();
+    const push = (t) => {
+      let start = t;
+      if (nowClamp >= 0) start = Math.max(start, nowClamp);
+      if (start < first || start > f.lastStart) return;
+      if (start + minDur > f.workEnd) return;
+      if (seen.has(start)) return;
+      seen.add(start); out.push({ start, cap: f.workEnd });
+    };
+    for (let t = first; t <= f.lastStart; t += WISH) push(t);
+    push(f.lastStart); // spaetestmoeglichen Start immer anbieten
+    out.sort((a, z) => a.start - z.start);
   } else {
-    addWindow(f.dayStart, Math.min(iv[0].s, f.workEnd), true);
+    addBefore(f.dayStart, iv[0].s);
     for (let i = 0; i < iv.length; i++) {
       const winStart = iv[i].e;
       const winEnd = (i + 1 < iv.length) ? iv[i + 1].s : f.workEnd;
-      addWindow(winStart, Math.min(winEnd, f.workEnd), false);
+      addAfter(winStart, Math.min(winEnd, f.workEnd));
     }
   }
   return out;
@@ -463,6 +492,59 @@ function sonderCounts(studentId) {
 }
 function sonderReq() {
   return { ueberland: Number(getSettingRaw('req_ueberland')), autobahn: Number(getSettingRaw('req_autobahn')), nacht: Number(getSettingRaw('req_nacht')) };
+}
+
+// Fahrstunden-Statistik: Einheiten (Doppelstunde = 80 Min = 1; 40=0,5; 120=1,5; 160=2),
+// Anzahl Termine, gefahrene Minuten – gesamt und nach Getriebe (Schalt/Automatik).
+function lessonStats(studentId) {
+  const UNIT = 80;
+  const rows = db.prepare(
+    "SELECT duration_min AS d, gearbox AS g, lesson_type AS t FROM bookings WHERE student_id=? AND status='done' AND (attended IS NULL OR attended=1)").all(studentId);
+  const s = {
+    sessions: 0, minutes: 0, units: 0,
+    schalt: { sessions: 0, minutes: 0, units: 0 },
+    automatik: { sessions: 0, minutes: 0, units: 0 },
+    sonder: { ueberland: { sessions: 0, minutes: 0 }, autobahn: { sessions: 0, minutes: 0 }, nacht: { sessions: 0, minutes: 0 } },
+  };
+  for (const r of rows) {
+    const d = Number(r.d) || 0;
+    s.sessions++; s.minutes += d; s.units += d / UNIT;
+    if (r.g === 'schalt') { s.schalt.sessions++; s.schalt.minutes += d; s.schalt.units += d / UNIT; }
+    else if (r.g === 'automatik') { s.automatik.sessions++; s.automatik.minutes += d; s.automatik.units += d / UNIT; }
+    if (s.sonder[r.t]) { s.sonder[r.t].sessions++; s.sonder[r.t].minutes += d; }
+  }
+  const round1 = (x) => Math.round(x * 10) / 10;
+  s.units = round1(s.units); s.schalt.units = round1(s.schalt.units); s.automatik.units = round1(s.automatik.units);
+  s.hours = round1(s.minutes / 60);
+  s.unit = UNIT;
+  return s;
+}
+
+// Zusammenfassung der Ausbildungskarte über ALLE Fahrstunden: je Aufgabe wie oft
+// geübt (gesamt + je Tag), letzter Stand, und welche Punkte noch geübt werden müssen.
+function adkSummary(studentId) {
+  const rows = db.prepare(
+    "SELECT date, curriculum FROM bookings WHERE student_id=? AND status='done' AND (attended IS NULL OR attended=1) AND curriculum IS NOT NULL AND curriculum <> '' ORDER BY date, start_time").all(studentId);
+  const items = {};        // key -> { count, days:{date:count}, lastDate, lastStatus, statuses:{geuebt,mehr,ok} }
+  let totalMarks = 0;
+  for (const r of rows) {
+    let arr = []; try { arr = JSON.parse(r.curriculum) || []; } catch {}
+    for (const raw of arr) {
+      const k = typeof raw === 'string' ? raw : (raw && raw.k);
+      if (!k) continue;
+      let st = (raw && typeof raw === 'object' && raw.s) ? raw.s : 'geuebt';
+      if (!['geuebt', 'mehr', 'ok'].includes(st)) st = 'geuebt';
+      const it = items[k] || (items[k] = { count: 0, days: {}, lastDate: null, lastStatus: null, statuses: { geuebt: 0, mehr: 0, ok: 0 } });
+      it.count++; totalMarks++;
+      it.days[r.date] = (it.days[r.date] || 0) + 1;
+      it.statuses[st]++;
+      it.lastDate = r.date; it.lastStatus = st; // rows sind chronologisch -> letzter gewinnt
+    }
+  }
+  // „Muss noch geübt werden" = zuletzt als 'mehr' markiert
+  const needWork = Object.keys(items).filter((k) => items[k].lastStatus === 'mehr');
+  const distinct = Object.keys(items).length;
+  return { items, totalMarks, distinct, needWork, lessonsWithCard: rows.length };
 }
 
 function dateOpenForStudents(date, studentId = null) {
@@ -772,10 +854,11 @@ async function handleApi(req, res, url) {
   if (p === '/api/my/bookings' && method === 'GET') {
     if (!requireStudent()) return bad(res, 'Bitte anmelden', 401);
     const rows = db.prepare(
-      `SELECT id,date,start_time,duration_min,status,gearbox,plate,note,started_at,ended_at,confirmed,feedback,lesson_type,late_minutes,attended,needs_sign,signed_at,signature,invoice_date,invoice_time,created_at
+      `SELECT id,date,start_time,duration_min,status,gearbox,plate,note,started_at,ended_at,confirmed,feedback,lesson_type,late_minutes,attended,needs_sign,signed_at,signature,curriculum,invoice_date,invoice_time,created_at
        FROM bookings WHERE student_id = ? AND status != 'cancelled' ORDER BY date, start_time`
     ).all(sess.student_id);
     return ok(res, { bookings: rows, weekInfo: weekInfoForStudent(sess.student_id),
+      stats: lessonStats(sess.student_id), adk: adkSummary(sess.student_id),
       progress: { ...studentRank(sess.student_id), sonder: sonderCounts(sess.student_id), req: sonderReq() } });
   }
   // Fahrschüler unterschreibt/bestätigt eine nachgetragene Fahrstunde.
@@ -1036,9 +1119,9 @@ async function handleApi(req, res, url) {
       if ('invoice_date' in b) { fields.push('invoice_date=?'); vals.push(/^\d{4}-\d{2}-\d{2}$/.test(b.invoice_date || '') ? b.invoice_date : null); }
       if ('invoice_time' in b) { fields.push('invoice_time=?'); vals.push(/^([01]?\d|2[0-3]):[0-5]\d$/.test(b.invoice_time || '') ? b.invoice_time : null); }
       if ('duration_min' in b && Number(b.duration_min) > 0) { fields.push('duration_min=?'); vals.push(newDur); }
-      if (!fields.length) return bad(res, 'Nichts zu aendern');
-      vals.push(id);
-      db.prepare(`UPDATE bookings SET ${fields.join(',')} WHERE id = ?`).run(...vals);
+      // curriculum/request_sign duerfen auch allein kommen (ohne weitere Felder).
+      if (!fields.length && !Array.isArray(b.curriculum) && !b.request_sign) return bad(res, 'Nichts zu aendern');
+      if (fields.length) { vals.push(id); db.prepare(`UPDATE bookings SET ${fields.join(',')} WHERE id = ?`).run(...vals); }
 
       // Beim Abschließen die tatsächliche Endzeit festhalten (echter Zeitpunkt).
       // started_at kommt – falls genutzt – vom Timer; wir leiten hier NICHTS ab
@@ -1048,15 +1131,28 @@ async function handleApi(req, res, url) {
         if (!f0.ended_at) db.prepare('UPDATE bookings SET ended_at=? WHERE id=?').run(new Date().toISOString(), id);
       }
       // An diesem Tag behandelte Ausbildungs-Themen protokollieren (mit Fahrdatum in der Karte).
+      // Format je Punkt: { k:'grundfahr:4', s:'geuebt'|'mehr'|'ok' } – s = Stand nach dieser Stunde.
+      // Abwaertskompatibel: reine Strings werden als { k, s:'geuebt' } uebernommen.
       if (Array.isArray(b.curriculum) && bk.student_id) {
-        const keys = b.curriculum.filter((k) => typeof k === 'string' && /^[a-z]+:\d+$/.test(k)).slice(0, 300);
-        db.prepare('UPDATE bookings SET curriculum=? WHERE id=?').run(JSON.stringify(keys), id);
-        if (keys.length) {
+        const valid = /^[a-z]+:\d+$/;
+        const st3 = new Set(['geuebt', 'mehr', 'ok']);
+        const seen = new Set();
+        const items = [];
+        for (const raw of b.curriculum) {
+          const k = typeof raw === 'string' ? raw : (raw && typeof raw.k === 'string' ? raw.k : null);
+          if (!k || !valid.test(k) || seen.has(k)) continue;
+          let s = (raw && typeof raw === 'object' && typeof raw.s === 'string') ? raw.s : 'geuebt';
+          if (!st3.has(s)) s = 'geuebt';
+          seen.add(k); items.push({ k, s });
+          if (items.length >= 300) break;
+        }
+        db.prepare('UPDATE bookings SET curriculum=? WHERE id=?').run(JSON.stringify(items), id);
+        if (items.length) {
           const stu = db.prepare('SELECT training FROM students WHERE id=?').get(bk.student_id);
           let tr = {}; try { tr = stu && stu.training ? JSON.parse(stu.training) : {}; } catch {}
           const ds = b.date || bk.date;
           const tsMs = Date.parse(ds + 'T12:00:00') || Date.now();
-          for (const k of keys) { if (!tr[k]) tr[k] = tsMs; }   // vorhandene Daten nicht überschreiben
+          for (const it of items) { if (!tr[it.k]) tr[it.k] = tsMs; }   // vorhandene Daten nicht überschreiben
           db.prepare('UPDATE students SET training=? WHERE id=?').run(JSON.stringify(tr), bk.student_id);
         }
       }
@@ -1847,9 +1943,9 @@ async function handleApi(req, res, url) {
     const st = db.prepare('SELECT name FROM students WHERE id=?').get(sid);
     if (!st) return bad(res, 'Schüler nicht gefunden', 404);
     const lessons = db.prepare(
-      `SELECT id,date,start_time,duration_min,status,gearbox,lesson_type,late_minutes,attended,feedback,needs_sign,signed_at,signature,invoice_date,invoice_time,created_at
+      `SELECT id,date,start_time,duration_min,status,gearbox,plate,lesson_type,late_minutes,attended,feedback,needs_sign,signed_at,signature,curriculum,invoice_date,invoice_time,created_at
        FROM bookings WHERE student_id=? AND status='done' ORDER BY date,start_time`).all(sid);
-    return ok(res, { lessons, name: st.name });
+    return ok(res, { lessons, name: st.name, stats: lessonStats(sid), adk: adkSummary(sid) });
   }
 
   const trm = p.match(/^\/api\/students\/(\d+)\/training$/);
@@ -1859,7 +1955,7 @@ async function handleApi(req, res, url) {
     if (!st) return bad(res, 'Schüler nicht gefunden', 404);
     let training = {};
     try { training = st.training ? JSON.parse(st.training) : {}; } catch {}
-    return ok(res, { training });
+    return ok(res, { training, adk: adkSummary(Number(trm[1])), stats: lessonStats(Number(trm[1])) });
   }
   if (trm && method === 'PUT') {
     if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
