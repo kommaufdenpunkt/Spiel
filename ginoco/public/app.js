@@ -468,8 +468,11 @@ function openTour() {
 window.__openTour = openTour;
 
 // ---------- Was ist neu? (Changelog) ----------
-const CHANGELOG_VER = '3.70';
+const CHANGELOG_VER = '3.71';
 const CHANGELOG = [
+  { v: '3.71', d: '25.08.2026', title: '✨ Feiner Feinschliff', items: [
+    '🔁 <strong>Wiederholungs-Vorschlag:</strong> Beim Abschließen einer Fahrstunde schlägt Ginoco dem Fahrlehrer vor, was sich zu üben lohnt – zuletzt 🔴 oder lange her.',
+    '🎛️ <strong>Edleres Menü:</strong> Das seitliche Menü glänzt jetzt eleganter – schlankere Griffe, sanfter Schimmer, feinere Kacheln.'] },
   { v: '3.70', d: '25.08.2026', title: '🎓 Prüfungsreife, Übersicht & mehr Nachweis', items: [
     '🎓 <strong>Prüfungsreife-Check:</strong> „Bin ich bald so weit?" – zeigt dir auf einen Blick, was noch fehlt: offene Sonderfahrten, rote ADK-Punkte und Ausbildungsabschnitte.',
     '🌄 <strong>Sonderfahrten korrekt gezählt:</strong> Eine Überlandfahrt (225 Min) zählt jetzt als 5 von 5 Einheiten – nicht mehr als „1".',
@@ -3224,6 +3227,7 @@ function openMarkModal(id) {
     <div class="field"><label>📝 Rückmeldung an den Schüler <span class="muted">(sieht der Schüler – „das haben wir gemacht")</span></label>
       <textarea id="m-feedback" rows="3" placeholder="z.B. Heute Kreisverkehr & Vorfahrt geübt – nächstes Mal Einparken." style="resize:vertical">${esc(b.feedback || '')}</textarea></div>
     ${b.student_id ? `<label class="ck-line" style="justify-content:flex-start" id="m-sign-line"><input type="checkbox" id="m-sign" ${b.signed_at ? '' : 'checked'}> ✍️ Beim Abschließen Unterschrift vom Fahrschüler anfordern <span class="muted">(landet per Push im Postfach)</span></label>${b.signed_at ? '<div class="hint" style="margin:.1rem 0 .4rem">✓ Diese Stunde ist bereits unterschrieben.</div>' : ''}` : ''}
+    ${b.student_id ? '<div id="m-recos" class="mk-recos"></div>' : ''}
     ${b.student_id ? `<details class="mk-curr" id="m-curr-wrap"><summary>📋 Was habt ihr heute gemacht? <span class="muted">(Ausbildungskarte Klasse B)</span></summary>
       <input id="m-curr-search" placeholder="🔎 suchen (z. B. Kreisverkehr)" autocomplete="off" style="margin:.5rem 0">
       <div id="m-curr-list" class="mk-curr-list"><span class="hint">Lädt…</span></div>
@@ -3270,8 +3274,32 @@ function openMarkModal(id) {
       if (!wasOn) btn.classList.add('on');
     }));
   };
+  // Empfehlung fürs Wiederholen: zuletzt 🔴 oder lange nicht mehr geübt.
+  const renderRecos = () => {
+    const box = $('#m-recos'); if (!box) return;
+    const items = currAdk.items || {};
+    const red = (currAdk.needWork || []).slice();
+    const now = Date.now(); const STALE = 21 * 864e5;
+    const daysAgo = (d) => d ? Math.round((now - (Date.parse(d + 'T12:00:00') || now)) / 864e5) : null;
+    const stale = Object.keys(items).filter((k) => !red.includes(k) && items[k].lastStatus !== 'ok' && items[k].lastDate && (now - (Date.parse(items[k].lastDate + 'T12:00:00') || now)) > STALE)
+      .sort((a, z) => (items[a].lastDate || '').localeCompare(items[z].lastDate || ''));
+    const recos = [...red.map((k) => ({ k, why: 'red' })), ...stale.map((k) => ({ k, why: 'stale' }))].slice(0, 8);
+    if (!recos.length) { box.innerHTML = ''; return; }
+    box.innerHTML = `<div class="mk-recos-t">🔁 Vorschlag fürs Wiederholen</div>
+      <div class="mk-recos-list">${recos.map((r) => {
+        const lbl = currLabel(r.k); if (!lbl) return '';
+        const dz = daysAgo(items[r.k] && items[r.k].lastDate);
+        return `<button type="button" class="mk-reco ${r.why}" data-reco="${r.k}">${r.why === 'red' ? '🔴' : '🕒'} ${esc(lbl)}${dz != null ? ` <span>· vor ${dz} T</span>` : ''}</button>`;
+      }).join('')}</div>`;
+    box.querySelectorAll('[data-reco]').forEach((btn) => btn.onclick = () => {
+      const wrap = $('#m-curr-wrap'); if (wrap) wrap.open = true;
+      const seg = document.querySelector(`#m-curr-list .mk-seg[data-cc="${btn.dataset.reco}"]`);
+      const item = seg && seg.closest('.mk-item2');
+      if (item) { item.style.display = ''; item.scrollIntoView({ block: 'center', behavior: 'smooth' }); item.classList.add('reco-flash'); setTimeout(() => item.classList.remove('reco-flash'), 1600); }
+    });
+  };
   if (b.student_id) {
-    api('/api/students/' + b.student_id + '/training').then((r) => { currDone = r.training || {}; currAdk = r.adk || { items: {} }; renderCurr(); })
+    api('/api/students/' + b.student_id + '/training').then((r) => { currDone = r.training || {}; currAdk = r.adk || { items: {} }; renderCurr(); renderRecos(); })
       .catch(() => { const el = $('#m-curr-list'); if (el) el.innerHTML = '<span class="hint">Ausbildungskarte nicht ladbar.</span>'; });
     const cs = $('#m-curr-search');
     if (cs) cs.oninput = () => { const q = cs.value.trim().toLowerCase(); document.querySelectorAll('#m-curr-list .mk-item2').forEach((l) => { l.style.display = (!q || l.dataset.txt.includes(q)) ? '' : 'none'; }); };
@@ -3318,6 +3346,7 @@ function openMarkModal(id) {
   };
 }
 window.__closeModal = closeModal;
+window.__openMarkModal = openMarkModal;
 
 // Fahrstunde NACHTRAGEN (Fahrlehrer): gefahrene Stunde mit echtem Datum+Uhrzeit eintragen
 function openLogLessonModal(sid, name) {
