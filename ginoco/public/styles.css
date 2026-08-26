@@ -1119,6 +1119,9 @@ a.btn-like:hover{background:var(--brand-dark)}
 .badge.st-geuebt{background:rgba(255,190,60,.16);color:#ffbe3c}
 .linkbtn{display:inline-block;margin-top:.25rem;padding:.15rem .1rem;background:none;border:none;color:var(--brand);font:inherit;font-size:.82rem;font-weight:600;cursor:pointer;text-decoration:underline;text-underline-offset:2px}
 .linkbtn:hover{opacity:.8}
+.or-sep{display:flex;align-items:center;text-align:center;color:var(--muted);font-size:.78rem;margin:.7rem 0 .5rem;gap:.6rem}
+.or-sep::before,.or-sep::after{content:'';flex:1;height:1px;background:var(--line)}
+.pk-row{display:flex;align-items:center;justify-content:space-between;gap:.5rem;padding:.35rem .1rem;border-bottom:1px solid var(--line);font-size:.9rem}
 /* Sonderfahrt buchen */
 .sf-book{margin-top:.45rem;width:100%;padding:.35rem .3rem;border:1px solid var(--tc,var(--brand));background:transparent;color:var(--tc,var(--brand));border-radius:9px;font-size:.78rem;font-weight:700;cursor:pointer;transition:.12s}
 .sf-book:hover{background:var(--tc,var(--brand));color:#fff}

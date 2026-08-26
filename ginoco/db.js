@@ -352,7 +352,10 @@ export function getSettings() {
   // Authenticator-Geheimnis & Wiederherstellungs-Hashes nie ausliefern – nur Status.
   out.totp_enabled = !!out.instructor_totp;
   out.two_factor = out.instructor_2fa === '1';
-  delete out.instructor_totp; delete out.instructor_totp_pending; delete out.instructor_recovery;
+  // Passkeys: nur den Status (an/aus) ausliefern, nie die gespeicherten Schlüssel.
+  let pkCount = 0; try { pkCount = (JSON.parse(out.instructor_passkeys || '[]') || []).length; } catch {}
+  out.passkey_enabled = pkCount > 0;
+  delete out.instructor_totp; delete out.instructor_totp_pending; delete out.instructor_recovery; delete out.instructor_passkeys;
   // Zahlen als Zahlen liefern
   for (const n of ['lesson_min', 'break_min', 'weekly_target_h', 'daily_target_h', 'weekly_lo_h',
     'monthly_target_h', 'monthly_max_h',

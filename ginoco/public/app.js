@@ -468,8 +468,11 @@ function openTour() {
 window.__openTour = openTour;
 
 // ---------- Was ist neu? (Changelog) ----------
-const CHANGELOG_VER = '3.71';
+const CHANGELOG_VER = '3.72';
 const CHANGELOG = [
+  { v: '3.72', d: '26.08.2026', title: '🔓 Face ID / Passkey für den Fahrlehrer', items: [
+    '🔓 <strong>Passkey-Login:</strong> Der Fahrlehrer meldet sich jetzt per <strong>Face ID / Touch ID</strong> an – ohne Passwort, phishing-sicher. Einrichten unter 🔐 Zugang.',
+    '🔐 Zur Erinnerung: Es gibt außerdem echtes Passwort, Authenticator (2-Faktor) und „Passwort vergessen".'] },
   { v: '3.71', d: '25.08.2026', title: '✨ Feiner Feinschliff', items: [
     '🔁 <strong>Wiederholungs-Vorschlag:</strong> Beim Abschließen einer Fahrstunde schlägt Ginoco dem Fahrlehrer vor, was sich zu üben lohnt – zuletzt 🔴 oder lange her.',
     '🎛️ <strong>Edleres Menü:</strong> Das seitliche Menü glänzt jetzt eleganter – schlankere Griffe, sanfter Schimmer, feinere Kacheln.'] },
@@ -1087,6 +1090,7 @@ function instrForm() {
     <div class="field hidden" id="i-2fa-wrap"><label>Authenticator-Code</label><input id="i-code" inputmode="numeric" autocomplete="one-time-code" placeholder="6-stelliger Code"></div>
     <label class="ck-line" style="justify-content:flex-start;margin:.1rem 0 .3rem"><input type="checkbox" id="i-remember" checked> Angemeldet bleiben</label>
     <div class="form-actions"><button id="i-go">Anmelden</button></div>
+    ${state.settings?.passkey_enabled ? '<div class="or-sep">oder</div><button id="i-passkey" class="sec" type="button" style="width:100%">🔓 Mit Face ID / Passkey anmelden</button>' : ''}
     <p class="hint" style="margin-top:.6rem"><a href="#" id="i-recover" class="linklike">Passwort vergessen?</a></p>`;
 }
 // Authenticator-Bereich in den Einstellungen (Status + Aktionen).
@@ -1109,6 +1113,8 @@ function renderAuthSection() {
     };
     $('#au-disable').onclick = openTotpDisable;
   }
+  box.insertAdjacentHTML('beforeend', '<div id="e-passkey" style="border-top:1px solid var(--line);margin-top:.8rem;padding-top:.2rem"></div>');
+  renderPasskeySection();
 }
 // QR-Code (dunkel auf weiß) als scharfes SVG in ein Element zeichnen.
 function renderQR(el, text) {
@@ -1178,6 +1184,74 @@ function openInstrForgotModal() {
   };
 }
 
+// ---------- Passkeys / Face ID / Touch ID (WebAuthn) ----------
+const waSupported = () => !!(window.PublicKeyCredential && navigator.credentials && navigator.credentials.create);
+function b64urlToBuf(s) {
+  s = String(s).replace(/-/g, '+').replace(/_/g, '/'); while (s.length % 4) s += '=';
+  const bin = atob(s); const b = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) b[i] = bin.charCodeAt(i); return b.buffer;
+}
+function bufToB64url(buf) {
+  const b = new Uint8Array(buf); let s = ''; for (let i = 0; i < b.length; i++) s += String.fromCharCode(b[i]);
+  return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+async function passkeyRegister() {
+  if (!waSupported()) { toast('Dieses Gerät/dieser Browser unterstützt keine Passkeys.', 'err'); return; }
+  try {
+    const o = await api('/api/instructor/passkey/register/options', { method: 'POST' });
+    const cred = await navigator.credentials.create({ publicKey: {
+      challenge: b64urlToBuf(o.challenge), rp: o.rp,
+      user: { id: b64urlToBuf(o.user.id), name: o.user.name, displayName: o.user.displayName },
+      pubKeyCredParams: o.pubKeyCredParams, authenticatorSelection: o.authenticatorSelection,
+      timeout: o.timeout, attestation: o.attestation,
+      excludeCredentials: (o.excludeCredentials || []).map((c) => ({ id: b64urlToBuf(c.id), type: c.type })),
+    } });
+    if (!cred) { toast('Abgebrochen', 'err'); return; }
+    const r = await api('/api/instructor/passkey/register/verify', { method: 'POST', body: {
+      clientDataJSON: bufToB64url(cred.response.clientDataJSON), attestationObject: bufToB64url(cred.response.attestationObject),
+    } });
+    toast(r.already ? 'Passkey war schon gespeichert' : 'Passkey/Face ID gespeichert ✓', 'ok');
+    try { const s = await api('/api/settings'); state.settings = s.settings; } catch {}
+    renderAuthSection();
+  } catch (e) { toast(e && e.name === 'NotAllowedError' ? 'Abgebrochen oder Zeitüberschreitung.' : (e.message || 'Einrichtung fehlgeschlagen'), 'err'); }
+}
+async function passkeyLogin() {
+  if (!waSupported()) { showErr('Dieses Gerät/dieser Browser unterstützt keine Passkeys.'); return; }
+  try {
+    const o = await api('/api/instructor/passkey/auth/options', { method: 'POST' });
+    if (!o.allowCredentials || !o.allowCredentials.length) { showErr('Auf diesem Server ist noch kein Passkey hinterlegt. Erst mit PIN/Passwort anmelden und Face ID einrichten.'); return; }
+    const assertion = await navigator.credentials.get({ publicKey: {
+      challenge: b64urlToBuf(o.challenge), rpId: o.rpId, timeout: o.timeout, userVerification: o.userVerification,
+      allowCredentials: o.allowCredentials.map((c) => ({ id: b64urlToBuf(c.id), type: c.type })),
+    } });
+    if (!assertion) { showErr('Abgebrochen'); return; }
+    await api('/api/instructor/passkey/auth/verify', { method: 'POST', body: {
+      id: assertion.id, clientDataJSON: bufToB64url(assertion.response.clientDataJSON),
+      authenticatorData: bufToB64url(assertion.response.authenticatorData), signature: bufToB64url(assertion.response.signature),
+    } });
+    const [me, s] = await Promise.all([api('/api/auth/me'), api('/api/settings')]);
+    state.user = me.user; state.settings = s.settings; render();
+    toast('Angemeldet mit Face ID ✓', 'ok');
+  } catch (e) { showErr(e && e.name === 'NotAllowedError' ? 'Abgebrochen oder Zeitüberschreitung.' : (e.message || 'Passkey-Anmeldung fehlgeschlagen')); }
+}
+async function renderPasskeySection() {
+  const box = document.getElementById('e-passkey'); if (!box) return;
+  let list = [];
+  try { const r = await api('/api/instructor/passkeys'); list = r.passkeys || []; } catch {}
+  const rows = list.map((k) => `<div class="pk-row"><span>🔑 ${esc(k.label)}</span><button class="ghost sm" data-pkdel="${esc(k.id)}" style="color:var(--bad)">Entfernen</button></div>`).join('');
+  box.innerHTML = `<h4 style="margin:1rem 0 .3rem">🔓 Passkey / Face ID</h4>
+    <p class="hint">Anmeldung per Gesicht oder Fingerabdruck – ohne Passwort, phishing-sicher. Am schnellsten &amp; sichersten.</p>
+    ${rows || '<p class="hint">Noch kein Passkey hinterlegt.</p>'}
+    <button class="sm" id="pk-add" ${waSupported() ? '' : 'disabled'} style="margin-top:.5rem">➕ Face ID / Passkey einrichten</button>
+    ${waSupported() ? '' : '<div class="hint" style="margin-top:.3rem">Dieses Gerät/dieser Browser unterstützt keine Passkeys.</div>'}`;
+  const add = document.getElementById('pk-add'); if (add) add.onclick = passkeyRegister;
+  box.querySelectorAll('[data-pkdel]').forEach((b) => b.onclick = async () => {
+    if (!confirm('Diesen Passkey entfernen?')) return;
+    try { await api('/api/instructor/passkey/delete', { method: 'POST', body: { id: b.dataset.pkdel } }); try { const s = await api('/api/settings'); state.settings = s.settings; } catch {} renderAuthSection(); }
+    catch (e) { toast(e.message, 'err'); }
+  });
+}
+window.__passkeyLogin = passkeyLogin; window.__passkeyRegister = passkeyRegister;
+
 function wireAuth(tab) {
   const done = async () => {
     const [me, s] = await Promise.all([api('/api/auth/me'), api('/api/settings')]);
@@ -1219,6 +1293,7 @@ function wireAuth(tab) {
       } catch (e) { showErr(e.message); }
     };
     const rc = $('#i-recover'); if (rc) rc.onclick = (ev) => { ev.preventDefault(); openInstrForgotModal(); };
+    const pk = $('#i-passkey'); if (pk) pk.onclick = passkeyLogin;
   }
   app.querySelectorAll('input').forEach((i) => i.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') { const b = app.querySelector('.form-actions button'); if (b) b.click(); }

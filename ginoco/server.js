@@ -2,7 +2,7 @@
 // Ohne externe Pakete: nur eingebaute Node-Module.
 import { createServer } from 'node:http';
 import { request as httpsRequest } from 'node:https';
-import { randomBytes, createECDH, hkdfSync, createCipheriv, createPrivateKey, sign as cryptoSign, createHmac } from 'node:crypto';
+import { randomBytes, createECDH, hkdfSync, createCipheriv, createPrivateKey, createPublicKey, sign as cryptoSign, verify as cryptoVerify, createHash, createHmac } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, extname, normalize } from 'node:path';
@@ -16,13 +16,13 @@ const PUBLIC = join(__dirname, 'public');
 const PORT = Number(process.env.PORT || 3000);
 const HOST = process.env.HOST || '0.0.0.0'; // hinter Caddy: HOST=127.0.0.1 (nur Proxy erreicht Node)
 const SESSION_DAYS = 30;
-const APP_VERSION = "3.71.0";
+const APP_VERSION = "3.72.0";
 // Einstellungen, die Schueler/Oeffentlichkeit sehen duerfen (Rest bleibt beim Fahrlehrer)
 const PUBLIC_SETTINGS = ['instructor_name', 'instructor_phone', 'policy_text',
   'cancel_hours', 'lock_hours', 'booking_horizon_days', 'booking_horizon_days_rank2',
   'live_lead_min', 'lesson_min', 'break_min', 'start_time', 'last_start', 'max_per_week', 'release_time',
   'registration_open', 'sonder_min_ueberland', 'sonder_min_autobahn', 'sonder_min_nacht',
-  'req_ueberland', 'req_autobahn', 'req_nacht', 'rank2_min_lessons'];
+  'req_ueberland', 'req_autobahn', 'req_nacht', 'rank2_min_lessons', 'passkey_enabled'];
 
 // ---------- Passwort-Richtlinie (stark, mit Sonderzeichen) ----------
 // Gibt null zurueck, wenn ok, sonst die fehlende Anforderung.
@@ -156,6 +156,76 @@ function newTotpSecret() { return base32Encode(randomBytes(20)); } // 160-bit
 function otpauthURL(secretB32, label, issuer) {
   return `otpauth://totp/${encodeURIComponent(issuer)}:${encodeURIComponent(label)}`
     + `?secret=${secretB32}&issuer=${encodeURIComponent(issuer)}&algorithm=SHA1&digits=6&period=30`;
+}
+
+// ===================== Passkeys / WebAuthn (Face ID / Touch ID) =====================
+// Zero-Dependency nach WebAuthn Level 2 – nur fuer den Fahrlehrer (mcp.ginoco.de).
+// Attestation wird als "none" behandelt (kein Zertifikatscheck); die Sicherheit kommt
+// aus der Signaturpruefung beim Login. Public Keys sind nicht geheim.
+const waChallenges = new Map(); // challenge(b64url) -> Ablauf (ms)
+function waIssueChallenge() {
+  const ch = b64url(randomBytes(32));
+  waChallenges.set(ch, Date.now() + 300000); // 5 Min gueltig
+  if (waChallenges.size > 300) for (const [k, exp] of waChallenges) if (exp < Date.now()) waChallenges.delete(k);
+  return ch;
+}
+function waConsumeChallenge(ch) {
+  const exp = waChallenges.get(ch);
+  if (!exp) return false;
+  waChallenges.delete(ch);
+  return exp >= Date.now();
+}
+function rpInfo(req) {
+  const host = String(req.headers.host || 'localhost').toLowerCase();
+  return { rpId: host.split(':')[0], origin: (isHttps(req) ? 'https://' : 'http://') + host };
+}
+function getPasskeys() { try { return JSON.parse(getSettingRaw('instructor_passkeys') || '[]'); } catch { return []; } }
+function setPasskeys(list) { setSettingRaw('instructor_passkeys', JSON.stringify(list)); }
+
+// Minimaler CBOR-Decoder (nur die WebAuthn-Teilmenge)
+function cborDecode(buf, start = 0) {
+  let o = start;
+  const readLen = (ai) => {
+    if (ai < 24) return ai;
+    if (ai === 24) { const v = buf[o]; o += 1; return v; }
+    if (ai === 25) { const v = buf.readUInt16BE(o); o += 2; return v; }
+    if (ai === 26) { const v = buf.readUInt32BE(o); o += 4; return v; }
+    if (ai === 27) { const v = Number(buf.readBigUInt64BE(o)); o += 8; return v; }
+    throw new Error('cbor-len');
+  };
+  const item = () => {
+    const b = buf[o]; o += 1;
+    const major = b >> 5, ai = b & 0x1f;
+    if (major === 0) return readLen(ai);
+    if (major === 1) return -1 - readLen(ai);
+    if (major === 2) { const n = readLen(ai); const v = buf.subarray(o, o + n); o += n; return v; }
+    if (major === 3) { const n = readLen(ai); const v = buf.toString('utf8', o, o + n); o += n; return v; }
+    if (major === 4) { const n = readLen(ai); const a = []; for (let i = 0; i < n; i++) a.push(item()); return a; }
+    if (major === 5) { const n = readLen(ai); const m = new Map(); for (let i = 0; i < n; i++) { const k = item(); m.set(k, item()); } return m; }
+    if (major === 7) { return null; }
+    throw new Error('cbor-major ' + major);
+  };
+  return { value: item(), offset: o };
+}
+// COSE-Public-Key (CBOR) -> KeyObject (ES256 / RS256)
+function coseToKey(coseBuf) {
+  const m = cborDecode(coseBuf).value;
+  const kty = m.get(1);
+  if (kty === 2) return createPublicKey({ key: { kty: 'EC', crv: 'P-256', x: b64url(m.get(-2)), y: b64url(m.get(-3)) }, format: 'jwk' });
+  if (kty === 3) return createPublicKey({ key: { kty: 'RSA', n: b64url(m.get(-1)), e: b64url(m.get(-2)) }, format: 'jwk' });
+  throw new Error('Schluesseltyp nicht unterstuetzt');
+}
+// authenticatorData zerlegen
+function parseAuthData(ad) {
+  const out = { rpIdHash: ad.subarray(0, 32), flags: ad[32], signCount: ad.readUInt32BE(33) };
+  out.up = !!(out.flags & 0x01); out.uv = !!(out.flags & 0x04); out.at = !!(out.flags & 0x40);
+  if (out.at) {
+    let o = 37 + 16;                       // 37 + aaguid(16)
+    const credLen = ad.readUInt16BE(o); o += 2;
+    out.credId = ad.subarray(o, o + credLen); o += credLen;
+    out.coseKey = ad.subarray(o);
+  }
+  return out;
 }
 
 // Wiederherstellungs-Codes für den Fahrlehrer erzeugen (Klartext zurück, Hashes speichern).
@@ -670,6 +740,94 @@ async function handleApi(req, res, url) {
     setSettingRaw('instructor_totp', ''); setSettingRaw('instructor_totp_pending', ''); setSettingRaw('instructor_2fa', '0');
     logEvent('info', { actor: 'instructor', detail: 'Authenticator entfernt' });
     return ok(res, { disabled: true });
+  }
+
+  // ===== Passkeys / Face ID (WebAuthn), nur Fahrlehrer =====
+  if (p === '/api/instructor/passkey/register/options' && method === 'POST') {
+    if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
+    const { rpId } = rpInfo(req);
+    return ok(res, {
+      challenge: waIssueChallenge(), rp: { id: rpId, name: 'Ginoco' },
+      user: { id: b64url(Buffer.from('ginoco-fahrlehrer')), name: getSettingRaw('instructor_name') || 'Fahrlehrer', displayName: getSettingRaw('instructor_name') || 'Fahrlehrer' },
+      pubKeyCredParams: [{ type: 'public-key', alg: -7 }, { type: 'public-key', alg: -257 }],
+      authenticatorSelection: { residentKey: 'preferred', userVerification: 'preferred' },
+      excludeCredentials: getPasskeys().map((k) => ({ id: k.id, type: 'public-key' })),
+      timeout: 120000, attestation: 'none',
+    });
+  }
+  if (p === '/api/instructor/passkey/register/verify' && method === 'POST') {
+    if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
+    const b = await readBody(req);
+    try {
+      const { rpId, origin } = rpInfo(req);
+      const clientData = JSON.parse(b64urlDecode(b.clientDataJSON).toString('utf8'));
+      if (clientData.type !== 'webauthn.create') return bad(res, 'Falscher Anfrage-Typ');
+      if (!waConsumeChallenge(clientData.challenge)) return bad(res, 'Anfrage abgelaufen – bitte erneut versuchen.');
+      if (clientData.origin !== origin) return bad(res, 'Origin stimmt nicht');
+      const att = cborDecode(b64urlDecode(b.attestationObject)).value;
+      const parsed = parseAuthData(att.get('authData'));
+      if (!parsed.up && !parsed.uv) return bad(res, 'Nutzerbestätigung fehlt');
+      if (!parsed.rpIdHash.equals(createHash('sha256').update(rpId).digest())) return bad(res, 'Domain stimmt nicht');
+      if (!parsed.credId) return bad(res, 'Kein Passkey erhalten');
+      coseToKey(parsed.coseKey); // prüfen, dass der Schlüssel lesbar ist
+      const id = b64url(parsed.credId);
+      const list = getPasskeys();
+      if (list.some((k) => k.id === id)) return ok(res, { ok: true, already: true });
+      const label = (b.label && String(b.label).slice(0, 40)) || ('Passkey ' + (list.length + 1));
+      list.push({ id, cose: b64url(parsed.coseKey), counter: parsed.signCount, label, created_at: new Date().toISOString() });
+      setPasskeys(list);
+      logEvent('info', { actor: 'instructor', detail: 'Passkey/Face ID hinzugefügt (' + label + ')' });
+      return ok(res, { ok: true, label });
+    } catch (e) { console.error('passkey reg', e); return bad(res, 'Passkey konnte nicht gespeichert werden.'); }
+  }
+  if (p === '/api/instructor/passkey/auth/options' && method === 'POST') {
+    if (loginBlocked(req)) return bad(res, 'Zu viele Versuche. Bitte in ein paar Minuten erneut.', 429);
+    const { rpId } = rpInfo(req);
+    return ok(res, {
+      challenge: waIssueChallenge(), rpId, timeout: 120000, userVerification: 'preferred',
+      allowCredentials: getPasskeys().map((k) => ({ id: k.id, type: 'public-key' })),
+    });
+  }
+  if (p === '/api/instructor/passkey/auth/verify' && method === 'POST') {
+    if (loginBlocked(req)) return bad(res, 'Zu viele Versuche. Bitte in ein paar Minuten erneut.', 429);
+    const b = await readBody(req);
+    try {
+      const { rpId, origin } = rpInfo(req);
+      const clientData = JSON.parse(b64urlDecode(b.clientDataJSON).toString('utf8'));
+      if (clientData.type !== 'webauthn.get') { noteLoginFail(req); return bad(res, 'Falscher Anfrage-Typ', 401); }
+      if (!waConsumeChallenge(clientData.challenge)) { noteLoginFail(req); return bad(res, 'Anfrage abgelaufen – bitte erneut.', 401); }
+      if (clientData.origin !== origin) { noteLoginFail(req); return bad(res, 'Origin stimmt nicht', 401); }
+      const cred = getPasskeys().find((k) => k.id === b.id);
+      if (!cred) { noteLoginFail(req); return bad(res, 'Passkey nicht bekannt', 401); }
+      const authData = b64urlDecode(b.authenticatorData);
+      const parsed = parseAuthData(authData);
+      if (!parsed.rpIdHash.equals(createHash('sha256').update(rpId).digest())) { noteLoginFail(req); return bad(res, 'Domain stimmt nicht', 401); }
+      if (!parsed.up) { noteLoginFail(req); return bad(res, 'Nutzerbestätigung fehlt', 401); }
+      const clientHash = createHash('sha256').update(b64urlDecode(b.clientDataJSON)).digest();
+      const signedData = Buffer.concat([authData, clientHash]);
+      if (!cryptoVerify('sha256', signedData, coseToKey(b64urlDecode(cred.cose)), b64urlDecode(b.signature))) {
+        noteLoginFail(req); return bad(res, 'Signatur ungültig', 401);
+      }
+      if (parsed.signCount > 0 || cred.counter > 0) {
+        const list = getPasskeys(); const c = list.find((k) => k.id === cred.id);
+        if (c) { c.counter = parsed.signCount; setPasskeys(list); }
+      }
+      noteLoginOk(req);
+      const token = createSession(res, 'instructor', null, isHttps(req), true);
+      return ok(res, { role: 'instructor', name: getSettingRaw('instructor_name'), token });
+    } catch (e) { console.error('passkey auth', e); return bad(res, 'Anmeldung fehlgeschlagen.', 401); }
+  }
+  if (p === '/api/instructor/passkeys' && method === 'GET') {
+    if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
+    return ok(res, { passkeys: getPasskeys().map((k) => ({ id: k.id, label: k.label, created_at: k.created_at })) });
+  }
+  if (p === '/api/instructor/passkey/delete' && method === 'POST') {
+    if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
+    const b = await readBody(req);
+    const list = getPasskeys().filter((k) => k.id !== b.id);
+    setPasskeys(list);
+    logEvent('info', { actor: 'instructor', detail: 'Passkey entfernt' });
+    return ok(res, { ok: true, count: list.length });
   }
   // Zugang wiederherstellen: mit einem Wiederherstellungs-Code ein neues Passwort setzen.
   if (p === '/api/auth/instructor/recover' && method === 'POST') {
