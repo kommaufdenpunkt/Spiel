@@ -1,0 +1,8 @@
+# Xcode / Build-Artefakte – nicht ins Repo
+build/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+*.xcarchive
+*.ipa
+.DS_Store
