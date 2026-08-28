@@ -254,6 +254,46 @@ async function handleApi(req, res, urlPath, ip) {
     return true;
   };
 
+  // ---- Bewerbung von der Startseite ------------------------------------
+  //
+  // Das war die Lücke, an der jede Bewerbung gescheitert ist: Auf 4ever1.tv
+  // führten acht Knöpfe hierher, und hier stand „Gib deine Zugangsnummer ein".
+  // Wer noch keine hat – also jede Interessentin – war raus.
+  //
+  // Diese Route nimmt die Anfrage entgegen und reicht sie ans PK-Board weiter.
+  // Dort geht sie als Mail an support@ und als Push an die Teamleitung raus.
+  // Ausdrücklich OHNE Ausweis, Foto oder BIGO-ID: das kommt erst beim Termin.
+  if (urlPath === '/api/bewerbung' && req.method === 'POST') {
+    let body; try { body = await readJson(req, 16 * 1024); } catch { sendJson(res, 400, { reason: 'bad-request' }); return true; }
+    const kurz = (v, n) => String(v == null ? '' : v).trim().slice(0, n);
+    const name = kurz(body.name, 60);
+    const kontakt = kurz(body.kontakt, 120);
+    if (!name || !kontakt) { sendJson(res, 400, { reason: 'name-oder-kontakt-fehlt' }); return true; }
+
+    // Honigtopf: ein Feld, das kein Mensch ausfüllt, weil er es nicht sieht.
+    // Ist es ausgefüllt, war es ein Skript – wir antworten freundlich und
+    // werfen es weg, damit der Absender nicht merkt, dass er aufgeflogen ist.
+    if (kurz(body.webseite, 40)) { sendJson(res, 200, { ok: true }); return true; }
+
+    const r = await mcp.bewerbungWeiterreichen({
+      name,
+      alter: kurz(body.alter, 10),
+      kontakt,
+      bigo: kurz(body.bigo, 80),
+      wann: kurz(body.wann, 80),
+      nachricht: kurz(body.nachricht, 600),
+      herkunft: kurz(req.headers.referer, 120),
+      ip: String(ip || ''),
+    });
+    if (!r.ok) {
+      console.error('Bewerbung konnte nicht übergeben werden:', r.status, r.text);
+      sendJson(res, 502, { reason: 'weiterleitung' });
+      return true;
+    }
+    sendJson(res, 200, { ok: true });
+    return true;
+  }
+
   // ---- Login (Admin ODER Mitarbeiter) ----
   if (urlPath === '/api/login' && req.method === 'POST') {
     if (!sec.loginAllowed(ip)) { sec.recordEvent('blocked', ip, 'Login von nicht erlaubter IP'); sendJson(res, 403, { reason: 'ip-blocked' }); return true; }

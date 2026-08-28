@@ -1,0 +1,82 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 420" width="980" height="420" role="img" aria-label="4EVER1.TV – Streamer-Agentur">
+  <title>4EVER1.TV – Streamer-Agentur</title>
+
+  <defs>
+    <!-- Gold lebt von einer HARTEN Kante in der Mitte. Ein weicher Verlauf
+         sieht aus wie Plastik; erst der Bruch macht Metall daraus. -->
+    <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"   stop-color="#FFF7D6"/>
+      <stop offset="22%"  stop-color="#F9CE55"/>
+      <stop offset="48%"  stop-color="#DFA412"/>
+      <stop offset="50%"  stop-color="#A96E05"/>
+      <stop offset="70%"  stop-color="#F3C34A"/>
+      <stop offset="88%"  stop-color="#C8890C"/>
+      <stop offset="100%" stop-color="#7A4D04"/>
+    </linearGradient>
+
+    <linearGradient id="goldHell" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"   stop-color="#FFFDF2"/>
+      <stop offset="40%"  stop-color="#FFDE7A"/>
+      <stop offset="50%"  stop-color="#E5A50F"/>
+      <stop offset="60%"  stop-color="#FFD262"/>
+      <stop offset="100%" stop-color="#9C6606"/>
+    </linearGradient>
+
+    <linearGradient id="glanz" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%"   stop-color="#fff" stop-opacity=".5"/>
+      <stop offset="35%"  stop-color="#fff" stop-opacity="0"/>
+      <stop offset="65%"  stop-color="#fff" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#fff" stop-opacity=".28"/>
+    </linearGradient>
+
+    <filter id="tiefe" x="-25%" y="-25%" width="150%" height="150%">
+      <feDropShadow dx="0" dy="6" stdDeviation="8" flood-color="#1a0f00" flood-opacity=".5"/>
+    </filter>
+
+    <path id="sL" d="M 490 210
+      C 490 116, 406 60, 308 60
+      C 196 60, 120 126, 120 210
+      C 120 294, 196 360, 308 360
+      C 406 360, 490 304, 490 210 Z"/>
+    <path id="sR" d="M 490 210
+      C 490 116, 574 60, 672 60
+      C 784 60, 860 126, 860 210
+      C 860 294, 784 360, 672 360
+      C 574 360, 490 304, 490 210 Z"/>
+
+    <!-- Laufwege MITTIG auf dem Band, damit die Wörter darauf sitzen statt
+         daneben. Der obere läuft links herum, der untere rechts. -->
+    <path id="wegOben"  d="M 137 178 C 150 106, 220 78, 305 78 C 392 78, 458 118, 480 182" fill="none"/>
+    <path id="wegUnten" d="M 500 238 C 522 302, 588 342, 675 342 C 760 342, 830 314, 843 242" fill="none"/>
+  </defs>
+
+  <g filter="url(#tiefe)">
+    <use href="#sL" fill="none" stroke="#2E1C00" stroke-width="74"/>
+    <use href="#sR" fill="none" stroke="#2E1C00" stroke-width="74"/>
+    <use href="#sL" fill="none" stroke="url(#gold)" stroke-width="62"/>
+    <use href="#sR" fill="none" stroke="url(#gold)" stroke-width="62"/>
+    <use href="#sL" fill="none" stroke="url(#glanz)" stroke-width="62"/>
+    <use href="#sR" fill="none" stroke="url(#glanz)" stroke-width="62"/>
+  </g>
+
+  <!-- Die kleinen Wörter jetzt DUNKEL auf dem Gold – vorher waren sie weiß
+       auf hellem Gold und damit praktisch unsichtbar. -->
+  <text font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="27" font-weight="800"
+        letter-spacing="9" fill="#4A2E00" opacity=".85">
+    <textPath href="#wegOben" startOffset="50%" text-anchor="middle">STREAMER</textPath>
+  </text>
+  <text font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="27" font-weight="800"
+        letter-spacing="9" fill="#4A2E00" opacity=".85">
+    <textPath href="#wegUnten" startOffset="50%" text-anchor="middle">AGENTUR</textPath>
+  </text>
+
+  <g filter="url(#tiefe)">
+    <text x="490" y="248" text-anchor="middle"
+          font-family="Impact, Haettenschweiler, Arial Black, sans-serif"
+          font-size="118" letter-spacing="0"
+          stroke="#2E1C00" stroke-width="15" stroke-linejoin="round" fill="none">4EVER1.TV</text>
+    <text x="490" y="248" text-anchor="middle"
+          font-family="Impact, Haettenschweiler, Arial Black, sans-serif"
+          font-size="118" letter-spacing="0" fill="url(#goldHell)">4EVER1.TV</text>
+  </g>
+</svg>

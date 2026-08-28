@@ -106,6 +106,65 @@
   }
   rechner();
 
+  // ---- Bewerbung absenden ----------------------------------------------
+  //
+  // Vorher führte jeder Bewerben-Knopf auf die Codeabfrage – wer keine
+  // Zugangsnummer hatte (also jede Interessentin), war raus. Jetzt landet
+  // die Anfrage bei der Teamleitung, und die schickt die Nummer.
+  function bewerbung() {
+    var f = document.getElementById('bewerbForm');
+    if (!f) return;
+    var meldung = document.getElementById('bMeldung');
+    var knopf = document.getElementById('bSenden');
+
+    function sagen(text, art) {
+      if (!meldung) return;
+      meldung.textContent = text;
+      meldung.className = 'bmeldung' + (art ? ' ' + art : '');
+    }
+
+    f.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var daten = {
+        name: (f.name.value || '').trim(),
+        alter: (f.alter.value || '').trim(),
+        kontakt: (f.kontakt.value || '').trim(),
+        bigo: (f.bigo.value || '').trim(),
+        wann: (f.wann.value || '').trim(),
+        webseite: (f.webseite.value || '').trim()
+      };
+      if (!daten.name) { sagen('Sag uns bitte noch, wie wir dich nennen sollen.', 'fehler'); f.name.focus(); return; }
+      if (!daten.kontakt) { sagen('Ohne einen Weg zu dir können wir dir die Nummer nicht schicken.', 'fehler'); f.kontakt.focus(); return; }
+      var jahre = parseInt(daten.alter, 10);
+      if (daten.alter && jahre && jahre < 18) {
+        sagen('Für BIGO musst du mindestens 18 sein. Melde dich gern, sobald es so weit ist.', 'fehler');
+        return;
+      }
+
+      f.classList.add('faehrt');
+      if (knopf) knopf.textContent = 'Wird gesendet \u2026';
+      sagen('');
+
+      fetch('/api/bewerbung', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(daten)
+      }).then(function (r) {
+        if (!r.ok) throw new Error(String(r.status));
+        f.reset();
+        sagen('Angekommen! Wir melden uns bei dir \u2013 meist noch heute. Schau auch im Spam-Ordner nach.', 'ok');
+        if (knopf) knopf.textContent = 'Danke dir \u2713';
+      }).catch(function () {
+        sagen('Das hat gerade nicht geklappt. Schreib uns bitte an support@4ever1.tv \u2013 wir melden uns.', 'fehler');
+        if (knopf) knopf.innerHTML = 'Nochmal versuchen <span class="ar">\u2192</span>';
+      }).then(function () {
+        f.classList.remove('faehrt');
+      });
+    });
+  }
+  bewerbung();
+
+
   // ---- Echtes Logo und Team-Foto, falls hinterlegt --------------------------
   // Liegt logo.png im Ordner public, ersetzt es das gezeichnete Zeichen oben.
   // Liegt team.jpg dort, erscheint es groß über der Teamleitung.

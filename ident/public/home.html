@@ -312,6 +312,28 @@
     transition:border-color .2s,transform .2s}
   .contact a:hover{border-color:var(--gold);transform:translateY(-3px)}
 
+  /* ── Direkt per WhatsApp ──────────────────────────────────────────
+     Eine Mailadresse ist eine Hürde: Programm öffnen, Betreff ausdenken,
+     warten. Ein WhatsApp-Knopf öffnet den Chat mit fertigem ersten Satz –
+     wer neugierig ist, schreibt in zehn Sekunden statt gar nicht.
+     Deshalb steht hier der Name der Person und nicht „Kontakt". Man
+     schreibt lieber jemandem als einer Agentur. */
+  .wa{display:grid;grid-template-columns:repeat(auto-fit,minmax(15rem,1fr));
+    gap:.9rem;max-width:46rem;margin:0 auto 1.4rem}
+  .wa a{display:flex;align-items:center;gap:.85rem;text-decoration:none;
+    background:linear-gradient(180deg,#1a140830,#0f0b0570);
+    border:1px solid var(--line);border-radius:1rem;padding:.9rem 1.1rem;
+    color:var(--ink);transition:border-color .2s,transform .2s,background .2s}
+  .wa a:hover{border-color:var(--gold);transform:translateY(-3px);
+    background:linear-gradient(180deg,#241a0a55,#120d0680)}
+  .wa .ic{flex:0 0 auto;width:2.6rem;height:2.6rem;border-radius:50%;
+    display:grid;place-items:center;font-size:1.35rem;
+    background:linear-gradient(160deg,#25d366,#128c7e);box-shadow:0 6px 16px -8px #25d36688}
+  .wa .txt{min-width:0;display:flex;flex-direction:column;gap:.1rem}
+  .wa .nm{font-weight:750;font-size:1.02rem;letter-spacing:.2px}
+  .wa .rl{font-size:.82rem;color:var(--muted, #9a8f7a)}
+  .wa .pfeil{margin-left:auto;color:var(--gold);font-weight:700;flex:0 0 auto}
+
   /* ---------- Aufruf ---------- */
   .cta{position:relative;overflow:hidden;border-radius:24px;padding:3.2rem 2rem;text-align:center;
     background:linear-gradient(160deg,#181106,#0c0904);border:1px solid var(--line2)}
@@ -340,6 +362,37 @@
   .reveal{opacity:0;transform:translateY(18px);transition:opacity .65s ease,transform .65s cubic-bezier(.2,.7,.3,1)}
   .reveal.in{opacity:1;transform:none}
   @media(prefers-reduced-motion:reduce){.reveal{opacity:1;transform:none;transition:none}.pk-bar i{animation:none;width:72%}}
+
+/* ── Bewerbungs-Formular ────────────────────────────────────────────
+   Der wichtigste Abschnitt der Seite: Hier entscheidet sich, ob aus
+   Interesse eine Bewerbung wird. Deshalb große Felder (Daumen, nicht
+   Maus), viel Luft und ein Knopf über die volle Breite. */
+.bewerb{max-width:46rem;margin:0 auto;background:var(--panel);
+  border:1px solid var(--line);border-radius:1.2rem;padding:1.6rem 1.4rem}
+.bzeile{display:grid;grid-template-columns:1fr 1fr;gap:.9rem}
+@media(max-width:560px){.bzeile{grid-template-columns:1fr}}
+.bfeld{margin-bottom:1rem;display:flex;flex-direction:column;gap:.42rem}
+.bfeld label{font-size:.94rem;font-weight:700;color:#f3e6c4}
+.bfeld label .opt{font-weight:400;color:var(--dim2)}
+.bfeld input{width:100%;box-sizing:border-box;font:inherit;font-size:1.02rem;
+  padding:.85rem .95rem;border-radius:.7rem;color:#fff;
+  background:var(--bg2);border:1px solid var(--line2);
+  -webkit-appearance:none;appearance:none}
+.bfeld input::placeholder{color:#6b5c3a}
+.bfeld input:focus{outline:none;border-color:#f7c948;
+  box-shadow:0 0 0 3px rgba(247,201,72,.18)}
+.bhilfe{font-size:.83rem;color:var(--dim2);line-height:1.45}
+/* Für Menschen unsichtbar, für Skripte verlockend. Nicht display:none –
+   manche Skripte prüfen genau darauf. */
+.bhonig{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}
+.bewerb .btn.big{width:100%;justify-content:center;margin-top:.4rem}
+.bfuss{font-size:.86rem;line-height:1.6;color:var(--dim2);margin:1rem 0 0}
+.bfuss b{color:#f3e6c4}
+.bmeldung{margin:.9rem 0 0;font-size:.95rem;line-height:1.5;min-height:1.2em}
+.bmeldung.ok{color:#7fd8a0}
+.bmeldung.fehler{color:#f0a08c}
+.bschon{text-align:center;margin-top:1.3rem;color:var(--dim2);font-size:.9rem}
+.bewerb.faehrt{opacity:.6;pointer-events:none}
 </style>
 </head>
 <body>
@@ -371,7 +424,7 @@
       <a href="#ablauf">Ablauf</a>
       <a href="#ratgeber">Ratgeber</a>
       <a class="btn" href="#bohnen">Mehr erfahren</a>
-      <a class="btn primary" href="https://ident.4ever1.tv">Jetzt bewerben</a>
+      <a class="btn primary" href="#start">Jetzt bewerben</a>
     </nav>
     <button class="burger" id="burger" aria-label="Menü" aria-expanded="false"><span></span></button>
   </div>
@@ -389,7 +442,7 @@
         <p class="lead">4EVER1.TV ist ein eingespieltes Team aus Streamern und Teamleitung, das gemeinsam Stunden macht,
           Targets erreicht und sich gegenseitig nach oben zieht. <b>Ein Team, das hinter dir steht.</b></p>
         <div class="hero-actions">
-          <a class="btn primary big" href="https://ident.4ever1.tv">Teil des Teams werden <span class="ar">→</span></a>
+          <a class="btn primary big" href="#start">Teil des Teams werden <span class="ar">→</span></a>
           <a class="btn big" href="#ablauf">So läuft es ab</a>
         </div>
         <div class="hero-note">Kostenlos · unter 15 Minuten · verschlüsselt in Deutschland gespeichert</div>
@@ -538,7 +591,7 @@
           <div class="need"><span class="tick">✓</span><div><b>Keine WhatsApp-Gruppen mehr</b><span>Dort ist jede Nummer für alle sichtbar. Im PK Board nicht.</span></div></div>
           <div class="need"><span class="tick">✓</span><div><b>Nichts geht mehr unter</b><span>Ankündigungen findest du jederzeit wieder – nicht nur, wenn du gerade online warst.</span></div></div>
           <div class="need"><span class="tick">✓</span><div><b>Alles an einem Ort</b><span>PK-Cards, Termine und Regeln – ohne Suchen in fünf Chats.</span></div></div>
-          <a class="btn primary" style="margin-top:1.4rem" href="https://ident.4ever1.tv">Mitmachen <span class="ar">→</span></a>
+          <a class="btn primary" style="margin-top:1.4rem" href="#start">Mitmachen <span class="ar">→</span></a>
         </div>
         <div class="phone" aria-hidden="true">
           <div class="screen">
@@ -551,6 +604,72 @@
           </div>
         </div>
       </div>
+    </div>
+  </section>
+
+  <!-- Bewerbung starten – die Tür, die vorher fehlte -->
+  <section id="start">
+    <div class="wrap">
+      <div class="sec-head">
+        <span class="eyebrow">Erster Schritt</span>
+        <h2 class="gold">Melde dich bei uns</h2>
+        <p>Du bekommst von uns eine persönliche Zugangsnummer. Damit startest du
+          später deine Audition. Mehr passiert hier noch nicht.</p>
+      </div>
+
+      <form class="bewerb" id="bewerbForm" novalidate>
+        <div class="bfeld">
+          <label for="bName">Wie sollen wir dich nennen?</label>
+          <input id="bName" name="name" maxlength="60" required autocomplete="given-name"
+                 placeholder="Vorname reicht">
+        </div>
+        <div class="bzeile">
+          <div class="bfeld">
+            <label for="bAlter">Wie alt bist du?</label>
+            <input id="bAlter" name="alter" inputmode="numeric" maxlength="3" required
+                   placeholder="ab 18">
+          </div>
+          <div class="bfeld">
+            <label for="bWann">Wann passt dir ein Termin?</label>
+            <input id="bWann" name="wann" maxlength="80"
+                   placeholder="z. B. abends unter der Woche">
+          </div>
+        </div>
+        <div class="bfeld">
+          <label for="bKontakt">Wohin dürfen wir die Nummer schicken?</label>
+          <input id="bKontakt" name="kontakt" maxlength="120" required
+                 placeholder="E-Mail, Instagram oder Telegram">
+        </div>
+        <div class="bfeld">
+          <label for="bBigo">Dein Name auf BIGO <span class="opt">(falls du schon einen hast)</span></label>
+          <input id="bBigo" name="bigo" maxlength="80" autocomplete="off"
+                 placeholder="einfach leer lassen, wenn noch nicht">
+          <small class="bhilfe">Noch kein Konto? Kein Problem – wir richten es mit dir zusammen ein.</small>
+        </div>
+
+        <!-- Honigtopf gegen Skripte: für Menschen unsichtbar. -->
+        <div class="bhonig" aria-hidden="true">
+          <label for="bWeb">Webseite</label>
+          <input id="bWeb" name="webseite" tabindex="-1" autocomplete="off">
+        </div>
+
+        <button class="btn primary big" type="submit" id="bSenden">
+          Zugangsnummer anfordern <span class="ar">&#8594;</span>
+        </button>
+
+        <p class="bfuss">
+          Kostenlos und unverbindlich. <b>Deinen Ausweis brauchst du erst beim Termin</b> &#8211;
+          jetzt noch nicht. Wir melden uns meist noch am selben Tag.
+          Deine Angaben nutzen wir nur, um dir zu antworten; Einzelheiten in der
+          <a href="/datenschutz">Datenschutzerkl&auml;rung</a>.
+        </p>
+        <p class="bmeldung" id="bMeldung" role="status"></p>
+      </form>
+
+      <p class="bschon">
+        Du hast schon eine Zugangsnummer?
+        <a href="#start">Hier geht es direkt zur Audition &#8594;</a>
+      </p>
     </div>
   </section>
 
@@ -621,7 +740,7 @@
         </div>
       </div>
       <div style="text-align:center;margin-top:1.8rem">
-        <a class="btn primary big" href="https://ident.4ever1.tv">Passt – Audition starten <span class="ar">→</span></a>
+        <a class="btn primary big" href="#start">Passt – Audition starten <span class="ar">→</span></a>
       </div>
     </div>
   </section>
@@ -677,7 +796,24 @@
       <div class="sec-head">
         <span class="eyebrow">Direkter Draht</span>
         <h2 class="gold">Noch Fragen?</h2>
-        <p>Schreib uns einfach – wir antworten persönlich, nicht automatisch.</p>
+        <p>Schreib direkt per WhatsApp – bei einem von uns dreien landest du immer richtig. Wir antworten persönlich, nicht automatisch.</p>
+      </div>
+      <div class="wa">
+        <a href="https://wa.me/4917683382930?text=Hallo%2C%20ich%20habe%20eure%20Seite%20gesehen%20und%20interessiere%20mich%20f%C3%BCr%204ever1.%20%F0%9F%92%9C" target="_blank" rel="noopener">
+          <span class="ic">💬</span>
+          <span class="txt"><span class="nm">eyfahrlehrer</span><span class="rl">Inhaber der Agentur</span></span>
+          <span class="pfeil">→</span>
+        </a>
+        <a href="https://wa.me/4915569488914?text=Hallo%2C%20ich%20habe%20eure%20Seite%20gesehen%20und%20interessiere%20mich%20f%C3%BCr%204ever1.%20%F0%9F%92%9C" target="_blank" rel="noopener">
+          <span class="ic">💬</span>
+          <span class="txt"><span class="nm">eyLisa</span><span class="rl">Teamleitung</span></span>
+          <span class="pfeil">→</span>
+        </a>
+        <a href="https://wa.me/4917643444411?text=Hallo%2C%20ich%20habe%20eure%20Seite%20gesehen%20und%20interessiere%20mich%20f%C3%BCr%204ever1.%20%F0%9F%92%9C" target="_blank" rel="noopener">
+          <span class="ic">💬</span>
+          <span class="txt"><span class="nm">eykeepcool</span><span class="rl">Teamleitung</span></span>
+          <span class="pfeil">→</span>
+        </a>
       </div>
       <div class="contact">
         <a href="mailto:ginoheidrich@outlook.com">✉️ ginoheidrich@outlook.com</a>
@@ -692,7 +828,7 @@
       <div class="cta">
         <h2 class="gold">Bereit für deine Audition?</h2>
         <p>Du brauchst nur ein Handy oder einen Rechner mit Kamera, deinen Ausweis und ein paar Minuten Zeit.</p>
-        <a class="btn primary big" href="https://ident.4ever1.tv">Teil des Teams werden <span class="ar">→</span></a>
+        <a class="btn primary big" href="#start">Teil des Teams werden <span class="ar">→</span></a>
       </div>
     </div>
   </section>
@@ -741,7 +877,7 @@
   </div>
 </footer>
 
-<div class="dock"><a class="btn primary" href="https://ident.4ever1.tv">Jetzt bewerben <span class="ar">→</span></a></div>
+<div class="dock"><a class="btn primary" href="#start">Jetzt bewerben <span class="ar">→</span></a></div>
 
 <script src="/figur-core.js"></script>
 <script src="/home.js"></script>

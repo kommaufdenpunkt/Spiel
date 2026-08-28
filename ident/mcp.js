@@ -204,4 +204,36 @@ function tokenOk(header) {
   return a.length === b.length && crypto.timingSafeEqual(a, b);
 }
 
-module.exports = { initSign, pruefeLink, aktiv, eigenerOrdner, autoAn, info, uebergeben, baueNutzlast, tokenOk };
+
+/**
+ * Eine Bewerbung von der Startseite an das PK-Board weiterreichen.
+ *
+ * Warum über das PK-Board und nicht direkt per Mail von hier? Weil dort schon
+ * alles liegt, was gebraucht wird: ein geprüfter Mailversand, die Push-Wege zur
+ * Teamleitung und der Kontrollraum, in dem die Bewerbung sichtbar wird. Ein
+ * zweiter Mailversand hier wäre eine zweite Sache, die kaputtgehen kann.
+ */
+async function bewerbungWeiterreichen(daten) {
+  if (!MCP_URL) return { ok: false, status: 0, text: 'MCP_URL fehlt' };
+  const ziel = MCP_URL.replace(/\/api\/ident\/akte$/, '/api/ident/bewerbung');
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), 15000);
+  try {
+    const res = await fetch(ziel, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(MCP_TOKEN ? { Authorization: 'Bearer ' + MCP_TOKEN } : {}),
+      },
+      body: JSON.stringify(daten),
+      signal: ctrl.signal,
+    });
+    const text = (await res.text().catch(() => '')).slice(0, 300);
+    return { ok: res.ok, status: res.status, text };
+  } catch (e) {
+    return { ok: false, status: 0, text: String((e && e.message) || e).slice(0, 300) };
+  } finally { clearTimeout(t); }
+}
+
+module.exports = {
+  bewerbungWeiterreichen, initSign, pruefeLink, aktiv, eigenerOrdner, autoAn, info, uebergeben, baueNutzlast, tokenOk };

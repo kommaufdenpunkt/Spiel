@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="4ever1.tv">
+  <title>4ever1.tv – Zeichen</title>
+  <!--
+    Das kompakte Zeichen: nur die Acht, ohne Schriftzug.
+
+    Grund: Im Seitenkopf, als Lesezeichen-Symbol oder als App-Symbol ist das
+    volle Logo 40 Pixel hoch – der Schriftzug wird dort zu einem grauen Strich,
+    und aus dem Ganzen wird ein Klecks. Genau das passiert auf 4ever1.tv
+    gerade. Ein zweites, reduziertes Zeichen löst das: Es bleibt erkennbar,
+    bis hinunter zu 16 Pixeln.
+
+    Die „1" in der Mitte ist kein Zufall: Sie bindet den Namen ins Zeichen
+    ein und trennt die beiden Schleifen sauber.
+  -->
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"   stop-color="#FFF7D6"/>
+      <stop offset="22%"  stop-color="#F9CE55"/>
+      <stop offset="48%"  stop-color="#DFA412"/>
+      <stop offset="50%"  stop-color="#A96E05"/>
+      <stop offset="70%"  stop-color="#F3C34A"/>
+      <stop offset="100%" stop-color="#7A4D04"/>
+    </linearGradient>
+    <linearGradient id="gl" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%"   stop-color="#fff" stop-opacity=".45"/>
+      <stop offset="40%"  stop-color="#fff" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#fff" stop-opacity=".25"/>
+    </linearGradient>
+    <filter id="t" x="-25%" y="-25%" width="150%" height="150%">
+      <feDropShadow dx="0" dy="7" stdDeviation="9" flood-color="#1a0f00" flood-opacity=".45"/>
+    </filter>
+    <path id="l" d="M 256 256 C 256 196, 210 160, 158 160 C 100 160, 60 202, 60 256
+                    C 60 310, 100 352, 158 352 C 210 352, 256 316, 256 256 Z"/>
+    <path id="r" d="M 256 256 C 256 196, 302 160, 354 160 C 412 160, 452 202, 452 256
+                    C 452 310, 412 352, 354 352 C 302 352, 256 316, 256 256 Z"/>
+  </defs>
+
+  <g filter="url(#t)">
+    <use href="#l" fill="none" stroke="#2E1C00" stroke-width="58"/>
+    <use href="#r" fill="none" stroke="#2E1C00" stroke-width="58"/>
+    <use href="#l" fill="none" stroke="url(#g)" stroke-width="46"/>
+    <use href="#r" fill="none" stroke="url(#g)" stroke-width="46"/>
+    <use href="#l" fill="none" stroke="url(#gl)" stroke-width="46"/>
+    <use href="#r" fill="none" stroke="url(#gl)" stroke-width="46"/>
+  </g>
+</svg>
