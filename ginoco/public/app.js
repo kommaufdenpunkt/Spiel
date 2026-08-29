@@ -767,6 +767,35 @@ function toast(msg, kind = '', ms = 3200) {
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => { t.hidden = true; }, ms);
 }
+// Kurzer, edler Erfolgs-Moment nach einer Buchung: gezeichneter Haken + zarte
+// Konfetti + ein Auto, das einmal durchfährt. Respektiert „Bewegung reduzieren“.
+let celebrateBusy = false;
+function celebrate(label) {
+  if (celebrateBusy) return; celebrateBusy = true;
+  const reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const colors = ['var(--brand)', 'var(--good)', 'var(--warn)', '#ffffff'];
+  const conf = reduce ? '' : Array.from({ length: 16 }, (_, i) => {
+    const l = Math.round(6 + Math.random() * 88);
+    const d = (Math.random() * 0.35).toFixed(2);
+    const r = Math.round(Math.random() * 360);
+    return `<i style="left:${l}%;--d:${d}s;--r:${r}deg;background:${colors[i % colors.length]}"></i>`;
+  }).join('');
+  const ov = document.createElement('div');
+  ov.className = 'celebrate';
+  ov.innerHTML = `
+    <div class="cel-conf">${conf}</div>
+    <div class="cel-card">
+      <svg class="cel-check" viewBox="0 0 52 52" aria-hidden="true">
+        <circle class="cel-ring" cx="26" cy="26" r="24"/>
+        <path class="cel-tick" d="M15 27 l7 7 l15 -16"/>
+      </svg>
+      <div class="cel-label">${esc(label || 'Gebucht')}</div>
+    </div>
+    ${reduce ? '' : '<div class="cel-car">🚗</div>'}`;
+  document.body.appendChild(ov);
+  setTimeout(() => ov.classList.add('out'), reduce ? 700 : 1500);
+  setTimeout(() => { ov.remove(); celebrateBusy = false; }, reduce ? 1000 : 1980);
+}
 // ---------- Kontext-Hilfe: kleiner „?“ neben Feldern -> Erklär-Blase ----------
 function helpDot(text) { return `<button type="button" class="help-dot" data-help="${esc(text)}" aria-label="Erklärung">?</button>`; }
 let helpTimer = null;
@@ -2053,7 +2082,7 @@ function confirmSonder(type, dur, date, start) {
   $('#sf-go').onclick = async () => {
     try {
       await api('/api/bookings', { method: 'POST', body: { date, start_time: start, sonder: type } });
-      closeModal(); toast(TYPE_LABEL[type] + ' gebucht ✓', 'ok'); syncStudent();
+      closeModal(); celebrate(TYPE_LABEL[type] + ' gebucht'); toast(TYPE_LABEL[type] + ' gebucht ✓', 'ok'); syncStudent();
     } catch (e) { toast(e.message, 'err'); }
   };
 }
@@ -2621,7 +2650,7 @@ async function withdrawOffer(id) {
   catch (e) { toast(e.message, 'err'); }
 }
 async function takeOffer(id) {
-  try { await api('/api/bookings/' + id + '/take', { method: 'POST' }); toast('Fahrstunde übernommen ✓', 'ok'); syncStudent(); }
+  try { await api('/api/bookings/' + id + '/take', { method: 'POST' }); celebrate('Übernommen'); toast('Fahrstunde übernommen ✓', 'ok'); syncStudent(); }
   catch (e) { toast(e.message, 'err'); }
 }
 async function declineOffer(id) {
@@ -2739,7 +2768,7 @@ function bookSlot(start, dur, maxDur) {
     const chosen = $('#bk-dur') ? Number($('#bk-dur').value) : allowed[0];
     try {
       await api('/api/bookings', { method: 'POST', body: { date: state.date, start_time: start, duration_min: chosen } });
-      closeModal(); toast('Termin gebucht ✓', 'ok'); syncStudent();
+      closeModal(); celebrate('Termin gebucht'); toast('Termin gebucht ✓', 'ok'); syncStudent();
     } catch (e) { toast(e.message, 'err'); }
   };
 }
