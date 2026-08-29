@@ -2286,7 +2286,7 @@ async function handleApi(req, res, url) {
     if ('monthly_max_h' in b && 'monthly_target_h' in b && Number(b.monthly_max_h) < Number(b.monthly_target_h))
       return bad(res, 'Das Skala-Ende (höchstens) darf nicht kleiner als das Monatsziel sein');
     const allowed = ['instructor_name', 'start_time', 'last_start', 'lesson_min', 'break_min',
-      'weekly_target_h', 'daily_target_h', 'weekly_lo_h', 'monthly_target_h', 'monthly_max_h', 'workdays', 'max_per_week',
+      'weekly_target_h', 'daily_target_h', 'weekly_lo_h', 'monthly_target_h', 'monthly_max_h', 'workdays', 'max_per_week', 'student_max_per_day',
       'booking_horizon_days', 'cancel_hours', 'lock_hours', 'release_time', 'short_day_last_start',
       'vacation_credit_min', 'vacation_days_left', 'late_grace_min', 'policy_text',
       'instructor_phone', 'avg_speed_kmh', 'live_lead_min',
@@ -2804,6 +2804,18 @@ function createBooking(res, sess, body) {
     const wi = weekInfoForStudent(studentId, date);
     if (wi.remaining <= 0)
       return bad(res, `Pro Woche sind nur ${wi.max} Fahrstunden moeglich. Diese Woche ist voll.`);
+    // Selbst-Buchungen pro Tag begrenzen (Standard 1). Fahrlehrer-Eintraege
+    // laufen ueber den isInstructor-Zweig und sind davon nicht betroffen.
+    const perDayMax = Number(getSettingRaw('student_max_per_day')) || 0;
+    if (perDayMax > 0) {
+      const sameDay = db.prepare(
+        "SELECT COUNT(*) AS n FROM bookings WHERE student_id = ? AND date = ? AND status != 'cancelled'"
+      ).get(studentId, date).n;
+      if (sameDay >= perDayMax)
+        return bad(res, perDayMax === 1
+          ? 'Du kannst dir pro Tag nur eine Fahrstunde selbst buchen. Für einen weiteren Termin an diesem Tag sprich bitte deinen Fahrlehrer an.'
+          : `Du kannst dir pro Tag höchstens ${perDayMax} Fahrstunden selbst buchen.`);
+    }
   }
 
   // Vom Fahrlehrer FÜR EINEN SCHÜLER eingetragen -> reserviert (confirmed=0), der

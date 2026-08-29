@@ -5180,6 +5180,7 @@ function tabEinstellungen() {
 
     ${sec('📅', 'Buchung & Stornierung', 'Vorausbuchung, Limits, Fristen, Aufklärungstext', `
       <div class="row"><div class="field"><label>Max. Fahrstunden pro Schüler & Woche</label><input id="e-max" type="number" value="${s.max_per_week}" min="1"></div>
+        <div class="field"><label>Selbst-Buchung pro Tag ${helpDot('So viele Fahrstunden darf sich ein Fahrschüler pro Tag selbst buchen. 0 = ohne Limit. Deine eigenen Einträge sind nicht betroffen.')}</label><input id="e-maxday" type="number" value="${s.student_max_per_day}" min="0"></div>
         <div class="field"><label>Vorausbuchung (Tage)</label><input id="e-horizon" type="number" value="${s.booking_horizon_days}" min="1"></div></div>
       <div class="row"><div class="field"><label>Kostenlos stornieren bis (Std. vorher) ${helpDot('Bis so viele Stunden vor Beginn darf der Fahrschüler kostenlos absagen.')}</label><input id="e-cancel" type="number" value="${s.cancel_hours}" min="0"></div>
         <div class="field"><label>Sperrfrist – fest ab (Std. vorher) ${helpDot('Ab so vielen Stunden vor Beginn steht der Termin fest – kein Absagen oder Ins-Angebot-Geben mehr.')}</label><input id="e-lock" type="number" value="${s.lock_hours}" min="0"></div></div>
@@ -5259,7 +5260,7 @@ function tabEinstellungen() {
         daily_target_h: Number($('#e-dt').value),
         monthly_target_h: Number($('#e-mt').value), monthly_max_h: Number($('#e-mmax').value),
         workdays: workdays || '1,2,3,4,5',
-        max_per_week: Number($('#e-max').value), instructor_name: $('#e-name').value,
+        max_per_week: Number($('#e-max').value), student_max_per_day: Number($('#e-maxday').value), instructor_name: $('#e-name').value,
         booking_horizon_days: Number($('#e-horizon').value), cancel_hours: Number($('#e-cancel').value),
         lock_hours: Number($('#e-lock').value),
         release_time: $('#e-release').value, short_day_last_start: $('#e-shortlast').value,
