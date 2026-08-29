@@ -1331,9 +1331,13 @@ header .brand .brandname{
 .av2-day{background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:.6rem .7rem}
 .av2-dh{font-weight:800;font-size:.85rem;margin-bottom:.45rem}
 .av2-none{font-weight:400;color:var(--muted);font-size:.8rem}
-.av2-win{display:flex;align-items:center;gap:.45rem;margin-bottom:.42rem}
-.av2-t{flex:1;min-width:0;font-variant-numeric:tabular-nums}
+.av2-win{display:flex;align-items:center;gap:.45rem;margin-bottom:.42rem;flex-wrap:wrap}
+.av2-t{flex:1;min-width:76px;font-variant-numeric:tabular-nums}
 .av2-dash{color:var(--muted);font-weight:700}
+.av2-mode{flex:0 0 auto;background:var(--card);border:1px solid var(--line);color:var(--ink);
+  border-radius:9px;padding:.4rem .6rem;font-size:.78rem;font-weight:700;box-shadow:none;white-space:nowrap}
+.av2-mode.pick{background:var(--good-bg);border-color:color-mix(in srgb,var(--good) 45%,transparent);color:var(--good)}
+.av2-place{flex:1 0 100%;font-size:.85rem}
 .av2-del{flex:0 0 auto;background:transparent;border:1px solid var(--line);color:var(--muted);
   border-radius:9px;padding:.4rem .58rem;box-shadow:none}
 .av2-del:hover{border-color:var(--bad);color:var(--bad);background:var(--bad-bg)}

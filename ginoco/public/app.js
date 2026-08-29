@@ -4232,42 +4232,56 @@ function showBulkResults(r) {
 // Präzise Verfügbarkeit: pro Wochentag beliebig viele „von–bis"-Zeiträume.
 const AV_DAYS = [['mo', 'Montag'], ['di', 'Dienstag'], ['mi', 'Mittwoch'], ['do', 'Donnerstag'], ['fr', 'Freitag'], ['sa', 'Samstag'], ['so', 'Sonntag']];
 const AV_RE = /^([01]?\d|2[0-3]):[0-5]\d$/;
+function avNormWin(w) {
+  if (Array.isArray(w) && w.length >= 2) return { v: String(w[0]), b: String(w[1]), m: 'school', p: '' };
+  if (w && typeof w === 'object') return { v: String(w.v || ''), b: String(w.b || ''), m: w.m === 'pickup' ? 'pickup' : 'school', p: w.p ? String(w.p) : '' };
+  return null;
+}
 function avParse(json) {
   let av = {}; try { av = JSON.parse(json || '{}') || {}; } catch { av = {}; }
   const st = {};
-  for (const [dk] of AV_DAYS) st[dk] = (Array.isArray(av[dk]) ? av[dk] : [])
-    .filter((w) => Array.isArray(w) && w.length === 2).map((w) => [String(w[0]), String(w[1])]);
+  for (const [dk] of AV_DAYS) st[dk] = (Array.isArray(av[dk]) ? av[dk] : []).map(avNormWin).filter(Boolean);
   return st;
 }
 function avSerialize(st) {
   const out = {};
   for (const [dk] of AV_DAYS) {
-    const wins = (st[dk] || []).filter((w) => AV_RE.test(w[0]) && AV_RE.test(w[1]) && w[0] < w[1]);
+    const wins = (st[dk] || []).filter((w) => AV_RE.test(w.v) && AV_RE.test(w.b) && w.v < w.b)
+      .map((w) => w.m === 'pickup' ? { v: w.v, b: w.b, m: 'pickup', p: (w.p || '').trim() } : { v: w.v, b: w.b });
     if (wins.length) out[dk] = wins;
   }
   return out;
 }
-// Rendert & verdrahtet den Editor neu (nach jedem Hinzufügen/Löschen).
+// Rendert & verdrahtet den Editor neu (nach jeder Änderung).
 function renderAvail(st) {
   const el = document.getElementById('es-avail'); if (!el) return;
   el.innerHTML = AV_DAYS.map(([dk, dl]) => {
     const wins = st[dk] || [];
     const rows = wins.map((w, i) => `<div class="av2-win">
-      <input type="time" class="av2-t" data-d="${dk}" data-i="${i}" data-p="0" value="${esc(w[0])}">
+      <input type="time" class="av2-t" data-d="${dk}" data-i="${i}" data-p="v" value="${esc(w.v)}">
       <span class="av2-dash">–</span>
-      <input type="time" class="av2-t" data-d="${dk}" data-i="${i}" data-p="1" value="${esc(w[1])}">
-      <button type="button" class="av2-del" data-del="${dk}:${i}" aria-label="entfernen">✕</button></div>`).join('');
+      <input type="time" class="av2-t" data-d="${dk}" data-i="${i}" data-p="b" value="${esc(w.b)}">
+      <button type="button" class="av2-mode ${w.m === 'pickup' ? 'pick' : ''}" data-mode="${dk}:${i}">${w.m === 'pickup' ? '📍 Abholung' : '🏫 Fahrschule'}</button>
+      <button type="button" class="av2-del" data-del="${dk}:${i}" aria-label="entfernen">✕</button>
+      ${w.m === 'pickup' ? `<input class="av2-place" data-place="${dk}:${i}" placeholder="Abholort (z.B. Schule, Bushaltestelle …)" value="${esc(w.p || '')}">` : ''}
+    </div>`).join('');
     return `<div class="av2-day"><div class="av2-dh">${dl}${wins.length ? '' : ' <span class="av2-none">– keine Zeit</span>'}</div>${rows}<button type="button" class="av2-add" data-add="${dk}">＋ Zeit hinzufügen</button></div>`;
   }).join('');
   el.querySelectorAll('[data-add]').forEach((b) => b.onclick = () => {
-    const dk = b.dataset.add; (st[dk] || (st[dk] = [])).push(['09:00', '12:00']); renderAvail(st);
+    const dk = b.dataset.add; (st[dk] || (st[dk] = [])).push({ v: '09:00', b: '12:00', m: 'school', p: '' }); renderAvail(st);
   });
   el.querySelectorAll('[data-del]').forEach((b) => b.onclick = () => {
     const [dk, i] = b.dataset.del.split(':'); st[dk].splice(Number(i), 1); renderAvail(st);
   });
+  el.querySelectorAll('[data-mode]').forEach((b) => b.onclick = () => {
+    const [dk, i] = b.dataset.mode.split(':'); const w = st[dk][Number(i)]; w.m = w.m === 'pickup' ? 'school' : 'pickup'; renderAvail(st);
+  });
   el.querySelectorAll('.av2-t').forEach((inp) => inp.onchange = () => {
-    const dk = inp.dataset.d, i = Number(inp.dataset.i), p = Number(inp.dataset.p);
+    const dk = inp.dataset.d, i = Number(inp.dataset.i), p = inp.dataset.p;
     if (st[dk] && st[dk][i]) st[dk][i][p] = inp.value;
+  });
+  el.querySelectorAll('.av2-place').forEach((inp) => inp.oninput = () => {
+    const [dk, i] = inp.dataset.place.split(':'); if (st[dk] && st[dk][i]) st[dk][i].p = inp.value;
   });
 }
 

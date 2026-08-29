@@ -1947,7 +1947,13 @@ async function handleApi(req, res, url) {
           for (const d of ['mo', 'di', 'mi', 'do', 'fr', 'sa', 'so']) {
             const arr = Array.isArray(src[d]) ? src[d] : [];
             const wins = [];
-            for (const w of arr) if (Array.isArray(w) && w.length === 2 && re.test(w[0]) && re.test(w[1]) && w[0] < w[1]) wins.push([w[0], w[1]]);
+            for (const w of arr) {
+              let v, bb, m = 'school', p = '';
+              if (Array.isArray(w) && w.length >= 2) { v = w[0]; bb = w[1]; }
+              else if (w && typeof w === 'object') { v = w.v; bb = w.b; m = w.m === 'pickup' ? 'pickup' : 'school'; p = w.p ? String(w.p).slice(0, 80).trim() : ''; }
+              else continue;
+              if (re.test(v) && re.test(bb) && v < bb) wins.push(m === 'pickup' ? { v, b: bb, m, p } : { v, b: bb });
+            }
             if (wins.length) clean[d] = wins;
           }
           if (Object.keys(clean).length) av = JSON.stringify(clean);
