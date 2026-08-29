@@ -589,6 +589,23 @@ th{color:var(--muted);font-weight:600;font-size:.78rem;text-transform:uppercase;
 .pl-mode{font-size:.78rem;color:var(--muted);background:#161d27;border:1px solid var(--line);border-radius:20px;padding:.15rem .55rem;white-space:nowrap;max-width:48%;overflow:hidden;text-overflow:ellipsis}
 .pl-mode.pick{color:#f0b459;border-color:rgba(230,150,58,.4);background:rgba(230,150,58,.1)}
 @media(max-width:560px){.pl-mode{max-width:40%}.pl-dur{display:none}}
+/* Tagesstatus */
+.ds-banner{display:flex;gap:.7rem;align-items:flex-start;border-radius:14px;padding:.8rem .95rem;margin:0 0 .9rem;border:1px solid var(--line)}
+.ds-banner .ds-ic{font-size:1.5rem;line-height:1}
+.ds-banner .ds-t{font-weight:800}
+.ds-banner .ds-s{font-size:.86rem;color:var(--muted);margin-top:.1rem;line-height:1.45}
+.ds-ok{background:var(--good-bg);border-color:rgba(53,192,125,.4)}
+.ds-ok .ds-t{color:var(--good)}
+.ds-delay{background:rgba(230,150,58,.12);border-color:rgba(230,150,58,.4)}
+.ds-delay .ds-t{color:#f0b459}
+.ds-cur{display:flex;gap:.6rem;align-items:center;border:1px solid var(--line);border-radius:12px;padding:.65rem .8rem;background:var(--card2)}
+.ds-cur .ds-ic{font-size:1.4rem}
+.ds-cur.ds-ok{background:var(--good-bg);border-color:rgba(53,192,125,.35)}
+.ds-cur.ds-delay{background:rgba(230,150,58,.1);border-color:rgba(230,150,58,.35)}
+.ds-chips{display:flex;flex-wrap:wrap;gap:.4rem}
+.ds-chip{background:#1c2531;color:var(--ink);border:1px solid var(--line);border-radius:20px;padding:.4rem .8rem;font-size:.86rem;font-weight:600}
+.ds-chip:hover{background:#26313f}
+.ds-chip.on{background:var(--brand);color:#fff;border-color:var(--brand)}
 
 /* ---- Aussehen-Panel (Farbe, Schrift, Größe) ---- */
 .ap-sec{padding:.9rem 0;margin:0;border-top:1px solid var(--line)}

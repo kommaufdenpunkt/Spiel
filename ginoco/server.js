@@ -1134,6 +1134,14 @@ async function handleApi(req, res, url) {
     return ok(res, { away: rows });
   }
 
+  // Tagesstatus (laeuft planmaessig / Verzoegerung) fuer einen Tag – fuer alle Eingeloggten lesbar.
+  if (p === '/api/day-status' && method === 'GET') {
+    if (!sess) return bad(res, 'Bitte anmelden', 401);
+    const date = url.searchParams.get('date') || todayStr();
+    const row = db.prepare('SELECT date,state,minutes,reason,note,updated_at FROM day_status WHERE date=?').get(date) || null;
+    return ok(res, { status: row });
+  }
+
   // Benachrichtigungen (Portal-Postfach)
   if (p === '/api/my/notifications' && method === 'GET') {
     if (!requireStudent()) return bad(res, 'Bitte anmelden', 401);
@@ -1624,6 +1632,36 @@ async function handleApi(req, res, url) {
       }
     }
     return ok(res, { moved, minutes: mins });
+  }
+
+  // Tagesstatus setzen: "laeuft planmaessig" oder Verzoegerung mit Grund. Die
+  // Fahrschueler mit einem Termin an dem Tag werden benachrichtigt (Push + Postfach).
+  if (p === '/api/instructor/day-status' && method === 'POST') {
+    if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
+    const b = await readBody(req);
+    const date = /^\d{4}-\d{2}-\d{2}$/.test(b.date || '') ? b.date : todayStr();
+    const state = b.state === 'delay' ? 'delay' : 'ok';
+    const REASONS = { rush: '🚗 Berufsverkehr', jam: '🚧 Stau', snow: '❄️ Schnee', ice: '🧊 Glatteis', weather: '🌧️ Witterung', other: '⏳ Grund' };
+    const reason = state === 'delay' && b.reason in REASONS ? b.reason : null;
+    const minutes = state === 'delay' ? Math.max(0, Math.min(240, Math.round(Number(b.minutes) || 0))) : 0;
+    const note = b.note ? String(b.note).trim().slice(0, 200) : null;
+    db.prepare(`INSERT INTO day_status(date,state,minutes,reason,note,updated_at)
+      VALUES(?,?,?,?,?,?)
+      ON CONFLICT(date) DO UPDATE SET state=excluded.state, minutes=excluded.minutes, reason=excluded.reason, note=excluded.note, updated_at=excluded.updated_at`)
+      .run(date, state, minutes, reason, note, new Date().toISOString());
+    // Betroffene Schueler (Termin an dem Tag, nicht storniert) benachrichtigen.
+    const studs = db.prepare("SELECT DISTINCT student_id FROM bookings WHERE date=? AND student_id IS NOT NULL AND status NOT IN ('cancelled')").all(date).map((r) => r.student_id);
+    const rlabel = reason ? REASONS[reason] : '';
+    let msg;
+    if (state === 'delay') {
+      msg = `⏳ Heute läuft es etwas später: dein Fahrlehrer meldet ca. ${minutes} Min Verzögerung${rlabel ? ' wegen ' + rlabel : ''}.${note ? ' ' + note : ''} Deine Uhrzeit bleibt – bitte trotzdem pünktlich da sein, es kann sich kurzfristig ändern.`;
+    } else {
+      msg = `✅ Heute läuft alles planmäßig. Bis später!`;
+    }
+    for (const sid of studs) notify(sid, 'daystatus', msg, date, null);
+    logEvent('daystatus', { actor: 'instructor', date,
+      detail: state === 'delay' ? `Verzögerung ~${minutes} Min${rlabel ? ' – ' + rlabel : ''}${note ? ' – ' + note : ''}` : 'Läuft planmäßig' });
+    return ok(res, { ok: true, notified: studs.length });
   }
 
   // Erinnerungen jetzt pruefen/versenden (laeuft auch automatisch im Hintergrund)

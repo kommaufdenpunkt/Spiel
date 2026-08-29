@@ -470,8 +470,9 @@ window.__openTour = openTour;
 // ---------- Was ist neu? (Changelog) ----------
 const CHANGELOG_VER = '3.74';
 const CHANGELOG = [
-  { v: '3.74', d: '29.08.2026', title: '🧠 KI-Planer & Termin-Vorschläge', items: [
+  { v: '3.74', d: '29.08.2026', title: '🧠 KI-Planer, Vorschläge & Tagesstatus', items: [
     '🧠 <strong>KI-Planer (Fahrlehrer):</strong> schlägt aus der Verfügbarkeit deiner Fahrschüler passende Termine vor – lückenlos in deine freien Slots, höchstens einer pro Tag & Schüler. Auswählen, „übernehmen“, fertig.',
+    '🚦 <strong>Tagesstatus:</strong> Der Fahrlehrer sagt mit einem Tipp, ob heute alles <strong>planmäßig</strong> läuft oder es <strong>später</strong> wird – mit Grund (Berufsverkehr, Stau, Schnee, Glatteis, Witterung). Du siehst es sofort oben und bekommst eine Push.',
     '✅ <strong>Vorschläge annehmen/ablehnen:</strong> Trägt dein Fahrlehrer einen Termin für dich ein, kannst du ihn jetzt klar <strong>annehmen</strong> oder <strong>ablehnen</strong> – er wird über deine Antwort benachrichtigt.',
     '⏳ <strong>Antwortfrist:</strong> Ein Vorschlag verfällt nach 2 Stunden ohne Antwort (einstellbar) – der Slot wird dann automatisch wieder frei.',
     '📜 Ruhiger Look ohne sichtbare Scrollbalken – wie eine echte App.'] },
@@ -1348,6 +1349,7 @@ async function renderStudent() {
     <div class="card hidden" id="live-card"></div>
     <div class="card hidden" id="notif-card"></div>
     <div class="card hidden" id="profile-card"></div>
+    <div id="daystatus-banner"></div>
     <div class="card" id="week-card"></div>
     <div class="card hidden" id="lessons-card"></div>
     <div class="card" id="messages-card"></div>
@@ -1395,12 +1397,14 @@ async function syncStudent() {
   $('#dlabel').textContent = fmtDay(state.date);
   $('#dpick').value = state.date;
   try {
-    const [mine, day, off, notif, away] = await Promise.all([
+    const [mine, day, off, notif, away, dstat] = await Promise.all([
       api('/api/my/bookings'), api('/api/slots?date=' + state.date),
-      api('/api/offers'), api('/api/my/notifications'), api('/api/away')]);
+      api('/api/offers'), api('/api/my/notifications'), api('/api/away'),
+      api('/api/day-status').catch(() => ({ status: null }))]);
     myBookingsCache = mine.bookings;
     myStats = mine.stats || null; myAdk = mine.adk || null; myProgress = mine.progress || null;
     renderAway(away.away);
+    renderDayStatusBanner(dstat.status, mine.bookings);
     renderNotifications(notif.notifications, notif.unread);
     renderLessonTimer(mine.bookings);
     refreshStudentLive();
@@ -2551,6 +2555,31 @@ function renderAway(away) {
   el.innerHTML = `🌴 <strong>Fahrlehrer im Urlaub:</strong> ${dates} – an diesen Tagen keine Fahrstunden.`;
 }
 
+// Tagesstatus (läuft planmäßig / Verzögerung) – Gründe zentral.
+const DS_REASONS = [['rush', '🚗', 'Berufsverkehr'], ['jam', '🚧', 'Stau'], ['snow', '❄️', 'Schnee'], ['ice', '🧊', 'Glatteis'], ['weather', '🌧️', 'Witterung'], ['other', '⏳', 'Sonstiges']];
+function dsReason(key) { const r = DS_REASONS.find((x) => x[0] === key); return r ? r[1] + ' ' + r[2] : ''; }
+// Schüler-Banner: nur zeigen, wenn heute ein Status gesetzt ist (und der Schüler heute eine Stunde hat).
+function renderDayStatusBanner(status, bookings) {
+  const el = $('#daystatus-banner'); if (!el) return;
+  const today = todayStr();
+  const hasToday = (bookings || []).some((b) => b.date === today && b.status !== 'cancelled' && b.confirmed !== 0);
+  if (!status || status.date !== today || !hasToday) { el.innerHTML = ''; return; }
+  if (status.state === 'delay') {
+    const r = status.reason ? dsReason(status.reason) : '';
+    el.innerHTML = `<div class="ds-banner ds-delay">
+      <div class="ds-ic">⏳</div>
+      <div><div class="ds-t">Heute etwas später — ca. ${status.minutes} Min</div>
+        <div class="ds-s">${r ? 'Grund: ' + esc(r) + '. ' : ''}${status.note ? esc(status.note) + ' ' : ''}Deine Uhrzeit bleibt – bitte trotzdem pünktlich da sein.</div></div>
+    </div>`;
+  } else {
+    el.innerHTML = `<div class="ds-banner ds-ok">
+      <div class="ds-ic">✅</div>
+      <div><div class="ds-t">Heute läuft alles planmäßig</div>
+        <div class="ds-s">Dein Fahrlehrer ist im Plan. Bis später!</div></div>
+    </div>`;
+  }
+}
+
 // ---- Handy-Benachrichtigungen (Web Push) ----
 function urlB64ToUint8(b64) {
   const pad = '='.repeat((4 - (b64.length % 4)) % 4);
@@ -3187,6 +3216,7 @@ async function tabHeute() {
   const gname = firstName(state.settings?.instructor_name || state.user?.name || '');
   box.innerHTML = `<div class="card hidden" id="live-card"></div>
     <div id="reset-reqs"></div>
+    <div class="card" id="ds-card"></div>
     <div class="card">
       <div class="greet-big">${greetWord()}${gname ? ', <strong>' + esc(gname) + '</strong>' : ''} 👋</div>
       <div id="today-strip"></div>
@@ -3196,6 +3226,7 @@ async function tabHeute() {
   try {
     renderLiveInstr();
     renderResetRequests();
+    renderInstrDayStatus();
     const stats = await api('/api/instructor/stats?date=' + todayStr());
     renderGauge($('#gauge'), stats);
     renderTiles($('#tiles'), stats);
@@ -3292,6 +3323,55 @@ async function renderLiveInstr() {
       renderLiveInstr();
     } catch (e) { toast(e.message, 'err'); }
   });
+}
+
+// Fahrlehrer: Tagesstatus setzen (läuft planmäßig / Verzögerung mit Grund).
+async function renderInstrDayStatus() {
+  const card = $('#ds-card'); if (!card) return;
+  let status = null;
+  try { status = (await api('/api/day-status?date=' + todayStr())).status; } catch {}
+  const isDelay = status && status.state === 'delay';
+  const cur = isDelay
+    ? `<div class="ds-cur ds-delay"><span class="ds-ic">⏳</span><div><strong>Heute ~${status.minutes} Min später</strong>${status.reason ? '<br><span class="muted">' + esc(dsReason(status.reason)) + '</span>' : ''}${status.note ? '<br><span class="muted">' + esc(status.note) + '</span>' : ''}</div></div>`
+    : (status && status.state === 'ok'
+      ? `<div class="ds-cur ds-ok"><span class="ds-ic">✅</span><div><strong>Läuft planmäßig</strong><br><span class="muted">Deine Fahrschüler mit einem Termin heute wurden informiert.</span></div></div>`
+      : `<div class="ds-cur"><span class="ds-ic">🕒</span><div><strong>Noch kein Status für heute</strong><br><span class="muted">Sag deinen Fahrschülern kurz Bescheid, wie der Tag läuft.</span></div></div>`);
+  card.innerHTML = `<h2>Tagesstatus</h2>
+    <p class="hint">Ein Tipp genügt: deine Fahrschüler mit einem Termin heute sehen sofort, ob alles planmäßig läuft – oder warum es später wird (Berufsverkehr, Glatteis, Schnee). Sie bekommen eine Push.</p>
+    ${cur}
+    <div class="inline" style="margin-top:.7rem">
+      <button class="${isDelay ? 'sec' : ''}" id="ds-ok">✅ Läuft planmäßig</button>
+      <button class="sec" id="ds-delay">⏳ Verzögerung melden</button>
+    </div>`;
+  $('#ds-ok').onclick = async () => {
+    try { const r = await api('/api/instructor/day-status', { method: 'POST', body: { state: 'ok' } });
+      toast(`Planmäßig gemeldet${r.notified ? ` · ${r.notified} informiert` : ''} ✓`, 'ok'); renderInstrDayStatus(); }
+    catch (e) { toast(e.message, 'err'); }
+  };
+  $('#ds-delay').onclick = () => openDelayStatusModal(status);
+}
+function openDelayStatusModal(status) {
+  const curMin = status && status.state === 'delay' ? status.minutes : 15;
+  const curReason = status && status.state === 'delay' ? status.reason : 'rush';
+  const mins = [5, 10, 15, 20, 30, 45];
+  modal(`<h3>⏳ Verzögerung melden</h3>
+    <p class="hint">Wie viel später wird’s ungefähr – und warum? Deine Fahrschüler heute bekommen eine Push.</p>
+    <label>Ungefähr</label>
+    <div class="ds-chips" id="ds-min">${mins.map((m) => `<button type="button" class="ds-chip ${m === curMin ? 'on' : ''}" data-m="${m}">+${m} Min</button>`).join('')}</div>
+    <label style="margin-top:.6rem">Grund</label>
+    <div class="ds-chips" id="ds-reason">${DS_REASONS.map(([k, ic, lb]) => `<button type="button" class="ds-chip ${k === curReason ? 'on' : ''}" data-r="${k}">${ic} ${lb}</button>`).join('')}</div>
+    <div class="field" style="margin-top:.6rem"><label>Notiz (optional)</label><input id="ds-note" maxlength="200" placeholder="z. B. Straße gesperrt, fahre außenrum" value="${status && status.note ? esc(status.note) : ''}"></div>
+    <div class="actions"><button class="sec" onclick="window.__closeModal()">Abbrechen</button><button id="ds-send">Melden & Push senden</button></div>`);
+  let selMin = curMin, selReason = curReason;
+  const wrapMin = $('#ds-min'), wrapR = $('#ds-reason');
+  wrapMin.querySelectorAll('[data-m]').forEach((b) => b.onclick = () => { selMin = Number(b.dataset.m); wrapMin.querySelectorAll('.ds-chip').forEach((x) => x.classList.toggle('on', x === b)); });
+  wrapR.querySelectorAll('[data-r]').forEach((b) => b.onclick = () => { selReason = b.dataset.r; wrapR.querySelectorAll('.ds-chip').forEach((x) => x.classList.toggle('on', x === b)); });
+  $('#ds-send').onclick = async () => {
+    try {
+      const r = await api('/api/instructor/day-status', { method: 'POST', body: { state: 'delay', minutes: selMin, reason: selReason, note: $('#ds-note').value.trim() } });
+      closeModal(); toast(`Verzögerung gemeldet${r.notified ? ` · ${r.notified} informiert` : ''} ✓`, 'ok'); renderInstrDayStatus();
+    } catch (e) { toast(e.message, 'err'); }
+  };
 }
 
 function renderTiles(el, stats) {

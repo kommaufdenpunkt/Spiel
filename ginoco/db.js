@@ -264,6 +264,17 @@ db.exec('INSERT OR IGNORE INTO live_location(id,active) VALUES(1,0)');
 ensureColumn('live_location', 'eta_min', 'eta_min INTEGER');  // "Ich bin in X Min da" (vom Fahrlehrer gesagt)
 ensureColumn('live_location', 'eta_at', 'eta_at TEXT');       // wann gesagt (zum Runterzaehlen)
 
+// Tagesstatus: der Fahrlehrer sagt fuer einen Tag "laeuft planmaessig" oder meldet
+// eine Verzoegerung mit Grund (Berufsverkehr, Stau, Schnee, Glatteis, Witterung).
+db.exec(`CREATE TABLE IF NOT EXISTS day_status (
+  date TEXT PRIMARY KEY,
+  state TEXT NOT NULL DEFAULT 'ok',   -- 'ok' | 'delay'
+  minutes INTEGER NOT NULL DEFAULT 0, -- ungefaehre Verzoegerung in Minuten
+  reason TEXT,                        -- rush | jam | snow | ice | weather | other
+  note TEXT,                          -- optionaler Freitext
+  updated_at TEXT
+);`);
+
 // ---- Voreinstellungen (einmalig setzen) ----
 const DEFAULTS = {
   instructor_name: 'Fahrlehrer',
