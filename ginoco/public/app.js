@@ -3541,7 +3541,8 @@ function openInvoiceModal(sid, name) {
         </div>
       </div>`;
     }).join('');
-    box.innerHTML = `<div class="inv-days"><div class="inv-days-h">Minuten je fsmanager-Tag</div>${dayRows || '<span class="hint">–</span>'}</div>
+    const anyOver = Object.values(byDay).some((m) => m > 495);
+    box.innerHTML = `<div class="inv-days"><div class="inv-days-h">Minuten je fsmanager-Tag</div>${dayRows || '<span class="hint">–</span>'}${anyOver ? '<div class="inv-legend">🔴 Rot = dieser Tag läge über der 495-Min-Grenze. Verschiebe unten eine Stunde per fsmanager-Datum auf einen freien Tag – die Summe rechnet sich sofort neu.</div>' : ''}</div>
       <div class="inv-list">${rows || '<p class="hint">Noch keine gefahrenen Stunden.</p>'}</div>`;
     box.querySelectorAll('.inv-row').forEach((row) => {
       const id = row.dataset.id;
