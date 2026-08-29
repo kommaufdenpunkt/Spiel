@@ -19,7 +19,7 @@ const SESSION_DAYS = 30;
 const APP_VERSION = "3.72.0";
 // Einstellungen, die Schueler/Oeffentlichkeit sehen duerfen (Rest bleibt beim Fahrlehrer)
 const PUBLIC_SETTINGS = ['instructor_name', 'instructor_phone', 'policy_text',
-  'cancel_hours', 'lock_hours', 'booking_horizon_days', 'booking_horizon_days_rank2',
+  'cancel_hours', 'lock_hours', 'reserve_expire_min', 'booking_horizon_days', 'booking_horizon_days_rank2',
   'live_lead_min', 'lesson_min', 'break_min', 'start_time', 'last_start', 'max_per_week', 'release_time',
   'registration_open', 'sonder_min_ueberland', 'sonder_min_autobahn', 'sonder_min_nacht',
   'req_ueberland', 'req_autobahn', 'req_nacht', 'rank2_min_lessons', 'passkey_enabled'];
@@ -2330,7 +2330,7 @@ async function handleApi(req, res, url) {
       return bad(res, 'Das Skala-Ende (höchstens) darf nicht kleiner als das Monatsziel sein');
     const allowed = ['instructor_name', 'start_time', 'last_start', 'lesson_min', 'break_min',
       'weekly_target_h', 'daily_target_h', 'weekly_lo_h', 'monthly_target_h', 'monthly_max_h', 'workdays', 'max_per_week', 'student_max_per_day',
-      'booking_horizon_days', 'cancel_hours', 'lock_hours', 'release_time', 'short_day_last_start',
+      'reserve_expire_min', 'booking_horizon_days', 'cancel_hours', 'lock_hours', 'release_time', 'short_day_last_start',
       'vacation_credit_min', 'vacation_days_left', 'late_grace_min', 'policy_text',
       'instructor_phone', 'avg_speed_kmh', 'live_lead_min',
       'meet_default_label', 'meet_default_lat', 'meet_default_lng',
@@ -2969,6 +2969,38 @@ function sendDueReminders() {
 // alte, gelesene Postfach-Eintraege entfernt; danach die WAL-Datei zusammengefuehrt
 // und der Abfrageplaner optimiert. So bleibt die DB schlank und schnell.
 let lastMaintDay = null;
+// Vom Fahrlehrer vorgeschlagene (reservierte, confirmed=0) Termine, auf die der
+// Schueler nicht rechtzeitig geantwortet hat, verfallen automatisch: Slot wird
+// wieder frei, Fahrlehrer bekommt eine Push. Frist = reserve_expire_min (Standard
+// 120 Min), aber immer gedeckelt durch den Termin selbst (spaetestens zum Start).
+function expireStaleReservations() {
+  const mins = Number(getSettingRaw('reserve_expire_min')) || 0;
+  const now = Date.now();
+  const rows = db.prepare(
+    "SELECT id,student_id,date,start_time,created_at FROM bookings WHERE status='booked' AND confirmed=0"
+  ).all();
+  let expired = 0;
+  for (const b of rows) {
+    // Termin bereits begonnen/vorbei? -> Vorschlag ist hinfaellig.
+    const lessonPassed = b.date < todayStr() || (b.date === todayStr() && toMin(b.start_time) <= toMin(nowHHMM()));
+    // Antwortfrist abgelaufen?
+    const proposedAt = Date.parse(b.created_at || '') || now;
+    const windowOver = mins > 0 && now >= proposedAt + mins * 60000;
+    if (!lessonPassed && !windowOver) continue;
+    db.prepare("UPDATE bookings SET status='cancelled' WHERE id=?").run(b.id);
+    expired++;
+    logEvent('reserve_expired', { actor: 'system', studentId: b.student_id, bookingId: b.id, date: b.date,
+      detail: `${wdShort(b.date)} ${dmy(b.date)} ${b.start_time} Uhr – Vorschlag ohne Antwort verfallen` });
+    const st = db.prepare('SELECT name FROM students WHERE id=?').get(b.student_id);
+    if (!lessonPassed) {
+      pushToInstructor(`⏳ Kein Rückmeldung von ${st?.name || 'einem Fahrschüler'} zum Vorschlag ${wdShort(b.date)} ${dmy(b.date)} ${b.start_time} Uhr – verfallen, der Slot ist wieder frei.`);
+      notify(b.student_id, 'info',
+        `⏳ Der vorgeschlagene Termin ${wdShort(b.date)} ${dmy(b.date)} um ${b.start_time} Uhr ist ohne deine Antwort verfallen. Frag deinen Fahrlehrer, falls du ihn doch möchtest.`, b.date, b.id);
+    }
+  }
+  return expired;
+}
+
 function nightlyMaintenance(force = false) {
   const today = todayStr();
   const hour = Number(nowHHMM().slice(0, 2));
@@ -3049,12 +3081,14 @@ server.listen(PORT, HOST, () => {
   try { ensureVapidKeys(); } catch (e) { console.error('vapid', e); } // Push-Schlüssel sicherstellen
   // Erinnerungen im Hintergrund pruefen (alle 5 Minuten) + naechtliche Server-Pflege
   try { sendDueReminders(); } catch (e) { console.error(e); }
+  try { expireStaleReservations(); } catch (e) { console.error(e); }
   try { nightlyMaintenance(); } catch (e) { console.error(e); }
   setInterval(() => {
     try { sendDueReminders(); } catch (e) { console.error(e); }
+    try { expireStaleReservations(); } catch (e) { console.error(e); }
     try { nightlyMaintenance(); } catch (e) { console.error(e); }
   }, 5 * 60 * 1000);
 });
 
 // Nur für automatisierte Tests exportiert (keine Wirkung auf den laufenden Server).
-export { encryptPush, vapidAuth, b64url, b64urlDecode, ensureVapidKeys };
+export { encryptPush, vapidAuth, b64url, b64urlDecode, ensureVapidKeys, expireStaleReservations };

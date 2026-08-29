@@ -279,6 +279,7 @@ const DEFAULTS = {
   workdays: '1,2,3,4,5,6',   // 1=Mo ... 7=So
   max_per_week: '2',         // max. Fahrstunden pro Schueler & Woche
   student_max_per_day: '1',  // max. selbst gebuchte Fahrstunden pro Schueler & Tag (0 = ohne Limit; Fahrlehrer-Eintraege zaehlen nicht)
+  reserve_expire_min: '120', // vom Fahrlehrer vorgeschlagener Termin verfaellt nach so vielen Min ohne Antwort (0 = nie); gedeckelt durch den Termin selbst
   booking_horizon_days: '10',// so viele Tage im Voraus duerfen Schueler buchen (Rang 1)
   cancel_hours: '48',        // bis so viele Std. vorher kostenlose Stornierung
   lock_hours: '36',          // ab so viel Std. vorher ist der Termin gesperrt (kein Absagen/Abgeben)
@@ -367,7 +368,7 @@ export function getSettings() {
   // Zahlen als Zahlen liefern
   for (const n of ['lesson_min', 'break_min', 'weekly_target_h', 'daily_target_h', 'weekly_lo_h',
     'monthly_target_h', 'monthly_max_h',
-    'max_per_week', 'student_max_per_day', 'booking_horizon_days', 'cancel_hours', 'lock_hours',
+    'max_per_week', 'student_max_per_day', 'reserve_expire_min', 'booking_horizon_days', 'cancel_hours', 'lock_hours',
     'vacation_credit_min', 'vacation_days_left', 'late_grace_min', 'avg_speed_kmh', 'live_lead_min',
     'req_ueberland', 'req_autobahn', 'req_nacht', 'rank2_min_lessons', 'booking_horizon_days_rank2',
     'sonder_min_ueberland', 'sonder_min_autobahn', 'sonder_min_nacht']) {

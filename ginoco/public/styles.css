@@ -571,6 +571,8 @@ th{color:var(--muted);font-weight:600;font-size:.78rem;text-transform:uppercase;
 .reserve-note{background:rgba(230,150,58,.12);border:1px solid rgba(230,150,58,.35);
   color:#f0c07a;border-radius:11px;padding:.6rem .85rem;font-size:.9rem;margin:0 0 .9rem;line-height:1.5}
 .reserve-note strong{color:#ffd9a0}
+.resv-due{margin-top:.3rem;font-size:.82rem;color:#f0b459;line-height:1.4}
+.resv-due strong{color:#ffd9a0}
 
 /* ---- Aussehen-Panel (Farbe, Schrift, Größe) ---- */
 .ap-sec{padding:.9rem 0;margin:0;border-top:1px solid var(--line)}

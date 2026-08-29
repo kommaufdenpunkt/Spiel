@@ -2141,7 +2141,7 @@ function studentBookingItem(b) {
   const cancelH = state.settings?.cancel_hours || 24;
   const h = hoursUntil(b.date, b.start_time);
   const soon = h < cancelH;
-  let st, actions = '';
+  let st, actions = '', reserveHint = '';
   if (b.status === 'done') {
     st = '<span class="badge done">gefahren</span>';
   } else if (b.status === 'offered') {
@@ -2152,6 +2152,18 @@ function studentBookingItem(b) {
     st = '<span class="badge reserved">🔶 reserviert</span>';
     actions = `<button class="sm" data-confirm="${b.id}">✅ Annehmen</button>`
       + ` <button class="ghost sm" data-reject="${b.id}">✕ Ablehnen</button>`;
+    // Frist zum Antworten (created_at + reserve_expire_min), gedeckelt durch den Termin.
+    const rm = Number(state.settings?.reserve_expire_min) || 0;
+    if (rm > 0 && b.created_at) {
+      const lessonAt = new Date(b.date + 'T' + (b.start_time.length === 4 ? '0' + b.start_time : b.start_time));
+      let due = new Date(new Date(b.created_at).getTime() + rm * 60000);
+      if (lessonAt < due) due = lessonAt;
+      if (due.getTime() > Date.now()) {
+        const dueTime = due.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+        const sameDay = due.toDateString() === new Date().toDateString();
+        reserveHint = `<div class="resv-due">⏳ Bitte bis <strong>${sameDay ? '' : fmtShort(due.toISOString().slice(0, 10)) + ' · '}${dueTime} Uhr</strong> antworten – sonst wird der Termin wieder frei.</div>`;
+      }
+    }
   } else {
     st = '<span class="badge booked">✅ bestätigt</span>';
     const lockH = state.settings?.lock_hours || 36;
@@ -2172,7 +2184,7 @@ function studentBookingItem(b) {
       <div class="when">${WD[isoDow(b.date) - 1]} ${fmtShort(b.date)} · ${b.start_time} <span class="muted" style="font-weight:400">(${b.duration_min} Min)</span></div>
       <div class="meta">${st} ${typeBadge(b.lesson_type)} ${gear} ${b.plate ? '· ' + esc(b.plate) : ''}
         ${b.status === 'booked' && soon ? `<span class="muted">· in ${h < 1 ? '<1' : Math.round(h)} h</span>` : ''}</div>
-      ${fb}
+      ${reserveHint}${fb}
     </div>
     <div class="inline">${actions}</div>
   </div>`;
@@ -5259,6 +5271,7 @@ function tabEinstellungen() {
       <div class="row"><div class="field"><label>Max. Fahrstunden pro Schüler & Woche</label><input id="e-max" type="number" value="${s.max_per_week}" min="1"></div>
         <div class="field"><label>Selbst-Buchung pro Tag ${helpDot('So viele Fahrstunden darf sich ein Fahrschüler pro Tag selbst buchen. 0 = ohne Limit. Deine eigenen Einträge sind nicht betroffen.')}</label><input id="e-maxday" type="number" value="${s.student_max_per_day}" min="0"></div>
         <div class="field"><label>Vorausbuchung (Tage)</label><input id="e-horizon" type="number" value="${s.booking_horizon_days}" min="1"></div></div>
+      <div class="field"><label>Vorschlag verfällt nach (Min ohne Antwort) ${helpDot('Schlägst du einem Fahrschüler einen Termin vor, verfällt er nach so vielen Minuten ohne Annehmen/Ablehnen – der Slot wird wieder frei und du bekommst eine Nachricht. Standard 120 (2 Std.). 0 = verfällt nie. Immer gedeckelt durch den Termin selbst.')}</label><input id="e-resv" type="number" value="${s.reserve_expire_min}" min="0" step="15"></div>
       <div class="row"><div class="field"><label>Kostenlos stornieren bis (Std. vorher) ${helpDot('Bis so viele Stunden vor Beginn darf der Fahrschüler kostenlos absagen.')}</label><input id="e-cancel" type="number" value="${s.cancel_hours}" min="0"></div>
         <div class="field"><label>Sperrfrist – fest ab (Std. vorher) ${helpDot('Ab so vielen Stunden vor Beginn steht der Termin fest – kein Absagen oder Ins-Angebot-Geben mehr.')}</label><input id="e-lock" type="number" value="${s.lock_hours}" min="0"></div></div>
       <div class="field"><label>Toleranz Verspätung (Min) ${helpDot('So viele Minuten Verspätung gelten noch nicht als „nicht erschienen“.')}</label><input id="e-grace" type="number" value="${s.late_grace_min}" step="5"></div>
@@ -5338,6 +5351,7 @@ function tabEinstellungen() {
         monthly_target_h: Number($('#e-mt').value), monthly_max_h: Number($('#e-mmax').value),
         workdays: workdays || '1,2,3,4,5',
         max_per_week: Number($('#e-max').value), student_max_per_day: Number($('#e-maxday').value), instructor_name: $('#e-name').value,
+        reserve_expire_min: Number($('#e-resv').value),
         booking_horizon_days: Number($('#e-horizon').value), cancel_hours: Number($('#e-cancel').value),
         lock_hours: Number($('#e-lock').value),
         release_time: $('#e-release').value, short_day_last_start: $('#e-shortlast').value,
