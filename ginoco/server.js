@@ -1880,7 +1880,7 @@ async function handleApi(req, res, url) {
     const rows = db.prepare(
       `SELECT s.id,s.name,s.first_name,s.last_name,s.email,s.phone,s.username,s.birth_year,s.birth_date,
         s.street,s.house_no,s.zip,s.city,s.allowed_durations,s.created_at,
-        s.home_label,s.home_lat,s.home_lng,s.travel_min,s.home_base,s.archived_at,s.notes,
+        s.home_label,s.home_lat,s.home_lng,s.travel_min,s.home_base,s.availability,s.archived_at,s.notes,
         (s.photo IS NOT NULL) AS has_photo,
         (SELECT COUNT(*) FROM bookings b WHERE b.student_id=s.id AND b.status='done') AS done_count
        FROM students s WHERE s.archived_at IS ${archived ? 'NOT NULL' : 'NULL'} ORDER BY s.name`
@@ -1900,7 +1900,7 @@ async function handleApi(req, res, url) {
     const b = await readBody(req);
     const sid = Number(stm[1]);
     // Stammdaten bearbeiten (Vorname/Nachname bzw. Name / Telefon / E-Mail / Jahrgang / Notiz)
-    if ('first_name' in b || 'last_name' in b || 'name' in b || 'phone' in b || 'email' in b || 'birth_year' in b || 'birth_date' in b || 'street' in b || 'house_no' in b || 'zip' in b || 'city' in b || 'notes' in b || 'travel_min' in b) {
+    if ('first_name' in b || 'last_name' in b || 'name' in b || 'phone' in b || 'email' in b || 'birth_year' in b || 'birth_date' in b || 'street' in b || 'house_no' in b || 'zip' in b || 'city' in b || 'notes' in b || 'travel_min' in b || 'availability' in b || 'home_base' in b) {
       const st = db.prepare('SELECT id FROM students WHERE id=?').get(sid);
       if (!st) return bad(res, 'Schueler nicht gefunden', 404);
       const fields = [], vals = [];
@@ -1936,6 +1936,23 @@ async function handleApi(req, res, url) {
       if ('home_base' in b) {
         const hb = ['main', 'finow'].includes(b.home_base) ? b.home_base : null;
         fields.push('home_base=?'); vals.push(hb);
+      }
+      // Verfuegbarkeit Mo–So als JSON {"mo":[["08:00","12:00"],...],...} – nur gueltige Fenster.
+      if ('availability' in b) {
+        let av = null;
+        const src = b.availability;
+        if (src && typeof src === 'object' && !Array.isArray(src)) {
+          const re = /^([01]?\d|2[0-3]):[0-5]\d$/;
+          const clean = {};
+          for (const d of ['mo', 'di', 'mi', 'do', 'fr', 'sa', 'so']) {
+            const arr = Array.isArray(src[d]) ? src[d] : [];
+            const wins = [];
+            for (const w of arr) if (Array.isArray(w) && w.length === 2 && re.test(w[0]) && re.test(w[1]) && w[0] < w[1]) wins.push([w[0], w[1]]);
+            if (wins.length) clean[d] = wins;
+          }
+          if (Object.keys(clean).length) av = JSON.stringify(clean);
+        }
+        fields.push('availability=?'); vals.push(av);
       }
       if (!fields.length) return bad(res, 'Nichts zu aendern');
       db.prepare(`UPDATE students SET ${fields.join(', ')} WHERE id=?`).run(...vals, sid);
@@ -2295,8 +2312,10 @@ async function handleApi(req, res, url) {
       'sonder_min_ueberland', 'sonder_min_autobahn', 'sonder_min_nacht',
       'rank2_min_lessons', 'booking_horizon_days_rank2', 'registration_open',
       'flow_schedule', 'auto_fill_gaps', 'school_lat', 'school_lng', 'travel_default_min',
-      'school_label', 'school2_label', 'school2_lat', 'school2_lng'];
-    const emptyOk = new Set(['instructor_phone', 'meet_default_label', 'meet_default_lat', 'meet_default_lng', 'policy_text']);
+      'school_label', 'school2_label', 'school2_lat', 'school2_lng',
+      'instructor_home_label', 'instructor_home_lat', 'instructor_home_lng'];
+    const emptyOk = new Set(['instructor_phone', 'meet_default_label', 'meet_default_lat', 'meet_default_lng', 'policy_text',
+      'instructor_home_label', 'instructor_home_lat', 'instructor_home_lng']);
     for (const k of allowed) {
       if (!(k in b) || b[k] == null) continue;
       if (b[k] === '' && !emptyOk.has(k)) continue;

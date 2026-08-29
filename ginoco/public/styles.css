@@ -1325,3 +1325,15 @@ header .brand .brandname{
 .bitem.ov-vac{border-left:3px solid var(--good)}
 .bitem.ov-free{border-left:3px solid var(--info)}
 .bitem.ov-short{border-left:3px solid var(--warn)}
+
+/* ===== „Bilderbuch"-Verfügbarkeit (Mo–Sa × Vormittag/Nachmittag/Abend) ===== */
+.avail{display:flex;flex-direction:column;gap:.35rem;background:var(--card2);border:1px solid var(--line);
+  border-radius:14px;padding:.65rem .6rem}
+.av-row{display:grid;grid-template-columns:2.5rem 1fr 1fr 1fr;gap:.4rem;align-items:center}
+.av-head .av-bh{font-size:.66rem;text-align:center;color:var(--muted);font-weight:700;line-height:1.25}
+.av-day{font-weight:800;font-size:.84rem;color:var(--muted);text-align:center}
+.av-cell{height:38px;border-radius:10px;border:1px solid var(--line);background:var(--card);cursor:pointer;
+  transition:transform .1s var(--ease,ease),background .14s var(--ease,ease),border-color .14s var(--ease,ease)}
+.av-cell:active{transform:scale(.94)}
+.av-cell.on{background:var(--good-bg);border-color:color-mix(in srgb,var(--good) 55%,transparent)}
+.av-cell.on::after{content:"✓";display:block;text-align:center;line-height:38px;color:var(--good);font-weight:800;font-size:1.05rem}

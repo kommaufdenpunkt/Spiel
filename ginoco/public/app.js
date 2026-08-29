@@ -4229,9 +4229,47 @@ function showBulkResults(r) {
   };
 }
 
+// „Bilderbuch"-Verfügbarkeit: Mo–Sa × Vormittag/Nachmittag/Abend zum Antippen.
+const AV_DAYS = [['mo', 'Montag'], ['di', 'Dienstag'], ['mi', 'Mittwoch'], ['do', 'Donnerstag'], ['fr', 'Freitag'], ['sa', 'Samstag']];
+const AV_BLOCKS = [['🌅', 'Vormittag', '08:00', '12:00'], ['☀️', 'Nachmittag', '12:00', '16:00'], ['🌆', 'Abend', '16:00', '20:00']];
+function avParse(json) {
+  const on = new Set(); let av = {};
+  try { av = JSON.parse(json || '{}') || {}; } catch { av = {}; }
+  for (const [dk] of AV_DAYS) {
+    const wins = Array.isArray(av[dk]) ? av[dk] : [];
+    AV_BLOCKS.forEach(([, , bs, be], i) => { if (wins.some((w) => Array.isArray(w) && w[0] <= bs && w[1] >= be)) on.add(dk + ':' + i); });
+  }
+  return on;
+}
+function avSerialize(on) {
+  const out = {};
+  for (const [dk] of AV_DAYS) {
+    const wins = []; let run = [];
+    for (let i = 0; i < AV_BLOCKS.length; i++) {
+      if (on.has(dk + ':' + i)) run.push(i);
+      else if (run.length) { wins.push([AV_BLOCKS[run[0]][2], AV_BLOCKS[run[run.length - 1]][3]]); run = []; }
+    }
+    if (run.length) wins.push([AV_BLOCKS[run[0]][2], AV_BLOCKS[run[run.length - 1]][3]]);
+    if (wins.length) out[dk] = wins;
+  }
+  return out;
+}
+function avGridHtml(on) {
+  return `<div class="avail" id="es-avail">
+    <div class="av-row av-head"><span></span>${AV_BLOCKS.map(([ic, lb]) => `<span class="av-bh">${ic}<br>${lb}</span>`).join('')}</div>
+    ${AV_DAYS.map(([dk, dl]) => `<div class="av-row"><span class="av-day">${dl.slice(0, 2)}</span>${AV_BLOCKS.map((_, i) => `<button type="button" class="av-cell${on.has(dk + ':' + i) ? ' on' : ''}" data-av="${dk}:${i}" aria-label="${dl} ${AV_BLOCKS[i][1]}"></button>`).join('')}</div>`).join('')}
+  </div>`;
+}
+function wireAvGrid(state) {
+  document.querySelectorAll('#es-avail [data-av]').forEach((b) => b.onclick = () => {
+    const k = b.dataset.av; if (state.has(k)) state.delete(k); else state.add(k); b.classList.toggle('on');
+  });
+}
+
 // Stammdaten bearbeiten
 function openEditStudentModal(s) {
   if (!s) return;
+  const avOn = avParse(s.availability);
   // Vorname/Nachname aus den Feldern; Fallback: kombinierten Namen zerlegen (letztes Wort = Nachname)
   let first = s.first_name || '', last = s.last_name || '';
   if (!first && !last) { const parts = String(s.name || '').trim().split(/\s+/); last = parts.length > 1 ? parts.pop() : ''; first = parts.join(' '); }
@@ -4265,12 +4303,16 @@ function openEditStudentModal(s) {
         </select></div>
     </div>
     <div class="hint" style="margin:-.2rem 0 .2rem">Abholzeit wird im Tagesplan vor jeder Fahrstunde eingerechnet. Leer lassen = automatisch schätzen${s.travel_est ? ` (aktuell ≈ ${s.travel_est} Min)` : ''} – vom gewählten (oder näheren) Standort aus.</div>
+    <div class="field"><label>🗓️ Wann hat ${esc(first || 'der Schüler')} Zeit? <span class="muted" style="font-weight:400">— tippe die Zeiten an</span></label>
+      ${avGridHtml(avOn)}
+      <div class="hint" style="margin:.35rem 0 0">Grün = hat Zeit. Damit schlägt Ginoco später passende Termine vor.</div></div>
     <div class="field"><label>📝 Notiz / Karteikarte (nur für dich)</label>
       <textarea id="es-notes" rows="4" placeholder="z.B. Ausbildungsstand, was noch geübt werden muss, Besonderheiten …" style="resize:vertical">${esc(s.notes || '')}</textarea></div>
     <div class="actions">
       <button class="sec" onclick="window.__closeModal()">Abbrechen</button>
       <button id="es-go">Speichern</button>
     </div>`);
+  wireAvGrid(avOn);
   $('#es-go').onclick = async () => {
     try {
       await api('/api/students/' + s.id, { method: 'PATCH', body: {
@@ -4281,6 +4323,7 @@ function openEditStudentModal(s) {
         phone: $('#es-phone').value || null, email: $('#es-email').value || null,
         travel_min: $('#es-travel').value.trim() === '' ? '' : $('#es-travel').value.trim(),
         home_base: $('#es-base').value || null,
+        availability: avSerialize(avOn),
         notes: $('#es-notes').value || null } });
       closeModal(); toast('Gespeichert ✓', 'ok'); tabSchueler();
     } catch (e) { const el = $('#autherr'); if (el) { el.textContent = e.message; el.classList.remove('hidden'); } else toast(e.message, 'err'); }

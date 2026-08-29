@@ -251,6 +251,9 @@ ensureColumn('students', 'travel_min', 'travel_min INTEGER');
 // Von welchem Standort wird die Abholzeit gerechnet? '' = automatisch (naeherer),
 // 'main' = Eberswalde, 'finow' = zweiter Standort. Nur relevant fuer die Schaetzung.
 ensureColumn('students', 'home_base', 'home_base TEXT');
+// Verfuegbarkeit je Wochentag als JSON, z.B. {"mo":[["08:00","12:00"]],"di":[...],...}
+// Leer/NULL = keine Angabe. Basis fuer die automatischen Terminvorschlaege.
+ensureColumn('students', 'availability', 'availability TEXT');
 
 // Live-Standort des Fahrlehrers (genau eine Zeile)
 db.exec(`CREATE TABLE IF NOT EXISTS live_location (
@@ -297,6 +300,10 @@ const DEFAULTS = {
   school2_label: 'Finow',
   school2_lat: '52.8360',
   school2_lng: '13.6990',
+  // Startadresse des Fahrlehrers (von wo aus der Tag beginnt/endet) – Basis fuer „wann losfahren?"
+  instructor_home_label: 'Ladeburg, Schmetzdorfer Str. 9',
+  instructor_home_lat: '52.7860',
+  instructor_home_lng: '13.6360',
   travel_default_min: '0',   // Abholzeit, falls fuer einen Schueler nichts Genaues hinterlegt ist
   live_lead_min: '20',       // so viele Min vor Beginn wird der Live-Standort geteilt
   meet_default_label: '',    // Standard-Treffpunkt (Text)
