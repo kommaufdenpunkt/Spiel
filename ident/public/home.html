@@ -59,6 +59,11 @@
   .brand{display:flex;align-items:center;gap:.6rem;flex:none}
   .brand .mark{width:74px;height:42px;flex:none}
   .brand img{height:44px;width:auto;display:block}
+  /* Das Logo im Fuß ist dasselbe Bild wie oben, nur ruhiger:
+     etwas kleiner und leicht zurückgenommen. Vorher stand hier ein
+     gezeichnetes Ersatzzeichen – zwei verschiedene Logos auf einer
+     Seite fallen sofort auf. */
+  .foot img.logo-fuss{height:52px;width:auto;display:block;margin-bottom:.6rem;opacity:.92}
   .nav-links{display:flex;align-items:center;gap:1.45rem}
   .nav-links a:not(.btn){color:var(--dim);font-size:.9rem;font-weight:550;position:relative;padding:.2rem 0;white-space:nowrap}
   .nav-links a:not(.btn)::after{content:"";position:absolute;left:0;right:100%;bottom:-2px;height:1px;
@@ -901,7 +906,7 @@
   <div class="wrap">
     <div class="foot">
       <div>
-        <svg class="mark" viewBox="0 0 148 84" style="width:96px;height:54px;margin-bottom:.5rem" aria-hidden="true">
+        <svg class="mark" id="footMark" viewBox="0 0 148 84" style="width:96px;height:54px;margin-bottom:.5rem" aria-hidden="true">
           <defs><linearGradient id="gf" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0" stop-color="#E7C8FF"/><stop offset=".48" stop-color="#B14BFF"/><stop offset="1" stop-color="#8A2CE0"/>
           </linearGradient></defs>

@@ -218,6 +218,15 @@
             i.onload = function () { alt.replaceWith(i); };
           }
         }
+        // Auch im Fuß dasselbe Logo – sonst stehen zwei verschiedene
+        // Zeichen auf einer Seite, und das fällt sofort auf.
+        var fuss = $('footMark');
+        if (fuss) {
+          var fi = new Image();
+          fi.className = 'logo-fuss'; fi.alt = '4EVER1.TV'; fi.src = j.logo;
+          fi.onload = function () { fuss.replaceWith(fi); };
+        }
+
         var kopf = $('brandLink');
         if (kopf) {
           var k = new Image();
