@@ -606,6 +606,10 @@ th{color:var(--muted);font-weight:600;font-size:.78rem;text-transform:uppercase;
 .ds-chip{background:#1c2531;color:var(--ink);border:1px solid var(--line);border-radius:20px;padding:.4rem .8rem;font-size:.86rem;font-weight:600}
 .ds-chip:hover{background:#26313f}
 .ds-chip.on{background:var(--brand);color:#fff;border-color:var(--brand)}
+.ds-weather{display:flex;gap:.6rem;align-items:flex-start;margin-top:.7rem;padding:.7rem .85rem;border-radius:12px;background:rgba(91,155,255,.1);border:1px solid rgba(91,155,255,.38)}
+.ds-weather .ds-ic{font-size:1.4rem;line-height:1}
+.ds-weather .ds-t{font-weight:800;color:#8fb8ff}
+.ds-weather .ds-s{font-size:.85rem;color:var(--muted);margin-top:.1rem;line-height:1.45}
 
 /* ---- Aussehen-Panel (Farbe, Schrift, Größe) ---- */
 .ap-sec{padding:.9rem 0;margin:0;border-top:1px solid var(--line)}

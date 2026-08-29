@@ -473,6 +473,7 @@ const CHANGELOG = [
   { v: '3.74', d: '29.08.2026', title: '🧠 KI-Planer, Vorschläge & Tagesstatus', items: [
     '🧠 <strong>KI-Planer (Fahrlehrer):</strong> schlägt aus der Verfügbarkeit deiner Fahrschüler passende Termine vor – lückenlos in deine freien Slots, höchstens einer pro Tag & Schüler. Auswählen, „übernehmen“, fertig.',
     '🚦 <strong>Tagesstatus:</strong> Der Fahrlehrer sagt mit einem Tipp, ob heute alles <strong>planmäßig</strong> läuft oder es <strong>später</strong> wird – mit Grund (Berufsverkehr, Stau, Schnee, Glatteis, Witterung). Du siehst es sofort oben und bekommst eine Push.',
+    '🌦️ <strong>Wetter-Warnung (für Fahrlehrer):</strong> ginoco schaut in die DWD-Wetterdaten und schlägt bei Glatteis, Schnee oder Starkregen von selbst vor, eine Verzögerung zu melden – ein Tipp genügt.',
     '✅ <strong>Vorschläge annehmen/ablehnen:</strong> Trägt dein Fahrlehrer einen Termin für dich ein, kannst du ihn jetzt klar <strong>annehmen</strong> oder <strong>ablehnen</strong> – er wird über deine Antwort benachrichtigt.',
     '⏳ <strong>Antwortfrist:</strong> Ein Vorschlag verfällt nach 2 Stunden ohne Antwort (einstellbar) – der Slot wird dann automatisch wieder frei.',
     '📜 Ruhiger Look ohne sichtbare Scrollbalken – wie eine echte App.'] },
@@ -3339,10 +3340,23 @@ async function renderInstrDayStatus() {
   card.innerHTML = `<h2>Tagesstatus</h2>
     <p class="hint">Ein Tipp genügt: deine Fahrschüler mit einem Termin heute sehen sofort, ob alles planmäßig läuft – oder warum es später wird (Berufsverkehr, Glatteis, Schnee). Sie bekommen eine Push.</p>
     ${cur}
+    <div id="ds-weather"></div>
     <div class="inline" style="margin-top:.7rem">
       <button class="${isDelay ? 'sec' : ''}" id="ds-ok">✅ Läuft planmäßig</button>
       <button class="sec" id="ds-delay">⏳ Verzögerung melden</button>
     </div>`;
+  // Wetter-Hinweis (DWD): proaktiver Vorschlag, wenn Glätte/Schnee/Starkregen droht.
+  (async () => {
+    try {
+      const wh = (await api('/api/instructor/weather-hint')).hint;
+      const wbox = $('#ds-weather'); if (!wbox || !wh) return;
+      wbox.innerHTML = `<div class="ds-weather"><div class="ds-ic">${wh.label.split(' ')[0]}</div>
+        <div><div class="ds-t">Wetter-Hinweis: ${esc(wh.label.replace(/^\S+\s/, ''))}</div>
+          <div class="ds-s">${esc(wh.detail)} Möchtest du das als Verzögerung melden?</div>
+          <button class="sm" id="ds-wsuggest" style="margin-top:.5rem">⏳ Verzögerung wegen ${esc(wh.label)} melden</button></div></div>`;
+      $('#ds-wsuggest').onclick = () => openDelayStatusModal(status, { reason: wh.reason, minutes: 15 });
+    } catch {}
+  })();
   $('#ds-ok').onclick = async () => {
     try { const r = await api('/api/instructor/day-status', { method: 'POST', body: { state: 'ok' } });
       toast(`Planmäßig gemeldet${r.notified ? ` · ${r.notified} informiert` : ''} ✓`, 'ok'); renderInstrDayStatus(); }
@@ -3350,9 +3364,9 @@ async function renderInstrDayStatus() {
   };
   $('#ds-delay').onclick = () => openDelayStatusModal(status);
 }
-function openDelayStatusModal(status) {
-  const curMin = status && status.state === 'delay' ? status.minutes : 15;
-  const curReason = status && status.state === 'delay' ? status.reason : 'rush';
+function openDelayStatusModal(status, prefill) {
+  const curMin = prefill && prefill.minutes ? prefill.minutes : (status && status.state === 'delay' ? status.minutes : 15);
+  const curReason = prefill && prefill.reason ? prefill.reason : (status && status.state === 'delay' ? status.reason : 'rush');
   const mins = [5, 10, 15, 20, 30, 45];
   modal(`<h3>⏳ Verzögerung melden</h3>
     <p class="hint">Wie viel später wird’s ungefähr – und warum? Deine Fahrschüler heute bekommen eine Push.</p>

@@ -1664,6 +1664,14 @@ async function handleApi(req, res, url) {
     return ok(res, { ok: true, notified: studs.length });
   }
 
+  // Wetter-Hinweis fuer den Tag (Glatteis/Schnee/Regen) – als Vorschlag fuer den Tagesstatus.
+  if (p === '/api/instructor/weather-hint' && method === 'GET') {
+    if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
+    const date = /^\d{4}-\d{2}-\d{2}$/.test(url.searchParams.get('date') || '') ? url.searchParams.get('date') : todayStr();
+    const hint = await weatherHintFor(date);
+    return ok(res, { hint });
+  }
+
   // Erinnerungen jetzt pruefen/versenden (laeuft auch automatisch im Hintergrund)
   if (p === '/api/instructor/run-reminders' && method === 'POST') {
     if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
@@ -2403,7 +2411,7 @@ async function handleApi(req, res, url) {
       return bad(res, 'Das Skala-Ende (höchstens) darf nicht kleiner als das Monatsziel sein');
     const allowed = ['instructor_name', 'start_time', 'last_start', 'lesson_min', 'break_min',
       'weekly_target_h', 'daily_target_h', 'weekly_lo_h', 'monthly_target_h', 'monthly_max_h', 'workdays', 'max_per_week', 'student_max_per_day',
-      'reserve_expire_min', 'booking_horizon_days', 'cancel_hours', 'lock_hours', 'release_time', 'short_day_last_start',
+      'reserve_expire_min', 'weather_enabled', 'booking_horizon_days', 'cancel_hours', 'lock_hours', 'release_time', 'short_day_last_start',
       'vacation_credit_min', 'vacation_days_left', 'late_grace_min', 'policy_text',
       'instructor_phone', 'avg_speed_kmh', 'live_lead_min',
       'meet_default_label', 'meet_default_lat', 'meet_default_lng',
@@ -3146,6 +3154,61 @@ function sendDueReminders() {
 // alte, gelesene Postfach-Eintraege entfernt; danach die WAL-Datei zusammengefuehrt
 // und der Abfrageplaner optimiert. So bleibt die DB schlank und schnell.
 let lastMaintDay = null;
+// ===================== WETTER-HINWEIS (DWD via BrightSky, kostenlos) =====================
+// Aus den Stundenwerten eines Tages einen Warnhinweis fuer den Tagesstatus ableiten.
+// Reine Funktion (fuer Tests) – bekommt die Stundenliste + Arbeitszeitfenster (Stunden).
+function classifyWeather(hours, startH, endH) {
+  let minT = Infinity, maxPrec = 0, snow = false, sleet = false, rain = false, thunder = false, any = false;
+  for (const h of hours || []) {
+    const hr = new Date(h.timestamp).getHours();
+    if (hr < startH || hr > endH) continue;
+    any = true;
+    if (typeof h.temperature === 'number') minT = Math.min(minT, h.temperature);
+    if (typeof h.precipitation === 'number') maxPrec = Math.max(maxPrec, h.precipitation);
+    const c = h.condition || '';
+    if (c === 'snow') snow = true;
+    else if (c === 'sleet' || c === 'hail') sleet = true;
+    else if (c === 'rain') rain = true;
+    else if (c === 'thunderstorm') thunder = true;
+  }
+  if (!any) return null;
+  const t = isFinite(minT) ? Math.round(minT) : null;
+  if (snow) return { reason: 'snow', label: '❄️ Schnee', detail: `Schnee gemeldet${t !== null ? `, kälteste Stunde ${t}°C` : ''}.` };
+  if (t !== null && t <= 1 && (maxPrec > 0 || sleet)) return { reason: 'ice', label: '🧊 Glatteis möglich', detail: `Um den Gefrierpunkt (${t}°C) bei Nässe – Glätte möglich.` };
+  if (t !== null && t <= 0) return { reason: 'ice', label: '🧊 Frost', detail: `Frost (${t}°C) – auf überfrierende Nässe achten.` };
+  if (thunder) return { reason: 'weather', label: '⛈️ Gewitter', detail: 'Gewitter im Tagesverlauf möglich.' };
+  if (maxPrec >= 2.5 || (rain && maxPrec >= 1)) return { reason: 'weather', label: '🌧️ Kräftiger Regen', detail: `Kräftiger Regen (bis ${maxPrec.toFixed(1)} mm/h).` };
+  return null; // ruhiges Wetter -> kein Hinweis
+}
+let _weatherCache = { key: null, at: 0, hint: null };
+async function weatherHintFor(date) {
+  if (getSettingRaw('weather_enabled') === '0') return null;
+  const lat = Number(getSettingRaw('school_lat')) || 52.834;
+  const lng = Number(getSettingRaw('school_lng')) || 13.828;
+  const key = `${date}|${lat}|${lng}`;
+  if (_weatherCache.key === key && Date.now() - _weatherCache.at < 2 * 3600e3) return _weatherCache.hint;
+  try {
+    const ctrl = new AbortController();
+    const to = setTimeout(() => ctrl.abort(), 4500);
+    const r = await fetch(`https://api.brightsky.dev/weather?lat=${lat}&lon=${lng}&date=${date}`, {
+      signal: ctrl.signal, headers: { Accept: 'application/json' },
+    });
+    clearTimeout(to);
+    if (!r.ok) throw new Error('weather ' + r.status);
+    const j = await r.json();
+    const f = dayFrame(date);
+    const startH = Math.max(0, Math.floor((f.closed ? 6 * 60 : f.dayStart) / 60));
+    const endH = Math.min(23, Math.ceil((f.closed ? 20 * 60 : f.workEnd) / 60));
+    const hint = classifyWeather(j.weather || [], startH, endH);
+    _weatherCache = { key, at: Date.now(), hint };
+    return hint;
+  } catch {
+    // Kein Internet / API-Fehler -> still nichts anzeigen (nie ein Fehler fuer den Nutzer).
+    _weatherCache = { key, at: Date.now(), hint: null };
+    return null;
+  }
+}
+
 // Vom Fahrlehrer vorgeschlagene (reservierte, confirmed=0) Termine, auf die der
 // Schueler nicht rechtzeitig geantwortet hat, verfallen automatisch: Slot wird
 // wieder frei, Fahrlehrer bekommt eine Push. Frist = reserve_expire_min (Standard
@@ -3268,4 +3331,4 @@ server.listen(PORT, HOST, () => {
 });
 
 // Nur für automatisierte Tests exportiert (keine Wirkung auf den laufenden Server).
-export { encryptPush, vapidAuth, b64url, b64urlDecode, ensureVapidKeys, expireStaleReservations };
+export { encryptPush, vapidAuth, b64url, b64urlDecode, ensureVapidKeys, expireStaleReservations, classifyWeather };
