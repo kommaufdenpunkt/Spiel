@@ -573,6 +573,22 @@ th{color:var(--muted);font-weight:600;font-size:.78rem;text-transform:uppercase;
 .reserve-note strong{color:#ffd9a0}
 .resv-due{margin-top:.3rem;font-size:.82rem;color:#f0b459;line-height:1.4}
 .resv-due strong{color:#ffd9a0}
+/* KI-Planer */
+.pl-head{display:flex;align-items:center;gap:.6rem;margin:0 0 .6rem;font-size:.95rem}
+.pl-head button{margin-left:auto}
+.pl-list{display:flex;flex-direction:column;gap:.9rem}
+.pl-day{border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--card2)}
+.pl-dh{background:#1a2330;padding:.5rem .8rem;font-weight:800;font-size:.88rem;color:var(--ink);border-bottom:1px solid var(--line)}
+.pl-row{display:flex;align-items:center;gap:.6rem;padding:.55rem .8rem;cursor:pointer;border-top:1px solid rgba(40,50,63,.5)}
+.pl-row:first-of-type{border-top:none}
+.pl-row:hover{background:#1c2531}
+.pl-row input[type=checkbox]{width:20px;height:20px}
+.pl-time{font-weight:800;font-variant-numeric:tabular-nums;min-width:3.2em}
+.pl-name{font-weight:700;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pl-dur{color:var(--muted);font-size:.82rem}
+.pl-mode{font-size:.78rem;color:var(--muted);background:#161d27;border:1px solid var(--line);border-radius:20px;padding:.15rem .55rem;white-space:nowrap;max-width:48%;overflow:hidden;text-overflow:ellipsis}
+.pl-mode.pick{color:#f0b459;border-color:rgba(230,150,58,.4);background:rgba(230,150,58,.1)}
+@media(max-width:560px){.pl-mode{max-width:40%}.pl-dur{display:none}}
 
 /* ---- Aussehen-Panel (Farbe, Schrift, Größe) ---- */
 .ap-sec{padding:.9rem 0;margin:0;border-top:1px solid var(--line)}

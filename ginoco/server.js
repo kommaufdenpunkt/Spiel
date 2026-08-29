@@ -1525,6 +1525,41 @@ async function handleApi(req, res, url) {
   }
 
   // ===== FAHRLEHRER =====
+  // KI-Planer: Terminvorschlaege aus Verfuegbarkeit + freien Slots (nichts wird gespeichert).
+  if (p === '/api/instructor/plan' && method === 'GET') {
+    if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
+    const from = url.searchParams.get('from') || addDays(todayStr(), 1);
+    let to = url.searchParams.get('to') || addDays(from, 13);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) return bad(res, 'Zeitraum ungültig');
+    if (to < from) to = from;
+    if (to > addDays(from, 34)) to = addDays(from, 34); // Zeitraum deckeln (max. 5 Wochen)
+    const sidParam = url.searchParams.get('student_id');
+    const studentIds = sidParam ? [Number(sidParam)] : null;
+    const suggestions = planSuggestions({ from, to, studentIds });
+    // Wie viele aktive Schueler haben ueberhaupt eine Verfuegbarkeit hinterlegt?
+    const withAvail = db.prepare("SELECT COUNT(*) AS n FROM students WHERE archived_at IS NULL AND availability IS NOT NULL AND availability <> '' AND availability <> '{}'").get().n;
+    return ok(res, { from, to, suggestions, students_with_availability: withAvail });
+  }
+  // KI-Planer: ausgewaehlte Vorschlaege als reservierte Termine uebernehmen.
+  if (p === '/api/instructor/plan/apply' && method === 'POST') {
+    if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
+    const b = await readBody(req);
+    const items = Array.isArray(b.items) ? b.items : [];
+    if (!items.length) return bad(res, 'Keine Vorschläge ausgewählt');
+    let created = 0; const results = [];
+    for (const it of items) {
+      const sid = Number(it.student_id);
+      const date = it.date, start = it.start_time;
+      const dur = Math.max(1, Number(it.duration_min) || getSettings().lesson_min);
+      if (!sid || !/^\d{4}-\d{2}-\d{2}$/.test(date || '') || !/^\d{1,2}:\d{2}$/.test(start || '')) { results.push({ ...it, error: 'ungültig' }); continue; }
+      if (date < todayStr() || (date === todayStr() && toMin(start) <= toMin(nowHHMM()))) { results.push({ ...it, error: 'liegt in der Vergangenheit' }); continue; }
+      if (!db.prepare('SELECT 1 FROM students WHERE id=? AND archived_at IS NULL').get(sid)) { results.push({ ...it, error: 'Fahrschüler nicht gefunden' }); continue; }
+      const r = reserveForStudent(sid, date, start, dur);
+      if (r.error) results.push({ ...it, error: r.error }); else { created++; results.push({ ...it, id: r.id }); }
+    }
+    return ok(res, { created, results });
+  }
+
   if (p === '/api/instructor/overview' && method === 'GET') {
     if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
     const from = url.searchParams.get('from') || todayStr();
@@ -2761,6 +2796,110 @@ function bulkInstructorBookings(res, body) {
     created++;
   }
   return ok(res, { committed: true, created, ...summary });
+}
+
+// ===================== KI-PLANER (Stufe 1) =====================
+// Wochentags-Schluessel der Verfuegbarkeit (isoDow 1..7 -> mo..so).
+const AV_KEY = ['mo', 'di', 'mi', 'do', 'fr', 'sa', 'so'];
+// Ein Verfuegbarkeitsfenster normalisieren: [v,b] (alt) oder {v,b,m,p} (neu).
+function planNormWin(w) {
+  const RE = /^([01]?\d|2[0-3]):[0-5]\d$/;
+  if (Array.isArray(w)) { const [v, b] = w; return RE.test(v) && RE.test(b) && v < b ? { v, b } : null; }
+  if (w && typeof w === 'object' && RE.test(w.v) && RE.test(w.b) && w.v < w.b)
+    return w.m === 'pickup' ? { v: w.v, b: w.b, m: 'pickup', p: w.p || '' } : { v: w.v, b: w.b };
+  return null;
+}
+// Terminvorschlaege erzeugen: fuer jeden Schueler mit hinterlegter Verfuegbarkeit
+// wird pro Tag hoechstens ein passender freier Slot vorgeschlagen. Es wird nichts
+// gespeichert – der Fahrlehrer entscheidet, was uebernommen wird. In-Memory-Belegung
+// verhindert, dass zwei Schueler denselben Slot vorgeschlagen bekommen.
+function planSuggestions({ from, to, studentIds }) {
+  const s = getSettings();
+  const brk = s.break_min;
+  const maxWeek = Number(getSettingRaw('max_per_week'));
+  const workdays = getSettingRaw('workdays').split(',').map(Number);
+  const students = (studentIds && studentIds.length
+    ? studentIds.map((id) => db.prepare('SELECT id,name,availability,allowed_durations FROM students WHERE id=? AND archived_at IS NULL').get(id)).filter(Boolean)
+    : db.prepare('SELECT id,name,availability,allowed_durations FROM students WHERE archived_at IS NULL ORDER BY name').all());
+  // Verfuegbarkeit vorab parsen; Schueler ohne Verfuegbarkeit fallen raus.
+  const withAvail = [];
+  for (const st of students) {
+    let av; try { av = JSON.parse(st.availability || '{}'); } catch { av = {}; }
+    if (av && typeof av === 'object' && Object.keys(av).some((k) => Array.isArray(av[k]) && av[k].length)) {
+      st._av = av; withAvail.push(st);
+    }
+  }
+  const tentative = {}; // date -> [{s,e}] vorlaeufig belegte Intervalle
+  const weekCount = {}; // "sid|weekFrom" -> Anzahl (aus DB vorgeladen)
+  const out = [];
+  for (let d = from; d <= to; d = addDays(d, 1)) {
+    const dow = isoDow(d);
+    if (!workdays.includes(dow)) continue;
+    const f = dayFrame(d);
+    if (f.closed) continue;
+    for (const st of withAvail) {
+      const wins = st._av[AV_KEY[dow - 1]];
+      if (!Array.isArray(wins) || !wins.length) continue;
+      // An diesem Tag schon ein Termin? -> nur ein Vorschlag pro Tag & Schueler.
+      if (db.prepare("SELECT 1 FROM bookings WHERE student_id=? AND date=? AND status!='cancelled'").get(st.id, d)) continue;
+      // Wochenlimit beachten.
+      const wk = weekStartEnd(d).from;
+      const key = st.id + '|' + wk;
+      if (weekCount[key] === undefined) weekCount[key] = weekInfoForStudent(st.id, d).count;
+      if (weekCount[key] >= maxWeek) continue;
+      const dur = (String(st.allowed_durations || '80').split(',').map(Number).filter((n) => n > 0)[0]) || s.lesson_min;
+      const cands = freeStarts(d, st.id);
+      if (!cands.length) continue;
+      const tv = tentative[d] || [];
+      let chosen = null;
+      for (const raw of wins) {
+        const w = planNormWin(raw);
+        if (!w) continue;
+        const wv = toMin(w.v), wb = toMin(w.b);
+        for (const c of cands) {
+          if (c.start < wv) continue;                       // Start muss im Fenster liegen
+          if (c.start + dur > Math.min(wb, c.cap)) continue; // Stunde muss ins Fenster & in den Tag passen
+          if (tv.some((t) => overlaps(c.start, c.start + dur + brk, t.s, t.e + brk))) continue; // schon vorgemerkt
+          chosen = { start: c.start, w }; break;
+        }
+        if (chosen) break;
+      }
+      if (!chosen) continue;
+      (tentative[d] ||= []).push({ s: chosen.start, e: chosen.start + dur });
+      weekCount[key]++;
+      out.push({
+        student_id: st.id, student_name: st.name, date: d, weekday: wdShort(d),
+        start_time: toHHMM(chosen.start), duration_min: dur,
+        mode: chosen.w.m === 'pickup' ? 'pickup' : 'school',
+        place: chosen.w.m === 'pickup' ? (chosen.w.p || '') : null,
+      });
+    }
+  }
+  return out;
+}
+
+// Einen vom Planer bestaetigten Termin als reservierten Vorschlag (confirmed=0)
+// anlegen – mit denselben Kollisionspruefungen wie beim normalen Buchen.
+function reserveForStudent(studentId, date, start, duration) {
+  const s = getSettings();
+  const newStart = toMin(start), newEnd = newStart + duration;
+  const dayB = db.prepare("SELECT * FROM bookings WHERE date=? AND status!='cancelled'").all(date);
+  for (const b of dayB) {
+    const bs = toMin(b.start_time), be = bs + b.duration_min;
+    if (overlaps(newStart, newEnd + s.break_min, bs, be + s.break_min)) return { error: 'Zeit ist bereits belegt' };
+  }
+  for (const bl of db.prepare('SELECT * FROM blocks WHERE date=?').all(date))
+    if (overlaps(newStart, newEnd, toMin(bl.start_time), toMin(bl.end_time))) return { error: `Zeit ist durch "${bl.title}" belegt` };
+  const info = db.prepare(
+    `INSERT INTO bookings(student_id,date,start_time,duration_min,status,confirmed,created_at)
+     VALUES(?,?,?,?,'booked',0,?)`
+  ).run(studentId, date, start, duration, new Date().toISOString());
+  const bid = Number(info.lastInsertRowid);
+  logEvent('book', { actor: 'instructor', studentId, bookingId: bid, date,
+    detail: `${wdShort(date)} ${dmy(date)} ${start} Uhr (${duration} Min) – KI-Planer vorgeschlagen (reserviert)` });
+  notify(studentId, 'info',
+    `Neuer Termin für dich vorgeschlagen: ${wdShort(date)} ${dmy(date)} um ${start} Uhr (${duration} Min). Bitte in der App annehmen oder ablehnen.`, date, bid);
+  return { id: bid };
 }
 
 function createBooking(res, sess, body) {

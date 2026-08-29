@@ -468,8 +468,13 @@ function openTour() {
 window.__openTour = openTour;
 
 // ---------- Was ist neu? (Changelog) ----------
-const CHANGELOG_VER = '3.73';
+const CHANGELOG_VER = '3.74';
 const CHANGELOG = [
+  { v: '3.74', d: '29.08.2026', title: '🧠 KI-Planer & Termin-Vorschläge', items: [
+    '🧠 <strong>KI-Planer (Fahrlehrer):</strong> schlägt aus der Verfügbarkeit deiner Fahrschüler passende Termine vor – lückenlos in deine freien Slots, höchstens einer pro Tag & Schüler. Auswählen, „übernehmen“, fertig.',
+    '✅ <strong>Vorschläge annehmen/ablehnen:</strong> Trägt dein Fahrlehrer einen Termin für dich ein, kannst du ihn jetzt klar <strong>annehmen</strong> oder <strong>ablehnen</strong> – er wird über deine Antwort benachrichtigt.',
+    '⏳ <strong>Antwortfrist:</strong> Ein Vorschlag verfällt nach 2 Stunden ohne Antwort (einstellbar) – der Slot wird dann automatisch wieder frei.',
+    '📜 Ruhiger Look ohne sichtbare Scrollbalken – wie eine echte App.'] },
   { v: '3.73', d: '29.08.2026', title: '✨ Edler, lebendiger – und fairer', items: [
     '🎉 <strong>Buch-Erfolg:</strong> Nach jeder Buchung gibt’s einen kleinen Moment mit Haken & Konfetti.',
     '💎 Feinerer Look: weichere Schatten, ruhigere Typografie, ein Hauch Glanz auf freien Zeiten und im Logo.',
@@ -893,6 +898,7 @@ const INSTR_NAV = [
   ['__group', 'Fahrschüler'],
   ['schueler', '🧑‍🎓', 'Fahrschüler'], ['nachrichten', '✉️', 'Nachrichten'], ['codes', '🔑', 'Zugangscodes'],
   ['__group', 'Planung'],
+  ['planer', '🧠', 'KI-Planer'],
   ['arbeitszeiten', '🕒', 'Arbeitszeiten'], ['theorie', '📚', 'Theorie'],
   ['__group', 'System'],
   ['bewertungen', '⭐', 'Bewertungen'],
@@ -2843,12 +2849,116 @@ function drawInstrTab() {
   if (t === 'kalender') return tabKalender();
   if (t === 'codes') return tabCodes();
   if (t === 'schueler') return tabSchueler();
+  if (t === 'planer') return tabPlaner();
   if (t === 'nachrichten') return tabNachrichten();
   if (t === 'theorie') return tabTheorie();
   if (t === 'arbeitszeiten') return tabArbeitszeiten();
   if (t === 'bewertungen') return tabBewertungen();
   if (t === 'protokoll') return tabProtokoll();
   if (t === 'einstellungen') return tabEinstellungen();
+}
+
+// ---- Tab: KI-Planer (Fahrlehrer) ----
+// Aus der hinterlegten Verfuegbarkeit + freien Slots konkrete Terminvorschlaege
+// erzeugen; ausgewaehlte werden als reservierte Vorschlaege an die Schueler geschickt.
+const planState = { from: null, to: null, student: '', suggestions: null, loading: false };
+async function tabPlaner() {
+  const box = $('#itab');
+  if (!planState.from) { planState.from = addDays(todayStr(), 1); planState.to = addDays(todayStr(), 14); }
+  // Schuelerliste fuer das Auswahlfeld einmalig laden.
+  if (!planState._students) {
+    try { planState._students = (await api('/api/students')).students || []; } catch { planState._students = []; }
+  }
+  const studs = planState._students;
+  const opts = `<option value="">Alle Fahrschüler</option>` +
+    studs.map((s) => `<option value="${s.id}" ${String(planState.student) === String(s.id) ? 'selected' : ''}>${esc(s.name)}${s.availability ? '' : ' — ohne Verfügbarkeit'}</option>`).join('');
+  box.innerHTML = `<div class="card">
+    <h2>🧠 KI-Planer</h2>
+    <p class="hint">Der Planer schaut sich die von deinen Fahrschülern hinterlegte <strong>Verfügbarkeit</strong> an und schlägt dir passende Termine vor – lückenlos in deine freien Slots gelegt, höchstens einer pro Tag &amp; Schüler, dein Wochenlimit wird beachtet. Du wählst aus, was passt, und schickst es mit einem Tipp als <strong>Vorschlag</strong> an die Schüler (die nehmen an oder lehnen ab).</p>
+    <div class="row">
+      <div class="field"><label>Von</label><input type="date" id="pl-from" value="${planState.from}" min="${todayStr()}"></div>
+      <div class="field"><label>Bis</label><input type="date" id="pl-to" value="${planState.to}" min="${todayStr()}"></div>
+      <div class="field"><label>Fahrschüler</label><select id="pl-stu">${opts}</select></div>
+    </div>
+    <div class="inline" style="margin-top:.3rem"><button id="pl-go">${planState.loading ? 'Rechne…' : '✨ Vorschläge erzeugen'}</button></div>
+    <div id="pl-out" style="margin-top:1rem"></div>
+  </div>`;
+  $('#pl-from').onchange = (e) => planState.from = e.target.value;
+  $('#pl-to').onchange = (e) => planState.to = e.target.value;
+  $('#pl-stu').onchange = (e) => planState.student = e.target.value;
+  $('#pl-go').onclick = runPlanner;
+  if (planState.suggestions) renderPlanResults();
+}
+async function runPlanner() {
+  planState.loading = true;
+  const btn = $('#pl-go'); if (btn) { btn.disabled = true; btn.textContent = 'Rechne…'; }
+  try {
+    const qs = `from=${planState.from}&to=${planState.to}` + (planState.student ? `&student_id=${planState.student}` : '');
+    const r = await api('/api/instructor/plan?' + qs);
+    planState.suggestions = r.suggestions || [];
+    planState._withAvail = r.students_with_availability || 0;
+    planState._picked = new Set(planState.suggestions.map((_, i) => i)); // anfangs alle ausgewaehlt
+    renderPlanResults();
+  } catch (e) { toast(e.message, 'err'); }
+  finally { planState.loading = false; const b = $('#pl-go'); if (b) { b.disabled = false; b.textContent = '✨ Vorschläge erzeugen'; } }
+}
+function renderPlanResults() {
+  const out = $('#pl-out'); if (!out) return;
+  const sug = planState.suggestions || [];
+  if (!sug.length) {
+    out.innerHTML = planState._withAvail
+      ? `<div class="reserve-note">Für diesen Zeitraum ergeben sich keine Vorschläge – die freien Slots passen gerade zu keiner hinterlegten Verfügbarkeit, oder die Woche ist voll. Probier einen größeren Zeitraum.</div>`
+      : `<div class="reserve-note">🔶 Noch kein Fahrschüler hat eine <strong>Verfügbarkeit</strong> hinterlegt. Öffne einen Fahrschüler → Reiter „Verfügbarkeit" und trage ein, wann er kann – dann kann der Planer Vorschläge machen.</div>`;
+    return;
+  }
+  // nach Datum gruppieren
+  const byDate = {};
+  sug.forEach((x, i) => { (byDate[x.date] ||= []).push({ ...x, _i: i }); });
+  const rows = Object.keys(byDate).sort().map((d) => {
+    const items = byDate[d].sort((a, z) => a.start_time.localeCompare(z.start_time));
+    return `<div class="pl-day"><div class="pl-dh">${WD_LONG[isoDow(d) - 1]}, ${fmtShort(d)}</div>` +
+      items.map((x) => `<label class="pl-row">
+        <input type="checkbox" data-i="${x._i}" ${planState._picked.has(x._i) ? 'checked' : ''}>
+        <span class="pl-time">${x.start_time}</span>
+        <span class="pl-name">${esc(x.student_name)}</span>
+        <span class="pl-dur">${x.duration_min} Min</span>
+        <span class="pl-mode ${x.mode === 'pickup' ? 'pick' : ''}">${x.mode === 'pickup' ? '📍 Abholung' + (x.place ? ' · ' + esc(x.place) : '') : '🏫 Fahrschule'}</span>
+      </label>`).join('') + `</div>`;
+  }).join('');
+  const n = planState._picked.size;
+  out.innerHTML = `<div class="pl-head"><strong>${sug.length}</strong> Vorschlag${sug.length === 1 ? '' : 'e'}
+      <button class="ghost sm" id="pl-all">Alle an/aus</button></div>
+    <div class="pl-list">${rows}</div>
+    <div class="actions" style="margin-top:1rem"><button id="pl-apply" ${n ? '' : 'disabled'}>✅ ${n} übernehmen &amp; vorschlagen</button></div>`;
+  out.querySelectorAll('[data-i]').forEach((cb) => cb.onchange = () => {
+    const i = Number(cb.dataset.i);
+    if (cb.checked) planState._picked.add(i); else planState._picked.delete(i);
+    const ap = $('#pl-apply'); const k = planState._picked.size;
+    if (ap) { ap.disabled = !k; ap.innerHTML = `✅ ${k} übernehmen &amp; vorschlagen`; }
+  });
+  $('#pl-all').onclick = () => {
+    if (planState._picked.size === sug.length) planState._picked.clear();
+    else sug.forEach((_, i) => planState._picked.add(i));
+    renderPlanResults();
+  };
+  $('#pl-apply').onclick = applyPlan;
+}
+async function applyPlan() {
+  const sug = planState.suggestions || [];
+  const items = [...planState._picked].map((i) => sug[i]).filter(Boolean)
+    .map((x) => ({ student_id: x.student_id, date: x.date, start_time: x.start_time, duration_min: x.duration_min }));
+  if (!items.length) return;
+  if (!confirm(`${items.length} Termin${items.length === 1 ? '' : 'e'} als Vorschlag an die Fahrschüler schicken? Sie bekommen eine Benachrichtigung zum Annehmen oder Ablehnen.`)) return;
+  const ap = $('#pl-apply'); if (ap) { ap.disabled = true; ap.textContent = 'Sende…'; }
+  try {
+    const r = await api('/api/instructor/plan/apply', { method: 'POST', body: { items } });
+    const failed = (r.results || []).filter((x) => x.error).length;
+    toast(`${r.created} Vorschlag${r.created === 1 ? '' : 'e'} verschickt${failed ? `, ${failed} nicht möglich (belegt)` : ''} ✓`, failed ? 'err' : 'ok');
+    // erledigte Vorschlaege aus der Liste nehmen und neu zeichnen
+    planState.suggestions = null; planState._picked = new Set();
+    planState.from = planState.from; // beibehalten
+    tabPlaner();
+  } catch (e) { toast(e.message, 'err'); if (ap) { ap.disabled = false; ap.textContent = '✅ übernehmen'; } }
 }
 
 // ---- Tab: Nachrichten (Fahrlehrer) ----
