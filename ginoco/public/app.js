@@ -1991,7 +1991,7 @@ function renderWeekCard(wi, bookings, progress) {
       <div class="nh-count">${countdownLabel(next.date, next.start_time)}</div>
     </div>` : ''}
     <h2>Meine Fahrstunden <span class="sub">diese Woche (${fmtShort(wi.from)}–${fmtShort(wi.to)})</span></h2>
-    ${reservedCount ? `<div class="reserve-note">🔶 <strong>${reservedCount} Termin${reservedCount === 1 ? '' : 'e'}</strong> von deinem Fahrlehrer eingetragen – bitte unten mit <strong>✅ Bestätigen</strong> zusagen.</div>` : ''}
+    ${reservedCount ? `<div class="reserve-note">🔶 <strong>${reservedCount} Termin${reservedCount === 1 ? '' : 'e'}</strong> von deinem Fahrlehrer vorgeschlagen – bitte unten <strong>✅ Annehmen</strong> oder <strong>✕ Ablehnen</strong>.</div>` : ''}
     <div class="inline" style="margin-bottom:1rem">
       <span class="pill" style="background:${wi.remaining > 0 ? 'var(--good-bg)' : 'var(--bad-bg)'};color:var(--${remainColor})">
         ${wi.count} von ${wi.max} gebucht · noch ${wi.remaining} frei
@@ -2008,6 +2008,7 @@ function renderWeekCard(wi, bookings, progress) {
         </div>`}`;
   const c = $('#week-card');
   c.querySelectorAll('[data-confirm]').forEach((b) => b.onclick = () => confirmBooking(b.dataset.confirm));
+  c.querySelectorAll('[data-reject]').forEach((b) => b.onclick = () => rejectBooking(b.dataset.reject));
   c.querySelectorAll('[data-cancel]').forEach((b) => b.onclick = () => cancelBooking(b.dataset.cancel));
   c.querySelectorAll('[data-offer]').forEach((b) => b.onclick = () => offerBooking(b.dataset.offer));
   c.querySelectorAll('[data-withdraw]').forEach((b) => b.onclick = () => withdrawOffer(b.dataset.withdraw));
@@ -2149,8 +2150,8 @@ function studentBookingItem(b) {
   } else if (b.confirmed === 0) {
     // Vom Fahrlehrer reservierter Termin – der Schüler bestätigt ihn zuerst.
     st = '<span class="badge reserved">🔶 reserviert</span>';
-    actions = `<button class="sm" data-confirm="${b.id}">✅ Bestätigen</button>`
-      + (h >= cancelH ? ` <button class="ghost sm" data-cancel="${b.id}">Passt nicht</button>` : '');
+    actions = `<button class="sm" data-confirm="${b.id}">✅ Annehmen</button>`
+      + ` <button class="ghost sm" data-reject="${b.id}">✕ Ablehnen</button>`;
   } else {
     st = '<span class="badge booked">✅ bestätigt</span>';
     const lockH = state.settings?.lock_hours || 36;
@@ -2792,7 +2793,12 @@ async function cancelBooking(id) {
   catch (e) { toast(e.message, 'err'); }
 }
 async function confirmBooking(id) {
-  try { await api('/api/bookings/' + id + '/confirm', { method: 'POST' }); toast('Termin bestätigt ✓', 'ok'); syncStudent(); }
+  try { await api('/api/bookings/' + id + '/confirm', { method: 'POST' }); toast('Termin angenommen ✓', 'ok'); syncStudent(); }
+  catch (e) { toast(e.message, 'err'); }
+}
+async function rejectBooking(id) {
+  if (!confirm('Diesen vom Fahrlehrer vorgeschlagenen Termin ablehnen? Der Fahrlehrer wird benachrichtigt und der Zeitpunkt wird wieder frei.')) return;
+  try { await api('/api/bookings/' + id + '/reject', { method: 'POST' }); toast('Termin abgelehnt', 'ok'); syncStudent(); }
   catch (e) { toast(e.message, 'err'); }
 }
 

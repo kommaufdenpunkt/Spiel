@@ -1483,6 +1483,26 @@ async function handleApi(req, res, url) {
     db.prepare('UPDATE bookings SET confirmed=1 WHERE id=?').run(bk.id);
     logEvent('confirm', { actor: 'student', studentId: bk.student_id, bookingId: bk.id, date: bk.date,
       detail: `${wdShort(bk.date)} ${dmy(bk.date)} ${bk.start_time} Uhr bestätigt` });
+    const stC = db.prepare('SELECT name FROM students WHERE id=?').get(bk.student_id);
+    pushToInstructor(`✅ ${stC?.name || 'Ein Fahrschüler'} hat den Termin ${wdShort(bk.date)} ${dmy(bk.date)} ${bk.start_time} Uhr zugesagt.`);
+    return ok(res);
+  }
+
+  // Schueler LEHNT einen reservierten Termin AB (den der Fahrlehrer eingetragen hat).
+  // Nur solange noch nicht bestaetigt – ein Termin, den der Schueler nie selbst
+  // zugesagt hat, darf jederzeit abgelehnt werden (unabhaengig von der Storno-Frist).
+  const rejm = p.match(/^\/api\/bookings\/(\d+)\/reject$/);
+  if (rejm && method === 'POST') {
+    if (!requireStudent()) return bad(res, 'Bitte anmelden', 401);
+    const bk = db.prepare('SELECT * FROM bookings WHERE id=?').get(Number(rejm[1]));
+    if (!bk || bk.student_id !== sess.student_id) return bad(res, 'Buchung nicht gefunden', 404);
+    if (bk.status === 'cancelled') return bad(res, 'Dieser Termin ist bereits storniert');
+    if (bk.confirmed === 1) return bad(res, 'Diesen Termin hast du schon zugesagt. Für eine Absage bitte stornieren oder ins Angebot geben.');
+    db.prepare("UPDATE bookings SET status='cancelled' WHERE id=?").run(bk.id);
+    logEvent('reject', { actor: 'student', studentId: bk.student_id, bookingId: bk.id, date: bk.date,
+      detail: `${wdShort(bk.date)} ${dmy(bk.date)} ${bk.start_time} Uhr abgelehnt` });
+    const stR = db.prepare('SELECT name FROM students WHERE id=?').get(bk.student_id);
+    pushToInstructor(`🚫 ${stR?.name || 'Ein Fahrschüler'} hat den reservierten Termin ${wdShort(bk.date)} ${dmy(bk.date)} ${bk.start_time} Uhr abgelehnt. Der Slot ist wieder frei.`);
     return ok(res);
   }
 
