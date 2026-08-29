@@ -299,36 +299,6 @@
   .card.nope{border-color:#4a2620}
   .card.nope::before{background:radial-gradient(300px 150px at 14% 0%,rgba(212,87,74,.10),transparent 72%)}
 
-  /* ---------- Rechner ---------- */
-  .rechner{background:linear-gradient(160deg,#191206,#0d0a04);border:1px solid var(--line2);border-radius:22px;
-    padding:1.9rem 1.8rem;max-width:52rem;margin:0 auto;position:relative;overflow:hidden}
-  .rechner::before{content:"";position:absolute;inset:-60% -20% auto -20%;height:340px;pointer-events:none;
-    background:radial-gradient(420px 190px at 70% 50%,rgba(177,75,255,.16),transparent 70%)}
-  .rechner>*{position:relative}
-  .rechner-head{display:flex;justify-content:space-between;align-items:flex-start;gap:1.6rem;flex-wrap:wrap;margin-bottom:1.4rem}
-  .rechner h3{font-family:var(--serif);font-variant:small-caps;font-size:1.7rem;margin:0 0 .35rem;font-weight:700}
-  .rechner-sub{color:var(--dim);margin:0;font-size:.92rem;max-width:26rem}
-  .rechner-sub b{color:var(--gold)}
-  .rechner-out{text-align:right;flex:none}
-  .rechner-out b{display:block;font-family:var(--serif);font-size:clamp(2.2rem,5vw,3rem);line-height:1;font-weight:700}
-  .rechner-out span{display:block;font-size:.68rem;letter-spacing:.16em;text-transform:uppercase;color:var(--dim2);margin-top:.35rem}
-  .rl{display:flex;justify-content:space-between;align-items:baseline;font-size:.85rem;color:var(--dim);
-    margin-bottom:.5rem;font-weight:600}
-  .rl em{font-style:normal;color:var(--ink);font-size:1rem;font-weight:700}
-  input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:6px;border-radius:4px;background:#2a2010;
-    outline:none;margin:0 0 1.5rem}
-  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:24px;height:24px;border-radius:50%;cursor:grab;
-    background:linear-gradient(180deg,#fff2ce,#B14BFF 55%,#8A2CE0);box-shadow:0 3px 12px rgba(0,0,0,.7),0 0 0 1px #7A1FC9}
-  input[type=range]::-moz-range-thumb{width:24px;height:24px;border:none;border-radius:50%;cursor:grab;
-    background:linear-gradient(180deg,#fff2ce,#B14BFF 55%,#8A2CE0);box-shadow:0 3px 12px rgba(0,0,0,.7)}
-  .rechner-ziel{background:#0D0D16;border:1px solid var(--line);border-radius:14px;padding:.95rem 1.1rem}
-  .zl{display:flex;justify-content:space-between;align-items:baseline;font-size:.83rem;color:var(--dim);margin-bottom:.5rem}
-  .zl b{font-size:.95rem;color:var(--gold)}
-  .zbar{height:8px;border-radius:5px;background:#2A2A3C;overflow:hidden}
-  .zbar i{display:block;height:100%;border-radius:5px;width:100%;
-    background:linear-gradient(90deg,#FF4D9D,#B14BFF 60%,#E7C8FF);transition:width .3s cubic-bezier(.3,.8,.3,1)}
-  .zmsg{margin:.65rem 0 0;font-size:.85rem;color:var(--dim)}
-  .rechner-fuss{margin:1.1rem 0 0;font-size:.8rem;color:var(--dim2);line-height:1.6}
 
   /* ---------- Wochen ---------- */
   .wochen{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem}
@@ -616,35 +586,6 @@
           <p>Ausgezahlt wird direkt von BIGO an dich – nicht über uns. Wir bekommen deine Bohnen nie in die Hand.</p></div>
       </div>
 
-      <!-- Rechner -->
-      <div class="rechner" id="rechner">
-        <div class="rechner-head">
-          <div>
-            <span class="eyebrow" style="margin-bottom:.4rem">Beispielrechnung</span>
-            <h3>Rechne selbst nach</h3>
-            <p class="rechner-sub">Schieb den Regler auf die Bohnen, die du im Monat sammelst.
-              Grundlage ist unser Target: <b>5.000 Bohnen ≈ 100 $</b>.</p>
-          </div>
-          <div class="rechner-out">
-            <b id="rOut" class="gold">100 $</b>
-            <span>geschätztes Taschengeld</span>
-          </div>
-        </div>
-
-        <label class="rl" for="rBohnen">Bohnen im Monat<em id="rBohnenVal">5.000</em></label>
-        <input type="range" id="rBohnen" min="0" max="30000" step="500" value="5000"
-               aria-describedby="rHinweis">
-
-        <div class="rechner-ziel">
-          <div class="zl"><span>Unser Target: 5.000 Bohnen</span><b id="rProz">100 %</b></div>
-          <div class="zbar"><i id="rBar"></i></div>
-          <p class="zmsg" id="rMsg">Target erreicht – genau da wollen wir mit dir hin.</p>
-        </div>
-
-        <p class="rechner-fuss" id="rHinweis">Das ist eine Beispielrechnung, keine Zusage. Was am Ende dabei
-          herauskommt, hängt von deinen Stunden, deinen Tagen und deinen Zuschauern ab – und davon, was BIGO
-          gerade zahlt. Wir versprechen dir bewusst keine Summe. Aber wir zeigen dir, wie du hinkommst.</p>
-      </div>
     </div>
   </section>
 
