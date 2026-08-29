@@ -608,6 +608,29 @@ th{color:var(--muted);font-weight:600;font-size:.78rem;text-transform:uppercase;
 .cap-meta{flex:0 0 auto;font-size:.78rem;color:var(--muted);white-space:nowrap}
 .cap-free{color:var(--good);font-weight:700}
 .cap-full{color:var(--muted)}
+/* Vertrag & Monat */
+.ct-big{margin:.2rem 0 .1rem;font-size:1rem;color:var(--muted)}
+.ct-big b{font-size:2.1rem;font-weight:900;color:var(--ink);font-variant-numeric:tabular-nums}
+.ct-big .ct-sub{display:block;font-size:.8rem;margin-top:.1rem}
+.ct-meter{margin:1.3rem 0 1.1rem}
+.ct-track{position:relative;height:16px;background:#0f151d;border:1px solid var(--line);border-radius:9px;overflow:visible}
+.ct-fill{position:absolute;left:0;top:0;bottom:0;border-radius:9px 0 0 9px;transition:width .5s ease}
+.ct-fill-lo{background:linear-gradient(90deg,#e6b23a,#d99a2a)}
+.ct-fill-ok{background:linear-gradient(90deg,#4d8dff,#3a6fd4)}
+.ct-fill-good{background:linear-gradient(90deg,#35c07d,#2aa568)}
+.ct-done{position:absolute;left:0;top:0;bottom:0;border-radius:9px 0 0 9px;background:rgba(255,255,255,.22);pointer-events:none}
+.ct-mark{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--muted);transform:translateX(-1px);border-radius:2px}
+.ct-mark.paid{background:var(--good);width:2.5px}
+.ct-mark.tgt{background:#fff;width:2.5px}
+.ct-scale{position:relative;height:1.1em;margin-top:.45rem}
+.ct-scale span{position:absolute;transform:translateX(-50%);font-size:.72rem;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+.ct-lines{display:flex;flex-direction:column;gap:.4rem}
+.ct-line{display:flex;align-items:center;gap:.55rem;font-size:.9rem;background:var(--card2);border:1px solid var(--line);border-radius:11px;padding:.5rem .7rem}
+.ct-line .ct-dot{flex:0 0 1.2em;text-align:center;color:var(--muted);font-weight:900}
+.ct-line.on .ct-dot{color:var(--good)}
+.ct-line .ct-lb{flex:1;min-width:0}
+.ct-line .ct-vl{font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap;color:var(--ink)}
+.ct-line.on .ct-vl{color:var(--good)}
 /* Tagesstatus */
 .ds-banner{display:flex;gap:.7rem;align-items:flex-start;border-radius:14px;padding:.8rem .95rem;margin:0 0 .9rem;border:1px solid var(--line)}
 .ds-banner .ds-ic{font-size:1.5rem;line-height:1}

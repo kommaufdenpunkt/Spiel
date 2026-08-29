@@ -287,6 +287,8 @@ const DEFAULTS = {
   weekly_lo_h: '25',         // untere Zielspanne (gelb -> gruen)
   monthly_target_h: '80',    // Monatsziel in Stunden (mind. 80, gruen ab hier)
   monthly_max_h: '130',      // Skala-Ende der Monats-Tachouhr (hoechstens)
+  contract_min_h: '80',      // Vertrag: monatliches Minimum an Stunden
+  contract_paid_h: '130',    // Vertrag: bis zu so vielen Stunden wird immer ausgezahlt
   workdays: '1,2,3,4,5,6',   // 1=Mo ... 7=So
   max_per_week: '2',         // max. Fahrstunden pro Schueler & Woche
   student_max_per_day: '1',  // max. selbst gebuchte Fahrstunden pro Schueler & Tag (0 = ohne Limit; Fahrlehrer-Eintraege zaehlen nicht)
@@ -380,7 +382,7 @@ export function getSettings() {
   delete out.instructor_totp; delete out.instructor_totp_pending; delete out.instructor_recovery; delete out.instructor_passkeys;
   // Zahlen als Zahlen liefern
   for (const n of ['lesson_min', 'break_min', 'weekly_target_h', 'daily_target_h', 'weekly_lo_h',
-    'monthly_target_h', 'monthly_max_h',
+    'monthly_target_h', 'monthly_max_h', 'contract_min_h', 'contract_paid_h',
     'max_per_week', 'student_max_per_day', 'reserve_expire_min', 'booking_horizon_days', 'cancel_hours', 'lock_hours',
     'vacation_credit_min', 'vacation_days_left', 'late_grace_min', 'avg_speed_kmh', 'live_lead_min',
     'req_ueberland', 'req_autobahn', 'req_nacht', 'rank2_min_lessons', 'booking_horizon_days_rank2',

@@ -472,7 +472,8 @@ const CHANGELOG_VER = '3.75';
 const CHANGELOG = [
   { v: '3.75', d: '29.08.2026', title: '📊 Deine Woche im Blick – frei & ausgelastet', items: [
     '📊 <strong>Auslastung & freie Zeiten (Fahrlehrer):</strong> Im KI-Planer siehst du oben, wie voll dein Kalender ist und wo noch Platz für Stunden ist – ein Tipp auf den Tag und du trägst direkt selbst ein.',
-    '🧑‍🏫 <strong>Du bleibst der Chef:</strong> Die KI meldet sich nie von selbst – Vorschläge kommen nur, wenn du sie öffnest. Selbst planen geht jederzeit.'] },
+    '🧑‍🏫 <strong>Du bleibst der Chef:</strong> Die KI meldet sich nie von selbst – Vorschläge kommen nur, wenn du sie öffnest. Selbst planen geht jederzeit.',
+    '📄 <strong>Vertrag & Monat:</strong> Auf „Heute“ siehst du deine Monatsstunden gegen dein Minimum und die immer ausgezahlte Grenze – auf einen Blick, mobil-sauber.'] },
   { v: '3.74', d: '29.08.2026', title: '🧠 KI-Planer, Vorschläge & Tagesstatus', items: [
     '🧠 <strong>KI-Planer (Fahrlehrer):</strong> schlägt aus der Verfügbarkeit deiner Fahrschüler passende Termine vor – lückenlos in deine freien Slots, höchstens einer pro Tag & Schüler. Auswählen, „übernehmen“, fertig.',
     '🚦 <strong>Tagesstatus:</strong> Der Fahrlehrer sagt mit einem Tipp, ob heute alles <strong>planmäßig</strong> läuft oder es <strong>später</strong> wird – mit Grund (Berufsverkehr, Stau, Schnee, Glatteis, Witterung). Du siehst es sofort oben und bekommst eine Push.',
@@ -3283,6 +3284,7 @@ async function tabHeute() {
       <div id="today-strip"></div>
       <h2 style="margin-top:.3rem">Wochenziel</h2><div id="gauge"></div><div id="tiles"></div>
     </div>
+    <div class="card" id="contract-card"></div>
     <div class="card"><h2>Heute <span class="sub" id="today-sub"></span></h2><div id="today-list"></div></div>`;
   try {
     renderLiveInstr();
@@ -3291,6 +3293,7 @@ async function tabHeute() {
     const stats = await api('/api/instructor/stats?date=' + todayStr());
     renderGauge($('#gauge'), stats);
     renderTiles($('#tiles'), stats);
+    renderContract(stats);
     const ov = await api('/api/instructor/overview?from=' + todayStr() + '&to=' + todayStr());
     $('#today-sub').textContent = fmtDay(todayStr());
     renderInstrDay($('#today-list'), todayStr(), ov.bookings, ov.blocks);
@@ -3493,6 +3496,49 @@ function gaugeSVG(minutes, targetH, loH, maxHFixed) {
     <text x="172" y="110" font-size="9" fill="#93a1b3">${Math.round(maxH)} h</text>
     ${done ? '<text x="100" y="60" font-size="17" text-anchor="middle">🎯</text>' : ''}
   </svg>`;
+}
+
+// Vertrag & Monat: Ist-Stunden gegen Minimum (80), immer-ausgezahlt (130) und Monatsziel.
+// Mobil-first: eine klare Leiste mit Marken + drei Status-Zeilen.
+function renderContract(stats) {
+  const el = $('#contract-card'); if (!el) return;
+  const m = stats.monthly || {};
+  const h = (min) => (min || 0) / 60;
+  const totalH = h(m.minutes);            // gefahren + gebucht (+ Urlaub-Gutschrift)
+  const doneH = h(m.doneMinutes);         // schon gefahren
+  const minH = Number(m.contractMinH) || 80;
+  const paidH = Number(m.contractPaidH) || 130;
+  const targetH = Number(m.targetH) || minH;
+  const fmt = (x) => (Math.round(x * 10) / 10).toLocaleString('de-DE');
+  // Skala: bis zum größten relevanten Wert + etwas Luft.
+  const scale = Math.max(paidH, targetH, totalH) * 1.06;
+  const pct = (x) => Math.max(0, Math.min(100, (x / scale) * 100));
+  const monName = new Date(m.from || todayStr()).toLocaleDateString('de-DE', { month: 'long', year: 'numeric' });
+  // Ampel: unter Minimum = amber, ab Minimum = blau, ab 130 = grün (alles extra)
+  const fillCls = totalH >= paidH ? 'ct-fill-good' : (totalH >= minH ? 'ct-fill-ok' : 'ct-fill-lo');
+  // Status-Zeilen
+  const line = (ok, label, val) => `<div class="ct-line ${ok ? 'on' : ''}"><span class="ct-dot">${ok ? '✓' : '•'}</span><span class="ct-lb">${label}</span><span class="ct-vl">${val}</span></div>`;
+  const toMinLine = totalH >= minH
+    ? line(true, `Minimum (${fmt(minH)} h)`, 'erreicht')
+    : line(false, `Minimum (${fmt(minH)} h)`, `noch ${fmt(minH - totalH)} h`);
+  const toPaidLine = totalH >= paidH
+    ? line(true, `Immer ausgezahlt (${fmt(paidH)} h)`, `+${fmt(totalH - paidH)} h extra`)
+    : line(false, `Immer ausgezahlt (${fmt(paidH)} h)`, `noch ${fmt(paidH - totalH)} h`);
+  const toTargetLine = targetH > paidH
+    ? (totalH >= targetH ? line(true, `Monatsziel (${fmt(targetH)} h)`, 'erreicht') : line(false, `Monatsziel (${fmt(targetH)} h)`, `noch ${fmt(targetH - totalH)} h`))
+    : '';
+  el.innerHTML = `<h2>📄 Vertrag &amp; Monat <span class="sub">${esc(monName)}</span></h2>
+    <div class="ct-big"><b>${fmt(totalH)}</b> h <span class="ct-sub">gefahren ${fmt(doneH)} h · gebucht ${fmt(totalH - doneH)} h</span></div>
+    <div class="ct-meter">
+      <div class="ct-track"><div class="ct-fill ${fillCls}" style="width:${pct(totalH)}%"></div>
+        <div class="ct-done" style="width:${pct(doneH)}%"></div>
+        <span class="ct-mark" style="left:${pct(minH)}%"></span>
+        <span class="ct-mark paid" style="left:${pct(paidH)}%"></span>
+        ${targetH > paidH ? `<span class="ct-mark tgt" style="left:${pct(targetH)}%"></span>` : ''}
+      </div>
+      <div class="ct-scale"><span style="left:${pct(minH)}%">${fmt(minH)}</span><span style="left:${pct(paidH)}%">${fmt(paidH)}</span>${targetH > paidH ? `<span style="left:${pct(targetH)}%">${fmt(targetH)}</span>` : ''}</div>
+    </div>
+    <div class="ct-lines">${toMinLine}${toPaidLine}${toTargetLine}</div>`;
 }
 
 function renderGauge(el, stats) {
@@ -5548,6 +5594,11 @@ function tabEinstellungen() {
       <div class="row"><div class="field"><label>Monatsziel (Std, mind. 80)</label><input id="e-mt" type="number" value="${s.monthly_target_h}" min="80" step="1"></div>
         <div class="field"><label>Monat Skala-Ende (höchstens)</label><input id="e-mmax" type="number" value="${s.monthly_max_h}" min="80" step="1"></div></div>`)}
 
+    ${sec('📄', 'Vertrag', 'Dein Stunden-Vertrag (Minimum & Auszahlung)', `
+      <div class="row"><div class="field"><label>Minimum (Std/Monat) ${helpDot('Dein vertragliches Monats-Minimum. Bis hierhin musst du kommen.')}</label><input id="e-cmin" type="number" value="${s.contract_min_h}" min="0" step="1"></div>
+        <div class="field"><label>Immer ausgezahlt (Std) ${helpDot('Bis zu so vielen Stunden bekommst du immer bezahlt – egal wie der Monat läuft. Alles darüber ist extra.')}</label><input id="e-cpaid" type="number" value="${s.contract_paid_h}" min="0" step="1"></div></div>
+      <div class="hint" style="margin:.3rem 0 0">Diese zwei Marken erscheinen auf der Vertrags-Karte unter „Heute“. Den konkreten Monatswert (z. B. 155 h) stellst du oben als <strong>Monatsziel</strong> ein.</div>`)}
+
     ${sec('🏆', 'Sonderfahrten & Rang', 'Soll-Fahrten, Rang-Aufstieg, anonymer Tausch', `
       <div class="row"><div class="field"><label>Soll Überland</label><input id="e-req-u" type="number" value="${s.req_ueberland}" min="0"></div>
         <div class="field"><label>Soll Autobahn</label><input id="e-req-a" type="number" value="${s.req_autobahn}" min="0"></div>
@@ -5618,6 +5669,7 @@ function tabEinstellungen() {
         weekly_target_h: Number($('#e-wt').value), weekly_lo_h: Number($('#e-wlo').value),
         daily_target_h: Number($('#e-dt').value),
         monthly_target_h: Number($('#e-mt').value), monthly_max_h: Number($('#e-mmax').value),
+        contract_min_h: Number($('#e-cmin').value), contract_paid_h: Number($('#e-cpaid').value),
         workdays: workdays || '1,2,3,4,5',
         max_per_week: Number($('#e-max').value), student_max_per_day: Number($('#e-maxday').value), instructor_name: $('#e-name').value,
         reserve_expire_min: Number($('#e-resv').value),

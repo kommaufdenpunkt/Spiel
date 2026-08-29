@@ -2448,7 +2448,7 @@ async function handleApi(req, res, url) {
     if ('monthly_max_h' in b && 'monthly_target_h' in b && Number(b.monthly_max_h) < Number(b.monthly_target_h))
       return bad(res, 'Das Skala-Ende (höchstens) darf nicht kleiner als das Monatsziel sein');
     const allowed = ['instructor_name', 'start_time', 'last_start', 'lesson_min', 'break_min',
-      'weekly_target_h', 'daily_target_h', 'weekly_lo_h', 'monthly_target_h', 'monthly_max_h', 'workdays', 'max_per_week', 'student_max_per_day',
+      'weekly_target_h', 'daily_target_h', 'weekly_lo_h', 'monthly_target_h', 'monthly_max_h', 'contract_min_h', 'contract_paid_h', 'workdays', 'max_per_week', 'student_max_per_day',
       'reserve_expire_min', 'weather_enabled', 'weather_autostatus', 'booking_horizon_days', 'cancel_hours', 'lock_hours', 'release_time', 'short_day_last_start',
       'vacation_credit_min', 'vacation_days_left', 'late_grace_min', 'policy_text',
       'instructor_phone', 'avg_speed_kmh', 'live_lead_min',
@@ -3155,7 +3155,8 @@ function statsFor(ref) {
     day, from, to,
     daily: { minutes: dayMin, doneMinutes: dayDone, targetH: s.daily_target_h },
     weekly: { minutes: weekMin, doneMinutes: weekDone, targetH: s.weekly_target_h, loH: s.weekly_lo_h },
-    monthly: { minutes: monthMin, doneMinutes: monthDone, targetH: s.monthly_target_h, maxH: s.monthly_max_h, from: mo.from, to: mo.to },
+    monthly: { minutes: monthMin, doneMinutes: monthDone, targetH: s.monthly_target_h, maxH: s.monthly_max_h,
+      contractMinH: s.contract_min_h, contractPaidH: s.contract_paid_h, from: mo.from, to: mo.to },
     perDay, counts,
     settings: s,
   };
