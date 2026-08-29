@@ -468,8 +468,11 @@ function openTour() {
 window.__openTour = openTour;
 
 // ---------- Was ist neu? (Changelog) ----------
-const CHANGELOG_VER = '3.74';
+const CHANGELOG_VER = '3.75';
 const CHANGELOG = [
+  { v: '3.75', d: '29.08.2026', title: '📊 Deine Woche im Blick – frei & ausgelastet', items: [
+    '📊 <strong>Auslastung & freie Zeiten (Fahrlehrer):</strong> Im KI-Planer siehst du oben, wie voll dein Kalender ist und wo noch Platz für Stunden ist – ein Tipp auf den Tag und du trägst direkt selbst ein.',
+    '🧑‍🏫 <strong>Du bleibst der Chef:</strong> Die KI meldet sich nie von selbst – Vorschläge kommen nur, wenn du sie öffnest. Selbst planen geht jederzeit.'] },
   { v: '3.74', d: '29.08.2026', title: '🧠 KI-Planer, Vorschläge & Tagesstatus', items: [
     '🧠 <strong>KI-Planer (Fahrlehrer):</strong> schlägt aus der Verfügbarkeit deiner Fahrschüler passende Termine vor – lückenlos in deine freien Slots, höchstens einer pro Tag & Schüler. Auswählen, „übernehmen“, fertig.',
     '🚦 <strong>Tagesstatus:</strong> Der Fahrlehrer sagt mit einem Tipp, ob heute alles <strong>planmäßig</strong> läuft oder es <strong>später</strong> wird – mit Grund (Berufsverkehr, Stau, Schnee, Glatteis, Witterung). Du siehst es sofort oben und bekommst eine Push.',
@@ -2913,9 +2916,12 @@ async function tabPlaner() {
   const studs = planState._students;
   const opts = `<option value="">Alle Fahrschüler</option>` +
     studs.map((s) => `<option value="${s.id}" ${String(planState.student) === String(s.id) ? 'selected' : ''}>${esc(s.name)}${s.availability ? '' : ' — ohne Verfügbarkeit'}</option>`).join('');
-  box.innerHTML = `<div class="card">
-    <h2>🧠 KI-Planer</h2>
-    <p class="hint">Der Planer schaut sich die von deinen Fahrschülern hinterlegte <strong>Verfügbarkeit</strong> an und schlägt dir passende Termine vor – lückenlos in deine freien Slots gelegt, höchstens einer pro Tag &amp; Schüler, dein Wochenlimit wird beachtet. Du wählst aus, was passt, und schickst es mit einem Tipp als <strong>Vorschlag</strong> an die Schüler (die nehmen an oder lehnen ab).</p>
+  box.innerHTML = `<div class="card" id="cap-card"><h2>📊 Deine Woche – frei &amp; ausgelastet</h2>
+      <p class="hint">Dein Überblick: wie voll dein Kalender ist und wo noch Platz für Stunden ist. Tipp auf einen Tag, um dort direkt selbst einen Termin einzutragen.</p>
+      <div id="cap-body"><p class="hint">Lädt…</p></div></div>
+    <div class="card">
+    <h2>🧠 KI-Planer <span class="sub" style="font-weight:400;color:var(--muted);font-size:.8rem">— nur wenn du willst</span></h2>
+    <p class="hint">Der Planer meldet sich nie von selbst. Wenn du magst, schaut er sich die <strong>Verfügbarkeit</strong> deiner Fahrschüler an und schlägt passende Termine vor – lückenlos in deine freien Slots, höchstens einer pro Tag &amp; Schüler. Du wählst aus und schickst sie als <strong>Vorschlag</strong> (die Schüler nehmen an oder lehnen ab). <strong>Du</strong> bleibst der Chef – eintragen kannst du jederzeit auch selbst im Kalender.</p>
     <div class="row">
       <div class="field"><label>Von</label><input type="date" id="pl-from" value="${planState.from}" min="${todayStr()}"></div>
       <div class="field"><label>Bis</label><input type="date" id="pl-to" value="${planState.to}" min="${todayStr()}"></div>
@@ -2929,6 +2935,49 @@ async function tabPlaner() {
   $('#pl-stu').onchange = (e) => planState.student = e.target.value;
   $('#pl-go').onclick = runPlanner;
   if (planState.suggestions) renderPlanResults();
+  renderCapacityPanel();
+}
+// Auslastung & freie Zeiten – dein Überblick, wo noch Platz ist (mehr Stunden = mehr Verdienst).
+async function renderCapacityPanel() {
+  const el = $('#cap-body'); if (!el) return;
+  let data;
+  try { data = await api('/api/instructor/capacity?from=' + todayStr() + '&to=' + addDays(todayStr(), 13)); }
+  catch (e) { el.innerHTML = `<p class="err">${esc(e.message)}</p>`; return; }
+  const days = (data.days || []).filter((d) => !d.closed);
+  const unitMin = data.unit || 90;
+  // Diese Woche (Mo–So um heute) zusammenfassen.
+  const wkFrom = mondayOf(todayStr()), wkTo = addDays(wkFrom, 6);
+  const wkDays = days.filter((d) => d.date >= wkFrom && d.date <= wkTo);
+  const wkBooked = wkDays.reduce((a, d) => a + (d.bookedCount || 0), 0);
+  const wkFreeMin = wkDays.reduce((a, d) => a + (d.free || 0), 0);
+  const wkOccMin = wkDays.reduce((a, d) => a + (d.occ || 0), 0);
+  const totMin = wkOccMin + wkFreeMin;
+  const fullPct = totMin > 0 ? Math.round((wkOccMin / totMin) * 100) : 0;
+  const freeH = (wkFreeMin / 60);
+  const freeLessons = wkDays.reduce((a, d) => a + (d.freeLessons || 0), 0);
+  const tiles = `<div class="cap-tiles">
+    <div class="cap-tile"><b>${wkBooked}</b><span>Fahrstunden gebucht<br>(diese Woche)</span></div>
+    <div class="cap-tile accent"><b>${fullPct}%</b><span>Kalender ausgelastet</span></div>
+    <div class="cap-tile good"><b>${freeH < 10 ? freeH.toFixed(1) : Math.round(freeH)} h</b><span>noch frei · Platz für ≈ ${freeLessons} Stunden</span></div>
+  </div>`;
+  const rows = days.map((d) => {
+    const pct = d.total > 0 ? Math.round((d.occ / d.total) * 100) : 0;
+    const freeH2 = (d.free / 60);
+    const isToday = d.date === todayStr();
+    return `<button class="cap-row" data-day="${d.date}">
+      <span class="cap-wd">${d.weekday}${isToday ? ' <em>heute</em>' : ''} <span class="cap-dt">${fmtShort(d.date)}</span></span>
+      <span class="cap-bar"><span class="cap-fill" style="width:${pct}%"></span></span>
+      <span class="cap-meta">${d.bookedCount}× · ${d.free > 0 ? `<span class="cap-free">${freeH2 < 10 ? freeH2.toFixed(1) : Math.round(freeH2)} h frei</span>` : '<span class="cap-full">voll</span>'}</span>
+    </button>`;
+  }).join('');
+  el.innerHTML = tiles + `<div class="cap-list">${rows || '<p class="hint">In den nächsten zwei Wochen sind keine Arbeitstage eingetragen.</p>'}</div>`;
+  el.querySelectorAll('[data-day]').forEach((b) => b.onclick = () => openDayInCalendar(b.dataset.day));
+}
+// Zu einem Tag im Kalender springen (dort kann der Fahrlehrer selbst eintragen).
+function openDayInCalendar(date) {
+  state.date = date; state.instrTab = 'kalender';
+  app.querySelectorAll('[data-nav]').forEach((b) => b.classList.toggle('active', b.dataset.nav === 'kalender'));
+  drawInstrTab();
 }
 async function runPlanner() {
   planState.loading = true;

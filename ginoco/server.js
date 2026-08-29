@@ -1568,6 +1568,42 @@ async function handleApi(req, res, url) {
     return ok(res, { created, results });
   }
 
+  // Auslastung & freie Zeiten je Tag: wie viel ist gebucht, wie viel Platz ist noch.
+  // Rein informativ, damit der Fahrlehrer sieht, wo er noch Stunden legen kann.
+  if (p === '/api/instructor/capacity' && method === 'GET') {
+    if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
+    const from = url.searchParams.get('from') || todayStr();
+    let to = url.searchParams.get('to') || addDays(from, 13);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) return bad(res, 'Zeitraum ungültig');
+    if (to < from) to = from;
+    if (to > addDays(from, 41)) to = addDays(from, 41);
+    const s = getSettings();
+    const unit = s.lesson_min + s.break_min;
+    const workdays = getSettingRaw('workdays').split(',').map(Number);
+    const days = [];
+    for (let d = from; d <= to; d = addDays(d, 1)) {
+      const ov = getOverride(d);
+      if (ov && ov.closed) { days.push({ date: d, weekday: wdShort(d), closed: true, type: ov.type || 'free' }); continue; }
+      if (!workdays.includes(isoDow(d))) continue; // regulaerer Ruhetag -> nicht auflisten
+      const f = dayFrame(d);
+      const winStart = f.dayStart, winEnd = f.workEnd, total = Math.max(0, winEnd - winStart);
+      let occ = 0;
+      for (const b of db.prepare("SELECT start_time,duration_min FROM bookings WHERE date=? AND status!='cancelled'").all(d)) {
+        const bs = toMin(b.start_time), be = bs + b.duration_min;
+        occ += Math.max(0, Math.min(be, winEnd) - Math.max(bs, winStart));
+      }
+      for (const bl of db.prepare('SELECT start_time,end_time FROM blocks WHERE date=?').all(d)) {
+        const bs = toMin(bl.start_time), be = toMin(bl.end_time);
+        occ += Math.max(0, Math.min(be, winEnd) - Math.max(bs, winStart));
+      }
+      occ = Math.min(occ, total);
+      const free = Math.max(0, total - occ);
+      const bookedCount = db.prepare("SELECT COUNT(*) AS n FROM bookings WHERE date=? AND status!='cancelled' AND student_id IS NOT NULL").get(d).n;
+      days.push({ date: d, weekday: wdShort(d), closed: false, total, occ, free, freeLessons: Math.floor(free / unit), bookedCount });
+    }
+    return ok(res, { from, to, unit, lessonMin: s.lesson_min, days });
+  }
+
   if (p === '/api/instructor/overview' && method === 'GET') {
     if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
     const from = url.searchParams.get('from') || todayStr();
