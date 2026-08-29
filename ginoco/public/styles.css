@@ -652,6 +652,8 @@ th{color:var(--muted);font-weight:600;font-size:.78rem;text-transform:uppercase;
 .ds-weather .ds-ic{font-size:1.4rem;line-height:1}
 .ds-weather .ds-t{font-weight:800;color:#8fb8ff}
 .ds-weather .ds-s{font-size:.85rem;color:var(--muted);margin-top:.1rem;line-height:1.45}
+.ds-weather.ds-jam{background:rgba(230,150,58,.12);border-color:rgba(230,150,58,.4);margin-top:.5rem}
+.ds-weather.ds-jam .ds-t{color:#f0b459}
 
 /* ---- Aussehen-Panel (Farbe, Schrift, Größe) ---- */
 .ap-sec{padding:.9rem 0;margin:0;border-top:1px solid var(--line)}

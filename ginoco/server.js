@@ -1707,6 +1707,12 @@ async function handleApi(req, res, url) {
     const hint = await weatherHintFor(date);
     return ok(res, { hint });
   }
+  // Verkehrs-Hinweis (Stau) – nur wenn ein TomTom-Schluessel hinterlegt ist.
+  if (p === '/api/instructor/traffic-hint' && method === 'GET') {
+    if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
+    const hint = await trafficHintFor();
+    return ok(res, { hint, configured: !!getSettingRaw('traffic_key') });
+  }
 
   // Erinnerungen jetzt pruefen/versenden (laeuft auch automatisch im Hintergrund)
   if (p === '/api/instructor/run-reminders' && method === 'POST') {
@@ -2449,7 +2455,7 @@ async function handleApi(req, res, url) {
       return bad(res, 'Das Skala-Ende (höchstens) darf nicht kleiner als das Monatsziel sein');
     const allowed = ['instructor_name', 'start_time', 'last_start', 'lesson_min', 'break_min',
       'weekly_target_h', 'daily_target_h', 'weekly_lo_h', 'monthly_target_h', 'monthly_max_h', 'contract_min_h', 'contract_paid_h', 'workdays', 'max_per_week', 'student_max_per_day',
-      'reserve_expire_min', 'weather_enabled', 'weather_autostatus', 'booking_horizon_days', 'cancel_hours', 'lock_hours', 'release_time', 'short_day_last_start',
+      'reserve_expire_min', 'weather_enabled', 'weather_autostatus', 'traffic_key', 'booking_horizon_days', 'cancel_hours', 'lock_hours', 'release_time', 'short_day_last_start',
       'vacation_credit_min', 'vacation_days_left', 'late_grace_min', 'policy_text',
       'instructor_phone', 'avg_speed_kmh', 'live_lead_min',
       'meet_default_label', 'meet_default_lat', 'meet_default_lng',
@@ -2460,7 +2466,7 @@ async function handleApi(req, res, url) {
       'school_label', 'school2_label', 'school2_lat', 'school2_lng',
       'instructor_home_label', 'instructor_home_lat', 'instructor_home_lng'];
     const emptyOk = new Set(['instructor_phone', 'meet_default_label', 'meet_default_lat', 'meet_default_lng', 'policy_text',
-      'instructor_home_label', 'instructor_home_lat', 'instructor_home_lng']);
+      'instructor_home_label', 'instructor_home_lat', 'instructor_home_lng', 'traffic_key']);
     for (const k of allowed) {
       if (!(k in b) || b[k] == null) continue;
       if (b[k] === '' && !emptyOk.has(k)) continue;
@@ -3219,6 +3225,49 @@ function classifyWeather(hours, startH, endH) {
   if (maxPrec >= 2.5 || (rain && maxPrec >= 1)) return { reason: 'weather', label: '🌧️ Kräftiger Regen', detail: `Kräftiger Regen (bis ${maxPrec.toFixed(1)} mm/h).` };
   return null; // ruhiges Wetter -> kein Hinweis
 }
+// ===================== VERKEHR / STAU (TomTom, kostenloser Schluessel) =====================
+// Reine Funktion: aus der Stau-Verzoegerung (Sekunden) einen Hinweis ableiten.
+function classifyTraffic(delaySec, whereLabel) {
+  const min = Math.round((delaySec || 0) / 60);
+  if (min < 5) return null; // unter 5 Min: kein Stau-Hinweis
+  return { reason: 'jam', minutes: min, label: '🚧 Stau', detail: `Mehr Verkehr${whereLabel ? ' Richtung ' + whereLabel : ''} als sonst – rund ${min} Min zusätzlich.` };
+}
+let _trafficCache = { key: null, at: 0, hint: null };
+async function trafficHintFor() {
+  const apiKey = getSettingRaw('traffic_key');
+  if (!apiKey) return null; // ohne Schluessel: Verkehrs-Hinweis aus
+  const hlat = Number(getSettingRaw('instructor_home_lat')), hlng = Number(getSettingRaw('instructor_home_lng'));
+  if (!isFinite(hlat) || !isFinite(hlng)) return null;
+  // Ziele: die beiden Standorte (Eberswalde + evtl. Bernau/Finow).
+  const dests = [];
+  const s1la = Number(getSettingRaw('school_lat')), s1lo = Number(getSettingRaw('school_lng'));
+  if (isFinite(s1la) && isFinite(s1lo)) dests.push({ label: getSettingRaw('school_label') || 'Standort 1', lat: s1la, lng: s1lo });
+  const s2la = Number(getSettingRaw('school2_lat')), s2lo = Number(getSettingRaw('school2_lng'));
+  if (isFinite(s2la) && isFinite(s2lo)) dests.push({ label: getSettingRaw('school2_label') || 'Standort 2', lat: s2la, lng: s2lo });
+  if (!dests.length) return null;
+  const cacheKey = `${hlat},${hlng}|${dests.map((d) => d.label).join(',')}`;
+  if (_trafficCache.key === cacheKey && Date.now() - _trafficCache.at < 15 * 60e3) return _trafficCache.hint;
+  let worst = null;
+  for (const d of dests) {
+    try {
+      const ctrl = new AbortController();
+      const to = setTimeout(() => ctrl.abort(), 4500);
+      const u = `https://api.tomtom.com/routing/1/calculateRoute/${hlat},${hlng}:${d.lat},${d.lng}/json?traffic=true&key=${encodeURIComponent(apiKey)}`;
+      const r = await fetch(u, { signal: ctrl.signal, headers: { Accept: 'application/json' } });
+      clearTimeout(to);
+      if (!r.ok) continue;
+      const j = await r.json();
+      const sum = j.routes && j.routes[0] && j.routes[0].summary;
+      if (!sum) continue;
+      const delay = Number(sum.trafficDelayInSeconds) || 0;
+      if (!worst || delay > worst.delay) worst = { delay, label: d.label };
+    } catch { /* Ziel uebersprungen */ }
+  }
+  const hint = worst ? classifyTraffic(worst.delay, worst.label) : null;
+  _trafficCache = { key: cacheKey, at: Date.now(), hint };
+  return hint;
+}
+
 let _weatherCache = { key: null, at: 0, hint: null };
 async function weatherHintFor(date) {
   if (getSettingRaw('weather_enabled') === '0') return null;
@@ -3403,4 +3452,4 @@ server.listen(PORT, HOST, () => {
 });
 
 // Nur für automatisierte Tests exportiert (keine Wirkung auf den laufenden Server).
-export { encryptPush, vapidAuth, b64url, b64urlDecode, ensureVapidKeys, expireStaleReservations, classifyWeather, autoWeatherStatus };
+export { encryptPush, vapidAuth, b64url, b64urlDecode, ensureVapidKeys, expireStaleReservations, classifyWeather, autoWeatherStatus, classifyTraffic };

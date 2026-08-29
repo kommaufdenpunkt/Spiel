@@ -473,7 +473,8 @@ const CHANGELOG = [
   { v: '3.75', d: '29.08.2026', title: '📊 Deine Woche im Blick – frei & ausgelastet', items: [
     '📊 <strong>Auslastung & freie Zeiten (Fahrlehrer):</strong> Im KI-Planer siehst du oben, wie voll dein Kalender ist und wo noch Platz für Stunden ist – ein Tipp auf den Tag und du trägst direkt selbst ein.',
     '🧑‍🏫 <strong>Du bleibst der Chef:</strong> Die KI meldet sich nie von selbst – Vorschläge kommen nur, wenn du sie öffnest. Selbst planen geht jederzeit.',
-    '📄 <strong>Vertrag & Monat:</strong> Auf „Heute“ siehst du deine Monatsstunden gegen dein Minimum und die immer ausgezahlte Grenze – auf einen Blick, mobil-sauber.'] },
+    '📄 <strong>Vertrag & Monat:</strong> Auf „Heute“ siehst du deine Monatsstunden gegen dein Minimum und die immer ausgezahlte Grenze – auf einen Blick, mobil-sauber.',
+    '🚧 <strong>Live-Verkehr (optional):</strong> Mit einem kostenlosen TomTom-Schlüssel (Einstellungen → Wetter &amp; Verkehr) warnt ginoco bei echtem Stau auf deinen Wegen und schlägt die Verzögerung zum Melden vor. Ohne Schlüssel bleibt es einfach aus.'] },
   { v: '3.74', d: '29.08.2026', title: '🧠 KI-Planer, Vorschläge & Tagesstatus', items: [
     '🧠 <strong>KI-Planer (Fahrlehrer):</strong> schlägt aus der Verfügbarkeit deiner Fahrschüler passende Termine vor – lückenlos in deine freien Slots, höchstens einer pro Tag & Schüler. Auswählen, „übernehmen“, fertig.',
     '🚦 <strong>Tagesstatus:</strong> Der Fahrlehrer sagt mit einem Tipp, ob heute alles <strong>planmäßig</strong> läuft oder es <strong>später</strong> wird – mit Grund (Berufsverkehr, Stau, Schnee, Glatteis, Witterung). Du siehst es sofort oben und bekommst eine Push.',
@@ -3404,6 +3405,7 @@ async function renderInstrDayStatus() {
     <p class="hint">Ein Tipp genügt: deine Fahrschüler mit einem Termin heute sehen sofort, ob alles planmäßig läuft – oder warum es später wird (Berufsverkehr, Glatteis, Schnee). Sie bekommen eine Push.</p>
     ${cur}
     <div id="ds-weather"></div>
+    <div id="ds-traffic"></div>
     <div class="inline" style="margin-top:.7rem">
       <button class="${isDelay ? 'sec' : ''}" id="ds-ok">✅ Läuft planmäßig</button>
       <button class="sec" id="ds-delay">⏳ Verzögerung melden</button>
@@ -3418,6 +3420,18 @@ async function renderInstrDayStatus() {
           <div class="ds-s">${esc(wh.detail)} Möchtest du das als Verzögerung melden?</div>
           <button class="sm" id="ds-wsuggest" style="margin-top:.5rem">⏳ Verzögerung wegen ${esc(wh.label)} melden</button></div></div>`;
       $('#ds-wsuggest').onclick = () => openDelayStatusModal(status, { reason: wh.reason, minutes: 15 });
+    } catch {}
+  })();
+  // Verkehrs-Hinweis (TomTom): nur wenn ein Schlüssel hinterlegt ist und es staut.
+  (async () => {
+    try {
+      const th = (await api('/api/instructor/traffic-hint')).hint;
+      const tbox = $('#ds-traffic'); if (!tbox || !th) return;
+      tbox.innerHTML = `<div class="ds-weather ds-jam"><div class="ds-ic">🚧</div>
+        <div><div class="ds-t">Verkehrs-Hinweis: Stau</div>
+          <div class="ds-s">${esc(th.detail)} Als Verzögerung melden?</div>
+          <button class="sm" id="ds-tsuggest" style="margin-top:.5rem">⏳ Verzögerung wegen 🚧 Stau (${th.minutes} Min) melden</button></div></div>`;
+      $('#ds-tsuggest').onclick = () => openDelayStatusModal(status, { reason: 'jam', minutes: th.minutes });
     } catch {}
   })();
   $('#ds-ok').onclick = async () => {
@@ -5623,7 +5637,9 @@ function tabEinstellungen() {
     ${sec('🌦️', 'Wetter & Verkehr', 'Automatische Vorwarnung bei Glatteis/Schnee', `
       <label class="ck-line"><input type="checkbox" id="e-weather" ${s.weather_enabled !== '0' ? 'checked' : ''}> Wetter-Hinweise anzeigen (Deutscher Wetterdienst – kostenlos, kein Schlüssel nötig)</label>
       <label class="ck-line" style="margin-top:.4rem"><input type="checkbox" id="e-weather-auto" ${s.weather_autostatus === '1' ? 'checked' : ''}> Bei Glatteis/Schnee die heutigen Fahrschüler <strong>automatisch</strong> vorwarnen</label>
-      <div class="hint" style="margin:.4rem 0 0">Ist der zweite Haken gesetzt, meldet ginoco von selbst eine kleine Verzögerung und schickt deinen Fahrschülern mit einem Termin heute eine Push – ohne dass du etwas tun musst. Deine eigene Ansage hat immer Vorrang. 🚧 <strong>Live-Verkehr/Stau</strong> folgt, sobald ein (kostenloser) Verkehrs-Schlüssel hinterlegt ist.</div>`)}
+      <div class="hint" style="margin:.4rem 0 0">Ist der zweite Haken gesetzt, meldet ginoco von selbst eine kleine Verzögerung und schickt deinen Fahrschülern mit einem Termin heute eine Push – ohne dass du etwas tun musst. Deine eigene Ansage hat immer Vorrang.</div>
+      <div class="field" style="margin-top:.7rem"><label>🚧 Verkehrs-Schlüssel (TomTom, kostenlos) ${helpDot('Optional. Mit einem kostenlosen TomTom-Schlüssel warnt ginoco bei echtem Stau auf deinen Wegen. Leer = Verkehrs-Hinweis aus.')}</label><input id="e-traffic" value="${esc(s.traffic_key || '')}" placeholder="hier deinen TomTom-Schlüssel einfügen" autocomplete="off"></div>
+      <div class="hint" style="margin:.3rem 0 0">Schlüssel gratis auf <strong>developer.tomtom.com</strong> holen (2 500 Anfragen/Tag frei). Ohne Schlüssel bleibt der Verkehrs-Hinweis einfach aus – nichts geht kaputt.</div>`)}
 
     ${sec('🔒', 'Privatmodus & Registrierung', 'Wer darf sich neu anmelden?', `
       <label class="ck-line"><input type="checkbox" id="e-reg-open" ${s.registration_open === '1' ? 'checked' : ''}> Neue Fahrschüler dürfen sich mit Code registrieren</label>
@@ -5687,6 +5703,7 @@ function tabEinstellungen() {
         registration_open: $('#e-reg-open').checked ? '1' : '0',
         weather_enabled: $('#e-weather').checked ? '1' : '0',
         weather_autostatus: $('#e-weather-auto').checked ? '1' : '0',
+        traffic_key: $('#e-traffic').value.trim(),
         flow_schedule: $('#e-flow').checked ? '1' : '0',
         auto_fill_gaps: $('#e-autofill').checked ? '1' : '0',
         school_label: $('#e-schoollabel').value.trim(),
