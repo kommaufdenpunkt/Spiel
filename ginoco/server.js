@@ -1783,11 +1783,13 @@ async function handleApi(req, res, url) {
     //  pickup = im Abhol-Fenster, Fahrlehrer teilt aber noch nicht: Abholort setzen/Standort teilen
     //  live   = Fahrlehrer ist unterwegs (Karte)
     const phase = active ? 'live' : (minutesToStart > winMin ? 'soon' : 'pickup');
+    // Tagesstatus (laeuft planmaessig / Verzoegerung mit Grund) automatisch mitliefern.
+    const ds = db.prepare('SELECT state,minutes,reason,note FROM day_status WHERE date=?').get(bk.date) || null;
     return ok(res, {
       window: true, active, busy: otherInProgress, phase,
       booking: { date: bk.date, start_time: bk.start_time, minutesToStart, delayMin: bk.delay_min || 0 },
       location: active ? { lat: live.lat, lng: live.lng, updated_at: live.updated_at } : null,
-      meet, distanceKm, etaMin, lead, announce,
+      meet, distanceKm, etaMin, lead, announce, dayStatus: ds,
       sharing: !!(meLive && meLive.live_active),
     });
   }
@@ -2411,7 +2413,7 @@ async function handleApi(req, res, url) {
       return bad(res, 'Das Skala-Ende (höchstens) darf nicht kleiner als das Monatsziel sein');
     const allowed = ['instructor_name', 'start_time', 'last_start', 'lesson_min', 'break_min',
       'weekly_target_h', 'daily_target_h', 'weekly_lo_h', 'monthly_target_h', 'monthly_max_h', 'workdays', 'max_per_week', 'student_max_per_day',
-      'reserve_expire_min', 'weather_enabled', 'booking_horizon_days', 'cancel_hours', 'lock_hours', 'release_time', 'short_day_last_start',
+      'reserve_expire_min', 'weather_enabled', 'weather_autostatus', 'booking_horizon_days', 'cancel_hours', 'lock_hours', 'release_time', 'short_day_last_start',
       'vacation_credit_min', 'vacation_days_left', 'late_grace_min', 'policy_text',
       'instructor_phone', 'avg_speed_kmh', 'live_lead_min',
       'meet_default_label', 'meet_default_lat', 'meet_default_lng',
@@ -3209,6 +3211,37 @@ async function weatherHintFor(date) {
   }
 }
 
+// Automatische Vorwarnung: ist "weather_autostatus" an und droht heute Glatteis
+// oder Schnee, setzt ginoco von selbst den Tagesstatus (Verzoegerung) und
+// benachrichtigt die heutigen Fahrschueler – ohne Zutun des Fahrlehrers. Nur wenn
+// noch KEIN Status fuer heute gesetzt ist (die manuelle Ansage hat immer Vorrang)
+// und es heute noch nicht begonnene Fahrstunden gibt.
+let _autoWeatherDay = null;
+async function autoWeatherStatus() {
+  if (getSettingRaw('weather_autostatus') !== '1') return;
+  const date = todayStr();
+  if (_autoWeatherDay === date) return;           // heute schon geprueft
+  // Schon ein Status gesetzt? -> nicht ueberschreiben.
+  if (db.prepare('SELECT 1 FROM day_status WHERE date=?').get(date)) { _autoWeatherDay = date; return; }
+  // Gibt es heute ueberhaupt noch nicht begonnene, gebuchte Stunden?
+  const nowM = toMin(nowHHMM());
+  const studs = db.prepare("SELECT DISTINCT student_id FROM bookings WHERE date=? AND student_id IS NOT NULL AND status='booked'").all(date)
+    .filter((r) => true).map((r) => r.student_id);
+  const future = db.prepare("SELECT start_time FROM bookings WHERE date=? AND status='booked'").all(date)
+    .some((b) => toMin(b.start_time) >= nowM);
+  if (!studs.length || !future) return;           // heute nichts (mehr) zu warnen – spaeter erneut versuchen
+  const hint = await weatherHintFor(date);
+  if (!hint || !(hint.reason === 'ice' || hint.reason === 'snow')) { _autoWeatherDay = date; return; }
+  _autoWeatherDay = date; // nur einmal pro Tag ausloesen
+  const REASONS = { snow: '❄️ Schnee', ice: '🧊 Glatteis' };
+  db.prepare(`INSERT INTO day_status(date,state,minutes,reason,note,updated_at)
+    VALUES(?, 'delay', 15, ?, ?, ?)
+    ON CONFLICT(date) DO NOTHING`).run(date, hint.reason, 'Automatisch nach Wetterlage – bitte auf Glätte einstellen.', new Date().toISOString());
+  const msg = `⚠️ Wetter-Vorwarnung: heute ${REASONS[hint.reason]} möglich. ${hint.detail} Plane etwas mehr Zeit ein und fahre vorsichtig – die Fahrstunde kann sich um ein paar Minuten verschieben.`;
+  for (const sid of studs) notify(sid, 'daystatus', msg, date, null);
+  logEvent('daystatus', { actor: 'system', date, detail: `Automatische Wetter-Vorwarnung: ${REASONS[hint.reason]} (${studs.length} informiert)` });
+}
+
 // Vom Fahrlehrer vorgeschlagene (reservierte, confirmed=0) Termine, auf die der
 // Schueler nicht rechtzeitig geantwortet hat, verfallen automatisch: Slot wird
 // wieder frei, Fahrlehrer bekommt eine Push. Frist = reserve_expire_min (Standard
@@ -3322,13 +3355,15 @@ server.listen(PORT, HOST, () => {
   // Erinnerungen im Hintergrund pruefen (alle 5 Minuten) + naechtliche Server-Pflege
   try { sendDueReminders(); } catch (e) { console.error(e); }
   try { expireStaleReservations(); } catch (e) { console.error(e); }
+  try { autoWeatherStatus().catch(() => {}); } catch (e) { console.error(e); }
   try { nightlyMaintenance(); } catch (e) { console.error(e); }
   setInterval(() => {
     try { sendDueReminders(); } catch (e) { console.error(e); }
     try { expireStaleReservations(); } catch (e) { console.error(e); }
+    try { autoWeatherStatus().catch(() => {}); } catch (e) { console.error(e); }
     try { nightlyMaintenance(); } catch (e) { console.error(e); }
   }, 5 * 60 * 1000);
 });
 
 // Nur für automatisierte Tests exportiert (keine Wirkung auf den laufenden Server).
-export { encryptPush, vapidAuth, b64url, b64urlDecode, ensureVapidKeys, expireStaleReservations, classifyWeather };
+export { encryptPush, vapidAuth, b64url, b64urlDecode, ensureVapidKeys, expireStaleReservations, classifyWeather, autoWeatherStatus };

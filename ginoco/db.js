@@ -292,6 +292,7 @@ const DEFAULTS = {
   student_max_per_day: '1',  // max. selbst gebuchte Fahrstunden pro Schueler & Tag (0 = ohne Limit; Fahrlehrer-Eintraege zaehlen nicht)
   reserve_expire_min: '120', // vom Fahrlehrer vorgeschlagener Termin verfaellt nach so vielen Min ohne Antwort (0 = nie); gedeckelt durch den Termin selbst
   weather_enabled: '1',      // Wetter-Hinweis (Glatteis/Schnee/Regen) fuer den Tagesstatus aus dem DWD (BrightSky, kostenlos, kein Schluessel)
+  weather_autostatus: '0',   // 1 = bei Glatteis/Schnee automatisch die heutigen Schueler vorwarnen (ohne Zutun des Fahrlehrers)
   booking_horizon_days: '10',// so viele Tage im Voraus duerfen Schueler buchen (Rang 1)
   cancel_hours: '48',        // bis so viele Std. vorher kostenlose Stornierung
   lock_hours: '36',          // ab so viel Std. vorher ist der Termin gesperrt (kein Absagen/Abgeben)

@@ -474,6 +474,7 @@ const CHANGELOG = [
     '🧠 <strong>KI-Planer (Fahrlehrer):</strong> schlägt aus der Verfügbarkeit deiner Fahrschüler passende Termine vor – lückenlos in deine freien Slots, höchstens einer pro Tag & Schüler. Auswählen, „übernehmen“, fertig.',
     '🚦 <strong>Tagesstatus:</strong> Der Fahrlehrer sagt mit einem Tipp, ob heute alles <strong>planmäßig</strong> läuft oder es <strong>später</strong> wird – mit Grund (Berufsverkehr, Stau, Schnee, Glatteis, Witterung). Du siehst es sofort oben und bekommst eine Push.',
     '🌦️ <strong>Wetter-Warnung (für Fahrlehrer):</strong> ginoco schaut in die DWD-Wetterdaten und schlägt bei Glatteis, Schnee oder Starkregen von selbst vor, eine Verzögerung zu melden – ein Tipp genügt.',
+    '⚡ <strong>Automatisch für die Fahrschüler:</strong> Auf Wunsch warnt ginoco die heutigen Fahrschüler bei Glatteis/Schnee ganz von selbst vor (Einstellungen → Wetter &amp; Verkehr). Und der Grund („🧊 Glatteis“, „🚧 Stau“) erscheint jetzt automatisch in der Live-Ansicht der Fahrstunde.',
     '✅ <strong>Vorschläge annehmen/ablehnen:</strong> Trägt dein Fahrlehrer einen Termin für dich ein, kannst du ihn jetzt klar <strong>annehmen</strong> oder <strong>ablehnen</strong> – er wird über deine Antwort benachrichtigt.',
     '⏳ <strong>Antwortfrist:</strong> Ein Vorschlag verfällt nach 2 Stunden ohne Antwort (einstellbar) – der Slot wird dann automatisch wieder frei.',
     '📜 Ruhiger Look ohne sichtbare Scrollbalken – wie eine echte App.'] },
@@ -2399,11 +2400,21 @@ async function refreshStudentLive() {
     </div>
     <div class="hint" style="margin:.4rem 0 0">${sharing ? '📍 Dein Standort wird geteilt – dein Fahrlehrer sieht jetzt genau, wo du bist.' : 'Teile deinen Standort, damit dich dein Fahrlehrer genau findet. Läuft nur jetzt und stoppt nach Beginn.'}</div>
   </div>`;
-  // Beruhigender Status ganz oben (planmäßig / etwas später) – gilt in jeder Phase
+  // Beruhigender Status ganz oben (planmäßig / etwas später) – gilt in jeder Phase.
+  // Verschobene Startzeit (delayMin) hat Vorrang; sonst der gemeldete Tagesstatus
+  // (inkl. automatischer Wetter-Vorwarnung: Grund wird direkt mit angezeigt).
   const delayMin = d.booking.delayMin || 0;
-  const statusBanner = delayMin > 0
-    ? `<div class="run-status late">⏱️ <div><strong>Wir starten heute etwas später.</strong><br><span>Deine Fahrstunde verschiebt sich um ~${delayMin} Min auf <strong>${d.booking.start_time} Uhr</strong>. Kein Stress – nimm dir die Zeit.</span></div></div>`
-    : `<div class="run-status ok">✅ <div><strong>Alles läuft planmäßig.</strong><br><span>Beginn um <strong>${d.booking.start_time} Uhr</strong> (in ${d.booking.minutesToStart} Min).</span></div></div>`;
+  const ds = d.dayStatus;
+  let statusBanner;
+  if (delayMin > 0) {
+    const why = ds && ds.state === 'delay' && ds.reason ? ` (${esc(dsReason(ds.reason))})` : '';
+    statusBanner = `<div class="run-status late">⏱️ <div><strong>Wir starten heute etwas später.</strong><br><span>Deine Fahrstunde verschiebt sich um ~${delayMin} Min auf <strong>${d.booking.start_time} Uhr</strong>${why}. Kein Stress – nimm dir die Zeit.</span></div></div>`;
+  } else if (ds && ds.state === 'delay') {
+    const why = ds.reason ? esc(dsReason(ds.reason)) : '';
+    statusBanner = `<div class="run-status late">⏱️ <div><strong>Heute wird’s ca. ${ds.minutes} Min später.</strong><br><span>${why ? 'Grund: ' + why + '. ' : ''}${ds.note ? esc(ds.note) + ' ' : ''}Deine Uhrzeit bleibt (<strong>${d.booking.start_time} Uhr</strong>) – bitte trotzdem pünktlich da sein.</span></div></div>`;
+  } else {
+    statusBanner = `<div class="run-status ok">✅ <div><strong>Alles läuft planmäßig.</strong><br><span>Beginn um <strong>${d.booking.start_time} Uhr</strong> (in ${d.booking.minutesToStart} Min).</span></div></div>`;
+  }
   if (d.phase === 'soon') {
     // ~1 Stunde vorher: freundlich nach dem Abholort fragen (in Gino's Ton)
     card.dataset.mode = 'soon'; destroyLiveMap('live-map');
@@ -5509,6 +5520,11 @@ function tabEinstellungen() {
         <div class="hint" id="e-meet-info" style="margin:.3rem 0 0">${s.meet_default_lat ? '✓ Koordinaten hinterlegt' : 'Ohne Koordinaten nur als Text.'}</div>
         <div class="hint" style="margin:.3rem 0 0">Wird nur genutzt, wenn weder beim Schüler noch beim Termin ein Treffpunkt gesetzt ist.</div></div>`)}
 
+    ${sec('🌦️', 'Wetter & Verkehr', 'Automatische Vorwarnung bei Glatteis/Schnee', `
+      <label class="ck-line"><input type="checkbox" id="e-weather" ${s.weather_enabled !== '0' ? 'checked' : ''}> Wetter-Hinweise anzeigen (Deutscher Wetterdienst – kostenlos, kein Schlüssel nötig)</label>
+      <label class="ck-line" style="margin-top:.4rem"><input type="checkbox" id="e-weather-auto" ${s.weather_autostatus === '1' ? 'checked' : ''}> Bei Glatteis/Schnee die heutigen Fahrschüler <strong>automatisch</strong> vorwarnen</label>
+      <div class="hint" style="margin:.4rem 0 0">Ist der zweite Haken gesetzt, meldet ginoco von selbst eine kleine Verzögerung und schickt deinen Fahrschülern mit einem Termin heute eine Push – ohne dass du etwas tun musst. Deine eigene Ansage hat immer Vorrang. 🚧 <strong>Live-Verkehr/Stau</strong> folgt, sobald ein (kostenloser) Verkehrs-Schlüssel hinterlegt ist.</div>`)}
+
     ${sec('🔒', 'Privatmodus & Registrierung', 'Wer darf sich neu anmelden?', `
       <label class="ck-line"><input type="checkbox" id="e-reg-open" ${s.registration_open === '1' ? 'checked' : ''}> Neue Fahrschüler dürfen sich mit Code registrieren</label>
       <div class="hint" style="margin:.4rem 0 0">Ist der Haken <strong>weg</strong>, läuft Ginoco im <strong>Privatmodus</strong>: Auf der Startseite gibt es keinen „Neu (mit Code)“-Reiter mehr und niemand Neues kann sich anmelden. Deine bestehenden Zugänge (und du selbst) funktionieren weiter. Du kannst das jederzeit wieder öffnen, wenn du Fahrschüler einladen willst.</div>`, s.registration_open !== '1')}
@@ -5568,6 +5584,8 @@ function tabEinstellungen() {
         req_ueberland: Number($('#e-req-u').value), req_autobahn: Number($('#e-req-a').value), req_nacht: Number($('#e-req-n').value),
         rank2_min_lessons: Number($('#e-rank2').value), booking_horizon_days_rank2: Number($('#e-horizon2').value),
         registration_open: $('#e-reg-open').checked ? '1' : '0',
+        weather_enabled: $('#e-weather').checked ? '1' : '0',
+        weather_autostatus: $('#e-weather-auto').checked ? '1' : '0',
         flow_schedule: $('#e-flow').checked ? '1' : '0',
         auto_fill_gaps: $('#e-autofill').checked ? '1' : '0',
         school_label: $('#e-schoollabel').value.trim(),
