@@ -1326,14 +1326,17 @@ header .brand .brandname{
 .bitem.ov-free{border-left:3px solid var(--info)}
 .bitem.ov-short{border-left:3px solid var(--warn)}
 
-/* ===== „Bilderbuch"-Verfügbarkeit (Mo–Sa × Vormittag/Nachmittag/Abend) ===== */
-.avail{display:flex;flex-direction:column;gap:.35rem;background:var(--card2);border:1px solid var(--line);
-  border-radius:14px;padding:.65rem .6rem}
-.av-row{display:grid;grid-template-columns:2.5rem 1fr 1fr 1fr;gap:.4rem;align-items:center}
-.av-head .av-bh{font-size:.66rem;text-align:center;color:var(--muted);font-weight:700;line-height:1.25}
-.av-day{font-weight:800;font-size:.84rem;color:var(--muted);text-align:center}
-.av-cell{height:38px;border-radius:10px;border:1px solid var(--line);background:var(--card);cursor:pointer;
-  transition:transform .1s var(--ease,ease),background .14s var(--ease,ease),border-color .14s var(--ease,ease)}
-.av-cell:active{transform:scale(.94)}
-.av-cell.on{background:var(--good-bg);border-color:color-mix(in srgb,var(--good) 55%,transparent)}
-.av-cell.on::after{content:"✓";display:block;text-align:center;line-height:38px;color:var(--good);font-weight:800;font-size:1.05rem}
+/* ===== Präzise Verfügbarkeit: von–bis pro Wochentag (mehrere möglich) ===== */
+.avail2{display:flex;flex-direction:column;gap:.45rem}
+.av2-day{background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:.6rem .7rem}
+.av2-dh{font-weight:800;font-size:.85rem;margin-bottom:.45rem}
+.av2-none{font-weight:400;color:var(--muted);font-size:.8rem}
+.av2-win{display:flex;align-items:center;gap:.45rem;margin-bottom:.42rem}
+.av2-t{flex:1;min-width:0;font-variant-numeric:tabular-nums}
+.av2-dash{color:var(--muted);font-weight:700}
+.av2-del{flex:0 0 auto;background:transparent;border:1px solid var(--line);color:var(--muted);
+  border-radius:9px;padding:.4rem .58rem;box-shadow:none}
+.av2-del:hover{border-color:var(--bad);color:var(--bad);background:var(--bad-bg)}
+.av2-add{background:transparent;color:var(--brand);border:1px dashed color-mix(in srgb,var(--brand) 45%,var(--line));
+  border-radius:9px;padding:.38rem .7rem;font-size:.82rem;font-weight:700;box-shadow:none}
+.av2-add:hover{background:color-mix(in srgb,var(--brand) 10%,transparent)}
