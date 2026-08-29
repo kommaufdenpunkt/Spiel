@@ -1157,3 +1157,75 @@ a.btn-like:hover{background:var(--brand-dark)}
 .mk-reco:hover{border-color:var(--brand)}
 .mk-item2.reco-flash{animation:reco-flash 1.6s ease}
 @keyframes reco-flash{0%,100%{background:transparent}20%,60%{background:var(--warn-bg)}}
+
+/* =========================================================================
+   EDEL-POLITUR  ·  feine, themeübergreifende Verfeinerungen
+   Nutzt die vorhandenen Farbtokens (kein Theme wird hart überschrieben).
+   color-mix()/Glanz degradieren auf älteren Systemen sauber – Layout bleibt.
+   ========================================================================= */
+:root{
+  --ease:cubic-bezier(.22,.61,.36,1);
+  /* Weichere, mehrlagige Tiefe statt harter Schlagschatten */
+  --shadow:0 1px 1px rgba(0,0,0,.26),0 6px 16px rgba(0,0,0,.22),0 22px 48px rgba(0,0,0,.30);
+  --shadow-sm:0 1px 2px rgba(0,0,0,.22),0 4px 10px rgba(0,0,0,.16);
+}
+
+/* Feineres Schrift-Rendering + ruhigere, präzisere Überschriften */
+body{-moz-osx-font-smoothing:grayscale;text-rendering:optimizeLegibility}
+h1,h2,h3,.greet-big,.nh-when,.auth h1{letter-spacing:-.015em}
+
+/* Karten: weiche Tiefe + sanftes Reagieren */
+.card{box-shadow:var(--shadow);
+  transition:box-shadow .28s var(--ease),transform .28s var(--ease),border-color .28s var(--ease)}
+
+/* Buttons: leises Anheben, sauberer Druck, zarter Marken-Schimmer */
+button{transition:transform .12s var(--ease),background .18s var(--ease),
+  box-shadow .2s var(--ease),filter .18s var(--ease)}
+button:not(.ghost):not(.sec):not(.danger):not(.linklike):not(.linkbtn):not(.iconbtn):not(.mk-reco){
+  box-shadow:var(--shadow-sm)}
+button:not(:disabled):hover{transform:translateY(-1px);filter:brightness(1.05)}
+button:not(:disabled):active{transform:translateY(0) scale(.98);filter:brightness(.97)}
+button:disabled{box-shadow:none;transform:none;filter:none}
+button.ghost,button.linklike,button.linkbtn{box-shadow:none}
+
+/* Eingaben: ruhiger, themegerechter Fokus-Ring (Fallback: bestehender Umriss) */
+input,select,textarea{transition:border-color .18s var(--ease),box-shadow .18s var(--ease)}
+input:focus,select:focus,textarea:focus{
+  outline:2px solid color-mix(in srgb,var(--brand) 55%,transparent);outline-offset:1px;
+  box-shadow:0 0 0 3px color-mix(in srgb,var(--brand) 20%,transparent)}
+
+/* Slots: freie Zeiten mit feinem Glanz, sanftes Anheben */
+.slot{transition:transform .16s var(--ease),box-shadow .2s var(--ease),
+  border-color .2s var(--ease),background .2s var(--ease)}
+.slot.free:hover,.slot.booked:hover{transform:translateY(-2px);box-shadow:var(--shadow-sm)}
+.slot.free{box-shadow:inset 0 1px 0 color-mix(in srgb,var(--good) 24%,transparent)}
+.slot .tag{letter-spacing:.05em}
+
+/* Erster Eindruck: zarter Lichthof hinter der Login-Karte, edleres Logo */
+.auth-wrap{position:relative}
+.auth-wrap::before{content:"";position:absolute;inset:0;pointer-events:none;z-index:0;
+  background:radial-gradient(58% 42% at 50% 20%,
+    color-mix(in srgb,var(--brand) 20%,transparent),transparent 70%)}
+.auth{position:relative;z-index:1}
+.auth .logo-big{filter:drop-shadow(0 6px 20px color-mix(in srgb,var(--brand) 42%,transparent))}
+.tabs{box-shadow:inset 0 1px 2px rgba(0,0,0,.25)}
+.tabs button{transition:background .18s var(--ease),color .18s var(--ease)}
+
+/* Modal: sanftes Auf- und Einblenden statt hartem Erscheinen */
+@keyframes ginoco-bg-in{from{opacity:0}to{opacity:1}}
+@keyframes ginoco-modal-in{from{opacity:0;transform:translateY(10px) scale(.985)}to{opacity:1;transform:none}}
+.modal-bg{animation:ginoco-bg-in .18s var(--ease) both}
+.modal{animation:ginoco-modal-in .24s var(--ease) both;box-shadow:0 24px 70px rgba(0,0,0,.62)}
+
+/* Toast: weiches Einschweben */
+@keyframes ginoco-toast-in{from{opacity:0;transform:translate(-50%,10px)}to{opacity:1;transform:translate(-50%,0)}}
+.toast{animation:ginoco-toast-in .22s var(--ease) both}
+
+/* Feinschliff: sanfteres Scrollen */
+html{scroll-behavior:smooth}
+
+/* Wer reduzierte Bewegung wünscht, bekommt keine Animationen */
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.001ms!important;transition-duration:.001ms!important}
+  html{scroll-behavior:auto}
+}
