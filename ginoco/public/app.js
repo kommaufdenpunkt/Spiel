@@ -1417,6 +1417,13 @@ function fmtDT(date, time) {
   const d = parseD(date);
   return d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }) + (time ? ', ' + time + ' Uhr' : '');
 }
+// Eintrag-Zeitpunkt (created_at, ISO) als lokales „TT.MM.JJJJ, HH:MM Uhr“.
+function fmtEntry(ts) {
+  if (!ts) return '';
+  const d = new Date(ts);
+  if (isNaN(d.getTime())) return fmtDT(String(ts).slice(0, 10));
+  return d.toLocaleString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) + ' Uhr';
+}
 function renderMyLessons(bookings) {
   const card = $('#lessons-card'); if (!card) return;
   const done = (bookings || []).filter((b) => b.status === 'done')
@@ -1436,7 +1443,7 @@ function renderMyLessons(bookings) {
       ? `<button class="sm ml-sign" data-sign="${b.id}">✍️ Unterschreiben</button>`
       : (b.signed_at ? `<span class="pill" style="background:var(--good-bg);color:var(--good)">✓ unterschrieben</span>` : '');
     return `<tr class="${noshow ? 'ml-noshow' : ''} ${b.needs_sign ? 'ml-tosign' : ''}">
-      <td class="ml-when" data-label="Wann"><strong>${fmtDT(b.date, b.start_time)}</strong>${nachgetragen ? `<span class="ml-entry">nachgetragen · eingetragen ${fmtDT(entryDate)}</span>` : ''}${b.invoice_date ? `<span class="ml-entry ml-inv">🧾 auf der Rechnung: ${fmtDT(b.invoice_date)}${b.invoice_time ? ' ' + b.invoice_time + ' Uhr' : ''}</span>` : ''}${sign ? `<div class="ml-signcell">${sign}</div>` : ''}</td>
+      <td class="ml-when" data-label="Wann">${nachgetragen ? '<span class="ml-drovelbl">gefahren am</span>' : ''}<strong>${fmtDT(b.date, b.start_time)}</strong>${nachgetragen ? `<span class="ml-entry">nachgetragen · eingetragen am ${fmtEntry(b.created_at)}</span>` : ''}${b.invoice_date ? `<span class="ml-entry ml-inv">🧾 auf der Rechnung: ${fmtDT(b.invoice_date)}${b.invoice_time ? ' ' + b.invoice_time + ' Uhr' : ''}</span>` : ''}${sign ? `<div class="ml-signcell">${sign}</div>` : ''}</td>
       <td data-label="Ende">${noshow ? '—' : 'bis ' + addMinHHMM(b.start_time, b.duration_min)}</td>
       <td data-label="Dauer">${noshow ? '🚫 nicht da' : (b.duration_min + ' Min')}</td>
       <td data-label="Art">${noshow ? '' : lessonTypeLabel(b.lesson_type)}</td>
@@ -1816,7 +1823,7 @@ function printLessonProof(name, done, adk, stats) {
     const artL = { ueberland: 'Überland', autobahn: 'Autobahn', nacht: 'Nachtfahrt' }[b.lesson_type] || 'Normal';
     return `<tr>
       <td class="c">${i + 1}</td>
-      <td>${fmtDT(b.date, b.start_time)}${nachgetragen ? `<br><span class="entry">nachgetragen · eingetragen ${fmtDT(entryDate)}</span>` : ''}</td>
+      <td>${nachgetragen ? '<span class="entry-lbl">gefahren am</span> ' : ''}${fmtDT(b.date, b.start_time)}${nachgetragen ? `<br><span class="entry">nachgetragen · eingetragen am ${fmtEntry(b.created_at)}</span>` : ''}</td>
       <td class="c inv-col">${b.invoice_date ? `<strong>${fmtDT(b.invoice_date)}</strong>${b.invoice_time ? '<br>' + b.invoice_time + ' Uhr' : ''}` : '<span class="wg">wie gefahren</span>'}</td>
       <td class="c">${noshow ? '—' : addMinHHMM(b.start_time, b.duration_min)}</td>
       <td class="c">${noshow ? 'nicht erschienen' : b.duration_min + ' Min'}</td>
@@ -1866,6 +1873,7 @@ function printLessonProof(name, done, adk, stats) {
       th{background:#faf3e2;color:#7a5300;font-size:10.5px;text-transform:uppercase;letter-spacing:.03em}
       tbody tr:nth-child(even){background:#fbfaf7}
       td.c{text-align:center;white-space:nowrap} .entry{font-size:10px;color:#777}
+      .entry-lbl{font-size:9px;text-transform:uppercase;letter-spacing:.04em;color:#999;font-weight:700}
       td.inv-col{color:#b26a00;font-weight:600} td.inv-col .wg{color:#aaa;font-weight:400;font-style:italic}
       td.sig-col{text-align:center;vertical-align:middle}
       .sig-img{height:36px;max-width:150px;object-fit:contain;display:block;margin:0 auto}

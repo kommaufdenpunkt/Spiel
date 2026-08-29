@@ -515,6 +515,7 @@ th{color:var(--muted);font-weight:600;font-size:.78rem;text-transform:uppercase;
 .ml-table td{padding:.55rem .6rem;border-top:1px solid var(--line);vertical-align:top}
 .ml-table tr:nth-child(even) td{background:rgba(255,255,255,.02)}
 .ml-when strong{color:var(--ink)}
+.ml-drovelbl{display:block;font-size:.66rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:.06rem}
 .ml-entry{display:block;font-size:.72rem;color:var(--warn);margin-top:.15rem}
 .ml-note{color:var(--muted);max-width:260px}
 .ml-noshow td{opacity:.7}
