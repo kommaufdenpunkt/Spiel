@@ -468,8 +468,14 @@ function openTour() {
 window.__openTour = openTour;
 
 // ---------- Was ist neu? (Changelog) ----------
-const CHANGELOG_VER = '3.72';
+const CHANGELOG_VER = '3.73';
 const CHANGELOG = [
+  { v: '3.73', d: '29.08.2026', title: '✨ Edler, lebendiger – und fairer', items: [
+    '🎉 <strong>Buch-Erfolg:</strong> Nach jeder Buchung gibt’s einen kleinen Moment mit Haken & Konfetti.',
+    '💎 Feinerer Look: weichere Schatten, ruhigere Typografie, ein Hauch Glanz auf freien Zeiten und im Logo.',
+    '🕒 <strong>Nachgetragene Stunden:</strong> klar getrennt in „gefahren am …“ und „eingetragen am …“ (mit Uhrzeit).',
+    '📅 <strong>Fair für alle:</strong> Pro Tag kannst du dir <strong>eine</strong> Fahrstunde selbst buchen – dein Fahrlehrer kann weiterhin mehr eintragen.',
+    '🗂️ Für Fahrlehrer: „Rechnung“ heißt jetzt <strong>fsmanager</strong> – mit 495-Min-Warnung je fsmanager-Tag.'] },
   { v: '3.72', d: '26.08.2026', title: '🔓 Face ID / Passkey für den Fahrlehrer', items: [
     '🔓 <strong>Passkey-Login:</strong> Der Fahrlehrer meldet sich jetzt per <strong>Face ID / Touch ID</strong> an – ohne Passwort, phishing-sicher. Einrichten unter 🔐 Zugang.',
     '🔐 Zur Erinnerung: Es gibt außerdem echtes Passwort, Authenticator (2-Faktor) und „Passwort vergessen".'] },
@@ -504,8 +510,8 @@ const CHANGELOG = [
     '📷 Authenticator (2-Faktor) per QR-Code einrichten – einfach mit der Authenticator-App abscannen (oder Schlüssel manuell). Optional bei jeder Anmeldung ein 6-stelliger Code.',
     '🆘 „Passwort vergessen": mit dem Authenticator-Code setzt du dir selbst ein neues Passwort – ganz ohne E-Mail.',
     '🎡 Tab-Icon (Lenkrad-Emblem) wird verlässlich geladen – auch wenn der Browser das alte Symbol gecacht hatte.'] },
-  { v: '3.63', d: '23.08.2026', title: '🧾 Rechnungsdatum im Protokoll', items: [
-    '🧾 Im Protokoll siehst du jetzt bei jeder Stunde, unter welchem Datum sie auf der Rechnung erscheint – gefahren am … · auf der Rechnung am …',
+  { v: '3.63', d: '23.08.2026', title: '🗂️ fsmanager-Datum im Protokoll', items: [
+    '🗂️ Im Protokoll siehst du jetzt bei jeder Stunde, unter welchem Datum sie im fsmanager geführt wird – gefahren am … · im fsmanager geführt am …',
     '📄 Steht auch auf dem ausgedruckten Fahrstunden-Nachweis, damit alles zusammenpasst.'] },
   { v: '3.62', d: '23.08.2026', title: '✍️ Unterschreiben & Töne', items: [
     '✍️ Nachgetragene Fahrstunden bestätigst du jetzt selbst: Dein Fahrlehrer trägt eine Stunde nach, du bekommst eine Benachrichtigung und unterschreibst mit dem Finger direkt in der App.',
@@ -1443,7 +1449,7 @@ function renderMyLessons(bookings) {
       ? `<button class="sm ml-sign" data-sign="${b.id}">✍️ Unterschreiben</button>`
       : (b.signed_at ? `<span class="pill" style="background:var(--good-bg);color:var(--good)">✓ unterschrieben</span>` : '');
     return `<tr class="${noshow ? 'ml-noshow' : ''} ${b.needs_sign ? 'ml-tosign' : ''}">
-      <td class="ml-when" data-label="Wann">${nachgetragen ? '<span class="ml-drovelbl">gefahren am</span>' : ''}<strong>${fmtDT(b.date, b.start_time)}</strong>${nachgetragen ? `<span class="ml-entry">nachgetragen · eingetragen am ${fmtEntry(b.created_at)}</span>` : ''}${b.invoice_date ? `<span class="ml-entry ml-inv">🧾 auf der Rechnung: ${fmtDT(b.invoice_date)}${b.invoice_time ? ' ' + b.invoice_time + ' Uhr' : ''}</span>` : ''}${sign ? `<div class="ml-signcell">${sign}</div>` : ''}</td>
+      <td class="ml-when" data-label="Wann">${nachgetragen ? '<span class="ml-drovelbl">gefahren am</span>' : ''}<strong>${fmtDT(b.date, b.start_time)}</strong>${nachgetragen ? `<span class="ml-entry">nachgetragen · eingetragen am ${fmtEntry(b.created_at)}</span>` : ''}${b.invoice_date ? `<span class="ml-entry ml-inv">🗂️ im fsmanager geführt am ${fmtDT(b.invoice_date)}${b.invoice_time ? ' ' + b.invoice_time + ' Uhr' : ''}</span>` : ''}${sign ? `<div class="ml-signcell">${sign}</div>` : ''}</td>
       <td data-label="Ende">${noshow ? '—' : 'bis ' + addMinHHMM(b.start_time, b.duration_min)}</td>
       <td data-label="Dauer">${noshow ? '🚫 nicht da' : (b.duration_min + ' Min')}</td>
       <td data-label="Art">${noshow ? '' : lessonTypeLabel(b.lesson_type)}</td>
@@ -1898,11 +1904,11 @@ function printLessonProof(name, done, adk, stats) {
       <div class="titleblock"><h1>Fahrstunden-Nachweis</h1><div class="stud">${esc(name)}</div><div class="meta">Stand: ${today}</div></div>
     </div>
     <div class="sum"><b>${driven.length} gefahrene Fahrstunden · ${hLabel(totalMin)} gesamt</b></div>
-    <table><thead><tr><th>#</th><th>Datum &amp; Uhrzeit (gefahren)</th><th>Auf der Rechnung</th><th>Ende</th><th>Dauer</th><th>Art</th><th>Verspätung</th><th>Vermerk</th><th>Unterschrift</th></tr></thead>
+    <table><thead><tr><th>#</th><th>Datum &amp; Uhrzeit (gefahren)</th><th>Im fsmanager</th><th>Ende</th><th>Dauer</th><th>Art</th><th>Verspätung</th><th>Vermerk</th><th>Unterschrift</th></tr></thead>
       <tbody>${rows}</tbody></table>
     <div class="sign"><div>Unterschrift Fahrlehrer</div><div>Unterschrift Fahrschüler</div></div>
     ${adkSection}
-    <div class="foot">Erstellt mit ginoco · ${today}. „Nachgetragen" = später eingetragene Fahrstunde; maßgeblich ist das angegebene Fahrdatum. „Auf der Rechnung" = Datum/Uhrzeit, unter dem die Stunde in der Abrechnung geführt wird (kann vom Fahrdatum abweichen); „wie gefahren" = identisch zum Fahrdatum. Mit ✔ markierte Stunden hat der Fahrschüler in der App bestätigt.</div>
+    <div class="foot">Erstellt mit ginoco · ${today}. „Nachgetragen" = später eingetragene Fahrstunde; maßgeblich ist das angegebene Fahrdatum. „Im fsmanager" = Datum/Uhrzeit, unter dem die Stunde im Ausbildungsnachweis-Programm fsmanager geführt wird (kann vom Fahrdatum abweichen, z. B. wegen der 495-Min-Tagesgrenze); „wie gefahren" = identisch zum Fahrdatum. Mit ✔ markierte Stunden hat der Fahrschüler in der App bestätigt.</div>
     <script>window.onload=function(){setTimeout(function(){window.print()},250)}<\/script></body></html>`;
   const w = window.open('', '_blank');
   if (!w) { toast('Bitte Pop-ups erlauben, um den Nachweis zu drucken.', 'err'); return; }
@@ -3478,11 +3484,11 @@ function openLogLessonModal(sid, name) {
     <label class="ck-line"><input type="checkbox" id="lg-att" checked> Fahrschüler ist erschienen (gefahren)</label>
     <div class="field"><label>Vermerk <span class="muted">(sieht der Fahrschüler – z.B. Verlauf/Besonderes)</span></label>
       <textarea id="lg-note" rows="3" placeholder="z.B. 20 Min zu spät gekommen, restliche 60 Min gefahren – Kreisverkehr & Vorfahrt geübt." style="resize:vertical"></textarea></div>
-    <details class="lg-inv"><summary>🧾 Abweichendes Rechnungsdatum (optional)</summary>
-      <p class="hint">Falls diese Stunde auf der Rechnung an einem anderen Tag/Uhrzeit erscheint (z.B. wegen der 495-Min-Tagesgrenze deines Abrechnungsprogramms). Der Fahrschüler sieht dann im Protokoll: gefahren am … · auf der Rechnung am …</p>
+    <details class="lg-inv"><summary>🗂️ Abweichender fsmanager-Eintrag (optional)</summary>
+      <p class="hint">Falls diese Stunde im fsmanager an einem anderen Tag/Uhrzeit geführt wird (z.B. weil am Fahrtag die 495-Min-Tagesgrenze schon voll ist). Der Fahrschüler sieht dann im Protokoll: gefahren am … · im fsmanager geführt am …</p>
       <div class="row">
-        <div class="field"><label>Rechnungsdatum</label><input type="date" id="lg-invdate"></div>
-        <div class="field"><label>Rechnungsuhrzeit</label><input id="lg-invtime" placeholder="z.B. 09:00"></div>
+        <div class="field"><label>fsmanager-Datum</label><input type="date" id="lg-invdate"></div>
+        <div class="field"><label>fsmanager-Uhrzeit</label><input id="lg-invtime" placeholder="z.B. 09:00"></div>
       </div>
     </details>
     <div class="actions"><button class="sec" onclick="window.__closeModal()">Abbrechen</button><button id="lg-save">Nachtragen</button></div>`);
@@ -3503,11 +3509,11 @@ function openLogLessonModal(sid, name) {
   };
 }
 
-// Rechnungsdaten verwalten (Fahrlehrer): pro gefahrener Stunde ein abweichendes
-// Rechnungsdatum/-zeit setzen. Zeigt die Minuten je Rechnungstag (Warnung > 495).
+// fsmanager-Eintrag verwalten (Fahrlehrer): pro gefahrener Stunde ein abweichendes
+// fsmanager-Datum/-zeit setzen. Zeigt die Minuten je fsmanager-Tag (Warnung > 495).
 function openInvoiceModal(sid, name) {
-  modal(`<h3>🧾 Rechnungsdaten – ${esc(name)}</h3>
-    <p class="hint">Eine Stunde wird an ihrem <strong>Fahrdatum</strong> gefahren, kann aber auf der <strong>Rechnung</strong> an einem anderen Tag/Uhrzeit erscheinen (z.&nbsp;B. wegen der 495-Min-Tagesgrenze deines Abrechnungsprogramms). Trag hier das Rechnungsdatum ein – der Fahrschüler sieht im Protokoll <em>beides</em>.</p>
+  modal(`<h3>🗂️ fsmanager-Eintrag – ${esc(name)}</h3>
+    <p class="hint">Eine Stunde wird an ihrem <strong>Fahrdatum</strong> gefahren, kann im <strong>fsmanager</strong> aber an einem anderen Tag/Uhrzeit geführt werden (z.&nbsp;B. weil am Fahrtag die <strong>495-Min-Tagesgrenze</strong> schon voll ist). Trag hier das fsmanager-Datum ein – der Fahrschüler sieht im Protokoll <em>beides</em>. Die Summe je fsmanager-Tag unten warnt, sobald ein Tag über 495 Min ginge.</p>
     <div id="inv-body"><p class="hint">Lädt…</p></div>
     <div class="actions"><button onclick="window.__closeModal()">Fertig</button></div>`, 'wide');
   const render = async () => {
@@ -3515,27 +3521,28 @@ function openInvoiceModal(sid, name) {
     let data; try { data = await api('/api/students/' + sid + '/lessons'); } catch (e) { box.innerHTML = `<p class="err">${esc(e.message)}</p>`; return; }
     const lessons = (data.lessons || []).filter((l) => l.attended !== 0)
       .sort((a, z) => (a.date + a.start_time).localeCompare(z.date + z.start_time));
-    // Minuten je Rechnungstag (Rechnungsdatum, sonst Fahrdatum)
+    // Minuten je fsmanager-Tag (fsmanager-Datum, sonst Fahrdatum)
     const byDay = {};
     lessons.forEach((l) => { const d = l.invoice_date || l.date; byDay[d] = (byDay[d] || 0) + (l.duration_min || 0); });
     const dayRows = Object.keys(byDay).sort().map((d) => {
       const m = byDay[d];
-      return `<div class="inv-day"><span>${fmtDT(d)}</span><span>${m} Min (${(m / 60).toFixed(1).replace('.', ',')} h)</span></div>`;
+      const over = m > 495;
+      return `<div class="inv-day${over ? ' over' : ''}"><span>${fmtDT(d)}</span><span>${m} Min (${(m / 60).toFixed(1).replace('.', ',')} h)${over ? ' ⚠️ über 495' : ''}</span></div>`;
     }).join('');
     const rows = lessons.map((l) => {
       const art = (l.lesson_type && l.lesson_type !== 'normal') ? ' · ' + lessonTypeLabel(l.lesson_type) : '';
       return `<div class="inv-row" data-id="${l.id}">
-        <div class="inv-drove">🚗 <strong>${fmtDT(l.date, l.start_time)}</strong> · ${l.duration_min} Min${art}${l.invoice_date ? ` <span class="pill" style="background:var(--good-bg);color:var(--good)">🧾 ${fmtDT(l.invoice_date)}${l.invoice_time ? ' ' + l.invoice_time : ''}</span>` : ''}</div>
+        <div class="inv-drove">🚗 <strong>${fmtDT(l.date, l.start_time)}</strong> · ${l.duration_min} Min${art}${l.invoice_date ? ` <span class="pill" style="background:var(--good-bg);color:var(--good)">🗂️ ${fmtDT(l.invoice_date)}${l.invoice_time ? ' ' + l.invoice_time : ''}</span>` : ''}</div>
         <div class="inv-fields">
-          <input type="date" class="inv-d" value="${l.invoice_date || ''}" aria-label="Rechnungsdatum">
-          <input class="inv-t" placeholder="HH:MM" value="${l.invoice_time || ''}" aria-label="Rechnungsuhrzeit">
+          <input type="date" class="inv-d" value="${l.invoice_date || ''}" aria-label="fsmanager-Datum">
+          <input class="inv-t" placeholder="HH:MM" value="${l.invoice_time || ''}" aria-label="fsmanager-Uhrzeit">
           <button class="sm inv-save">Speichern</button>
           ${l.invoice_date ? '<button class="ghost sm inv-clr" title="Zurücksetzen">✕</button>' : ''}
         </div>
       </div>`;
     }).join('');
-    box.innerHTML = `<div class="inv-days"><div class="inv-days-h">Minuten je Rechnungstag</div>${dayRows || '<span class="hint">–</span>'}</div>
-      <div class="inv-list">${rows || '<p class="hint">Noch keine gefahrenen Stunden zum Abrechnen.</p>'}</div>`;
+    box.innerHTML = `<div class="inv-days"><div class="inv-days-h">Minuten je fsmanager-Tag</div>${dayRows || '<span class="hint">–</span>'}</div>
+      <div class="inv-list">${rows || '<p class="hint">Noch keine gefahrenen Stunden.</p>'}</div>`;
     box.querySelectorAll('.inv-row').forEach((row) => {
       const id = row.dataset.id;
       row.querySelector('.inv-save').onclick = async () => {
@@ -4077,7 +4084,7 @@ async function tabSchueler(scope) {
           <div class="stu-actions">
             <button class="iconbtn" data-edit="${s.id}" title="Bearbeiten" aria-label="Bearbeiten"><span class="ib-ic">✏️</span><span class="ib-lb">Bearbeiten</span></button>
             <button class="iconbtn" data-log="${s.id}" data-lname="${esc(s.name)}" title="Fahrstunde nachtragen" aria-label="Fahrstunde nachtragen"><span class="ib-ic">➕</span><span class="ib-lb">Nachtragen</span></button>
-            <button class="iconbtn" data-invoice="${s.id}" data-iname="${esc(s.name)}" title="Rechnungsdaten" aria-label="Rechnungsdaten"><span class="ib-ic">🧾</span><span class="ib-lb">Rechnung</span></button>
+            <button class="iconbtn" data-invoice="${s.id}" data-iname="${esc(s.name)}" title="fsmanager-Eintrag" aria-label="fsmanager-Eintrag"><span class="ib-ic">🗂️</span><span class="ib-lb">fsmanager</span></button>
             <button class="iconbtn" data-proof="${s.id}" data-pname="${esc(s.name)}" title="Nachweis drucken" aria-label="Nachweis drucken"><span class="ib-ic">📄</span><span class="ib-lb">Nachweis</span></button>
             <button class="iconbtn" data-card="${s.id}" data-cname="${esc(s.name)}" title="Ausbildungskarte" aria-label="Ausbildungskarte"><span class="ib-ic">📋</span><span class="ib-lb">Karte</span></button>
             <button class="iconbtn" data-reset="${s.id}" data-uname="${esc(s.username || '')}" data-sname="${esc(s.name)}" title="Zugangsdaten" aria-label="Zugangsdaten"><span class="ib-ic">🔑</span><span class="ib-lb">Zugang</span></button>

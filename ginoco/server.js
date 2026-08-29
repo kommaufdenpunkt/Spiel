@@ -1173,7 +1173,7 @@ async function handleApi(req, res, url) {
     const attended = (b.attended === false || b.attended === 0 || b.attended === '0') ? 0 : 1;
     const gear = ['schalt', 'automatik'].includes(b.gearbox) ? b.gearbox : null;
     const vermerk = b.feedback ? String(b.feedback).trim() : null;
-    // Abweichendes Rechnungsdatum (optional): gefahren an X, auf der Rechnung an Y.
+    // Abweichendes fsmanager-Datum (optional): gefahren an X, im fsmanager gefuehrt an Y.
     const invDate = /^\d{4}-\d{2}-\d{2}$/.test(b.invoice_date || '') ? b.invoice_date : null;
     const invTime = /^([01]?\d|2[0-3]):[0-5]\d$/.test(b.invoice_time || '') ? b.invoice_time : null;
     // Nachgetragene, tatsächlich gefahrene Stunden müssen vom Schüler unterschrieben werden.
@@ -1283,7 +1283,7 @@ async function handleApi(req, res, url) {
       if ('meet_lng' in b) { fields.push('meet_lng=?'); vals.push(b.meet_lng == null || b.meet_lng === '' ? null : Number(b.meet_lng)); }
       if ('attended' in b) { fields.push('attended=?'); vals.push(b.attended == null ? null : (b.attended ? 1 : 0)); }
       if ('late_minutes' in b) { fields.push('late_minutes=?'); vals.push(Math.max(0, Number(b.late_minutes) || 0)); }
-      // Abweichendes Rechnungsdatum/-zeit (leer = löschen)
+      // Abweichendes fsmanager-Datum/-zeit (leer = loeschen)
       if ('invoice_date' in b) { fields.push('invoice_date=?'); vals.push(/^\d{4}-\d{2}-\d{2}$/.test(b.invoice_date || '') ? b.invoice_date : null); }
       if ('invoice_time' in b) { fields.push('invoice_time=?'); vals.push(/^([01]?\d|2[0-3]):[0-5]\d$/.test(b.invoice_time || '') ? b.invoice_time : null); }
       if ('duration_min' in b && Number(b.duration_min) > 0) { fields.push('duration_min=?'); vals.push(newDur); }
