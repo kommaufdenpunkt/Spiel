@@ -1295,3 +1295,33 @@ header .brand .brandname{
   .slot.free::after,header .brand .brandname{animation:none}
   header .brand .brandname{background-position:0 0}
 }
+
+/* ===== Dienstplan-Feinschliff: freie Tage · Urlaub · kürzer ===== */
+:root{ --info:#5b9bff; --info-bg:rgba(91,155,255,.16); }
+/* Tag-Typ-Chips im Wochen-Kopf & Monat – semantisch gefärbt (amber/blau/grün) */
+.wk-head .daytag,.m-tag{display:inline-flex;align-items:center;gap:.18rem;font-size:.62rem;font-weight:700;
+  padding:.08rem .42rem;border-radius:20px;border:1px solid transparent;white-space:nowrap;line-height:1.6}
+.wk-head .daytag{margin-top:.2rem}
+.dt-vac{color:var(--good);background:var(--good-bg);border-color:color-mix(in srgb,var(--good) 38%,transparent)}
+.dt-free{color:var(--info);background:var(--info-bg);border-color:color-mix(in srgb,var(--info) 38%,transparent)}
+.dt-short{color:var(--warn);background:var(--warn-bg);border-color:color-mix(in srgb,var(--warn) 38%,transparent)}
+
+/* Segment-Wahl: der aktive Typ trägt seine eigene Farbe (statt immer Gold) */
+.seg button[data-t="vacation"].active{background:linear-gradient(180deg,var(--good),#2aa568);border-color:var(--good)}
+.seg button[data-t="free"].active{background:linear-gradient(180deg,var(--info),#3f7fd6);border-color:var(--info)}
+.seg button[data-t="short"].active{background:linear-gradient(180deg,var(--warn),#c9962a);border-color:var(--warn)}
+.seg button.active .seg-lb,.seg button.active .seg-sub{color:#161006}
+.seg button.active .seg-ic{filter:drop-shadow(0 1px 3px rgba(0,0,0,.28))}
+
+/* Frei-/Urlaubs-Fläche in der Wochenansicht: dezent getönt + zentriertes Label */
+.wk-block.closed{display:flex;align-items:center;justify-content:center;gap:.25rem;font-weight:800;font-size:.8rem;
+  text-align:center;color:var(--ink);
+  background:repeating-linear-gradient(45deg,rgba(255,255,255,.045),rgba(255,255,255,.045) 8px,transparent 8px,transparent 16px),rgba(10,14,20,.5)}
+.wk-block.closed.dt-vac{box-shadow:inset 0 0 0 2px color-mix(in srgb,var(--good) 45%,transparent);color:var(--good)}
+.wk-block.closed.dt-free{box-shadow:inset 0 0 0 2px color-mix(in srgb,var(--info) 45%,transparent);color:var(--info)}
+
+/* Eingetragene-Tage-Liste: farbige linke Kante je Typ (statt einheitlich Gold) */
+.bitem.ov-vac,.bitem.ov-free,.bitem.ov-short{background:var(--card2);border-color:var(--line)}
+.bitem.ov-vac{border-left:3px solid var(--good)}
+.bitem.ov-free{border-left:3px solid var(--info)}
+.bitem.ov-short{border-left:3px solid var(--warn)}

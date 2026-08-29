@@ -3783,7 +3783,7 @@ function renderWeek(el, monday, ov) {
     const ovd = ovByDate[d];
     let inner = '';
     if (ovd && ovd.closed) {
-      inner += `<div class="wk-block closed">${ovd.type === 'vacation' ? '🌴 Urlaub' : '🏖️ frei'}</div>`;
+      inner += `<div class="wk-block closed ${ovd.type === 'vacation' ? 'dt-vac' : 'dt-free'}">${ovd.type === 'vacation' ? '🌴 Urlaub' : '🏖️ frei'}</div>`;
     }
     for (const bl of ov.blocks.filter((x) => x.date === d)) {
       const top = y(toM(bl.start_time)), h = Math.max(16, y(toM(bl.end_time)) - top);
@@ -3807,7 +3807,8 @@ function renderWeek(el, monday, ov) {
     ${days.map((d) => {
       const ovd = ovByDate[d];
       const tag = ovd ? (ovd.type === 'vacation' ? '🌴 Urlaub' : ovd.closed ? '🏖️ frei' : `✂️ kurz bis ${ovd.last_start || ''}`) : '';
-      return `<div class="wk-head ${d === today ? 'today' : ''}">${WD[isoDow(d) - 1]}<span class="sub">${fmtShort(d)}</span>${tag ? `<span class="daytag">${tag}</span>` : ''}</div>`;
+      const dtCls = ovd ? (ovd.type === 'vacation' ? 'dt-vac' : ovd.closed ? 'dt-free' : 'dt-short') : '';
+      return `<div class="wk-head ${d === today ? 'today' : ''}">${WD[isoDow(d) - 1]}<span class="sub">${fmtShort(d)}</span>${tag ? `<span class="daytag ${dtCls}">${tag}</span>` : ''}</div>`;
     }).join('')}
     <div class="wk-times">${hourLabels.join('')}</div>
     ${days.map(dayCol).join('')}
@@ -3847,14 +3848,14 @@ function renderMonth(el, firstDay, gridStart, ov) {
       const c = b.status === 'offered' ? '#e6b23a' : (TYPE_COLORS[b.lesson_type] || studentColor(b.student_id));
       return `<span class="m-dot" style="background:${c}" title="${b.start_time} ${esc(b.student_name || b.title || '')}"></span>`;
     }).join('');
-    let tag = '';
-    if (ovd && ovd.type === 'vacation') tag = '🌴 Urlaub';
-    else if (ovd && ovd.closed) tag = '🏖️ frei';
-    else if (ovd && ovd.last_start) tag = '✂️ kurz';
+    let tag = '', tagCls = '';
+    if (ovd && ovd.type === 'vacation') { tag = '🌴 Urlaub'; tagCls = 'dt-vac'; }
+    else if (ovd && ovd.closed) { tag = '🏖️ frei'; tagCls = 'dt-free'; }
+    else if (ovd && ovd.last_start) { tag = '✂️ kurz'; tagCls = 'dt-short'; }
     else if (info.blocks.some((b) => b.type === 'theorie')) tag = '📚 Theorie';
     cells += `<div class="m-cell ${inMonth ? '' : 'out'} ${d === today ? 'today' : ''} ${isWorkday ? '' : 'off'}" data-day="${d}">
       <div class="m-day"><span>${dn}</span>${cnt ? `<span class="cnt">${cnt}</span>` : ''}</div>
-      ${tag ? `<div class="m-tag">${tag}</div>` : ''}
+      ${tag ? `<div class="m-tag ${tagCls}">${tag}</div>` : ''}
       <div class="m-dots">${dots}</div>
     </div>`;
   }
@@ -4875,7 +4876,7 @@ async function loadOverrides() {
     const { overrides } = await api('/api/day-overrides');
     $('#w-list').innerHTML = overrides.length ? `<div class="inline" style="justify-content:space-between;margin-bottom:.5rem">
         <h2 style="font-size:.95rem;margin:0">Eingetragene Tage</h2><span class="pill">${overrides.length}</span></div><div class="blist">${
-      overrides.map((o) => `<div class="bitem warm">
+      overrides.map((o) => `<div class="bitem ${o.type === 'vacation' ? 'ov-vac' : o.closed ? 'ov-free' : 'ov-short'}">
         <div><div class="when">${o.type === 'vacation' ? '🌴' : o.closed ? '🏖️' : '✂️'} ${WD_LONG[isoDow(o.date) - 1]}, ${fmtShort(o.date)}</div>
         <div class="meta">${o.type === 'vacation' ? 'Urlaub' : o.closed ? 'ganzer Tag frei' : `kurzer Tag · ${o.start_time || state.settings.start_time}–${o.last_start || '?'}`}</div></div>
         <button class="ghost sm" data-delov="${o.date}">Löschen</button></div>`).join('')
