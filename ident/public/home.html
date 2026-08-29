@@ -133,7 +133,49 @@
   .orbit.b{width:min(78%,352px);border-style:dotted;border-color:rgba(177,75,255,.18);animation-duration:34s;animation-direction:reverse}
   @keyframes dreh{to{transform:rotate(360deg)}}
   .brandart .mark-big{position:relative;width:min(100%,430px);filter:drop-shadow(0 24px 54px rgba(177,75,255,.28))}
-  .brandart .logo-img{position:relative;width:min(100%,420px);filter:drop-shadow(0 24px 54px rgba(177,75,255,.3))}
+  .brandart .logo-img{position:relative;width:min(100%,420px)}
+
+  /* ── Das Logo atmet durch die Farben ────────────────────────────────
+     Ein Farbwechsel kann billig aussehen – wenn er schnell ist und hart
+     umspringt. Edel wird er durch drei Dinge:
+
+     1. LANGSAM. Ein voller Durchgang dauert 18 Sekunden. Man sieht die
+        Bewegung nicht, man bemerkt sie – wie bei einem Perlmuttknopf,
+        den man ins Licht dreht.
+     2. Der SCHEIN läuft mit. Ein Logo, das die Farbe wechselt, aber
+        denselben Schatten behält, wirkt wie ein Aufkleber. Hier wandert
+        das Leuchten dahinter im selben Takt mit.
+     3. Die Sättigung ATMET leicht. Immer gleich satt wirkt flach.
+
+     Die drei Stellen laufen bewusst versetzt: oben, Mitte, unten sind je
+     ein paar Sekunden auseinander. Alles gleichzeitig sähe nach Blinklicht
+     aus, versetzt wie eine Welle über die Seite. */
+  @keyframes markenLauf{
+      0%{filter:hue-rotate(0deg)     saturate(1)    drop-shadow(0 24px 54px rgba(177,75,255,.34))}
+     20%{filter:hue-rotate(72deg)    saturate(1.12) drop-shadow(0 24px 54px rgba(255,77,157,.34))}
+     40%{filter:hue-rotate(144deg)   saturate(1.06) drop-shadow(0 24px 54px rgba(55,224,200,.30))}
+     60%{filter:hue-rotate(216deg)   saturate(1.14) drop-shadow(0 24px 54px rgba(91,140,255,.32))}
+     80%{filter:hue-rotate(288deg)   saturate(1.08) drop-shadow(0 24px 54px rgba(200,90,255,.34))}
+    100%{filter:hue-rotate(360deg)   saturate(1)    drop-shadow(0 24px 54px rgba(177,75,255,.34))}
+  }
+  /* Kleinere Ausgaben brauchen einen kleineren Schein, sonst schmiert es. */
+  @keyframes markenLaufKlein{
+      0%{filter:hue-rotate(0deg)   saturate(1)    drop-shadow(0 4px 14px rgba(177,75,255,.5))}
+     25%{filter:hue-rotate(90deg)  saturate(1.12) drop-shadow(0 4px 14px rgba(255,77,157,.5))}
+     50%{filter:hue-rotate(180deg) saturate(1.05) drop-shadow(0 4px 14px rgba(55,224,200,.45))}
+     75%{filter:hue-rotate(270deg) saturate(1.12) drop-shadow(0 4px 14px rgba(91,140,255,.48))}
+    100%{filter:hue-rotate(360deg) saturate(1)    drop-shadow(0 4px 14px rgba(177,75,255,.5))}
+  }
+  .brandart .logo-img{animation:markenLauf 18s linear infinite}
+  .brand img{animation:markenLaufKlein 18s linear infinite;animation-delay:-6s}
+  .foot img.logo-fuss{animation:markenLaufKlein 18s linear infinite;animation-delay:-12s}
+
+  /* Wer Bewegung reduziert haben will, bekommt das Logo ruhig – aber mit
+     dem Schein, damit es nicht flach wird. */
+  @media(prefers-reduced-motion:reduce){
+    .brandart .logo-img{animation:none;filter:drop-shadow(0 24px 54px rgba(177,75,255,.3))}
+    .brand img,.foot img.logo-fuss{animation:none;filter:drop-shadow(0 4px 14px rgba(177,75,255,.45))}
+  }
   .chip{position:absolute;z-index:3;background:#0e0b06e8;border:1px solid var(--line2);border-radius:14px;
     padding:.62rem .9rem;backdrop-filter:blur(6px);box-shadow:0 18px 38px -18px #000}
   .chip b{display:block;font-size:1.18rem;font-weight:750;line-height:1.15}
@@ -884,7 +926,9 @@
         </a>
       </div>
       <div class="contact">
-        <a href="mailto:ginoheidrich@outlook.com">✉️ ginoheidrich@outlook.com</a>
+        <a href="mailto:support@4ever1.tv">✉️ support@4ever1.tv</a>
+        <a href="mailto:eylisa@4ever1.tv">✉️ eylisa@4ever1.tv</a>
+        <a href="mailto:eykeepcool@4ever1.tv">✉️ eykeepcool@4ever1.tv</a>
         <a href="https://ident.4ever1.tv">🎬 Direkt zur Audition</a>
       </div>
     </div>
@@ -937,7 +981,9 @@
           <li><a href="https://ident.4ever1.tv">Zur Audition</a></li>
           <li><a href="/impressum">Impressum</a></li>
           <li><a href="/datenschutz">Datenschutz</a></li>
-          <li><a href="mailto:ginoheidrich@outlook.com">ginoheidrich@outlook.com</a></li>
+          <li><a href="mailto:support@4ever1.tv">support@4ever1.tv</a></li>
+          <li><a href="mailto:eylisa@4ever1.tv">eylisa@4ever1.tv</a></li>
+          <li><a href="mailto:eykeepcool@4ever1.tv">eykeepcool@4ever1.tv</a></li>
         </ul>
       </div>
     </div>
