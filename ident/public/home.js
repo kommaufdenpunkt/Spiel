@@ -64,6 +64,40 @@
       });
     }, { rootMargin: '0px 0px -60px 0px', threshold: 0.08 });
   }
+  // ── Sprungmarken: sofort zeigen, nicht auf Scrollen warten ───────────
+  //
+  // Die Einblendung haengt am IntersectionObserver – der verlangt 8 %
+  // Sichtbarkeit und zieht unten 60 Pixel ab. Springt jemand ueber
+  // „Jetzt bewerben" direkt zu #start, landet die Ueberschrift genau im
+  // toten Winkel unter der klebenden Kopfleiste und bleibt UNSICHTBAR.
+  //
+  // Das Formular war da, die Ueberschrift darueber nicht: Eingabefelder
+  // ohne Titel. Genau auf dem Weg, den die sieben Bewerben-Knoepfe nehmen.
+  //
+  // Deshalb: Wer per Sprungmarke kommt, bekommt den ganzen Abschnitt sofort.
+  function sofortZeigen(ziel) {
+    if (!ziel) return;
+    if (ziel.classList && ziel.classList.contains('reveal')) ziel.classList.add('in');
+    Array.prototype.forEach.call(ziel.querySelectorAll('.reveal'), function (el) {
+      el.style.transitionDelay = '0ms';
+      el.classList.add('in');
+    });
+    Array.prototype.forEach.call(ziel.querySelectorAll('[data-count]'), zaehlen);
+  }
+  function ausHash() {
+    var id = (location.hash || '').replace('#', '');
+    if (!id) return;
+    var ziel = document.getElementById(id);
+    if (ziel) setTimeout(function () { sofortZeigen(ziel); }, 60);
+  }
+  window.addEventListener('hashchange', ausHash);
+  document.addEventListener('click', function (e) {
+    var a = e.target && e.target.closest && e.target.closest('a[href^="#"]');
+    if (!a) return;
+    var ziel = document.getElementById(a.getAttribute('href').slice(1));
+    if (ziel) setTimeout(function () { sofortZeigen(ziel); }, 60);
+  }, true);
+
   function zeigen(liste) {
     if (!obs) return;
     Array.prototype.forEach.call(liste, function (el, i) {
@@ -230,6 +264,10 @@
     }).catch(function () {});
   }
   vomServer();
+
+  // Wer die Seite direkt mit einer Sprungmarke oeffnet (Link aus WhatsApp,
+  // Lesezeichen), soll den Abschnitt genauso sofort sehen.
+  ausHash();
 
   zeigen(document.querySelectorAll('.sec-head, .card, .stepline, .stat, .woche, .rechner, .faq details, .contact a, .cta, .phone, #teammanagement .grid > div:first-child, .foot > div'));
 })();
