@@ -271,7 +271,7 @@
   input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:6px;border-radius:4px;background:#2a2010;
     outline:none;margin:0 0 1.5rem}
   input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:24px;height:24px;border-radius:50%;cursor:grab;
-    background:linear-gradient(180deg,#fff2ce,#B14BFF 55%,#8A2CE0);box-shadow:0 3px 12px rgba(0,0,0,.7),0 0 0 1px #8d5f10}
+    background:linear-gradient(180deg,#fff2ce,#B14BFF 55%,#8A2CE0);box-shadow:0 3px 12px rgba(0,0,0,.7),0 0 0 1px #7A1FC9}
   input[type=range]::-moz-range-thumb{width:24px;height:24px;border:none;border-radius:50%;cursor:grab;
     background:linear-gradient(180deg,#fff2ce,#B14BFF 55%,#8A2CE0);box-shadow:0 3px 12px rgba(0,0,0,.7)}
   .rechner-ziel{background:#0D0D16;border:1px solid var(--line);border-radius:14px;padding:.95rem 1.1rem}
@@ -379,15 +379,15 @@
 .bzeile{display:grid;grid-template-columns:1fr 1fr;gap:.9rem}
 @media(max-width:560px){.bzeile{grid-template-columns:1fr}}
 .bfeld{margin-bottom:1rem;display:flex;flex-direction:column;gap:.42rem}
-.bfeld label{font-size:.94rem;font-weight:700;color:#f3e6c4}
+.bfeld label{font-size:.94rem;font-weight:700;color:var(--ink)}
 .bfeld label .opt{font-weight:400;color:var(--dim2)}
 .bfeld input{width:100%;box-sizing:border-box;font:inherit;font-size:1.02rem;
   padding:.85rem .95rem;border-radius:.7rem;color:#fff;
   background:var(--bg2);border:1px solid var(--line2);
   -webkit-appearance:none;appearance:none}
-.bfeld input::placeholder{color:#6b5c3a}
-.bfeld input:focus{outline:none;border-color:#f7c948;
-  box-shadow:0 0 0 3px rgba(247,201,72,.18)}
+.bfeld input::placeholder{color:var(--dim2)}
+.bfeld input:focus{outline:none;border-color:var(--gold);
+  box-shadow:0 0 0 3px rgba(177,75,255,.22)}
 .bhilfe{font-size:.83rem;color:var(--dim2);line-height:1.45}
 /* Für Menschen unsichtbar, für Skripte verlockend. Nicht display:none –
    manche Skripte prüfen genau darauf. */
@@ -400,6 +400,34 @@
 .bmeldung.fehler{color:#f0a08c}
 .bschon{text-align:center;margin-top:1.3rem;color:var(--dim2);font-size:.9rem}
 .bewerb.faehrt{opacity:.6;pointer-events:none}
+
+/* ── Oder eben per WhatsApp ──────────────────────────────────────────
+   Ein Formular ist für manche eine Hürde: Man weiß nicht, was danach
+   passiert, und hat nichts in der Hand. WhatsApp ist vertraut – man
+   sieht, dass die Nachricht ankam, und kann sofort nachfragen. Deshalb
+   stehen beide Wege gleichberechtigt nebeneinander. */
+.oder{display:flex;align-items:center;gap:1rem;max-width:46rem;
+  margin:1.9rem auto 1.3rem;color:var(--dim2);font-size:.86rem;
+  text-transform:uppercase;letter-spacing:.18em}
+.oder::before,.oder::after{content:"";flex:1;height:1px;background:var(--line)}
+.wa-wahl{max-width:46rem;margin:0 auto;display:grid;gap:.75rem;
+  grid-template-columns:repeat(auto-fit,minmax(14rem,1fr))}
+.wa-wahl a{display:flex;align-items:center;gap:.8rem;text-decoration:none;
+  background:linear-gradient(180deg,#1a1430,#12101f);border:1px solid var(--line);
+  border-radius:1rem;padding:.85rem 1rem;color:var(--ink);
+  transition:border-color .2s,transform .2s,background .2s}
+.wa-wahl a:hover{border-color:#25d366;transform:translateY(-3px);
+  background:linear-gradient(180deg,#1f1a3a,#141226)}
+.wa-wahl .wa-ic{flex:0 0 auto;width:2.5rem;height:2.5rem;border-radius:50%;
+  display:grid;place-items:center;background:#25d366;
+  box-shadow:0 6px 16px -8px rgba(37,211,102,.85)}
+.wa-wahl .wa-ic svg{width:1.5rem;height:1.5rem;display:block}
+.wa-wahl .wa-t{display:flex;flex-direction:column;gap:.08rem;min-width:0}
+.wa-wahl .wa-n{font-weight:720;font-size:1rem}
+.wa-wahl .wa-r{font-size:.8rem;color:var(--dim)}
+.wa-wahl .wa-p{margin-left:auto;color:var(--gold);font-weight:700}
+.wa-hinweis{max-width:46rem;margin:.9rem auto 0;text-align:center;
+  font-size:.86rem;color:var(--dim)}
 </style>
 </head>
 <body>
@@ -460,11 +488,11 @@
         <svg class="mark-big" viewBox="0 0 340 200" aria-label="4EVER1.TV">
           <defs>
             <linearGradient id="g2" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0" stop-color="#fff3cf"/><stop offset=".34" stop-color="#f2c860"/>
-              <stop offset=".62" stop-color="#FF4D9D"/><stop offset="1" stop-color="#8d5f10"/>
+              <stop offset="0" stop-color="#EBD2FF"/><stop offset=".34" stop-color="#C46BFF"/>
+              <stop offset=".62" stop-color="#FF4D9D"/><stop offset="1" stop-color="#7A1FC9"/>
             </linearGradient>
             <linearGradient id="g3" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0" stop-color="#fff8e2"/><stop offset=".42" stop-color="#B14BFF"/><stop offset="1" stop-color="#8A2CE0"/>
+              <stop offset="0" stop-color="#F3E4FF"/><stop offset=".42" stop-color="#B14BFF"/><stop offset="1" stop-color="#8A2CE0"/>
             </linearGradient>
           </defs>
           <g fill="none" stroke="url(#g2)" stroke-width="21" stroke-linecap="round">
@@ -653,6 +681,13 @@
                  placeholder="einfach leer lassen, wenn noch nicht">
           <small class="bhilfe">Noch kein Konto? Kein Problem – wir richten es mit dir zusammen ein.</small>
         </div>
+        <div class="bfeld">
+          <label for="bBigoId">Deine BIGO-ID <span class="opt">(damit wir dich besser finden)</span></label>
+          <input id="bBigoId" name="bigo_id" inputmode="numeric" maxlength="15"
+                 placeholder="die Zahl in deinem BIGO-Profil">
+          <p class="bhilfe">Du findest sie in der BIGO-App in deinem Profil unter deinem Namen.
+            Noch keine? Lass das Feld einfach leer.</p>
+        </div>
 
         <!-- Honigtopf gegen Skripte: für Menschen unsichtbar. -->
         <div class="bhonig" aria-hidden="true">
@@ -672,6 +707,27 @@
         </p>
         <p class="bmeldung" id="bMeldung" role="status"></p>
       </form>
+
+      <!-- Zweiter Weg: WhatsApp. Gleichberechtigt neben dem Formular. -->
+      <div class="oder">oder</div>
+      <div class="wa-wahl">
+          <a href="https://wa.me/4917683382930?text=Hallo%2C%20ich%20m%C3%B6chte%20mich%20bei%204ever1%20bewerben.%20%F0%9F%92%9C" target="_blank" rel="noopener">
+            <span class="wa-ic"><svg viewBox="0 0 24 24" fill="#fff" aria-hidden="true"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2 22l5.25-1.38c1.45.79 3.08 1.21 4.79 1.21h.01c5.46 0 9.91-4.45 9.91-9.91C21.96 6.45 17.5 2 12.04 2zm0 18.15h-.01c-1.52 0-3.01-.41-4.31-1.18l-.31-.18-3.2.84.85-3.12-.2-.32a8.2 8.2 0 01-1.26-4.38c0-4.54 3.7-8.24 8.25-8.24 2.2 0 4.27.86 5.83 2.42a8.19 8.19 0 012.41 5.83c0 4.54-3.7 8.23-8.25 8.23zm4.52-6.16c-.25-.12-1.47-.72-1.69-.81-.23-.08-.39-.12-.56.13-.16.25-.64.81-.79.98-.14.16-.29.18-.54.06-.25-.12-1.05-.39-2-1.23-.74-.66-1.24-1.47-1.38-1.72-.15-.25-.02-.38.11-.5.11-.11.25-.29.37-.43.12-.15.16-.25.25-.41.08-.17.04-.31-.02-.43-.06-.12-.56-1.34-.76-1.84-.2-.48-.41-.42-.56-.43h-.48c-.16 0-.43.06-.65.31-.23.25-.85.83-.85 2.02s.87 2.34.99 2.5c.12.16 1.71 2.61 4.15 3.66.58.25 1.03.4 1.39.51.58.19 1.11.16 1.53.1.47-.07 1.47-.6 1.67-1.18.21-.58.21-1.07.15-1.18-.06-.11-.22-.17-.47-.29z"/></svg></span>
+            <span class="wa-t"><span class="wa-n">eyfahrlehrer</span><span class="wa-r">Inhaber der Agentur</span></span>
+            <span class="wa-p">→</span>
+          </a>
+          <a href="https://wa.me/4915569488914?text=Hallo%2C%20ich%20m%C3%B6chte%20mich%20bei%204ever1%20bewerben.%20%F0%9F%92%9C" target="_blank" rel="noopener">
+            <span class="wa-ic"><svg viewBox="0 0 24 24" fill="#fff" aria-hidden="true"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2 22l5.25-1.38c1.45.79 3.08 1.21 4.79 1.21h.01c5.46 0 9.91-4.45 9.91-9.91C21.96 6.45 17.5 2 12.04 2zm0 18.15h-.01c-1.52 0-3.01-.41-4.31-1.18l-.31-.18-3.2.84.85-3.12-.2-.32a8.2 8.2 0 01-1.26-4.38c0-4.54 3.7-8.24 8.25-8.24 2.2 0 4.27.86 5.83 2.42a8.19 8.19 0 012.41 5.83c0 4.54-3.7 8.23-8.25 8.23zm4.52-6.16c-.25-.12-1.47-.72-1.69-.81-.23-.08-.39-.12-.56.13-.16.25-.64.81-.79.98-.14.16-.29.18-.54.06-.25-.12-1.05-.39-2-1.23-.74-.66-1.24-1.47-1.38-1.72-.15-.25-.02-.38.11-.5.11-.11.25-.29.37-.43.12-.15.16-.25.25-.41.08-.17.04-.31-.02-.43-.06-.12-.56-1.34-.76-1.84-.2-.48-.41-.42-.56-.43h-.48c-.16 0-.43.06-.65.31-.23.25-.85.83-.85 2.02s.87 2.34.99 2.5c.12.16 1.71 2.61 4.15 3.66.58.25 1.03.4 1.39.51.58.19 1.11.16 1.53.1.47-.07 1.47-.6 1.67-1.18.21-.58.21-1.07.15-1.18-.06-.11-.22-.17-.47-.29z"/></svg></span>
+            <span class="wa-t"><span class="wa-n">eyLisa</span><span class="wa-r">Teamleitung</span></span>
+            <span class="wa-p">→</span>
+          </a>
+          <a href="https://wa.me/4917643444411?text=Hallo%2C%20ich%20m%C3%B6chte%20mich%20bei%204ever1%20bewerben.%20%F0%9F%92%9C" target="_blank" rel="noopener">
+            <span class="wa-ic"><svg viewBox="0 0 24 24" fill="#fff" aria-hidden="true"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2 22l5.25-1.38c1.45.79 3.08 1.21 4.79 1.21h.01c5.46 0 9.91-4.45 9.91-9.91C21.96 6.45 17.5 2 12.04 2zm0 18.15h-.01c-1.52 0-3.01-.41-4.31-1.18l-.31-.18-3.2.84.85-3.12-.2-.32a8.2 8.2 0 01-1.26-4.38c0-4.54 3.7-8.24 8.25-8.24 2.2 0 4.27.86 5.83 2.42a8.19 8.19 0 012.41 5.83c0 4.54-3.7 8.23-8.25 8.23zm4.52-6.16c-.25-.12-1.47-.72-1.69-.81-.23-.08-.39-.12-.56.13-.16.25-.64.81-.79.98-.14.16-.29.18-.54.06-.25-.12-1.05-.39-2-1.23-.74-.66-1.24-1.47-1.38-1.72-.15-.25-.02-.38.11-.5.11-.11.25-.29.37-.43.12-.15.16-.25.25-.41.08-.17.04-.31-.02-.43-.06-.12-.56-1.34-.76-1.84-.2-.48-.41-.42-.56-.43h-.48c-.16 0-.43.06-.65.31-.23.25-.85.83-.85 2.02s.87 2.34.99 2.5c.12.16 1.71 2.61 4.15 3.66.58.25 1.03.4 1.39.51.58.19 1.11.16 1.53.1.47-.07 1.47-.6 1.67-1.18.21-.58.21-1.07.15-1.18-.06-.11-.22-.17-.47-.29z"/></svg></span>
+            <span class="wa-t"><span class="wa-n">eykeepcool</span><span class="wa-r">Teamleitung</span></span>
+            <span class="wa-p">→</span>
+          </a>
+      </div>
+      <p class="wa-hinweis">Schreib einfach los – wir antworten persönlich. Auch per WhatsApp brauchst du nichts weiter als deinen Vornamen und dein Alter.</p>
 
       <p class="bschon">
         Du hast schon eine Zugangsnummer?

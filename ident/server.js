@@ -280,6 +280,7 @@ async function handleApi(req, res, urlPath, ip) {
       alter: kurz(body.alter, 10),
       kontakt,
       bigo: kurz(body.bigo, 80),
+      bigo_id: kurz(body.bigo_id, 15),
       wann: kurz(body.wann, 80),
       nachricht: kurz(body.nachricht, 600),
       herkunft: kurz(req.headers.referer, 120),

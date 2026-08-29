@@ -164,6 +164,9 @@
         alter: (f.alter.value || '').trim(),
         kontakt: (f.kontakt.value || '').trim(),
         bigo: (f.bigo.value || '').trim(),
+        // Die BIGO-ID ist die Zahl im Profil. Damit findet die Teamleitung
+        // eine Bewerberin eindeutig – Namen gibt es auf BIGO doppelt.
+        bigo_id: (f.bigo_id && f.bigo_id.value || '').trim(),
         wann: (f.wann.value || '').trim(),
         webseite: (f.webseite.value || '').trim()
       };
