@@ -43,6 +43,9 @@ a{color:var(--brand)}
 .muted{color:var(--muted)}
 .center{text-align:center}
 .hidden{display:none!important}
+/* Scrollbalken überall unsichtbar – gescrollt wird trotzdem (nativer App-Look) */
+*{scrollbar-width:none;-ms-overflow-style:none}
+*::-webkit-scrollbar{width:0;height:0;display:none}
 
 /* ---- Header ---- */
 header{position:sticky;top:0;z-index:20;background:rgba(14,19,26,.9);backdrop-filter:blur(8px);
