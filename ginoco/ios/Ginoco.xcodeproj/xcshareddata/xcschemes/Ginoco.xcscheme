@@ -14,7 +14,7 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "A1000000000000000000A006"
+               BlueprintIdentifier = "B2000000000000000000B040"
                BuildableName = "Ginoco.app"
                BlueprintName = "Ginoco"
                ReferencedContainer = "container:Ginoco.xcodeproj">
@@ -44,7 +44,7 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "A1000000000000000000A006"
+            BlueprintIdentifier = "B2000000000000000000B040"
             BuildableName = "Ginoco.app"
             BlueprintName = "Ginoco"
             ReferencedContainer = "container:Ginoco.xcodeproj">
@@ -61,7 +61,7 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "A1000000000000000000A006"
+            BlueprintIdentifier = "B2000000000000000000B040"
             BuildableName = "Ginoco.app"
             BlueprintName = "Ginoco"
             ReferencedContainer = "container:Ginoco.xcodeproj">

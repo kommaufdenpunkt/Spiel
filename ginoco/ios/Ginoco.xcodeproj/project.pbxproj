@@ -3,23 +3,26 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 77;
+	objectVersion = 56;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		B2000000000000000000B011 /* GinocoApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000000000000000000B001 /* GinocoApp.swift */; };
+		B2000000000000000000B012 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000000000000000000B002 /* ContentView.swift */; };
+		B2000000000000000000B013 /* WebView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000000000000000000B003 /* WebView.swift */; };
+		B2000000000000000000B014 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B2000000000000000000B004 /* Assets.xcassets */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
-		A1000000000000000000A002 /* Ginoco.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Ginoco.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		B2000000000000000000B001 /* GinocoApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GinocoApp.swift; sourceTree = "<group>"; };
+		B2000000000000000000B002 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		B2000000000000000000B003 /* WebView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebView.swift; sourceTree = "<group>"; };
+		B2000000000000000000B004 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		B2000000000000000000B005 /* Ginoco.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Ginoco.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
-/* Begin PBXFileSystemSynchronizedRootGroup section */
-		A1000000000000000000A001 /* Ginoco */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = Ginoco;
-			sourceTree = "<group>";
-		};
-/* End PBXFileSystemSynchronizedRootGroup section */
-
 /* Begin PBXFrameworksBuildPhase section */
-		A1000000000000000000A003 /* Frameworks */ = {
+		B2000000000000000000B031 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -29,18 +32,29 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		A1000000000000000000A004 = {
+		B2000000000000000000B020 = {
 			isa = PBXGroup;
 			children = (
-				A1000000000000000000A001 /* Ginoco */,
-				A1000000000000000000A005 /* Products */,
+				B2000000000000000000B021 /* Ginoco */,
+				B2000000000000000000B022 /* Products */,
 			);
 			sourceTree = "<group>";
 		};
-		A1000000000000000000A005 /* Products */ = {
+		B2000000000000000000B021 /* Ginoco */ = {
 			isa = PBXGroup;
 			children = (
-				A1000000000000000000A002 /* Ginoco.app */,
+				B2000000000000000000B001 /* GinocoApp.swift */,
+				B2000000000000000000B002 /* ContentView.swift */,
+				B2000000000000000000B003 /* WebView.swift */,
+				B2000000000000000000B004 /* Assets.xcassets */,
+			);
+			path = Ginoco;
+			sourceTree = "<group>";
+		};
+		B2000000000000000000B022 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				B2000000000000000000B005 /* Ginoco.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -48,85 +62,82 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		A1000000000000000000A006 /* Ginoco */ = {
+		B2000000000000000000B040 /* Ginoco */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = A1000000000000000000A007 /* Build configuration list for PBXNativeTarget "Ginoco" */;
+			buildConfigurationList = B2000000000000000000B050 /* Build configuration list for PBXNativeTarget "Ginoco" */;
 			buildPhases = (
-				A1000000000000000000A008 /* Sources */,
-				A1000000000000000000A003 /* Frameworks */,
-				A1000000000000000000A009 /* Resources */,
+				B2000000000000000000B030 /* Sources */,
+				B2000000000000000000B031 /* Frameworks */,
+				B2000000000000000000B032 /* Resources */,
 			);
 			buildRules = (
 			);
 			dependencies = (
 			);
-			fileSystemSynchronizedGroups = (
-				A1000000000000000000A001 /* Ginoco */,
-			);
 			name = Ginoco;
-			packageProductDependencies = (
-			);
 			productName = Ginoco;
-			productReference = A1000000000000000000A002 /* Ginoco.app */;
+			productReference = B2000000000000000000B005 /* Ginoco.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
-		A1000000000000000000A00A /* Project object */ = {
+		B2000000000000000000B041 /* Project object */ = {
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
 				LastSwiftUpdateCheck = 2600;
 				LastUpgradeCheck = 2600;
 				TargetAttributes = {
-					A1000000000000000000A006 = {
+					B2000000000000000000B040 = {
 						CreatedOnToolsVersion = 26.0;
 					};
 				};
 			};
-			buildConfigurationList = A1000000000000000000A00B /* Build configuration list for PBXProject "Ginoco" */;
-			compatibilityVersion = "Xcode 16.0";
+			buildConfigurationList = B2000000000000000000B051 /* Build configuration list for PBXProject "Ginoco" */;
+			compatibilityVersion = "Xcode 14.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
 				en,
 				Base,
 			);
-			mainGroup = A1000000000000000000A004;
-			minimizedProjectReferenceProxies = 1;
-			preferredProjectObjectVersion = 77;
-			productRefGroup = A1000000000000000000A005 /* Products */;
+			mainGroup = B2000000000000000000B020;
+			productRefGroup = B2000000000000000000B022 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				A1000000000000000000A006 /* Ginoco */,
+				B2000000000000000000B040 /* Ginoco */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
-		A1000000000000000000A009 /* Resources */ = {
+		B2000000000000000000B032 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B2000000000000000000B014 /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
-		A1000000000000000000A008 /* Sources */ = {
+		B2000000000000000000B030 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B2000000000000000000B012 /* ContentView.swift in Sources */,
+				B2000000000000000000B011 /* GinocoApp.swift in Sources */,
+				B2000000000000000000B013 /* WebView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin XCBuildConfiguration section */
-		A1000000000000000000A00C /* Debug */ = {
+		B2000000000000000000B062 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -179,7 +190,6 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
-				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -189,7 +199,7 @@
 			};
 			name = Debug;
 		};
-		A1000000000000000000A00D /* Release */ = {
+		B2000000000000000000B063 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -236,7 +246,6 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
-				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				SDKROOT = iphoneos;
@@ -245,14 +254,13 @@
 			};
 			name = Release;
 		};
-		A1000000000000000000A00E /* Debug */ = {
+		B2000000000000000000B060 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSFaceIDUsageDescription = "Ginoco nutzt Face ID, um dich sicher und ohne Passwort anzumelden.";
@@ -275,14 +283,13 @@
 			};
 			name = Debug;
 		};
-		A1000000000000000000A00F /* Release */ = {
+		B2000000000000000000B061 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSFaceIDUsageDescription = "Ginoco nutzt Face ID, um dich sicher und ohne Passwort anzumelden.";
@@ -308,25 +315,25 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		A1000000000000000000A007 /* Build configuration list for PBXNativeTarget "Ginoco" */ = {
+		B2000000000000000000B050 /* Build configuration list for PBXNativeTarget "Ginoco" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				A1000000000000000000A00E /* Debug */,
-				A1000000000000000000A00F /* Release */,
+				B2000000000000000000B060 /* Debug */,
+				B2000000000000000000B061 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		A1000000000000000000A00B /* Build configuration list for PBXProject "Ginoco" */ = {
+		B2000000000000000000B051 /* Build configuration list for PBXProject "Ginoco" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				A1000000000000000000A00C /* Debug */,
-				A1000000000000000000A00D /* Release */,
+				B2000000000000000000B062 /* Debug */,
+				B2000000000000000000B063 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
 	};
-	rootObject = A1000000000000000000A00A /* Project object */;
+	rootObject = B2000000000000000000B041 /* Project object */;
 }
