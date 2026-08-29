@@ -225,9 +225,9 @@
   .card h3{margin:0 0 .45rem;font-size:1.07rem;font-weight:700}
   .card p{margin:0;color:var(--dim);font-size:.94rem}
 
-  .bohnen-kurs{margin:0;padding:1rem 1.2rem;border-radius:14px;background:#0D0D16;
-    border:1px solid var(--line);color:var(--dim);font-size:.92rem;line-height:1.65}
-  .bohnen-kurs b{color:var(--gold)}
+  /* Bewusst unauffaellig: kein Kasten, keine goldenen Zahlen. Die Angabe
+     soll auffindbar sein, nicht beworben. */
+  .bohnen-kurs{margin:0;color:var(--dim2);font-size:.86rem;line-height:1.7;max-width:46rem}
 
   /* ---------- Team ---------- */
   .team{display:grid;grid-template-columns:repeat(3,1fr);gap:1.15rem}
@@ -531,15 +531,13 @@
           <text x="170" y="180" text-anchor="middle" font-family="Georgia,serif" font-size="11.5"
                 fill="#e0cb9c" letter-spacing="6" opacity=".8">AGENTUR</text>
         </svg>
-        <!-- „Dein Taschengeld" stand hier ohne jede Bedingung und las sich
-             wie eine Zusage auf Dauer. Richtig ist: In den ersten beiden
-             Monaten sind 5.000 Bohnen rund 100 $. Der Euro-Betrag steht
-             vorn, weil hier alle in Euro denken - ausgezahlt wird von BIGO
-             aber in Dollar, deshalb bleibt der Dollar-Wert daneben stehen.
-             Kurs: 1 $ = 0,8589 EUR (EZB-Referenz, 28.08.2026). Wenn der
-             Kurs deutlich wandert, gehoert die Zahl nachgezogen - sie steht
-             nur an dieser einen Stelle und in .bohnen-kurs weiter unten. -->
-        <div class="chip l"><b class="gold">~86 €</b><span>≈ 100 $ · Monat 1&nbsp;–&nbsp;2</span></div>
+        <!-- Hier stand ein zweiter Chip mit dem Geldbetrag. Ein Euro-Wert
+             als schwebender Blickfang ueber dem Logo ist das Erste, was
+             jemand sieht - und macht aus einer Agentur ein Verdienst-
+             versprechen. Die Zahl steht weiterhin auf der Seite, aber
+             unten im Abschnitt „Bohnen & Taschengeld", wo man sie sucht
+             und wo die Bedingungen danebenstehen (.bohnen-kurs).
+             Das Bohnen-Target bleibt: Es ist ein Ziel, kein Betrag. -->
         <div class="chip r"><b class="gold">5.000</b><span>Bohnen Target</span></div>
       </div>
     </div>
@@ -598,11 +596,11 @@
           <p>Ausgezahlt wird direkt von BIGO an dich – nicht über uns. Wir bekommen deine Bohnen nie in die Hand.</p></div>
       </div>
 
-      <p class="bohnen-kurs">In deinen <b>ersten beiden Monaten</b> liegt das Target bei
-        <b>5.000 Bohnen</b> – das entspricht rund <b>100 $</b>, also etwa <b>86 €</b>.
-        Ausgezahlt wird in Dollar; was in Euro ankommt, hängt vom Tageskurs ab.
-        Danach setzen wir das Target gemeinsam mit dir neu. Eine feste Summe
-        versprechen wir dir bewusst nicht.</p>
+      <p class="bohnen-kurs">In den ersten beiden Monaten liegt dein Target bei 5.000 Bohnen –
+        das sind ungefähr 100 $, je nach Tageskurs also grob 86 €. Ausgezahlt wird in Dollar.
+        Danach setzen wir dein Target gemeinsam neu. Eine feste Summe versprechen wir dir
+        bewusst nicht – was am Ende herauskommt, hängt von deinen Stunden und deinen
+        Zuschauern ab.</p>
 
     </div>
   </section>
