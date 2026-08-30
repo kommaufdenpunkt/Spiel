@@ -708,6 +708,11 @@ th{color:var(--muted);font-weight:600;font-size:.78rem;text-transform:uppercase;
 .ap-sec:first-of-type{border-top:none;padding-top:.2rem}
 .ap-label{font-size:.78rem;font-weight:800;color:var(--brand);margin-bottom:.5rem;text-transform:uppercase;letter-spacing:.03em}
 .ap-label .muted{font-weight:500;text-transform:none;letter-spacing:0;color:var(--muted)}
+.ap-hint{font-size:.78rem;color:var(--muted);margin-top:.5rem;line-height:1.4}
+.tone-row{display:flex;gap:.6rem;align-items:center;flex-wrap:wrap}
+.tone-sel{flex:1;min-width:180px;padding:.55rem .7rem;border-radius:11px;border:1px solid var(--line);
+  background:var(--card2);color:var(--ink);font-size:.92rem;font-weight:600;appearance:none;-webkit-appearance:none;cursor:pointer}
+.tone-sel:focus{outline:2px solid var(--brand);outline-offset:1px}
 .ap-grid2{display:grid;grid-template-columns:1fr 1fr;gap:.5rem}
 .ap-fonts{display:grid;grid-template-columns:1fr 1fr;gap:.5rem}
 .ap-swatches{display:flex;gap:.55rem;flex-wrap:wrap;align-items:center}

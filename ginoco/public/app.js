@@ -124,8 +124,22 @@ loadAppearance();
 // ---------- Benachrichtigungston (kurzer Zwei-Ton-Klang, ohne externe Datei) ----------
 let _audioCtx = null;
 let _soundOn = true;
-try { _soundOn = localStorage.getItem('fsp-sound') !== '0'; } catch {}
-function setSoundOn(on) { _soundOn = !!on; try { localStorage.setItem('fsp-sound', on ? '1' : '0'); } catch {} if (on) { unlockAudio(); playChime(); } }
+// Ton-Art: 'chime' (Glocke), 'carlock' (Auto-Verriegeln), 'off'. Mit Rückwärtskompat
+// zum alten An/Aus-Schalter ('fsp-sound').
+let NOTIFY_TONE = 'chime';
+try {
+  const t = localStorage.getItem('fsp-tone');
+  if (t) NOTIFY_TONE = t;
+  else if (localStorage.getItem('fsp-sound') === '0') NOTIFY_TONE = 'off';
+} catch {}
+_soundOn = NOTIFY_TONE !== 'off';
+function setNotifyTone(tone) {
+  NOTIFY_TONE = ['chime', 'carlock', 'off'].includes(tone) ? tone : 'chime';
+  _soundOn = NOTIFY_TONE !== 'off';
+  try { localStorage.setItem('fsp-tone', NOTIFY_TONE); localStorage.setItem('fsp-sound', _soundOn ? '1' : '0'); } catch {}
+  if (_soundOn) { unlockAudio(); playChime(); } // gleich einmal zur Probe
+}
+function setSoundOn(on) { setNotifyTone(on ? (NOTIFY_TONE === 'off' ? 'chime' : NOTIFY_TONE) : 'off'); }
 function unlockAudio() {
   try {
     if (!_audioCtx) { const AC = window.AudioContext || window.webkitAudioContext; if (AC) _audioCtx = new AC(); }
@@ -135,8 +149,8 @@ function unlockAudio() {
 // Audio erst nach der ersten Nutzer-Interaktion freischalten (Browser-Vorgabe).
 window.addEventListener('pointerdown', unlockAudio, { passive: true });
 window.addEventListener('keydown', unlockAudio, { passive: true });
-function playChime() {
-  if (!_soundOn) return;
+// Sanfte Zwei-Ton-Glocke (Standard).
+function playBell() {
   unlockAudio();
   if (!_audioCtx) return;
   try {
@@ -152,6 +166,46 @@ function playChime() {
       o.start(s); o.stop(s + 0.36);
     });
   } catch {}
+}
+// „Auto-Verriegeln": bevorzugt die echte Klangdatei (public/klingelton-car-lock.mp3),
+// sonst ein synthetischer Zentralverriegelungs-Chirp (funktioniert auch ohne Datei).
+let _lockAudio = null;
+function ensureLockAudio() {
+  if (_lockAudio !== null) return;
+  try { _lockAudio = new Audio('/klingelton-car-lock.mp3'); _lockAudio.preload = 'auto'; }
+  catch { _lockAudio = false; }
+}
+function playLockChirp() {
+  unlockAudio();
+  if (!_audioCtx) return;
+  try {
+    const t = _audioCtx.currentTime;
+    [0, 0.12].forEach((off) => {
+      const o = _audioCtx.createOscillator(), g = _audioCtx.createGain();
+      o.type = 'square';
+      o.frequency.setValueAtTime(2100, t + off);
+      o.frequency.exponentialRampToValueAtTime(1650, t + off + 0.07);
+      o.connect(g); g.connect(_audioCtx.destination);
+      g.gain.setValueAtTime(0.0001, t + off);
+      g.gain.exponentialRampToValueAtTime(0.16, t + off + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + off + 0.09);
+      o.start(t + off); o.stop(t + off + 0.1);
+    });
+  } catch {}
+}
+function playLock() {
+  ensureLockAudio();
+  if (_lockAudio) {
+    try { _lockAudio.currentTime = 0; const p = _lockAudio.play(); if (p && p.catch) p.catch(() => playLockChirp()); return; }
+    catch { /* fällt unten auf den Chirp zurück */ }
+  }
+  playLockChirp();
+}
+// Verteiler: spielt den gewählten Benachrichtigungston.
+function playChime() {
+  if (NOTIFY_TONE === 'off') return;
+  if (NOTIFY_TONE === 'carlock') return playLock();
+  playBell();
 }
 // Merkt sich die letzten Zähler, um „neu eingegangen" zu erkennen.
 let _lastNotifUnread = null, _lastMsgUnread = null;
@@ -223,7 +277,15 @@ function openThemePicker() {
     </div>
 
     <div class="ap-sec"><div class="ap-label">Benachrichtigungston</div>
-      <label class="ck-line" style="justify-content:flex-start"><input type="checkbox" id="ap-sound" ${_soundOn ? 'checked' : ''}> 🔊 Ton bei neuen Benachrichtigungen</label>
+      <div class="tone-row">
+        <select id="ap-tone" class="tone-sel">
+          <option value="chime">🔔 Glocke (Standard)</option>
+          <option value="carlock">🚗🔒 Auto-Verriegeln</option>
+          <option value="off">🔇 Aus</option>
+        </select>
+        <button class="ghost sm" id="ap-tone-test" type="button">▶︎ Probe</button>
+      </div>
+      <div class="ap-hint">Klingt bei neuen Mitteilungen (z. B. „Etwas liegt im Postfach"), solange die App offen ist.</div>
     </div>
 
     <div class="actions" style="justify-content:space-between">
@@ -258,8 +320,10 @@ function openThemePicker() {
     efree.oninput = () => { state.prefs.edge = efree.value; applyAppearance(); };            // live-Vorschau
     efree.onchange = () => { savePref('edge', efree.value); mkEdge(); };                      // festhalten
   }
-  const snd = $('#ap-sound');
-  if (snd) snd.onchange = () => setSoundOn(snd.checked);
+  const toneSel = $('#ap-tone');
+  if (toneSel) { toneSel.value = NOTIFY_TONE; toneSel.onchange = () => setNotifyTone(toneSel.value); }
+  const toneTest = $('#ap-tone-test');
+  if (toneTest) toneTest.onclick = () => { unlockAudio(); const prev = NOTIFY_TONE; NOTIFY_TONE = (toneSel && toneSel.value) || NOTIFY_TONE; playChime(); NOTIFY_TONE = prev; };
   const rst = $('#ap-reset');
   if (rst) rst.onclick = () => { resetAppearance(); toast('Auf Standard zurückgesetzt', 'ok'); mkTheme(); mkAccent(); mkFont(); mkInk(); mkEdge(); mkSize(); };
 }
@@ -509,8 +573,10 @@ function openTour() {
 window.__openTour = openTour;
 
 // ---------- Was ist neu? (Changelog) ----------
-const CHANGELOG_VER = '3.85';
+const CHANGELOG_VER = '3.86';
 const CHANGELOG = [
+  { v: '3.86', d: '30.08.2026', title: '🔔 Ton aussuchen', items: [
+    '🚗🔒 <strong>Auto-Verriegeln als Ton:</strong> Unter „🎨 Aussehen → Benachrichtigungston" kannst du jetzt zwischen 🔔 Glocke, 🚗🔒 Auto-Verriegeln und 🔇 Aus wählen – mit „Probe"-Knopf zum Reinhören.'] },
   { v: '3.85', d: '30.08.2026', title: '📬 „Etwas liegt in deinem Postfach"', items: [
     '📬 <strong>Push, wenn eine Unterschrift wartet:</strong> Fordert dein Fahrlehrer die Unterschrift an, kommt jetzt sofort eine Handy-Benachrichtigung „✍️ Etwas liegt in deinem Postfach" – auch wenn die App zu ist.',
     '👉 <strong>Ein Tipp genügt:</strong> Tippst du auf die Nachricht, öffnet sich die App direkt am Postfach, leuchtet kurz auf und legt dir die Fahrstunde zum Durchsehen & Unterschreiben hin.'] },
