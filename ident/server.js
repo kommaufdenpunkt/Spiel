@@ -1714,6 +1714,15 @@ const server = http.createServer(async (req, res) => {
   // Datei jederzeit ausgetauscht werden, ohne dass irgendetwas neu startet.
   let basis = PUBLIC_DIR;
   if (urlPath.startsWith('/musik/')) {
+    // Das Portal (mein.4ever1.tv) benutzt dieselbe Datei. Ohne diese
+    // Freigabe scheitert dort schon die Frage „gibt es sie ueberhaupt?" -
+    // und der Knopf bliebe fuer immer unsichtbar. Nur fuer /musik/, nur
+    // fuer unsere eigenen Adressen.
+    const her = String(req.headers.origin || '');
+    if (/^https:\/\/(mein|team|family|mcp|acp)\.4ever1\.tv$/.test(her)) {
+      res.setHeader('Access-Control-Allow-Origin', her);
+      res.setHeader('Vary', 'Origin');
+    }
     const ausData = path.normalize(path.join(DATA_DIR, urlPath));
     if (ausData.startsWith(path.join(DATA_DIR, 'musik')) && fs.existsSync(ausData)) {
       basis = DATA_DIR;
