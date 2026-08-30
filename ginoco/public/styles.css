@@ -1228,6 +1228,16 @@ body:has(.fp-overlay) .pwa-install{display:none}
 .inv-fields{display:flex;flex-wrap:wrap;gap:.45rem;align-items:center}
 .inv-fields .inv-d{max-width:158px}.inv-fields .inv-t{max-width:96px}
 .inv-fields input{font-variant-numeric:tabular-nums}
+/* Schnell-Chips fürs Rechnungsdatum */
+.inv-cur{background:var(--good-bg);color:var(--good)}
+.inv-cur-none{font-size:.82rem;color:var(--muted)}
+.inv-chips{display:flex;flex-wrap:wrap;gap:.4rem}
+.inv-chip{background:#1c2531;color:var(--ink);border:1px solid var(--line);border-radius:20px;padding:.4rem .8rem;font-size:.85rem;font-weight:600}
+.inv-chip:hover{background:#26313f}
+.inv-chip.on{background:var(--brand);color:#fff;border-color:var(--brand)}
+.inv-chip.inv-custom-btn{color:var(--muted)}
+.inv-custom{display:flex;flex-wrap:wrap;gap:.45rem;align-items:center;margin-top:.5rem}
+.inv-custom .inv-d{max-width:158px}.inv-custom .inv-t{max-width:150px}
 .ml-inv{color:var(--brand);font-variant-numeric:tabular-nums}
 
 /* ===== Wiederherstellungs-Codes ===== */
