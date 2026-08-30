@@ -184,17 +184,37 @@
           if (alt) {
             var i = new Image();
             i.className = 'logo-img kommt'; i.alt = '4EVER1.TV'; i.src = j.logo;
-            // Der Zeichnung ihren Moment lassen. Vorher sprang das fertige
-            // Logo hinein, sobald der Server geantwortet hatte - und der
-            // Aufbau der Acht war nie zu sehen. Jetzt zuerst der Strich,
-            // dann die Ueberblendung.
+
+            // Die Zeichnung bekommt ihren Moment - aber einen KURZEN.
+            //
+            // Zuerst wartete das hier stur 1,9 Sekunden. So lange stand die
+            // nackte gezeichnete Acht auf dem Schirm, ohne Schriftzug, und
+            // sah nach Platzhalter aus. Jetzt sind es 900 ms, und getauscht
+            // wird erst, wenn das echte Logo WIRKLICH geladen ist - je
+            // nachdem, was spaeter kommt. Ist es schon im Zwischenspeicher,
+            // ist der Vorgang nach knapp einer Sekunde vorbei.
+            var MINDESTENS = 900;
+            try {
+              if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) MINDESTENS = 0;
+            } catch (e) { /* alte Browser: normal weiter */ }
+            var seit = Date.now();
+
             i.onload = function () {
-              var wartet = 1900;
-              try {
-                if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) wartet = 0;
-              } catch (e) { /* alte Browser: normal weiter */ }
-              setTimeout(function () { alt.replaceWith(i); }, wartet);
+              var rest = Math.max(0, MINDESTENS - (Date.now() - seit));
+              setTimeout(function () {
+                // Ueberblenden statt austauschen: erst das Logo daneben
+                // stellen, dann die Zeichnung ausblenden. Sonst blitzt fuer
+                // einen Bildlauf eine Luecke auf.
+                var eltern = alt.parentNode;
+                if (!eltern) { alt.replaceWith(i); return; }
+                eltern.appendChild(i);
+                alt.classList.add('geht');
+                setTimeout(function () { if (alt.parentNode) alt.remove(); }, 480);
+              }, rest);
             };
+            // Kaputtes oder fehlendes Bild? Dann bleibt die Zeichnung stehen -
+            // besser als ein leeres Loch.
+            i.onerror = function () { /* Zeichnung bleibt */ };
           }
         }
         // Auch im Fuß dasselbe Logo – sonst stehen zwei verschiedene

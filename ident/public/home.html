@@ -14,6 +14,9 @@
 <meta property="og:locale" content="de_DE">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="/icon-192.png">
+<!-- Das echte Logo vorladen. Ohne das steht waehrend des Ladens die nackte
+     gezeichnete Acht auf dem Schirm - die sieht nach Platzhalter aus. -->
+<link rel="preload" as="image" href="/logo.png">
 <link rel="apple-touch-icon" href="/icon-180.png">
 <meta name="theme-color" content="#0B0B12">
 <style>
@@ -185,19 +188,29 @@
      laufen beide Schleifen im Gleichschritt, egal wie lang sie wirklich sind.
      Die zweite startet leicht versetzt, sonst wirkt es wie ein Kreis statt
      wie eine Acht. */
+  /* Kurz halten. Der erste Versuch lief 1,1 s + 0,32 s Versatz, und der
+     Schriftzug kam erst nach 1,5 s - anderthalb Sekunden lang stand also
+     eine NACKTE Acht auf dem Schirm. Das liest sich nicht als Aufbau,
+     sondern als Platzhalter. Jetzt ist der ganze Vorgang nach knapp einer
+     Sekunde durch, und der Schriftzug ist fast sofort da. */
   .acht-zug path{stroke-dasharray:1;stroke-dashoffset:1;
-    animation:achtZiehen 1.1s cubic-bezier(.65,0,.35,1) forwards}
-  .acht-zug path:nth-child(2){animation-delay:.32s}
+    animation:achtZiehen .62s cubic-bezier(.55,0,.3,1) forwards}
+  .acht-zug path:nth-child(2){animation-delay:.16s}
   @keyframes achtZiehen{to{stroke-dashoffset:0}}
-  .acht-glanz{opacity:0;animation:achtEin .6s ease 1.35s forwards}
-  .acht-wort{opacity:0;animation:achtEin .7s ease 1.5s forwards}
+  .acht-glanz{opacity:0;animation:achtEin .35s ease .5s forwards}
+  .acht-wort{opacity:0;animation:achtEin .4s ease .42s forwards}
   @keyframes achtEin{from{opacity:0}to{opacity:.5}}
   .acht-wort{animation-name:achtWortEin}
   @keyframes achtWortEin{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
   /* Das fertige Logo loest die Zeichnung ab - nicht hart, sondern als
      Ueberblendung. Deshalb liegen beide kurz uebereinander. */
-  .brandart .logo-img.kommt{animation:markenLauf 18s linear infinite,logoEin .9s ease both}
-  @keyframes logoEin{from{opacity:0;transform:scale(.965)}to{opacity:1;transform:none}}
+  .brandart .logo-img.kommt{animation:markenLauf 18s linear infinite,logoEin .5s ease both}
+  @keyframes logoEin{from{opacity:0;transform:scale(.98)}to{opacity:1;transform:none}}
+  /* Die Zeichnung verschwindet, waehrend das Logo kommt - beide liegen kurz
+     uebereinander, sonst blitzt eine Luecke auf. */
+  .brandart .mark-big.geht{position:absolute;inset:0;margin:auto;
+    animation:achtWeg .45s ease forwards;pointer-events:none}
+  @keyframes achtWeg{to{opacity:0;transform:scale(1.03)}}
   @media(prefers-reduced-motion:reduce){
     .acht-zug path,.acht-glanz,.acht-wort{animation:none;stroke-dashoffset:0;opacity:1}
     .brandart .logo-img.kommt{animation:none}
