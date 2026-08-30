@@ -178,45 +178,10 @@
     fetch('/api/site').then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
       if (!j) return;
       if (j.logo) {
-        var art = $('brandArt');
-        if (art) {
-          var alt = art.querySelector('.mark-big');
-          if (alt) {
-            var i = new Image();
-            i.className = 'logo-img kommt'; i.alt = '4EVER1.TV'; i.src = j.logo;
-
-            // Die Zeichnung bekommt ihren Moment - aber einen KURZEN.
-            //
-            // Zuerst wartete das hier stur 1,9 Sekunden. So lange stand die
-            // nackte gezeichnete Acht auf dem Schirm, ohne Schriftzug, und
-            // sah nach Platzhalter aus. Jetzt sind es 900 ms, und getauscht
-            // wird erst, wenn das echte Logo WIRKLICH geladen ist - je
-            // nachdem, was spaeter kommt. Ist es schon im Zwischenspeicher,
-            // ist der Vorgang nach knapp einer Sekunde vorbei.
-            var MINDESTENS = 900;
-            try {
-              if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) MINDESTENS = 0;
-            } catch (e) { /* alte Browser: normal weiter */ }
-            var seit = Date.now();
-
-            i.onload = function () {
-              var rest = Math.max(0, MINDESTENS - (Date.now() - seit));
-              setTimeout(function () {
-                // Ueberblenden statt austauschen: erst das Logo daneben
-                // stellen, dann die Zeichnung ausblenden. Sonst blitzt fuer
-                // einen Bildlauf eine Luecke auf.
-                var eltern = alt.parentNode;
-                if (!eltern) { alt.replaceWith(i); return; }
-                eltern.appendChild(i);
-                alt.classList.add('geht');
-                setTimeout(function () { if (alt.parentNode) alt.remove(); }, 480);
-              }, rest);
-            };
-            // Kaputtes oder fehlendes Bild? Dann bleibt die Zeichnung stehen -
-            // besser als ein leeres Loch.
-            i.onerror = function () { /* Zeichnung bleibt */ };
-          }
-        }
+        // Im Titelbild liegt das echte Logo bereits im SVG (es wird dort nur
+        // entlang der Acht freigelegt). Hier ist also nichts mehr zu
+        // tauschen - frueher wurde an dieser Stelle eine Strichzeichnung
+        // gegen das Logo ersetzt, und genau dieser Wechsel sah schlecht aus.
         // Auch im Fuß dasselbe Logo – sonst stehen zwei verschiedene
         // Zeichen auf einer Seite, und das fällt sofort auf.
         var fuss = $('footMark');
