@@ -495,8 +495,11 @@ function openTour() {
 window.__openTour = openTour;
 
 // ---------- Was ist neu? (Changelog) ----------
-const CHANGELOG_VER = '3.78';
+const CHANGELOG_VER = '3.79';
 const CHANGELOG = [
+  { v: '3.79', d: '30.08.2026', title: '✨ Smarter Feinschliff', items: [
+    '✨ <strong>Fühlt sich „gekonnt" an:</strong> Alles Tippbare senkt sich beim Drücken ganz leicht, Ansichten blenden sanft ein, sanftes Scrollen – und das hässliche Tap-Flackern ist weg.',
+    '🎚️ <strong>Edlere Menü-Griffe</strong> links & rechts (schlanke Milchglas-Kapsel, feine Gold-Griffleiste) – in ginoco.de und mcp.ginoco.de.'] },
   { v: '3.78', d: '30.08.2026', title: '🎬 Neuer Startbildschirm', items: [
     '🎬 Beim Öffnen zeichnet sich erst das ginoco-Logo (das „G"), dann baut sich die App auf – ein kleiner, edler Moment beim Start.'] },
   { v: '3.77', d: '30.08.2026', title: '🧾 Klarere Fahrstunden & Nachweis', items: [
@@ -2924,6 +2927,9 @@ async function refreshEventBadge() {
 
 function drawInstrTab() {
   app.querySelectorAll('.navtabs button').forEach((b) => b.classList.toggle('active', b.dataset.tab === state.instrTab));
+  // Sanfte Einblendung beim Tab-Wechsel (nur bei Navigation, nicht bei Live-Refresh).
+  const _it = $('#itab');
+  if (_it) { _it.classList.remove('tab-in'); requestAnimationFrame(() => _it.classList.add('tab-in')); }
   const t = state.instrTab;
   if (t !== 'nachrichten') openConvo = null;
   if (t === 'heute') return tabHeute();

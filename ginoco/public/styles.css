@@ -68,6 +68,20 @@ a{color:var(--brand)}
 /* Scrollbalken überall unsichtbar – gescrollt wird trotzdem (nativer App-Look) */
 *{scrollbar-width:none;-ms-overflow-style:none}
 *::-webkit-scrollbar{width:0;height:0;display:none}
+/* ── Smart-Politur: ruhige Bewegung, tastbare Reaktion, kein Tap-Flackern ── */
+*{-webkit-tap-highlight-color:transparent}
+html{scroll-behavior:smooth}
+/* Alles Tippbare senkt sich beim Drücken minimal – fühlt sich „echt" an */
+button:not(:disabled):not(.edge-handle):active{transform:translateY(.5px) scale(.985)}
+.edge-tile:active,.stu-card:active,.pl-row:active,.cap-row:active,.bitem:active,.iconbtn:active,.convo:active,.sset:active{transform:scale(.985);transition:transform .08s ease}
+/* Sanfte Einblendung des Tab-Inhalts beim Umschalten (Fahrlehrer) */
+@keyframes tabIn{from{opacity:0;transform:translateY(9px)}to{opacity:1;transform:none}}
+#itab.tab-in{animation:tabIn .34s cubic-bezier(.22,.61,.36,1)}
+@media (prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto}
+  #itab.tab-in{animation:none}
+  button:not(:disabled):not(.edge-handle):active,.edge-tile:active,.stu-card:active,.pl-row:active,.cap-row:active,.bitem:active,.iconbtn:active,.convo:active,.sset:active{transform:none}
+}
 
 /* ---- Header ---- */
 header{position:sticky;top:0;z-index:20;background:rgba(14,19,26,.9);backdrop-filter:blur(8px);
