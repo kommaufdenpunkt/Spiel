@@ -920,6 +920,12 @@ button:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
 .notif-msg{font-size:.92rem;color:var(--ink);line-height:1.4}
 .notif-time{font-size:.76rem;color:var(--muted);margin-top:.2rem}
 .notif-dot{flex:0 0 auto;width:9px;height:9px;border-radius:50%;background:var(--brand);margin-top:.4rem}
+/* Kurzes Aufleuchten, wenn man per Push „Etwas liegt im Postfach" hierher springt. */
+#notif-card.flash-in{animation:flashIn 1.6s ease-out}
+@keyframes flashIn{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--brand) 55%,transparent)}
+  35%{box-shadow:0 0 0 6px color-mix(in srgb,var(--brand) 30%,transparent)}
+  100%{box-shadow:0 0 0 0 transparent}}
+@media (prefers-reduced-motion:reduce){#notif-card.flash-in{animation:none}}
 
 /* Protokoll-Statistik-Kacheln */
 .pr-stats{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:.5rem;margin-bottom:1rem}

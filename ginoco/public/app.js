@@ -509,8 +509,11 @@ function openTour() {
 window.__openTour = openTour;
 
 // ---------- Was ist neu? (Changelog) ----------
-const CHANGELOG_VER = '3.84';
+const CHANGELOG_VER = '3.85';
 const CHANGELOG = [
+  { v: '3.85', d: '30.08.2026', title: '📬 „Etwas liegt in deinem Postfach"', items: [
+    '📬 <strong>Push, wenn eine Unterschrift wartet:</strong> Fordert dein Fahrlehrer die Unterschrift an, kommt jetzt sofort eine Handy-Benachrichtigung „✍️ Etwas liegt in deinem Postfach" – auch wenn die App zu ist.',
+    '👉 <strong>Ein Tipp genügt:</strong> Tippst du auf die Nachricht, öffnet sich die App direkt am Postfach, leuchtet kurz auf und legt dir die Fahrstunde zum Durchsehen & Unterschreiben hin.'] },
   { v: '3.84', d: '30.08.2026', title: '📋 Schüler sieht alles vor der Unterschrift', items: [
     '📋 <strong>Überblick vor dem Unterschreiben:</strong> Öffnest du die Unterschrift aus dem Postfach, siehst du jetzt die Fahrstunde, <strong>was ihr geübt habt</strong> und dass dein Fahrlehrer schon unterschrieben hat – erst drüberschauen, dann unterschreiben.',
     '🧾 <strong>Rechnungsdatum edler:</strong> zwei klare Zeilen (gefahren / Rechnung), Schnell-Chips (+1/+2/+3 Tage), genauer Tag + Uhrzeit, „leeren" – alles speichert sofort.'] },
@@ -1500,7 +1503,32 @@ async function syncStudent() {
     // Kalender folgt dem gewählten Tag: beim Blättern in einen neuen Monat springt er mit.
     state.calMonth = firstOfMonth(state.date);
     renderBookingCalendar();
+    maybeOpenPostfach(mine.bookings); // Push „Etwas liegt im Postfach" → direkt hin
   } catch (e) { toast(e.message, 'err'); }
+}
+
+// Nach Tippen auf die Push-Nachricht (/?postfach=1) direkt ins Postfach führen:
+// hinscrollen, kurz hervorheben – und wenn genau eine Unterschrift offen ist,
+// gleich den Überblick zum Unterschreiben öffnen. Läuft nur einmal.
+function maybeOpenPostfach(bookings) {
+  let flag = false;
+  try {
+    const u = new URL(location.href);
+    if (u.searchParams.get('postfach') === '1') {
+      flag = true;
+      u.searchParams.delete('postfach');
+      history.replaceState(null, '', u.pathname + u.search + u.hash);
+    }
+  } catch { /* ignore */ }
+  if (!flag || maybeOpenPostfach._done) return;
+  maybeOpenPostfach._done = true;
+  const card = $('#notif-card');
+  if (!card) return;
+  card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  card.classList.add('flash-in');
+  setTimeout(() => card.classList.remove('flash-in'), 1600);
+  const pending = (bookings || []).filter((b) => b.needs_sign && !b.signed_at);
+  if (pending.length === 1) setTimeout(() => openSignModal(pending[0]), 650);
 }
 
 // ---------- „Meine Fahrstunden" (Schüler-Historie, tabellarisch) ----------

@@ -411,12 +411,12 @@ function postPush(endpoint, body, auth) {
   });
 }
 // Push an alle Geraete eines Schuelers (fire-and-forget). Tote Abos (404/410) werden entfernt.
-function pushToStudent(studentId, message, url = '/') {
+function pushToStudent(studentId, message, url = '/', title = 'Ginoco') {
   try {
     if (!studentId || !getSettingRaw('vapid_public')) return;
     const subs = db.prepare('SELECT * FROM push_subscriptions WHERE student_id = ?').all(studentId);
     if (!subs.length) return;
-    const payload = JSON.stringify({ title: 'Ginoco', body: String(message).slice(0, 300), url });
+    const payload = JSON.stringify({ title: String(title).slice(0, 80) || 'Ginoco', body: String(message).slice(0, 300), url });
     for (const s of subs) {
       let body; try { body = encryptPush(payload, s.p256dh, s.auth); } catch (e) { console.error('push enc', e); continue; }
       postPush(s.endpoint, body, vapidAuth(s.endpoint)).then((r) => {
@@ -1380,7 +1380,8 @@ async function handleApi(req, res, url) {
         if (fr.status === 'done' && fr.attended !== 0 && !fr.signed_at) {
           db.prepare('UPDATE bookings SET needs_sign=1 WHERE id=?').run(id);
           notify(bk.student_id, 'sign',
-            `✍️ Bitte bestätige deine Fahrstunde vom ${wdShort(fr.date)} ${dmy(fr.date)} um ${fr.start_time} Uhr (${fr.duration_min} Min)${fr.feedback ? ` – ${fr.feedback}` : ''}.`, fr.date, id);
+            `Deine Fahrstunde vom ${wdShort(fr.date)} ${dmy(fr.date)} um ${fr.start_time} Uhr (${fr.duration_min} Min) liegt zum Durchsehen & Unterschreiben bereit${fr.feedback ? ` – ${fr.feedback}` : ''}.`,
+            fr.date, id, { pushTitle: '✍️ Etwas liegt in deinem Postfach', url: '/?postfach=1' });
         }
       }
       // Rückmeldung/Vermerk an den Schüler (nur wenn neu/geändert und nicht leer)
@@ -2657,12 +2658,25 @@ function weekInfoForStudent(studentId, ref = todayStr()) {
 
 // Eine Benachrichtigung fuer einen Schueler anlegen (Portal-Postfach)
 // und zusaetzlich an externe Kanaele (E-Mail/Push) uebergeben, sofern konfiguriert.
-function notify(studentId, kind, message, date = null, refBookingId = null) {
+function notify(studentId, kind, message, date = null, refBookingId = null, opts = {}) {
   db.prepare(`INSERT INTO notifications(student_id,kind,message,date,ref_booking_id,created_at)
     VALUES(?,?,?,?,?,?)`).run(studentId, kind, message, date, refBookingId, new Date().toISOString());
   dispatchExternal(studentId, message);
-  pushToStudent(studentId, message); // Handy-Push (falls Gerät angemeldet)
+  // Handy-Push (falls Gerät angemeldet) – je nach Art mit passender Überschrift,
+  // damit z. B. eine Unterschriften-Anfrage wie eine echte Postfach-Nachricht wirkt.
+  const pushTitle = opts.pushTitle || PUSH_TITLES[kind] || 'Ginoco';
+  pushToStudent(studentId, message, opts.url || '/', pushTitle);
 }
+// Kurze, sprechende Push-Überschriften je Nachrichten-Art.
+const PUSH_TITLES = {
+  sign: '✍️ Etwas liegt in deinem Postfach',
+  offer: '📩 Neuer Terminvorschlag',
+  booking: '✅ Termin bestätigt',
+  cancel: '⚠️ Termin abgesagt',
+  reminder: '⏰ Erinnerung',
+  daystatus: '🚦 Tagesstatus',
+  weather: '🌨️ Wetterhinweis',
+};
 
 // Haken fuer E-Mail / Push. Standardmaessig aus – aktivierbar ueber Umgebungs-
 // variablen, ohne dass das Portal sonst etwas braucht. (Details siehe README.)
