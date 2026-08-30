@@ -1022,7 +1022,7 @@ async function handleApi(req, res, url) {
   if (p === '/api/my/bookings' && method === 'GET') {
     if (!requireStudent()) return bad(res, 'Bitte anmelden', 401);
     const rows = db.prepare(
-      `SELECT id,date,start_time,duration_min,status,gearbox,plate,note,started_at,ended_at,confirmed,feedback,lesson_type,late_minutes,attended,needs_sign,signed_at,signature,curriculum,invoice_date,invoice_time,created_at
+      `SELECT id,date,start_time,duration_min,status,gearbox,plate,note,started_at,ended_at,confirmed,feedback,lesson_type,late_minutes,attended,needs_sign,signed_at,signature,instr_signature,instr_signed_at,curriculum,invoice_date,invoice_time,created_at
        FROM bookings WHERE student_id = ? AND status != 'cancelled' ORDER BY date, start_time`
     ).all(sess.student_id);
     return ok(res, { bookings: rows, weekInfo: weekInfoForStudent(sess.student_id),
@@ -1331,8 +1331,14 @@ async function handleApi(req, res, url) {
       if ('invoice_date' in b) { fields.push('invoice_date=?'); vals.push(/^\d{4}-\d{2}-\d{2}$/.test(b.invoice_date || '') ? b.invoice_date : null); }
       if ('invoice_time' in b) { fields.push('invoice_time=?'); vals.push(/^([01]?\d|2[0-3]):[0-5]\d$/.test(b.invoice_time || '') ? b.invoice_time : null); }
       if ('duration_min' in b && Number(b.duration_min) > 0) { fields.push('duration_min=?'); vals.push(newDur); }
-      // curriculum/request_sign duerfen auch allein kommen (ohne weitere Felder).
-      if (!fields.length && !Array.isArray(b.curriculum) && !b.request_sign) return bad(res, 'Nichts zu aendern');
+      // Fahrlehrer-Unterschrift (gezeichnete data-URL) speichern; optional als Standard merken.
+      const hasInstrSig = typeof b.instr_signature === 'string' && b.instr_signature.startsWith('data:image/') && b.instr_signature.length < 300000;
+      if (hasInstrSig) {
+        db.prepare('UPDATE bookings SET instr_signature=?, instr_signed_at=? WHERE id=?').run(b.instr_signature, new Date().toISOString(), id);
+        if (b.remember_signature) setSettingRaw('instructor_signature', b.instr_signature);
+      }
+      // curriculum/request_sign/Unterschrift duerfen auch allein kommen (ohne weitere Felder).
+      if (!fields.length && !Array.isArray(b.curriculum) && !b.request_sign && !hasInstrSig) return bad(res, 'Nichts zu aendern');
       if (fields.length) { vals.push(id); db.prepare(`UPDATE bookings SET ${fields.join(',')} WHERE id = ?`).run(...vals); }
 
       // Beim Abschließen die tatsächliche Endzeit festhalten (echter Zeitpunkt).
@@ -2319,7 +2325,7 @@ async function handleApi(req, res, url) {
     const st = db.prepare('SELECT name FROM students WHERE id=?').get(sid);
     if (!st) return bad(res, 'Schüler nicht gefunden', 404);
     const lessons = db.prepare(
-      `SELECT id,date,start_time,duration_min,status,gearbox,plate,lesson_type,late_minutes,attended,feedback,needs_sign,signed_at,signature,curriculum,invoice_date,invoice_time,created_at
+      `SELECT id,date,start_time,duration_min,status,gearbox,plate,lesson_type,late_minutes,attended,feedback,needs_sign,signed_at,signature,instr_signature,instr_signed_at,curriculum,invoice_date,invoice_time,created_at
        FROM bookings WHERE student_id=? AND status='done' ORDER BY date,start_time`).all(sid);
     return ok(res, { lessons, name: st.name, stats: lessonStats(sid), adk: adkSummary(sid) });
   }

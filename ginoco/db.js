@@ -191,7 +191,9 @@ ensureColumn('reviews', 'featured', 'featured INTEGER NOT NULL DEFAULT 0'); // v
 // Nachgetragene Fahrstunden: der Fahrschüler bestätigt/unterschreibt sie in der App.
 ensureColumn('bookings', 'needs_sign', 'needs_sign INTEGER NOT NULL DEFAULT 0'); // 1 = wartet auf Unterschrift des Schülers
 ensureColumn('bookings', 'signed_at', 'signed_at TEXT');   // Zeitpunkt der Unterschrift/Bestätigung
-ensureColumn('bookings', 'signature', 'signature TEXT');   // gezeichnete Unterschrift (data-URL, optional)
+ensureColumn('bookings', 'signature', 'signature TEXT');   // gezeichnete Unterschrift des Fahrschuelers (data-URL, optional)
+ensureColumn('bookings', 'instr_signature', 'instr_signature TEXT'); // gezeichnete Unterschrift des Fahrlehrers (data-URL)
+ensureColumn('bookings', 'instr_signed_at', 'instr_signed_at TEXT'); // Zeitpunkt der Fahrlehrer-Unterschrift
 // Rechnungsdatum: die Stunde wird an X gefahren, erscheint aber auf der Rechnung
 // (paralleles Abrechnungsprogramm) unter Y – z.B. wegen der 495-Min-Tagesgrenze.
 ensureColumn('bookings', 'invoice_date', 'invoice_date TEXT'); // YYYY-MM-DD (abweichendes Rechnungsdatum)
@@ -296,6 +298,7 @@ const DEFAULTS = {
   reserve_expire_min: '120', // vom Fahrlehrer vorgeschlagener Termin verfaellt nach so vielen Min ohne Antwort (0 = nie); gedeckelt durch den Termin selbst
   weather_enabled: '1',      // Wetter-Hinweis (Glatteis/Schnee/Regen) fuer den Tagesstatus aus dem DWD (BrightSky, kostenlos, kein Schluessel)
   weather_autostatus: '0',   // 1 = bei Glatteis/Schnee automatisch die heutigen Schueler vorwarnen (ohne Zutun des Fahrlehrers)
+  instructor_signature: '',  // gespeicherte Standard-Unterschrift des Fahrlehrers (data-URL), wird beim Abschliessen wiederverwendet
   traffic_key: '',           // kostenloser TomTom-API-Schluessel (leer = Verkehrs-Hinweis aus)
   booking_horizon_days: '10',// so viele Tage im Voraus duerfen Schueler buchen (Rang 1)
   cancel_hours: '48',        // bis so viele Std. vorher kostenlose Stornierung

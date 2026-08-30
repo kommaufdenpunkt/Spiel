@@ -509,8 +509,11 @@ function openTour() {
 window.__openTour = openTour;
 
 // ---------- Was ist neu? (Changelog) ----------
-const CHANGELOG_VER = '3.82';
+const CHANGELOG_VER = '3.83';
 const CHANGELOG = [
+  { v: '3.83', d: '30.08.2026', title: '✍️ Abschließen in Stufen – mit beiden Unterschriften', items: [
+    '✨ <strong>Edler Ablauf:</strong> Das Abschließen läuft jetzt in gläsernen, animierten Schritten – 1. Stattgefunden? · 2. Was gemacht? · 3. Was übt ihr als Nächstes? · 4. Unterschriften.',
+    '✍️ <strong>Beide unterschreiben:</strong> Du unterschreibst auf dem Tablet (einmal merken – wird wiederverwendet), der Fahrschüler auf seinem Handy. Beide Unterschriften stehen im gedruckten Nachweis.'] },
   { v: '3.82', d: '30.08.2026', title: '✅ Fahrstunde abschließen & abhaken', items: [
     '✅ <strong>Ein Tipp nach der Fahrstunde:</strong> Bei jeder Stunde jetzt der Knopf „Abschließen &amp; abhaken" – die Ausbildungskarte (Klasse B) ist gleich aufgeklappt, du hakst jeden Punkt ab (🔴/🟡/🟢), gibst Rückmeldung und forderst die Unterschrift an.',
     '📋 So ist schwarz auf weiß dokumentiert, dass du dich an die Ausbildungsdiagrammkarte hältst – im gedruckten Nachweis mit Datum je Übung.'] },
@@ -1570,6 +1573,28 @@ function renderMyLessons(bookings) {
 }
 
 // Unterschrift-Fenster: der Fahrschüler bestätigt & unterschreibt eine nachgetragene Fahrstunde.
+// Wiederverwendbares Unterschriften-Feld (Finger/Stift malen) auf einem <canvas>.
+function attachSignPad(canvas) {
+  const ctx = canvas.getContext('2d');
+  let drawn = false, drawing = false, last = null;
+  const fit = () => {
+    const r = canvas.getBoundingClientRect();
+    const dpr = Math.min(3, window.devicePixelRatio || 1);
+    canvas.width = Math.max(1, Math.round(r.width * dpr));
+    canvas.height = Math.max(1, Math.round(r.height * dpr));
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, r.width, r.height);
+    ctx.strokeStyle = '#111'; ctx.lineWidth = 2.4; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  };
+  setTimeout(fit, 30);
+  const pos = (e) => { const r = canvas.getBoundingClientRect(); const t = e.touches ? e.touches[0] : e; return { x: t.clientX - r.left, y: t.clientY - r.top }; };
+  const start = (e) => { e.preventDefault(); drawing = true; last = pos(e); };
+  const move = (e) => { if (!drawing) return; e.preventDefault(); const p = pos(e); ctx.beginPath(); ctx.moveTo(last.x, last.y); ctx.lineTo(p.x, p.y); ctx.stroke(); last = p; drawn = true; };
+  const end = () => { drawing = false; };
+  canvas.addEventListener('pointerdown', start); canvas.addEventListener('pointermove', move); window.addEventListener('pointerup', end);
+  return { drawn: () => drawn, url: () => { try { return canvas.toDataURL('image/png'); } catch { return ''; } }, clear: () => { fit(); drawn = false; } };
+}
+
 function openSignModal(l) {
   if (!l) return;
   const art = (l.lesson_type && l.lesson_type !== 'normal') ? ' · ' + lessonTypeLabel(l.lesson_type) : '';
@@ -1921,7 +1946,10 @@ function printLessonProof(name, done, adk, stats) {
       <td class="c">${noshow ? '' : artL}</td>
       <td>${late ? `Fahrschüler ${late} Min zu spät` : ''}</td>
       <td>${esc(b.feedback || '')}</td>
-      <td class="c sig-col">${b.signature ? `<img class="sig-img" src="${b.signature}" alt="Unterschrift">` : (b.signed_at ? `<span class="sig-ok">✔</span><br><span class="entry">${fmtDT(String(b.signed_at).slice(0, 10))}</span>` : '')}</td>
+      <td class="c sig-col">
+        ${b.instr_signature ? `<div class="sig2"><span class="sig2-l">FL</span><img class="sig-img" src="${b.instr_signature}" alt="Unterschrift Fahrlehrer"></div>` : ''}
+        ${b.signature ? `<div class="sig2"><span class="sig2-l">FS</span><img class="sig-img" src="${b.signature}" alt="Unterschrift Fahrschüler"></div>` : (b.signed_at ? `<div class="sig2"><span class="sig2-l">FS</span><span class="sig-ok">✔</span></div>` : '')}
+      </td>
     </tr>`;
   }).join('');
   const addr = esc(state.settings?.school_label || '');
@@ -1967,8 +1995,10 @@ function printLessonProof(name, done, adk, stats) {
       .entry-lbl{font-size:9px;text-transform:uppercase;letter-spacing:.04em;color:#999;font-weight:700}
       td.inv-col{color:#b26a00;font-weight:600} td.inv-col .wg{color:#aaa;font-weight:400;font-style:italic}
       td.sig-col{text-align:center;vertical-align:middle}
-      .sig-img{height:36px;max-width:150px;object-fit:contain;display:block;margin:0 auto}
+      .sig-img{height:30px;max-width:130px;object-fit:contain;display:block;margin:0 auto}
       .sig-ok{color:#0a7d3b;font-weight:700;font-size:14px}
+      .sig2{display:flex;align-items:center;gap:4px;justify-content:center;margin:1px 0}
+      .sig2-l{font-size:8px;font-weight:700;color:#999;width:16px;text-align:right}
       tr{break-inside:avoid}
       .sign{margin-top:32px;display:flex;gap:64px}
       .sign div{flex:1;border-top:1px solid #333;padding-top:6px;font-size:11px;color:#444}
@@ -3721,59 +3751,85 @@ function addMin(hhmm, min) {
 function openMarkModal(id) {
   const b = window.__instrBookings.find((x) => String(x.id) === String(id));
   if (!b) return;
-  modal(`<h3>Fahrstunde bearbeiten</h3>
-    <div class="row">
-      <div class="field"><label>Datum (verschieben)</label><input type="date" id="m-date" value="${b.date}"></div>
-      <div class="field"><label>Uhrzeit (vorziehen/zurück)</label><input id="m-time" value="${b.start_time}"></div>
+  const _who = b.student_name ? esc(b.student_name) : (b.title ? esc(b.title) : 'Termin');
+  modal(`<h3>✅ Fahrstunde abschließen</h3>
+    <p class="mk-sub">${_who} · ${WD[isoDow(b.date) - 1]} ${fmtShort(b.date)} · ${b.start_time} Uhr</p>
+
+    <div class="mk-step glass" style="--i:0">
+      <div class="mk-step-h"><span class="mk-step-n">1</span> Hat die Fahrstunde stattgefunden?</div>
+      <div class="row">
+        <div class="field"><label>Erschienen?</label>
+          <select id="m-att">
+            <option value="" ${b.attended == null ? 'selected' : ''}>– offen –</option>
+            <option value="1" ${b.attended === 1 ? 'selected' : ''}>Ja, da gewesen</option>
+            <option value="0" ${b.attended === 0 ? 'selected' : ''}>Nein, nicht erschienen</option>
+          </select></div>
+        <div class="field"><label>Abgeschlossen?</label>
+          <select id="m-status">
+            <option value="booked" ${b.status === 'booked' ? 'selected' : ''}>noch offen</option>
+            <option value="done" ${b.status === 'done' ? 'selected' : ''}>abgeschlossen ✓</option>
+          </select></div>
+      </div>
+      <div class="row">
+        <div class="field"><label>Dauer (Min)</label><input id="m-dur" type="number" value="${b.duration_min}" min="0" step="5"></div>
+        <div class="field"><label>Verspätung (Min)</label><input id="m-late" type="number" value="${b.late_minutes || 0}" min="0" step="5"></div>
+      </div>
+      <div class="row">
+        <div class="field"><label>Getriebe</label>
+          <select id="m-gear">
+            <option value="">– offen –</option>
+            <option value="schalt" ${b.gearbox === 'schalt' ? 'selected' : ''}>Schalter</option>
+            <option value="automatik" ${b.gearbox === 'automatik' ? 'selected' : ''}>Automatik</option>
+          </select></div>
+        <div class="field"><label>Fahrt-Art</label>
+          <select id="m-type">
+            <option value="">Normal</option>
+            <option value="ueberland" ${b.lesson_type === 'ueberland' ? 'selected' : ''}>🌄 Überland</option>
+            <option value="autobahn" ${b.lesson_type === 'autobahn' ? 'selected' : ''}>🛣️ Autobahn</option>
+            <option value="nacht" ${b.lesson_type === 'nacht' ? 'selected' : ''}>🌙 Nachtfahrt</option>
+          </select></div>
+      </div>
+      <div class="hint" id="m-hint"></div>
+      <details class="mk-more"><summary>Mehr Angaben (Kennzeichen, Datum/Zeit, Treffpunkt, Notiz)</summary>
+        <div class="field" style="margin-top:.5rem"><label>Kennzeichen (optional)</label><input id="m-plate" value="${esc(b.plate || '')}" placeholder="z.B. B-FS 1234"></div>
+        <div class="row">
+          <div class="field"><label>Datum (verschieben)</label><input type="date" id="m-date" value="${b.date}"></div>
+          <div class="field"><label>Uhrzeit</label><input id="m-time" value="${b.start_time}"></div>
+        </div>
+        <div class="field"><label>Treffpunkt (Live-Standort &amp; Navigation)</label>
+          <div class="inline"><input id="m-meet" value="${esc(b.meet_label || '')}" placeholder="z.B. vor der Schule" style="flex:1">
+            <button class="sec sm" id="m-meet-here" type="button">📍 Standort</button></div>
+          <div class="hint" id="m-meet-info" style="margin:.3rem 0 0">${b.meet_lat != null ? '✓ Koordinaten hinterlegt (ETA möglich)' : 'Ohne Koordinaten nur als Text.'}</div>
+        </div>
+        <div class="field"><label>Grund (bei Absage/Nichterscheinen)</label><input id="m-reason" value="${esc(b.reason || '')}"></div>
+        <div class="field"><label>Interne Notiz (nur für dich)</label><input id="m-note" value="${esc(b.note || '')}"></div>
+      </details>
     </div>
-    <div class="field"><label>Getriebe</label>
-      <select id="m-gear">
-        <option value="">– noch offen –</option>
-        <option value="schalt" ${b.gearbox === 'schalt' ? 'selected' : ''}>Schalter</option>
-        <option value="automatik" ${b.gearbox === 'automatik' ? 'selected' : ''}>Automatik</option>
-      </select></div>
-    <div class="field"><label>Kennzeichen (optional)</label><input id="m-plate" value="${esc(b.plate || '')}" placeholder="z.B. B-FS 1234"></div>
-    <div class="field"><label>Fahrt-Art (für Sonderfahrten-Protokoll)</label>
-      <select id="m-type">
-        <option value="">Normal</option>
-        <option value="ueberland" ${b.lesson_type === 'ueberland' ? 'selected' : ''}>🌄 Überland</option>
-        <option value="autobahn" ${b.lesson_type === 'autobahn' ? 'selected' : ''}>🛣️ Autobahn</option>
-        <option value="nacht" ${b.lesson_type === 'nacht' ? 'selected' : ''}>🌙 Nachtfahrt</option>
-      </select></div>
-    <div class="row">
-      <div class="field"><label>Erschienen?</label>
-        <select id="m-att">
-          <option value="" ${b.attended == null ? 'selected' : ''}>– offen –</option>
-          <option value="1" ${b.attended === 1 ? 'selected' : ''}>Ja, da gewesen</option>
-          <option value="0" ${b.attended === 0 ? 'selected' : ''}>Nein, nicht erschienen</option>
-        </select></div>
-      <div class="field"><label>Verspätung (Min)</label><input id="m-late" type="number" value="${b.late_minutes || 0}" min="0" step="5"></div>
-    </div>
-    <div class="row">
-      <div class="field"><label>Dauer (Min)</label><input id="m-dur" type="number" value="${b.duration_min}" min="0" step="5"></div>
-      <div class="field"><label>Status</label>
-        <select id="m-status">
-          <option value="booked" ${b.status === 'booked' ? 'selected' : ''}>gebucht</option>
-          <option value="done" ${b.status === 'done' ? 'selected' : ''}>abgeschlossen ✓</option>
-        </select></div>
-    </div>
-    <div class="field"><label>📝 Rückmeldung an den Schüler <span class="muted">(sieht der Schüler – „das haben wir gemacht")</span></label>
-      <textarea id="m-feedback" rows="3" placeholder="z.B. Heute Kreisverkehr & Vorfahrt geübt – nächstes Mal Einparken." style="resize:vertical">${esc(b.feedback || '')}</textarea></div>
-    ${b.student_id ? `<label class="ck-line" style="justify-content:flex-start" id="m-sign-line"><input type="checkbox" id="m-sign" ${b.signed_at ? '' : 'checked'}> ✍️ Beim Abschließen Unterschrift vom Fahrschüler anfordern <span class="muted">(landet per Push im Postfach)</span></label>${b.signed_at ? '<div class="hint" style="margin:.1rem 0 .4rem">✓ Diese Stunde ist bereits unterschrieben.</div>' : ''}` : ''}
-    ${b.student_id ? '<div id="m-recos" class="mk-recos"></div>' : ''}
-    ${b.student_id ? `<details class="mk-curr" id="m-curr-wrap" ${b.status !== 'done' ? 'open' : ''}><summary>📋 Was habt ihr heute gemacht? <span class="muted">(Ausbildungskarte Klasse B – jeden Punkt abhaken)</span></summary>
-      <input id="m-curr-search" placeholder="🔎 suchen (z. B. Kreisverkehr)" autocomplete="off" style="margin:.5rem 0">
-      <div id="m-curr-list" class="mk-curr-list"><span class="hint">Lädt…</span></div>
-    </details>` : ''}
-    ${b.student_id ? `<button class="adk-open" id="m-adk" type="button">📋 Ausbildungskarte abhaken (Vollbild)</button>` : ''}
-    <div class="field"><label>Grund (bei Absage/Nichterscheinen, optional)</label><input id="m-reason" value="${esc(b.reason || '')}"></div>
-    <div class="field"><label>Interne Notiz (nur für dich)</label><input id="m-note" value="${esc(b.note || '')}"></div>
-    <div class="field"><label>Treffpunkt (für Live-Standort & Navigation)</label>
-      <div class="inline"><input id="m-meet" value="${esc(b.meet_label || '')}" placeholder="z.B. vor der Schule" style="flex:1">
-        <button class="sec sm" id="m-meet-here" type="button">📍 Standort</button></div>
-      <div class="hint" id="m-meet-info" style="margin:.3rem 0 0">${b.meet_lat != null ? '✓ Koordinaten hinterlegt (ETA möglich)' : 'Ohne Koordinaten nur als Text.'}</div>
-    </div>
-    <div class="hint" id="m-hint"></div>
+
+    ${b.student_id ? `<div class="mk-step glass" style="--i:1">
+      <div class="mk-step-h"><span class="mk-step-n">2</span> Was habt ihr gemacht?</div>
+      <div class="field"><label>📝 Rückmeldung an den Schüler <span class="muted">(sieht der Schüler)</span></label>
+        <textarea id="m-feedback" rows="2" placeholder="z.B. Kreisverkehr &amp; Vorfahrt geübt – nächstes Mal Einparken." style="resize:vertical">${esc(b.feedback || '')}</textarea></div>
+      <details class="mk-curr" id="m-curr-wrap" ${b.status !== 'done' ? 'open' : ''}><summary>📋 Ausbildungskarte Klasse B – jeden Punkt abhaken</summary>
+        <input id="m-curr-search" placeholder="🔎 suchen (z. B. Kreisverkehr)" autocomplete="off" style="margin:.5rem 0">
+        <div id="m-curr-list" class="mk-curr-list">${gLoad('Lädt…')}</div>
+      </details>
+      <button class="adk-open" id="m-adk" type="button">📋 Ausbildungskarte im Vollbild</button>
+    </div>` : ''}
+
+    ${b.student_id ? `<div class="mk-step glass" style="--i:2">
+      <div class="mk-step-h"><span class="mk-step-n">3</span> Was übt ihr als Nächstes?</div>
+      <div id="m-recos" class="mk-recos"><span class="hint">Wird aus der Ausbildungskarte vorgeschlagen …</span></div>
+    </div>` : ''}
+
+    ${b.student_id ? `<div class="mk-step glass" style="--i:3">
+      <div class="mk-step-h"><span class="mk-step-n">4</span> Unterschriften</div>
+      <label class="sign-lb">✍️ Deine Unterschrift <span class="muted">(Fahrlehrer, auf dem Tablet)</span></label>
+      <div id="m-isig-body"></div>
+      <label class="ck-line" style="justify-content:flex-start;margin-top:.6rem" id="m-sign-line"><input type="checkbox" id="m-sign" ${b.signed_at ? '' : 'checked'}> ✍️ Unterschrift vom Fahrschüler anfordern <span class="muted">(auf seinem Handy)</span></label>
+      ${b.signed_at ? '<div class="hint" style="margin:.1rem 0 0">✓ Der Fahrschüler hat bereits unterschrieben.</div>' : ''}
+    </div>` : ''}
+
     <div class="actions">
       <button class="sec" onclick="window.__closeModal()">Abbrechen</button>
       <button id="m-save">Speichern</button>
@@ -3781,6 +3837,30 @@ function openMarkModal(id) {
   let meetLat = b.meet_lat, meetLng = b.meet_lng;
   const adkBtn = $('#m-adk');
   if (adkBtn) adkBtn.onclick = () => { closeModal(); openTrainingCard(b.student_id, b.student_name || ''); };
+  // Fahrlehrer-Unterschrift: gespeicherte verwenden oder neu zeichnen.
+  let isigPad = null;
+  const isigStored = state.settings?.instructor_signature || '';
+  let isigMode = (b.instr_signature || isigStored) ? 'stored' : 'pad';
+  let isigShown = b.instr_signature || isigStored; // was gerade als „stored" angezeigt wird
+  const renderIsig = () => {
+    const box = $('#m-isig-body'); if (!box) return;
+    if (isigMode === 'stored' && isigShown) {
+      box.innerHTML = `<div class="isig-stored"><img src="${isigShown}" class="isig-prev" alt="Unterschrift Fahrlehrer">
+        <button type="button" class="ghost sm" id="isig-redo">✏️ Neu zeichnen</button></div>`;
+      $('#isig-redo').onclick = () => { isigMode = 'pad'; renderIsig(); };
+    } else {
+      box.innerHTML = `<div class="sign-pad-wrap"><canvas id="m-isig-pad" class="sign-pad"></canvas>
+          <button type="button" class="ghost sm sign-clear" id="isig-clear">Löschen</button></div>
+        <div class="inline" style="margin-top:.3rem">
+          <label class="ck-line" style="justify-content:flex-start;margin:0"><input type="checkbox" id="isig-remember" ${isigStored ? '' : 'checked'}> Als meine Standard-Unterschrift merken</label>
+          ${isigShown ? '<button type="button" class="ghost sm" id="isig-usestored" style="margin-left:auto">gespeicherte verwenden</button>' : ''}
+        </div>`;
+      isigPad = attachSignPad($('#m-isig-pad'));
+      $('#isig-clear').onclick = () => isigPad.clear();
+      const us = $('#isig-usestored'); if (us) us.onclick = () => { isigMode = 'stored'; isigPad = null; renderIsig(); };
+    }
+  };
+  if (b.student_id) renderIsig();
   // „Was habt ihr heute gemacht?" – Ausbildungskarte pro Fahrstunde abhaken,
   // je Punkt mit Stand: 🔴 muss noch geübt · 🟡 geübt · 🟢 sitzt ganz gut.
   let currDone = {};            // Zeitstempel je Punkt (früher erledigt)
@@ -3873,6 +3953,15 @@ function openMarkModal(id) {
         return on ? { k: seg.dataset.cc, s: on.dataset.s } : null;
       }).filter(Boolean);
       if (curr.length) body.curriculum = curr;
+      // Fahrlehrer-Unterschrift: neu gezeichnet -> mitschicken (+ optional merken); sonst gespeicherte anwenden.
+      if (b.student_id) {
+        if (isigMode === 'pad' && isigPad && isigPad.drawn()) {
+          body.instr_signature = isigPad.url();
+          if ($('#isig-remember')?.checked) body.remember_signature = true;
+        } else if (isigMode === 'stored' && isigShown && !b.instr_signature) {
+          body.instr_signature = isigShown; // gespeicherte Unterschrift für diese Stunde übernehmen
+        }
+      }
       await api('/api/bookings/' + id, { method: 'PATCH', body });
       closeModal(); toast(body.request_sign ? 'Abgeschlossen ✓ – Unterschrift angefordert' : 'Gespeichert ✓', 'ok'); refreshEventBadge(); drawInstrTab();
     } catch (e) { toast(e.message, 'err'); }

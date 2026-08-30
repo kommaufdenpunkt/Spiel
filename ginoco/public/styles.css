@@ -1177,6 +1177,23 @@ body:has(.fp-overlay) .pwa-install{display:none}
 .ml-signcell{margin-top:.35rem}
 .sign-lesson{background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:.6rem .75rem;margin:.2rem 0 .7rem}
 .sign-note{color:var(--muted);font-style:italic;margin-top:.3rem;font-size:.9rem}
+/* „Fahrstunde abschließen": gläserne, animierte Schritte */
+.mk-sub{color:var(--muted);font-size:.9rem;margin:.1rem 0 1rem}
+.mk-step{position:relative;border-radius:16px;padding:1rem 1.05rem;margin:0 0 .9rem;
+  border:1px solid rgba(255,255,255,.08);
+  background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,.02));
+  backdrop-filter:blur(10px) saturate(1.1);-webkit-backdrop-filter:blur(10px) saturate(1.1);
+  box-shadow:0 8px 26px rgba(0,0,0,.24),inset 0 1px 0 rgba(255,255,255,.08);
+  opacity:0;transform:translateY(12px);animation:mkIn .5s cubic-bezier(.22,.61,.36,1) forwards;animation-delay:calc(var(--i,0)*.08s)}
+@keyframes mkIn{to{opacity:1;transform:none}}
+.mk-step-h{display:flex;align-items:center;gap:.55rem;font-weight:800;font-size:1rem;margin:0 0 .7rem;letter-spacing:-.01em}
+.mk-step-n{flex:0 0 auto;width:1.5rem;height:1.5rem;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;
+  font-size:.82rem;font-weight:900;color:#1a1206;background:linear-gradient(135deg,#f6890d,#ffd24a);box-shadow:0 2px 8px rgba(242,160,26,.4)}
+.mk-more{margin-top:.6rem;border-top:1px solid rgba(255,255,255,.08);padding-top:.5rem}
+.mk-more summary{cursor:pointer;font-size:.85rem;color:var(--muted);font-weight:600}
+.isig-stored{display:flex;align-items:center;gap:.7rem;flex-wrap:wrap}
+.isig-prev{height:66px;max-width:230px;object-fit:contain;background:#fff;border-radius:10px;padding:4px 8px;border:1px solid var(--line)}
+@media (prefers-reduced-motion:reduce){.mk-step{animation:none;opacity:1;transform:none}}
 .sign-lb{display:block;font-size:.9rem;font-weight:600;margin:.2rem 0 .35rem}
 .sign-pad-wrap{position:relative;margin-bottom:.6rem}
 .sign-pad{width:100%;height:150px;background:#fff;border:2px dashed var(--line);border-radius:12px;touch-action:none;display:block;cursor:crosshair}
