@@ -183,8 +183,18 @@
           var alt = art.querySelector('.mark-big');
           if (alt) {
             var i = new Image();
-            i.className = 'logo-img'; i.alt = '4EVER1.TV'; i.src = j.logo;
-            i.onload = function () { alt.replaceWith(i); };
+            i.className = 'logo-img kommt'; i.alt = '4EVER1.TV'; i.src = j.logo;
+            // Der Zeichnung ihren Moment lassen. Vorher sprang das fertige
+            // Logo hinein, sobald der Server geantwortet hatte - und der
+            // Aufbau der Acht war nie zu sehen. Jetzt zuerst der Strich,
+            // dann die Ueberblendung.
+            i.onload = function () {
+              var wartet = 1900;
+              try {
+                if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) wartet = 0;
+              } catch (e) { /* alte Browser: normal weiter */ }
+              setTimeout(function () { alt.replaceWith(i); }, wartet);
+            };
           }
         }
         // Auch im Fuß dasselbe Logo – sonst stehen zwei verschiedene
@@ -251,4 +261,79 @@
   ausHash();
 
   zeigen(document.querySelectorAll('.sec-head, .card, .stepline, .stat, .woche, .faq details, .contact a, .cta, .phone, #teammanagement .grid > div:first-child, .foot > div'));
+
+  // ── Hymne im Hintergrund ───────────────────────────────────────────────
+  //
+  // Drei Regeln, und alle drei sind Absicht:
+  //  1. NIE von allein. Ungefragter Ton auf einer Webseite ist der
+  //     schnellste Weg, jemanden wieder wegzuklicken - und jeder moderne
+  //     Browser blockiert ihn ohnehin.
+  //  2. Der Knopf erscheint nur, wenn es die Datei wirklich gibt. Ein
+  //     Knopf, der nichts tut, ist schlimmer als keiner.
+  //  3. Leise anfangen und aufblenden. Ein Anthem, das mit voller
+  //     Lautstaerke losbricht, erschreckt.
+  function hymne() {
+    var knopf = $('tonKnopf');
+    if (!knopf) return;
+    var QUELLE = '/musik/hymne.mp3';
+
+    // Gibt es die Datei? Sonst den Knopf gar nicht erst zeigen.
+    knopf.style.display = 'none';
+    fetch(QUELLE, { method: 'HEAD' }).then(function (r) {
+      if (!r.ok) return;
+      knopf.style.display = '';
+      var audio = new Audio(QUELLE);
+      audio.loop = true;
+      audio.preload = 'none';
+      audio.volume = 0;
+
+      var laeuft = false, blende = null;
+      function aufblenden(ziel, fertig) {
+        clearInterval(blende);
+        blende = setInterval(function () {
+          var d = ziel - audio.volume;
+          if (Math.abs(d) < 0.02) {
+            audio.volume = ziel; clearInterval(blende);
+            if (fertig) fertig();
+            return;
+          }
+          audio.volume = Math.max(0, Math.min(1, audio.volume + d * 0.12));
+        }, 40);
+      }
+
+      function an() {
+        audio.play().then(function () {
+          laeuft = true;
+          knopf.setAttribute('aria-pressed', 'true');
+          knopf.setAttribute('aria-label', 'Musik ausschalten');
+          aufblenden(0.32);
+          try { localStorage.setItem('hymne', 'an'); } catch (e) {}
+        }).catch(function () { /* Browser hat abgelehnt - dann eben nicht */ });
+      }
+      function aus() {
+        aufblenden(0, function () { audio.pause(); });
+        laeuft = false;
+        knopf.setAttribute('aria-pressed', 'false');
+        knopf.setAttribute('aria-label', 'Musik einschalten');
+        try { localStorage.setItem('hymne', 'aus'); } catch (e) {}
+      }
+
+      knopf.addEventListener('click', function () { laeuft ? aus() : an(); });
+
+      // Wer sie beim letzten Besuch anhatte, bekommt sie beim ersten Tipp
+      // irgendwo auf der Seite wieder - ohne Tipp bleibt es still, das
+      // verlangt der Browser so.
+      var wunsch = null;
+      try { wunsch = localStorage.getItem('hymne'); } catch (e) {}
+      if (wunsch === 'an') {
+        var einmal = function () {
+          document.removeEventListener('pointerdown', einmal);
+          an();
+        };
+        document.addEventListener('pointerdown', einmal, { once: true });
+      }
+    }).catch(function () { /* keine Datei, kein Knopf */ });
+  }
+  hymne();
+
 })();
