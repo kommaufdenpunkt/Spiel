@@ -40,6 +40,11 @@ body{background:
   .sp-arc,.sp-hub,.sp-spokes,.sp-needle,.sp-spark,.sp-word{animation:none;opacity:1;stroke-dashoffset:0;transform:none}
 }
 .boot{padding:4rem;text-align:center;color:var(--muted);display:flex;flex-direction:column;align-items:center;gap:.7rem}
+/* Drehendes „G" als Ladeanzeige – zwischendurch beim Laden */
+.g-load{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.6rem;padding:2rem 1rem;color:var(--muted);font-size:.9rem}
+.g-spin{transform-origin:50% 50%;animation:gSpin 1.05s cubic-bezier(.65,.05,.36,1) infinite;filter:drop-shadow(0 3px 11px rgba(242,160,26,.28))}
+@keyframes gSpin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.g-spin{animation-duration:2.2s;animation-timing-function:linear}}
 .boot .tire{font-size:2.4rem}
 button{font-family:inherit;font-size:.95rem;cursor:pointer;border:none;border-radius:13px;
   padding:.6rem 1rem;background:var(--brand);color:#fff;font-weight:600;transition:.15s}

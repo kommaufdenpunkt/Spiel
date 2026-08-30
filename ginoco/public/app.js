@@ -495,8 +495,10 @@ function openTour() {
 window.__openTour = openTour;
 
 // ---------- Was ist neu? (Changelog) ----------
-const CHANGELOG_VER = '3.79';
+const CHANGELOG_VER = '3.80';
 const CHANGELOG = [
+  { v: '3.80', d: '30.08.2026', title: '🎡 Das „G" beim Laden', items: [
+    '🎡 <strong>Ladeanzeige mit Herz:</strong> Wenn etwas lädt, dreht sich jetzt das ginoco-„G" (das Lenkrad) – und wenn du buchst, wird daraus der grüne Haken mit Konfetti. 🎉'] },
   { v: '3.79', d: '30.08.2026', title: '✨ Smarter Feinschliff', items: [
     '✨ <strong>Fühlt sich „gekonnt" an:</strong> Alles Tippbare senkt sich beim Drücken ganz leicht, Ansichten blenden sanft ein, sanftes Scrollen – und das hässliche Tap-Flackern ist weg.',
     '🎚️ <strong>Edlere Menü-Griffe</strong> links & rechts (schlanke Milchglas-Kapsel, feine Gold-Griffleiste) – in ginoco.de und mcp.ginoco.de.'] },
@@ -913,6 +915,17 @@ function render() {
   if (state.user.role === 'instructor') return renderInstructor();
   return renderStudent();
 }
+
+// Das drehende „G" als Ladeanzeige (taucht zwischendurch beim Laden auf).
+function gSvg(cls) {
+  return `<svg class="g-spin ${cls || ''}" viewBox="-8 -8 116 116" width="36" height="36" fill="none" aria-hidden="true">
+    <defs><linearGradient id="glg" x1="6" y1="96" x2="92" y2="8" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#e9530a"/><stop offset=".32" stop-color="#f6890d"/><stop offset=".62" stop-color="#ffc21a"/><stop offset="1" stop-color="#f7c40f"/></linearGradient></defs>
+    <path d="M87.6 36.3 A40 40 0 1 1 64.98 12.9" stroke="url(#glg)" stroke-width="14" stroke-linecap="round"/>
+    <circle cx="50" cy="50" r="10" stroke="url(#glg)" stroke-width="10"/>
+    <g stroke="url(#glg)" stroke-width="13" stroke-linecap="round"><line x1="35" y1="50" x2="17" y2="50"/><line x1="65" y1="50" x2="83" y2="50"/><line x1="50" y1="65" x2="50" y2="83"/></g></svg>`;
+}
+function gLoad(text) { return `<div class="g-load">${gSvg()}${text ? `<span>${esc(text)}</span>` : ''}</div>`; }
 
 function header() {
   const u = state.user;
@@ -2961,7 +2974,7 @@ async function tabPlaner() {
     studs.map((s) => `<option value="${s.id}" ${String(planState.student) === String(s.id) ? 'selected' : ''}>${esc(s.name)}${s.availability ? '' : ' — ohne Verfügbarkeit'}</option>`).join('');
   box.innerHTML = `<div class="card" id="cap-card"><h2>📊 Deine Woche – frei &amp; ausgelastet</h2>
       <p class="hint">Dein Überblick: wie voll dein Kalender ist und wo noch Platz für Stunden ist. Tipp auf einen Tag, um dort direkt selbst einen Termin einzutragen.</p>
-      <div id="cap-body"><p class="hint">Lädt…</p></div></div>
+      <div id="cap-body">${gLoad('Lädt…')}</div></div>
     <div class="card">
     <h2>🧠 KI-Planer <span class="sub" style="font-weight:400;color:var(--muted);font-size:.8rem">— nur wenn du willst</span></h2>
     <p class="hint">Der Planer meldet sich nie von selbst. Wenn du magst, schaut er sich die <strong>Verfügbarkeit</strong> deiner Fahrschüler an und schlägt passende Termine vor – lückenlos in deine freien Slots, höchstens einer pro Tag &amp; Schüler. Du wählst aus und schickst sie als <strong>Vorschlag</strong> (die Schüler nehmen an oder lehnen ab). <strong>Du</strong> bleibst der Chef – eintragen kannst du jederzeit auch selbst im Kalender.</p>
@@ -3099,7 +3112,7 @@ let openConvo = null; // { id, name }
 async function tabNachrichten() {
   const box = $('#itab');
   if (openConvo) return convoView(openConvo.id, openConvo.name);
-  box.innerHTML = '<div class="card"><h2>✉️ Nachrichten</h2><p class="hint">Lädt…</p></div>';
+  box.innerHTML = `<div class="card"><h2>✉️ Nachrichten</h2>${gLoad('Lädt…')}</div>`;
   let data = {};
   try { data = await api('/api/instructor/messages'); } catch (e) { box.innerHTML = `<div class="card"><p class="err">${esc(e.message)}</p></div>`; return; }
   const cs = data.conversations || [];
@@ -3134,7 +3147,7 @@ async function tabNachrichten() {
 }
 async function convoView(sid, name) {
   const box = $('#itab');
-  box.innerHTML = '<div class="card"><p class="hint">Lädt…</p></div>';
+  box.innerHTML = `<div class="card">${gLoad('Lädt…')}</div>`;
   let data = {};
   try { data = await api('/api/instructor/messages/' + sid); } catch (e) { box.innerHTML = `<div class="card"><p class="err">${esc(e.message)}</p></div>`; return; }
   const nm = data.student?.name || name || 'Fahrschüler';
@@ -3164,7 +3177,7 @@ let revFilter = 'alle';
 const revStars = (n) => '★★★★★'.slice(0, n) + '☆☆☆☆☆'.slice(0, 5 - n);
 async function tabBewertungen() {
   const box = $('#itab');
-  box.innerHTML = '<div class="card"><h2>⭐ Bewertungen</h2><p class="hint">Lädt…</p></div>';
+  box.innerHTML = `<div class="card"><h2>⭐ Bewertungen</h2>${gLoad('Lädt…')}</div>`;
   let reviews = [];
   try { reviews = (await api('/api/instructor/reviews')).reviews || []; } catch (e) { box.innerHTML = `<div class="card"><p class="err">${esc(e.message)}</p></div>`; return; }
   reviews.forEach((r) => { if (typeof r.ratings === 'string') { try { r.ratings = JSON.parse(r.ratings); } catch { r.ratings = null; } } });
