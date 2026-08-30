@@ -4062,6 +4062,7 @@ function openInvoiceModal(sid, name) {
           <input type="date" class="inv-d" value="${cur}" aria-label="Rechnungs-Datum">
           <input type="time" class="inv-t" value="${padT(l.invoice_time)}" aria-label="Rechnungs-Uhrzeit">
           <button class="sm inv-save">Übernehmen</button>
+          <button class="ghost sm inv-clear">✕ leeren</button>
         </div>
       </div>`;
     }).join('');
@@ -4086,6 +4087,8 @@ function openInvoiceModal(sid, name) {
       if (cb) cb.onclick = () => { const cx = row.querySelector('.inv-custom'); if (cx) cx.hidden = !cx.hidden; };
       const sv = row.querySelector('.inv-save');
       if (sv) sv.onclick = () => patch({ invoice_date: row.querySelector('.inv-d').value, invoice_time: row.querySelector('.inv-t').value }, 'Rechnungsdatum gesetzt ✓');
+      const cl = row.querySelector('.inv-clear');
+      if (cl) cl.onclick = () => patch({ invoice_date: '', invoice_time: '' }, 'Rechnung geleert – wie gefahren ✓');
     });
   };
   render();
