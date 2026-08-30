@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "de.ginoco.twa",
+      "sha256_cert_fingerprints": [
+        "77:10:0D:10:89:F3:09:2B:FB:49:DB:F9:90:38:34:AE:E7:7A:C0:22:44:72:5F:FD:E4:66:23:C2:13:13:67:90"
+      ]
+    }
+  }
+]

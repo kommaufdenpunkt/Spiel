@@ -1,0 +1,7 @@
+# Laufzeit-Datenbank (wird beim Start automatisch angelegt)
+fahrschule.db
+fahrschule.db-*
+*.db
+*.db-shm
+*.db-wal
+node_modules/

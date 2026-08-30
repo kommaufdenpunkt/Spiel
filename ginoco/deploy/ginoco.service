@@ -1,0 +1,28 @@
+# systemd-Dienst für ginoco – startet die App automatisch und neu bei Absturz/Neustart.
+# Nach /etc/systemd/system/ginoco.service kopieren.
+
+[Unit]
+Description=ginoco Fahrschul-Portal
+After=network.target
+
+[Service]
+Type=simple
+User=ginoco
+WorkingDirectory=/home/ginoco/app/ginoco
+# Node 22+ nötig (node:sqlite). Pfad ggf. anpassen (which node).
+ExecStart=/usr/bin/node server.js
+Restart=always
+RestartSec=3
+
+# Nur der Caddy-Proxy erreicht Node, nicht das offene Internet:
+Environment=HOST=127.0.0.1
+Environment=PORT=3000
+# Die SQLite-Datenbank liegt im WorkingDirectory (fahrschule.db o.ä.).
+
+# Etwas Härtung:
+NoNewPrivileges=true
+ProtectSystem=full
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

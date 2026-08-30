@@ -1,0 +1,15 @@
+# Einmaliger Backup-Lauf (wird vom Timer ginoco-backup.timer gestartet).
+# Nach /etc/systemd/system/ginoco-backup.service kopieren.
+# WICHTIG: WorkingDirectory an deine echte Installation anpassen
+# (dort, wo git pull läuft – z. B. /home/ginoco/spiel/ginoco).
+
+[Unit]
+Description=Ginoco – Datenbank-Backup
+
+[Service]
+Type=oneshot
+User=ginoco
+WorkingDirectory=/home/ginoco/spiel/ginoco
+ExecStart=/usr/bin/node deploy/backup.mjs
+# So viele Backups behalten (Standard 14 Tage):
+Environment=BACKUP_KEEP=14

@@ -1,0 +1,18 @@
+# ginoco – Reverse-Proxy mit automatischem HTTPS (Let's Encrypt)
+# Caddy holt und erneuert das SSL-Zertifikat vollautomatisch.
+# Diese Datei nach /etc/caddy/Caddyfile kopieren.
+
+ginoco.de, www.ginoco.de {
+	# Node-Server läuft lokal auf Port 3000 (nur über den Proxy erreichbar)
+	reverse_proxy 127.0.0.1:3000
+
+	# Zugriffs-Log
+	log {
+		output file /var/log/caddy/ginoco.log
+		format console
+	}
+
+	# Sicherheits-Header setzt ginoco selbst (nosniff, HSTS, X-Frame-Options …).
+	# Caddy leitet automatisch x-forwarded-proto=https weiter,
+	# damit ginoco die Cookies als "Secure" markiert.
+}

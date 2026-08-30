@@ -1,0 +1,21 @@
+{
+  "id": "/",
+  "name": "Ginoco – Fahrstunden buchen",
+  "short_name": "Ginoco",
+  "description": "Fahrstunden bei deiner Fahrschule einfach online buchen, verwalten und tauschen – mit Live-Abholung, Ausbildungsnachweis und Erinnerungen.",
+  "lang": "de",
+  "dir": "ltr",
+  "categories": ["education", "productivity", "lifestyle"],
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["standalone"],
+  "orientation": "portrait",
+  "background_color": "#0a0a0c",
+  "theme_color": "#0a0a0c",
+  "icons": [
+    { "src": "/icon-192.png?v=3631", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png?v=3631", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png?v=3631", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
