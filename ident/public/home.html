@@ -188,6 +188,25 @@
      laufen beide Schleifen im Gleichschritt, egal wie lang sie wirklich sind.
      Die zweite startet leicht versetzt, sonst wirkt es wie ein Kreis statt
      wie eine Acht. */
+  /* ── Ladebildschirm ─────────────────────────────────────────────────
+     Derselbe Grund wie die Seite, damit beim Weggehen nichts umspringt. */
+  .ladeschirm{position:fixed;inset:0;z-index:999;display:grid;place-items:center;
+    align-content:center;gap:1.4rem;background:var(--bg);
+    transition:opacity .55s ease,visibility .55s}
+  .ladeschirm.weg{opacity:0;visibility:hidden;pointer-events:none}
+  .lade-mark{width:min(74vw,340px);height:auto;
+    filter:drop-shadow(0 18px 46px rgba(177,75,255,.32))}
+  .lade-zug{stroke-dasharray:1;stroke-dashoffset:1;
+    animation:achtFrei 2.05s cubic-bezier(.5,.02,.28,1) .15s forwards}
+  .lade-wort{font-family:var(--serif);font-size:.78rem;letter-spacing:.42em;
+    text-transform:uppercase;color:var(--dim2);opacity:0;
+    animation:ladeWort .8s ease 1.5s forwards}
+  @keyframes ladeWort{to{opacity:1}}
+  @media(prefers-reduced-motion:reduce){
+    .lade-zug{animation:none;stroke-dashoffset:0}
+    .lade-wort{animation:none;opacity:1}
+  }
+
   /* ── Das echte Logo legt sich frei ───────────────────────────────────
      Die Maske ist ein dicker Strich entlang der Acht. Er waechst von 0 auf
      seine volle Laenge - und schiebt dabei das Logo ins Bild. Deshalb
@@ -196,8 +215,10 @@
   .brandart .mark-bau{position:relative;width:min(100%,420px);
     filter:drop-shadow(0 24px 54px rgba(177,75,255,.28));
     animation:markenLauf 18s linear infinite}
-  .maske-zug{stroke-dasharray:1;stroke-dashoffset:1;
-    animation:achtFrei 1.05s cubic-bezier(.55,.02,.3,1) .1s forwards}
+  /* Im Titelbild steht das Logo fertig da. Den Aufbau hat der
+     Ladebildschirm schon gezeigt - ihn direkt danach zu wiederholen,
+     wirkt wie ein Fehler und nicht wie Absicht. */
+  .maske-zug{stroke-dasharray:1;stroke-dashoffset:0}
   @keyframes achtFrei{to{stroke-dashoffset:0}}
   /* Ein Lichtstreifen laeuft hinterher - er macht aus dem Freilegen ein
      Aufblitzen des Chroms, statt es nur erscheinen zu lassen. */
@@ -483,6 +504,28 @@
 </style>
 </head>
 <body>
+<!-- ── Ladebildschirm ─────────────────────────────────────────────────────
+     Das echte Logo legt sich entlang der Acht frei, dann geht der Schirm auf.
+
+     Er steht fest im HTML und nicht im JavaScript: So ist er in der ersten
+     Bildzeile da, und es blitzt nie eine ungestylte Seite auf. Weg geht er,
+     sobald die Seite bereit ist - und spaetestens nach 4 Sekunden auf jeden
+     Fall. Ein Ladebildschirm, der haengenbleibt, ist schlimmer als keiner. -->
+<div class="ladeschirm" id="ladeschirm" role="status" aria-label="4EVER1.TV wird geladen">
+  <svg class="lade-mark" viewBox="0 0 324 143" aria-hidden="true">
+    <defs>
+      <mask id="ladeMaske" maskUnits="userSpaceOnUse" x="-40" y="-40" width="404" height="223">
+        <path class="lade-zug" pathLength="1" fill="none" stroke="#fff" stroke-width="96"
+              stroke-linecap="round" stroke-linejoin="round"
+              d="M162 71 C120 6, 16 6, 16 71 C16 136, 120 136, 162 71
+                 C204 6, 308 6, 308 71 C308 136, 204 136, 162 71 Z"/>
+      </mask>
+    </defs>
+    <image href="/logo.png" x="0" y="0" width="324" height="143" mask="url(#ladeMaske)"/>
+  </svg>
+  <div class="lade-wort">Streamer-Agentur</div>
+</div>
+
 <div id="prog"></div>
 <div class="topline"></div>
 

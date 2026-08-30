@@ -357,4 +357,39 @@
   }
   hymne();
 
+
+  // ── Ladebildschirm wieder wegnehmen ────────────────────────────────────
+  //
+  // Drei Bedingungen, und die letzte ist die wichtigste:
+  //  1. Die Freilegung darf zu Ende laufen (2,2 s) - sonst reisst man dem
+  //     Aufbau die Pointe weg.
+  //  2. Die Seite muss geladen sein.
+  //  3. NOTBREMSE nach 4 Sekunden. Ein Ladebildschirm, der haengenbleibt -
+  //     weil ein Bild fehlt, das Netz stockt oder ein Skript stolpert -,
+  //     ist schlimmer als gar keiner: Dann sieht der Besucher nie etwas.
+  //     Diese Zeile ist der Grund, warum das hier ueberhaupt vertretbar ist.
+  (function ladeschirmWeg() {
+    var el = document.getElementById('ladeschirm');
+    if (!el) return;
+    var weg = false;
+    function schliessen() {
+      if (weg) return;
+      weg = true;
+      el.classList.add('weg');
+      // Nach dem Ausblenden wirklich entfernen, damit er niemandem im Weg
+      // liegt - auch nicht der Tastaturbedienung.
+      setTimeout(function () { if (el.parentNode) el.remove(); }, 700);
+    }
+    var ruhig = false;
+    try { ruhig = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
+    var mindestens = ruhig ? 0 : 2200;
+    var start = Date.now();
+    function wennBereit() {
+      setTimeout(schliessen, Math.max(0, mindestens - (Date.now() - start)));
+    }
+    if (document.readyState === 'complete') wennBereit();
+    else window.addEventListener('load', wennBereit);
+    setTimeout(schliessen, 4000); // Notbremse
+  })();
+
 })();
