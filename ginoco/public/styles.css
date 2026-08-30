@@ -1228,7 +1228,15 @@ body:has(.fp-overlay) .pwa-install{display:none}
 .inv-fields{display:flex;flex-wrap:wrap;gap:.45rem;align-items:center}
 .inv-fields .inv-d{max-width:158px}.inv-fields .inv-t{max-width:96px}
 .inv-fields input{font-variant-numeric:tabular-nums}
-/* Schnell-Chips fürs Rechnungsdatum */
+/* Rechnungsdatum: zwei Zeilen (Gefahren / Rechnung) + Schnell-Chips */
+.inv-pair{display:flex;flex-wrap:wrap;gap:.45rem;align-items:center;margin-bottom:.5rem}
+.inv-pair:last-of-type{margin-bottom:0}
+.inv-tag{flex:0 0 auto;font-size:.74rem;font-weight:800;letter-spacing:.02em;border-radius:8px;padding:.28rem .5rem;min-width:6.6em;text-align:center}
+.inv-tag.drove{background:rgba(229,96,95,.14);color:#f0a0a0}
+.inv-tag.bill{background:var(--good-bg);color:var(--good)}
+.inv-tag.ghost{background:var(--card);color:var(--muted);font-weight:700}
+.inv-dur{font-size:.82rem;color:var(--muted);font-variant-numeric:tabular-nums}
+.inv-gd{max-width:150px}.inv-gt{max-width:96px}
 .inv-cur{background:var(--good-bg);color:var(--good)}
 .inv-cur-none{font-size:.82rem;color:var(--muted)}
 .inv-chips{display:flex;flex-wrap:wrap;gap:.4rem}

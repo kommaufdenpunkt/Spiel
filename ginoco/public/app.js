@@ -4033,24 +4033,34 @@ function openInvoiceModal(sid, name) {
       const over = m > 495;
       return `<div class="inv-day${over ? ' over' : ''}"><span>${fmtDT(d)}</span><span>${m} Min (${(m / 60).toFixed(1).replace('.', ',')} h)${over ? ' ⚠️ über 495' : ''}</span></div>`;
     }).join('');
+    const padT = (t) => t ? (String(t).length === 4 ? '0' + t : String(t)) : '';
     const rows = lessons.map((l) => {
       const art = (l.lesson_type && l.lesson_type !== 'normal') ? ' · ' + lessonTypeLabel(l.lesson_type) : '';
       const cur = l.invoice_date || '';
       const p1 = addDays(l.date, 1), p2 = addDays(l.date, 2), p3 = addDays(l.date, 3);
+      const custom = cur && cur !== p1 && cur !== p2 && cur !== p3;
       const chip = (label, val, on) => `<button class="inv-chip${on ? ' on' : ''}" data-set="${val}">${label}</button>`;
       return `<div class="inv-row" data-id="${l.id}">
-        <div class="inv-drove">🚗 <strong>${fmtDT(l.date, l.start_time)}</strong> · ${l.duration_min} Min${art}
-          ${cur ? `<span class="pill inv-cur">🧾 Rechnung: ${fmtDT(cur)}${l.invoice_time ? ' · ' + l.invoice_time : ''}</span>` : '<span class="inv-cur-none">🧾 wie gefahren</span>'}</div>
-        <div class="inv-chips">
-          ${chip('wie gefahren', '', !cur)}
-          ${chip('+1 Tag', p1, cur === p1)}
-          ${chip('+2 Tage', p2, cur === p2)}
-          ${chip('+3 Tage', p3, cur === p3)}
-          <button class="inv-chip inv-custom-btn" data-custom="1">📅 anderer Tag …</button>
+        <div class="inv-pair">
+          <span class="inv-tag drove">🚗 Gefahren</span>
+          <input type="date" class="inv-gd" value="${l.date}" aria-label="Fahrdatum">
+          <input type="time" class="inv-gt" value="${padT(l.start_time)}" aria-label="Fahr-Uhrzeit">
+          <span class="inv-dur">${l.duration_min} Min${art}</span>
         </div>
-        <div class="inv-custom" hidden>
+        <div class="inv-pair">
+          <span class="inv-tag bill">🧾 Rechnung</span>
+          <div class="inv-chips">
+            ${chip('wie gefahren', '', !cur)}
+            ${chip('+1 Tag', p1, cur === p1)}
+            ${chip('+2 Tage', p2, cur === p2)}
+            ${chip('+3 Tage', p3, cur === p3)}
+            <button class="inv-chip inv-custom-btn${custom ? ' on' : ''}" data-custom="1">📅 anderer Tag …</button>
+          </div>
+        </div>
+        <div class="inv-custom" ${custom ? '' : 'hidden'}>
+          <span class="inv-tag ghost">🧾 genau am</span>
           <input type="date" class="inv-d" value="${cur}" aria-label="Rechnungs-Datum">
-          <input class="inv-t" placeholder="Uhrzeit (optional)" value="${l.invoice_time || ''}" aria-label="Rechnungs-Uhrzeit">
+          <input type="time" class="inv-t" value="${padT(l.invoice_time)}" aria-label="Rechnungs-Uhrzeit">
           <button class="sm inv-save">Übernehmen</button>
         </div>
       </div>`;
@@ -4060,18 +4070,22 @@ function openInvoiceModal(sid, name) {
       <div class="inv-list">${rows || '<p class="hint">Noch keine gefahrenen Stunden.</p>'}</div>`;
     box.querySelectorAll('.inv-row').forEach((row) => {
       const id = row.dataset.id;
-      const save = async (invoice_date, invoice_time) => {
-        try { await api('/api/bookings/' + id, { method: 'PATCH', body: { invoice_date, invoice_time: invoice_time || '' } });
-          toast(invoice_date ? 'Rechnungsdatum gesetzt ✓' : 'Wie gefahren ✓', 'ok'); render(); }
+      const patch = async (body, okMsg) => {
+        try { await api('/api/bookings/' + id, { method: 'PATCH', body }); toast(okMsg, 'ok'); render(); }
         catch (e) { toast(e.message, 'err'); }
       };
-      // Schnell-Chips: ein Tipp -> sofort gespeichert
-      row.querySelectorAll('.inv-chip[data-set]').forEach((c) => c.onclick = () => save(c.dataset.set, ''));
-      // „anderer Tag …" klappt das Datumsfeld auf
+      // 🚗 Gefahren: Fahrdatum/-uhrzeit ändern (auto-speichern beim Ändern)
+      const gd = row.querySelector('.inv-gd'), gt = row.querySelector('.inv-gt');
+      const saveDrove = () => { if (gd.value && gt.value) patch({ date: gd.value, start_time: gt.value }, 'Fahrdatum geändert ✓'); };
+      if (gd) gd.onchange = saveDrove;
+      if (gt) gt.onchange = saveDrove;
+      // 🧾 Rechnung: Schnell-Chips, ein Tipp -> sofort gespeichert
+      row.querySelectorAll('.inv-chip[data-set]').forEach((c) => c.onclick = () => patch({ invoice_date: c.dataset.set, invoice_time: '' }, c.dataset.set ? 'Rechnungsdatum gesetzt ✓' : 'Wie gefahren ✓'));
+      // „anderer Tag …" klappt das genaue Datum/Uhrzeit auf
       const cb = row.querySelector('.inv-custom-btn');
       if (cb) cb.onclick = () => { const cx = row.querySelector('.inv-custom'); if (cx) cx.hidden = !cx.hidden; };
       const sv = row.querySelector('.inv-save');
-      if (sv) sv.onclick = () => save(row.querySelector('.inv-d').value, row.querySelector('.inv-t').value.trim());
+      if (sv) sv.onclick = () => patch({ invoice_date: row.querySelector('.inv-d').value, invoice_time: row.querySelector('.inv-t').value }, 'Rechnungsdatum gesetzt ✓');
     });
   };
   render();
