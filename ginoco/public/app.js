@@ -509,8 +509,11 @@ function openTour() {
 window.__openTour = openTour;
 
 // ---------- Was ist neu? (Changelog) ----------
-const CHANGELOG_VER = '3.81';
+const CHANGELOG_VER = '3.82';
 const CHANGELOG = [
+  { v: '3.82', d: '30.08.2026', title: '✅ Fahrstunde abschließen & abhaken', items: [
+    '✅ <strong>Ein Tipp nach der Fahrstunde:</strong> Bei jeder Stunde jetzt der Knopf „Abschließen &amp; abhaken" – die Ausbildungskarte (Klasse B) ist gleich aufgeklappt, du hakst jeden Punkt ab (🔴/🟡/🟢), gibst Rückmeldung und forderst die Unterschrift an.',
+    '📋 So ist schwarz auf weiß dokumentiert, dass du dich an die Ausbildungsdiagrammkarte hältst – im gedruckten Nachweis mit Datum je Übung.'] },
   { v: '3.80', d: '30.08.2026', title: '🎡 Das „G" beim Laden', items: [
     '🎡 <strong>Ladeanzeige mit Herz:</strong> Wenn etwas lädt, dreht sich jetzt das ginoco-„G" (das Lenkrad) – und wenn du buchst, wird daraus der grüne Haken mit Konfetti. 🎉'] },
   { v: '3.79', d: '30.08.2026', title: '✨ Smarter Feinschliff', items: [
@@ -3690,7 +3693,9 @@ function instrBookingItem(b) {
       <div class="meta">${st} ${typeBadge(b.lesson_type)} ${gear} ${b.plate ? '· 🚘 ' + esc(b.plate) : ''} ${b.meet_label ? '· 📍 ' + esc(b.meet_label) : ''} ${b.note ? '· ' + esc(b.note) : ''}</div>
     </div>
     <div class="inline">
-      <button class="sec sm" data-mark="${b.id}">Bearbeiten</button>
+      ${b.student_id && b.status !== 'done'
+        ? `<button class="sm" data-mark="${b.id}">✅ Abschließen &amp; abhaken</button>`
+        : `<button class="sec sm" data-mark="${b.id}">Bearbeiten</button>`}
       <button class="ghost sm" data-cancel="${b.id}">Stornieren</button>
     </div>
   </div>`;
@@ -3756,7 +3761,7 @@ function openMarkModal(id) {
       <textarea id="m-feedback" rows="3" placeholder="z.B. Heute Kreisverkehr & Vorfahrt geübt – nächstes Mal Einparken." style="resize:vertical">${esc(b.feedback || '')}</textarea></div>
     ${b.student_id ? `<label class="ck-line" style="justify-content:flex-start" id="m-sign-line"><input type="checkbox" id="m-sign" ${b.signed_at ? '' : 'checked'}> ✍️ Beim Abschließen Unterschrift vom Fahrschüler anfordern <span class="muted">(landet per Push im Postfach)</span></label>${b.signed_at ? '<div class="hint" style="margin:.1rem 0 .4rem">✓ Diese Stunde ist bereits unterschrieben.</div>' : ''}` : ''}
     ${b.student_id ? '<div id="m-recos" class="mk-recos"></div>' : ''}
-    ${b.student_id ? `<details class="mk-curr" id="m-curr-wrap"><summary>📋 Was habt ihr heute gemacht? <span class="muted">(Ausbildungskarte Klasse B)</span></summary>
+    ${b.student_id ? `<details class="mk-curr" id="m-curr-wrap" ${b.status !== 'done' ? 'open' : ''}><summary>📋 Was habt ihr heute gemacht? <span class="muted">(Ausbildungskarte Klasse B – jeden Punkt abhaken)</span></summary>
       <input id="m-curr-search" placeholder="🔎 suchen (z. B. Kreisverkehr)" autocomplete="off" style="margin:.5rem 0">
       <div id="m-curr-list" class="mk-curr-list"><span class="hint">Lädt…</span></div>
     </details>` : ''}
