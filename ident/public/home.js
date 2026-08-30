@@ -264,31 +264,44 @@
 
   // ── Hymne im Hintergrund ───────────────────────────────────────────────
   //
-  // Drei Regeln, und alle drei sind Absicht:
-  //  1. NIE von allein. Ungefragter Ton auf einer Webseite ist der
-  //     schnellste Weg, jemanden wieder wegzuklicken - und jeder moderne
-  //     Browser blockiert ihn ohnehin.
-  //  2. Der Knopf erscheint nur, wenn es die Datei wirklich gibt. Ein
-  //     Knopf, der nichts tut, ist schlimmer als keiner.
-  //  3. Leise anfangen und aufblenden. Ein Anthem, das mit voller
-  //     Lautstaerke losbricht, erschreckt.
+  // Sie beginnt beim ERSTEN SCROLLEN - nicht beim Laden. Wer die Seite nur
+  // kurz oeffnet und wieder geht, hoert nichts; wer anfaengt zu lesen,
+  // bekommt sie dazu.
+  //
+  // EINSTIEG BEI 1:04. Der Song hat 3:40 und baut sich lange auf. Ich habe
+  // die Lautstaerke Sekunde fuer Sekunde vermessen: Bei 1:04 rastet der
+  // Refrain ein und bleibt oben (79-83 %), davor sind es 55-66 %. Genau
+  // dort steigen wir ein - man landet mitten in der Hymne, nicht im Vorspann.
+  //
+  // NUR AUF DER STARTSEITE. Auf Impressum, Datenschutz und der
+  // Bewerbungsseite bleibt es still.
+  //
+  // Und eine Ehrlichkeit zur Technik: Browser lassen Ton ohne echte
+  // Berührung meist nicht zu, und Scrollen zaehlt oft NICHT als solche.
+  // Deshalb wird es beim Scrollen versucht - und wenn der Browser ablehnt,
+  // liegt eine zweite Zuendschnur bereit, die beim ersten Tippen zuendet.
+  // Der Knopf bleibt in jedem Fall als Notausgang.
+  var HYMNE_START = 64; // Sekunden - Refrain-Einsatz, ausgemessen
+
   function hymne() {
     var knopf = $('tonKnopf');
-    if (!knopf) return;
-    var QUELLE = '/musik/hymne.mp3';
+    var aufStartseite = /\/(index\.html)?$/.test(location.pathname);
+    if (!aufStartseite) { if (knopf) knopf.style.display = 'none'; return; }
 
-    // Gibt es die Datei? Sonst den Knopf gar nicht erst zeigen.
-    knopf.style.display = 'none';
+    var QUELLE = '/musik/hymne.mp3';
+    if (knopf) knopf.style.display = 'none';
+
     fetch(QUELLE, { method: 'HEAD' }).then(function (r) {
       if (!r.ok) return;
-      knopf.style.display = '';
+      if (knopf) knopf.style.display = '';
+
       var audio = new Audio(QUELLE);
       audio.loop = true;
-      audio.preload = 'none';
+      audio.preload = 'auto';
       audio.volume = 0;
+      var laeuft = false, blende = null, schonVersucht = false;
 
-      var laeuft = false, blende = null;
-      function aufblenden(ziel, fertig) {
+      function blenden(ziel, fertig) {
         clearInterval(blende);
         blende = setInterval(function () {
           var d = ziel - audio.volume;
@@ -297,41 +310,64 @@
             if (fertig) fertig();
             return;
           }
-          audio.volume = Math.max(0, Math.min(1, audio.volume + d * 0.12));
+          audio.volume = Math.max(0, Math.min(1, audio.volume + d * 0.08));
         }, 40);
       }
 
-      function an() {
-        audio.play().then(function () {
-          laeuft = true;
-          knopf.setAttribute('aria-pressed', 'true');
-          knopf.setAttribute('aria-label', 'Musik ausschalten');
-          aufblenden(0.32);
-          try { localStorage.setItem('hymne', 'an'); } catch (e) {}
-        }).catch(function () { /* Browser hat abgelehnt - dann eben nicht */ });
+      function anzeigen(an) {
+        if (!knopf) return;
+        knopf.setAttribute('aria-pressed', an ? 'true' : 'false');
+        knopf.setAttribute('aria-label', an ? 'Musik ausschalten' : 'Musik einschalten');
       }
+
+      function an() {
+        // Mitten im Lied einsteigen - aber nur beim allerersten Start.
+        // Wer zwischendurch pausiert, soll dort weitermachen, wo er war.
+        if (!schonVersucht) {
+          schonVersucht = true;
+          try { audio.currentTime = HYMNE_START; } catch (e) { /* kommt gleich nochmal */ }
+        }
+        return audio.play().then(function () {
+          // Manche Browser setzen currentTime erst, wenn Daten da sind.
+          if (audio.currentTime < 1 && HYMNE_START > 0) {
+            try { audio.currentTime = HYMNE_START; } catch (e) {}
+          }
+          laeuft = true; anzeigen(true); blenden(0.3);
+          try { localStorage.setItem('hymne', 'an'); } catch (e) {}
+        });
+      }
+
       function aus() {
-        aufblenden(0, function () { audio.pause(); });
-        laeuft = false;
-        knopf.setAttribute('aria-pressed', 'false');
-        knopf.setAttribute('aria-label', 'Musik einschalten');
+        blenden(0, function () { audio.pause(); });
+        laeuft = false; anzeigen(false);
         try { localStorage.setItem('hymne', 'aus'); } catch (e) {}
       }
 
-      knopf.addEventListener('click', function () { laeuft ? aus() : an(); });
+      if (knopf) knopf.addEventListener('click', function () { laeuft ? aus() : an(); });
 
-      // Wer sie beim letzten Besuch anhatte, bekommt sie beim ersten Tipp
-      // irgendwo auf der Seite wieder - ohne Tipp bleibt es still, das
-      // verlangt der Browser so.
+      // Wer ausdruecklich ausgeschaltet hat, wird nicht wieder beschallt.
       var wunsch = null;
       try { wunsch = localStorage.getItem('hymne'); } catch (e) {}
-      if (wunsch === 'an') {
-        var einmal = function () {
-          document.removeEventListener('pointerdown', einmal);
-          an();
-        };
-        document.addEventListener('pointerdown', einmal, { once: true });
+      if (wunsch === 'aus') return;
+
+      var gezuendet = false;
+      function zuenden() {
+        if (gezuendet) return;
+        gezuendet = true;
+        window.removeEventListener('scroll', beimScrollen);
+        an().catch(function () {
+          // Browser hat abgelehnt (kein echter Tastendruck). Zweite
+          // Zuendschnur: beim ersten Tippen oder Klicken irgendwo.
+          gezuendet = false;
+          document.addEventListener('pointerdown', function nochmal() {
+            document.removeEventListener('pointerdown', nochmal);
+            gezuendet = true;
+            an().catch(function () { /* dann bleibt der Knopf */ });
+          }, { once: true });
+        });
       }
+      function beimScrollen() { if (window.scrollY > 60) zuenden(); }
+      window.addEventListener('scroll', beimScrollen, { passive: true });
     }).catch(function () { /* keine Datei, kein Knopf */ });
   }
   hymne();

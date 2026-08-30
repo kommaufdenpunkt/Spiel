@@ -1700,8 +1700,22 @@ const server = http.createServer(async (req, res) => {
   if (urlPath === '/figur' || urlPath === '/figuren') urlPath = '/figur.html';
   if (urlPath === '/datenschutz') urlPath = '/datenschutz.html';
   if (urlPath === '/impressum') urlPath = '/impressum.html';
-  const filePath = path.normalize(path.join(PUBLIC_DIR, urlPath));
-  if (!filePath.startsWith(PUBLIC_DIR)) { res.writeHead(403); res.end('Forbidden'); return; }
+  // ── Musik kommt aus dem Datenordner, nicht aus dem Abbild ──────────────
+  //
+  // Die Hymne ist Inhalt, kein Code. Laege sie im Projekt, muesste man fuer
+  // jede neue Fassung das ganze Abbild neu bauen und ausrollen - und 5 MB
+  // Audio wuerden bei jedem Stand mitwandern. /opt/4ever1-ident/data ist als
+  // einziges Verzeichnis in den Container eingehaengt; von dort kann die
+  // Datei jederzeit ausgetauscht werden, ohne dass irgendetwas neu startet.
+  let basis = PUBLIC_DIR;
+  if (urlPath.startsWith('/musik/')) {
+    const ausData = path.normalize(path.join(DATA_DIR, urlPath));
+    if (ausData.startsWith(path.join(DATA_DIR, 'musik')) && fs.existsSync(ausData)) {
+      basis = DATA_DIR;
+    }
+  }
+  const filePath = path.normalize(path.join(basis, urlPath));
+  if (!filePath.startsWith(basis)) { res.writeHead(403); res.end('Forbidden'); return; }
   // Groesse und Aenderungszeit brauchen wir fuer die Cache-Marke.
   let st = null;
   try { st = fs.statSync(filePath); } catch { st = null; }

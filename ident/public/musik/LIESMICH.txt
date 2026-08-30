@@ -1,0 +1,15 @@
+Dieser Ordner ist absichtlich leer.
+
+Die Hymne liegt NICHT hier, sondern im eingehaengten Datenordner:
+
+  /opt/4ever1-ident/data/musik/hymne.mp3
+
+Grund: Musik ist Inhalt, kein Code. Laege sie im Projekt, muesste fuer jede
+neue Fassung das Docker-Abbild neu gebaut und ausgerollt werden - und 5 MB
+Audio wuerden bei jedem Stand im Git mitwandern.
+
+Der Server liefert /musik/* bevorzugt aus dem Datenordner aus (server.js,
+Abschnitt "Musik kommt aus dem Datenordner"). Austauschen geht damit ohne
+Ausrollen und ohne Neustart:
+
+  ~/hymne-hochladen.sh              (vom Mac aus, sucht die neueste Datei)
