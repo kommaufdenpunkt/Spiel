@@ -509,8 +509,11 @@ function openTour() {
 window.__openTour = openTour;
 
 // ---------- Was ist neu? (Changelog) ----------
-const CHANGELOG_VER = '3.83';
+const CHANGELOG_VER = '3.84';
 const CHANGELOG = [
+  { v: '3.84', d: '30.08.2026', title: '📋 Schüler sieht alles vor der Unterschrift', items: [
+    '📋 <strong>Überblick vor dem Unterschreiben:</strong> Öffnest du die Unterschrift aus dem Postfach, siehst du jetzt die Fahrstunde, <strong>was ihr geübt habt</strong> und dass dein Fahrlehrer schon unterschrieben hat – erst drüberschauen, dann unterschreiben.',
+    '🧾 <strong>Rechnungsdatum edler:</strong> zwei klare Zeilen (gefahren / Rechnung), Schnell-Chips (+1/+2/+3 Tage), genauer Tag + Uhrzeit, „leeren" – alles speichert sofort.'] },
   { v: '3.83', d: '30.08.2026', title: '✍️ Abschließen in Stufen – mit beiden Unterschriften', items: [
     '✨ <strong>Edler Ablauf:</strong> Das Abschließen läuft jetzt in gläsernen, animierten Schritten – 1. Stattgefunden? · 2. Was gemacht? · 3. Was übt ihr als Nächstes? · 4. Unterschriften.',
     '✍️ <strong>Beide unterschreiben:</strong> Du unterschreibst auf dem Tablet (einmal merken – wird wiederverwendet), der Fahrschüler auf seinem Handy. Beide Unterschriften stehen im gedruckten Nachweis.'] },
@@ -1598,9 +1601,12 @@ function attachSignPad(canvas) {
 function openSignModal(l) {
   if (!l) return;
   const art = (l.lesson_type && l.lesson_type !== 'normal') ? ' · ' + lessonTypeLabel(l.lesson_type) : '';
+  const adk = lessonAdkParse(l.curriculum);
   modal(`<h3>✍️ Fahrstunde bestätigen</h3>
-    <p class="hint">Bestätige, dass diese Fahrstunde stattgefunden hat. Deine Unterschrift kommt auf deinen Fahrstunden-Nachweis.</p>
+    <p class="hint">Schau kurz drüber und bestätige mit deiner Unterschrift – sie kommt auf deinen Fahrstunden-Nachweis.</p>
     <div class="sign-lesson">📅 <strong>${fmtDT(l.date, l.start_time)}</strong> · ${l.duration_min} Min${art}${l.late_minutes ? ` · ⏱️ ${l.late_minutes} Min zu spät` : ''}${l.feedback ? `<div class="sign-note">„${esc(l.feedback)}"</div>` : ''}</div>
+    ${adk.length ? `<div class="sign-adk"><div class="sign-adk-h">📋 Das habt ihr geübt</div>${adk.map((a) => `<div class="sign-adk-i">${currStatusMeta(a.s).dot} ${esc(a.label)}</div>`).join('')}</div>` : ''}
+    ${l.instr_signature ? `<div class="sign-fl">✓ Dein Fahrlehrer hat unterschrieben <img src="${l.instr_signature}" class="sign-fl-img" alt="Unterschrift Fahrlehrer"></div>` : ''}
     <label class="sign-lb">Deine Unterschrift <span class="muted">(mit dem Finger malen)</span></label>
     <div class="sign-pad-wrap">
       <canvas id="sign-pad" class="sign-pad"></canvas>

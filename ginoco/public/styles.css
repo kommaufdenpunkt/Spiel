@@ -1194,6 +1194,11 @@ body:has(.fp-overlay) .pwa-install{display:none}
 .isig-stored{display:flex;align-items:center;gap:.7rem;flex-wrap:wrap}
 .isig-prev{height:66px;max-width:230px;object-fit:contain;background:#fff;border-radius:10px;padding:4px 8px;border:1px solid var(--line)}
 @media (prefers-reduced-motion:reduce){.mk-step{animation:none;opacity:1;transform:none}}
+.sign-adk{background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:.6rem .75rem;margin:.5rem 0}
+.sign-adk-h{font-size:.72rem;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:.4rem}
+.sign-adk-i{font-size:.9rem;line-height:1.55}
+.sign-fl{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;font-size:.86rem;color:var(--good);margin:.5rem 0;font-weight:600}
+.sign-fl-img{height:40px;max-width:150px;object-fit:contain;background:#fff;border-radius:8px;padding:2px 6px;border:1px solid var(--line)}
 .sign-lb{display:block;font-size:.9rem;font-weight:600;margin:.2rem 0 .35rem}
 .sign-pad-wrap{position:relative;margin-bottom:.6rem}
 .sign-pad{width:100%;height:150px;background:#fff;border:2px dashed var(--line);border-radius:12px;touch-action:none;display:block;cursor:crosshair}
