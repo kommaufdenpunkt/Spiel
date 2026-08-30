@@ -490,7 +490,10 @@ th{color:var(--muted);font-weight:600;font-size:.78rem;text-transform:uppercase;
 .wn-h{font-size:.95rem;margin-bottom:.35rem}
 .wn-v{display:inline-block;background:var(--brand);color:#fff;font-size:.72rem;font-weight:800;border-radius:6px;padding:.1rem .4rem;margin-right:.2rem}
 .wn-list{margin:0;padding-left:1.1rem;line-height:1.7;font-size:.9rem}
-.edge-handle.hasnew::after{content:'';position:absolute;top:8px;right:6px;width:9px;height:9px;border-radius:50%;background:var(--bad);border:2px solid var(--card)}
+.edge-handle.hasnew::after{content:'';position:absolute;top:11px;left:50%;transform:translateX(-50%);width:6px;height:6px;border-radius:50%;
+  background:var(--brand);box-shadow:0 0 0 3px rgba(242,160,26,.16),0 0 9px -1px var(--brand);animation:edgePulse 2.6s ease-in-out infinite}
+@keyframes edgePulse{0%,100%{opacity:.5}50%{opacity:1}}
+@media (prefers-reduced-motion: reduce){.edge-handle.hasnew::after{animation:none;opacity:.8}}
 #pf-age{text-align:center;font-weight:700;color:var(--ink);background:var(--card)}
 .mini-avatar{display:inline-flex;width:30px;height:30px;border-radius:50%;overflow:hidden;
   vertical-align:middle;margin-right:.45rem;background:var(--card2);border:1px solid var(--line);
@@ -745,18 +748,22 @@ th{color:var(--muted);font-weight:600;font-size:.78rem;text-transform:uppercase;
 
 /* ---------- Edge-Menüs (Samsung-Edge-Stil: Griffe links & rechts) ---------- */
 /* S8-artiger Edge-Griff: schlanke, glasige Lasche mit Grip-Linie und Brand-Glow */
-.edge-handle{position:fixed;top:50%;transform:translateY(-50%);z-index:30;width:21px;height:92px;
-  display:flex;align-items:center;justify-content:center;font-size:1rem;color:#fff;cursor:pointer;padding:0;
-  border:1px solid rgba(255,255,255,.18);background:linear-gradient(150deg,var(--brand),var(--brand-dark));
-  box-shadow:0 6px 20px rgba(0,0,0,.45),0 0 24px -8px var(--brand),inset 0 1px 0 rgba(255,255,255,.3);
-  opacity:.9;transition:opacity .2s,width .18s ease,box-shadow .2s}
-.edge-handle:hover{opacity:1;width:27px;box-shadow:0 8px 26px rgba(0,0,0,.5),0 0 32px -4px var(--brand),inset 0 1px 0 rgba(255,255,255,.35)}
-.edge-handle.left{left:0;border-left:none;border-radius:0 22px 22px 0}
-.edge-handle.right{right:0;border-right:none;border-radius:22px 0 0 22px}
-/* feine Griff-Linie am äußeren Rand (S8-Look) */
-.edge-handle::before{content:'';position:absolute;top:17px;bottom:17px;width:2px;border-radius:2px;background:rgba(255,255,255,.45)}
-.edge-handle.left::before{right:4px}
-.edge-handle.right::before{left:4px}
+/* Edle, schlanke Griffe: Milchglas-Kapsel mit feiner Gold-Griffleiste (kein Emoji-Ballast) */
+.edge-handle{position:fixed;top:50%;transform:translateY(-50%);z-index:30;width:15px;height:76px;
+  cursor:pointer;padding:0;color:transparent;font-size:0;line-height:0;
+  border:1px solid rgba(242,160,26,.30);
+  background:linear-gradient(180deg,rgba(242,160,26,.20),rgba(242,160,26,.07));
+  backdrop-filter:blur(9px) saturate(1.15);-webkit-backdrop-filter:blur(9px) saturate(1.15);
+  box-shadow:0 4px 16px rgba(0,0,0,.32),inset 0 1px 0 rgba(255,255,255,.22);
+  opacity:.72;transition:opacity .22s,width .2s cubic-bezier(.22,.61,.36,1),background .22s,box-shadow .22s}
+.edge-handle:hover,.edge-handle:focus-visible{opacity:1;width:19px;outline:none;
+  background:linear-gradient(180deg,rgba(242,160,26,.32),rgba(242,160,26,.14));
+  box-shadow:0 8px 24px rgba(0,0,0,.4),0 0 26px -10px var(--brand),inset 0 1px 0 rgba(255,255,255,.34)}
+.edge-handle.left{left:0;border-left:none;border-radius:0 15px 15px 0}
+.edge-handle.right{right:0;border-right:none;border-radius:15px 0 0 15px}
+/* schlanke, mittige Gold-Griffleiste */
+.edge-handle::before{content:'';position:absolute;top:26px;bottom:26px;left:50%;width:2.5px;margin-left:-1.25px;border-radius:3px;
+  background:linear-gradient(180deg,rgba(255,255,255,.55),var(--brand));opacity:.8}
 .edge-overlay{position:fixed;inset:0;z-index:39;background:radial-gradient(120% 80% at 50% 50%,rgba(4,7,11,.35),rgba(4,7,11,.64));
   backdrop-filter:blur(5px) saturate(1.05);-webkit-backdrop-filter:blur(5px) saturate(1.05);
   opacity:0;pointer-events:none;transition:opacity .22s}
