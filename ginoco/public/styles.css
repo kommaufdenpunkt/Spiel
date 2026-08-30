@@ -17,6 +17,28 @@ body{background:
   color:var(--ink);
   font-family:var(--font,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif);
   -webkit-font-smoothing:antialiased;line-height:1.5;min-height:100%}
+/* „G"-Ladebildschirm: das Logo zeichnet sich, dann baut sich der Rest auf */
+#splash{position:fixed;inset:0;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1.1rem;
+  background:radial-gradient(120% 90% at 50% 40%,var(--bg-glow),transparent 60%),var(--bg);
+  transition:opacity .5s ease}
+#splash.gone{opacity:0;pointer-events:none}
+#splash .sp-logo{filter:drop-shadow(0 6px 22px rgba(242,160,26,.28))}
+.sp-arc{stroke-dasharray:100;stroke-dashoffset:100;animation:spDraw .95s cubic-bezier(.65,0,.35,1) forwards}
+.sp-hub{opacity:0;transform-box:fill-box;transform-origin:center;transform:scale(.2);animation:spPop .45s cubic-bezier(.2,.8,.3,1.4) .6s forwards}
+.sp-spokes{opacity:0;animation:spFade .4s ease .78s forwards}
+.sp-needle{opacity:0;transform-box:fill-box;transform-origin:60px 30px;transform:scale(.3) rotate(-25deg);animation:spNeedle .5s cubic-bezier(.2,.8,.3,1.4) .92s forwards}
+.sp-spark{opacity:0;animation:spFade .35s ease 1.18s forwards}
+.sp-word{opacity:0;transform:translateY(10px);font-size:2rem;font-weight:900;letter-spacing:-.02em;
+  background:linear-gradient(100deg,#ef6a12,#f5c518);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+  animation:spWord .55s ease 1.05s forwards}
+@keyframes spDraw{to{stroke-dashoffset:0}}
+@keyframes spPop{to{opacity:1;transform:scale(1)}}
+@keyframes spFade{to{opacity:1}}
+@keyframes spNeedle{to{opacity:1;transform:scale(1) rotate(0)}}
+@keyframes spWord{to{opacity:1;transform:translateY(0)}}
+@media (prefers-reduced-motion: reduce){
+  .sp-arc,.sp-hub,.sp-spokes,.sp-needle,.sp-spark,.sp-word{animation:none;opacity:1;stroke-dashoffset:0;transform:none}
+}
 .boot{padding:4rem;text-align:center;color:var(--muted);display:flex;flex-direction:column;align-items:center;gap:.7rem}
 .boot .tire{font-size:2.4rem}
 button{font-family:inherit;font-size:.95rem;cursor:pointer;border:none;border-radius:13px;

@@ -495,8 +495,10 @@ function openTour() {
 window.__openTour = openTour;
 
 // ---------- Was ist neu? (Changelog) ----------
-const CHANGELOG_VER = '3.77';
+const CHANGELOG_VER = '3.78';
 const CHANGELOG = [
+  { v: '3.78', d: '30.08.2026', title: '🎬 Neuer Startbildschirm', items: [
+    '🎬 Beim Öffnen zeichnet sich erst das ginoco-Logo (das „G"), dann baut sich die App auf – ein kleiner, edler Moment beim Start.'] },
   { v: '3.77', d: '30.08.2026', title: '🧾 Klarere Fahrstunden & Nachweis', items: [
     '🧾 <strong>„Auf der Rechnung zu sehen am …":</strong> Weicht eine Stunde vom Fahrdatum ab, steht jetzt klar, wann sie auf der Rechnung erscheint (statt „fsmanager").',
     '🕒 <strong>Verständlicher:</strong> „vom Fahrlehrer eingetragen am …" statt des verwirrenden „nachgetragen".',
