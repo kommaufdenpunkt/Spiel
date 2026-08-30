@@ -4085,8 +4085,13 @@ function openInvoiceModal(sid, name) {
       // „anderer Tag …" klappt das genaue Datum/Uhrzeit auf
       const cb = row.querySelector('.inv-custom-btn');
       if (cb) cb.onclick = () => { const cx = row.querySelector('.inv-custom'); if (cx) cx.hidden = !cx.hidden; };
+      // Genauer Tag + Uhrzeit auf der Rechnung – speichert sofort beim Ändern (kein Extra-Klick nötig)
+      const rd = row.querySelector('.inv-d'), rt = row.querySelector('.inv-t');
+      const saveBill = () => patch({ invoice_date: rd.value, invoice_time: rt.value }, rd.value ? 'Rechnung gesetzt ✓' : 'Wie gefahren ✓');
+      if (rd) rd.onchange = saveBill;
+      if (rt) rt.onchange = saveBill;
       const sv = row.querySelector('.inv-save');
-      if (sv) sv.onclick = () => patch({ invoice_date: row.querySelector('.inv-d').value, invoice_time: row.querySelector('.inv-t').value }, 'Rechnungsdatum gesetzt ✓');
+      if (sv) sv.onclick = saveBill;
       const cl = row.querySelector('.inv-clear');
       if (cl) cl.onclick = () => patch({ invoice_date: '', invoice_time: '' }, 'Rechnung geleert – wie gefahren ✓');
     });
