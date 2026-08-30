@@ -573,8 +573,21 @@ function openTour() {
 window.__openTour = openTour;
 
 // ---------- Was ist neu? (Changelog) ----------
-const CHANGELOG_VER = '3.86';
+const CHANGELOG_VER = '3.87';
 const CHANGELOG = [
+  { v: '3.87', d: '31.08.2026', title: '🚗 Das große Update – alles Neue auf einen Blick', items: [
+    '<strong>Ein rundum edleres, smarteres ginoco.</strong> Hier die lange Liste mit allem, was in den letzten Tagen dazugekommen ist:',
+    '✅ <strong>Fahrstunde abschließen &amp; abhaken:</strong> Nach jeder Stunde führt dich ein gläserner, animierter Ablauf in Schritten durch – 1. Stattgefunden? · 2. Was habt ihr gemacht? · 3. Was übt ihr als Nächstes? · 4. Unterschriften. Die Ausbildungskarte (Klasse B) ist gleich aufgeklappt, jeder Punkt wird abgehakt (🔴 muss noch · 🟡 geübt · 🟢 sitzt).',
+    '✍️ <strong>Beide unterschreiben – richtig dokumentiert:</strong> Dein Fahrlehrer unterschreibt auf dem Tablet (einmal gemerkt, immer gleich), du auf deinem Handy. Beide Unterschriften stehen im gedruckten Nachweis.',
+    '📋 <strong>Erst schauen, dann unterschreiben:</strong> Öffnest du die Unterschrift, siehst du vorher die ganze Fahrstunde, <strong>was ihr geübt habt</strong> und dass dein Fahrlehrer schon unterschrieben hat.',
+    '📬 <strong>„Etwas liegt in deinem Postfach":</strong> Fordert dein Fahrlehrer die Unterschrift an, kommt sofort eine Handy-Benachrichtigung – auch wenn die App zu ist. Ein Tipp darauf öffnet die App direkt am Postfach und legt dir die Stunde zum Unterschreiben hin.',
+    '🔔 <strong>Ton aussuchen:</strong> Unter „🎨 Aussehen → Benachrichtigungston" wählst du 🔔 Glocke, 🚗🔒 Auto-Verriegeln oder 🔇 Aus – mit „Probe"-Knopf.',
+    '🧾 <strong>Rechnungsdatum &amp; Klartext:</strong> Zwei klare Zeilen (gefahren / Rechnung) mit Schnell-Chips (+1/+2/+3 Tage), genauem Tag + Uhrzeit und „leeren". Und im Nachweis steht jetzt verständlich „vom Fahrlehrer eingetragen am …", „Auf der Rechnung zu sehen am …" und „… Min zu spät".',
+    '🧠 <strong>KI-Planer &amp; Tagesstatus (für deinen Fahrlehrer):</strong> Passende Termine aus der Verfügbarkeit, ein Tages-Status „läuft planmäßig / wird später" mit Grund (Berufsverkehr, Stau, Schnee, Glatteis) – du siehst es oben und bekommst eine Push.',
+    '🌦️ <strong>Wetter &amp; Live-Verkehr:</strong> ginoco warnt bei Glatteis/Schnee automatisch und kann – mit optionalem Verkehrs-Schlüssel – bei echtem Stau auf den Wegen eine Verzögerung vorschlagen.',
+    '✅ <strong>Vorschläge annehmen/ablehnen:</strong> Trägt dein Fahrlehrer einen Termin für dich ein, kannst du klar <strong>annehmen</strong> oder <strong>ablehnen</strong>; ohne Antwort verfällt der Vorschlag nach 2 Stunden und der Slot wird wieder frei.',
+    '🎬 <strong>Neuer Start &amp; smarter Look:</strong> Beim Öffnen baut sich erst das „G" auf, beim Laden dreht es sich, beim Buchen wird der grüne Haken mit Konfetti daraus. Alles Tippbare senkt sich beim Drücken, Ansichten blenden sanft ein, keine sichtbaren Scrollbalken, edlere Menü-Griffe – auch die Farb-Auswahl reagiert jetzt flüssig.',
+    '📜 <strong>Nutzungsbedingungen</strong> sind jetzt klar einsehbar (unten im Anmelde-Bildschirm), und du kannst dein <strong>Konto selbst löschen</strong> (unter „Mein Profil") – gefahrene Stunden bleiben anonym im Ausbildungsnachweis der Fahrschule.'] },
   { v: '3.86', d: '30.08.2026', title: '🔔 Ton aussuchen', items: [
     '🚗🔒 <strong>Auto-Verriegeln als Ton:</strong> Unter „🎨 Aussehen → Benachrichtigungston" kannst du jetzt zwischen 🔔 Glocke, 🚗🔒 Auto-Verriegeln und 🔇 Aus wählen – mit „Probe"-Knopf zum Reinhören.'] },
   { v: '3.85', d: '30.08.2026', title: '📬 „Etwas liegt in deinem Postfach"', items: [
