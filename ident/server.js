@@ -106,6 +106,11 @@ const MIME = {
   '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png',
   '.jpg': 'image/jpeg', '.ico': 'image/x-icon', '.json': 'application/json; charset=utf-8',
   '.webmanifest': 'application/manifest+json; charset=utf-8',
+  // Ohne diese Zeilen ging die Hymne als application/octet-stream hinaus -
+  // Safari und iOS spielen so etwas nicht ab, sondern bieten es zum
+  // Herunterladen an. Der Ton blieb also stumm, ohne Fehlermeldung.
+  '.mp3': 'audio/mpeg', '.m4a': 'audio/mp4', '.ogg': 'audio/ogg', '.wav': 'audio/wav',
+  '.webp': 'image/webp', '.jpeg': 'image/jpeg',
 };
 
 // ---- Geräte-Freigabe für den Admin-Bereich ---------------------------------
