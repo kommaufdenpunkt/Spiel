@@ -79,6 +79,8 @@ html{scroll-behavior:smooth}
 /* Alles Tippbare senkt sich beim Drücken minimal – fühlt sich „echt" an */
 button:not(:disabled):not(.edge-handle):active{transform:translateY(.5px) scale(.985)}
 .edge-tile:active,.stu-card:active,.pl-row:active,.cap-row:active,.bitem:active,.iconbtn:active,.convo:active,.sset:active{transform:scale(.985);transition:transform .08s ease}
+/* Beim Farb-/Theme-Wechsel Übergänge kurz aus -> neue Farbe sitzt sofort (kein „Kriechen") */
+html.anim-off,html.anim-off *,html.anim-off *::before,html.anim-off *::after{transition:none!important}
 /* Sanfte Einblendung des Tab-Inhalts beim Umschalten (Fahrlehrer) */
 @keyframes tabIn{from{opacity:0;transform:translateY(9px)}to{opacity:1;transform:none}}
 #itab.tab-in{animation:tabIn .34s cubic-bezier(.22,.61,.36,1)}

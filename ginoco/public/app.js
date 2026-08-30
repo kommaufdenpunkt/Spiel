@@ -87,8 +87,12 @@ function applyThemeVars(key) {
   for (const [k, v] of Object.entries(t.vars)) document.documentElement.style.setProperty(k, v);
 }
 function applyAppearance() {
+  const root = document.documentElement;
+  // Übergänge kurz aus, damit die neue Farbe SOFORT sitzt (kein „Kriechen")
+  root.classList.add('anim-off');
+  requestAnimationFrame(() => requestAnimationFrame(() => root.classList.remove('anim-off')));
   applyThemeVars(state.theme || 'unternbuchen');
-  const p = state.prefs || {}, root = document.documentElement;
+  const p = state.prefs || {};
   if (p.accent) { root.style.setProperty('--brand', p.accent); root.style.setProperty('--brand-dark', shade(p.accent, -16)); }
   if (p.ink) root.style.setProperty('--ink', p.ink);
   // Menü-Farbe: färbt die Menü-Panels + Kacheln (frei wählbar)
@@ -227,27 +231,37 @@ function openThemePicker() {
       <button class="sec" onclick="window.__closeModal()">Fertig</button>
     </div>`, 'wide');
 
-  const reopen = () => openThemePicker();
-  document.querySelectorAll('[data-theme]').forEach((b) => b.onclick = () => { setTheme(b.dataset.theme); reopen(); });
-  document.querySelectorAll('[data-accent]').forEach((b) => b.onclick = () => { savePref('accent', b.dataset.accent); reopen(); });
-  document.querySelectorAll('[data-font]').forEach((b) => b.onclick = () => { savePref('font', b.dataset.font); reopen(); });
-  document.querySelectorAll('[data-ink]').forEach((b) => b.onclick = () => { savePref('ink', b.dataset.ink); reopen(); });
-  document.querySelectorAll('[data-edge]').forEach((b) => b.onclick = () => { savePref('edge', b.dataset.edge); reopen(); });
-  document.querySelectorAll('[data-size]').forEach((b) => b.onclick = () => { savePref('size', b.dataset.size); reopen(); });
+  // Auswahl NUR in-place markieren (kein Neuaufbau des Fensters -> kein „Hängen"/Flackern)
+  const pf = () => state.prefs || {};
+  const mkTheme = () => document.querySelectorAll('[data-theme]').forEach((x) => {
+    const t = THEMES[x.dataset.theme] || THEMES.unternbuchen; const on = x.dataset.theme === (state.theme || 'unternbuchen');
+    x.style.outline = on ? '2px solid ' + t.dot : ''; x.innerHTML = `<span style="width:16px;height:16px;border-radius:50%;background:${t.dot}"></span>${t.label}${on ? ' ✓' : ''}`;
+  });
+  const mkAccent = () => document.querySelectorAll('[data-accent]').forEach((x) => { x.style.borderColor = (pf().accent || '').toLowerCase() === x.dataset.accent.toLowerCase() ? 'var(--ink)' : 'transparent'; });
+  const mkFont = () => document.querySelectorAll('[data-font]').forEach((x) => { const on = (pf().font || 'system') === x.dataset.font; x.style.outline = on ? '2px solid var(--brand)' : ''; x.innerHTML = `${(FONTS[x.dataset.font] || FONTS.system).label}${on ? ' ✓' : ''}`; });
+  const mkInk = () => document.querySelectorAll('[data-ink]').forEach((x) => { x.style.borderColor = (pf().ink || '') === x.dataset.ink ? 'var(--ink)' : 'transparent'; });
+  const mkEdge = () => document.querySelectorAll('[data-edge]').forEach((x) => { if (x.dataset.edge === '') return; x.style.borderColor = (pf().edge || '').toLowerCase() === x.dataset.edge.toLowerCase() ? 'var(--ink)' : 'transparent'; });
+  const mkSize = () => document.querySelectorAll('[data-size]').forEach((x) => { const on = (pf().size || 'normal') === x.dataset.size; x.style.outline = on ? '2px solid var(--brand)' : ''; x.innerHTML = `${SIZE_LABEL[x.dataset.size]}${on ? ' ✓' : ''}`; });
+  document.querySelectorAll('[data-theme]').forEach((b) => b.onclick = () => { setTheme(b.dataset.theme); mkTheme(); });
+  document.querySelectorAll('[data-accent]').forEach((b) => b.onclick = () => { savePref('accent', b.dataset.accent); mkAccent(); });
+  document.querySelectorAll('[data-font]').forEach((b) => b.onclick = () => { savePref('font', b.dataset.font); mkFont(); });
+  document.querySelectorAll('[data-ink]').forEach((b) => b.onclick = () => { savePref('ink', b.dataset.ink); mkInk(); });
+  document.querySelectorAll('[data-edge]').forEach((b) => b.onclick = () => { savePref('edge', b.dataset.edge); mkEdge(); });
+  document.querySelectorAll('[data-size]').forEach((b) => b.onclick = () => { savePref('size', b.dataset.size); mkSize(); });
   const free = $('#ap-accent-free');
   if (free) {
     free.oninput = () => { state.prefs.accent = free.value; applyAppearance(); };           // live-Vorschau
-    free.onchange = () => { savePref('accent', free.value); reopen(); };                     // festhalten
+    free.onchange = () => { savePref('accent', free.value); mkAccent(); };                   // festhalten
   }
   const efree = $('#ap-edge-free');
   if (efree) {
     efree.oninput = () => { state.prefs.edge = efree.value; applyAppearance(); };            // live-Vorschau
-    efree.onchange = () => { savePref('edge', efree.value); reopen(); };                     // festhalten
+    efree.onchange = () => { savePref('edge', efree.value); mkEdge(); };                      // festhalten
   }
   const snd = $('#ap-sound');
   if (snd) snd.onchange = () => setSoundOn(snd.checked);
   const rst = $('#ap-reset');
-  if (rst) rst.onclick = () => { resetAppearance(); toast('Auf Standard zurückgesetzt', 'ok'); reopen(); };
+  if (rst) rst.onclick = () => { resetAppearance(); toast('Auf Standard zurückgesetzt', 'ok'); mkTheme(); mkAccent(); mkFont(); mkInk(); mkEdge(); mkSize(); };
 }
 window.__openThemePicker = openThemePicker;
 
@@ -495,7 +509,7 @@ function openTour() {
 window.__openTour = openTour;
 
 // ---------- Was ist neu? (Changelog) ----------
-const CHANGELOG_VER = '3.80';
+const CHANGELOG_VER = '3.81';
 const CHANGELOG = [
   { v: '3.80', d: '30.08.2026', title: '🎡 Das „G" beim Laden', items: [
     '🎡 <strong>Ladeanzeige mit Herz:</strong> Wenn etwas lädt, dreht sich jetzt das ginoco-„G" (das Lenkrad) – und wenn du buchst, wird daraus der grüne Haken mit Konfetti. 🎉'] },
