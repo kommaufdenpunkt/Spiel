@@ -361,6 +361,11 @@ async function renderProfileCard() {
         ${ip ? `<div class="field"><label>Fahrschule erreichen</label><div class="inline">${contactButtons(ip)}</div></div>` : ''}
       </div>
       <div class="actions"><button id="pf-save">Speichern</button></div>
+      <div class="pf-danger">
+        <div class="pf-sec-h">⚠️ Konto</div>
+        <p class="hint" style="margin:.1rem 0 .5rem">Du kannst dein Konto jederzeit selbst löschen. Dein Login und deine persönlichen Daten werden dann entfernt. Deine bereits gefahrenen Fahrstunden bleiben – anonymisiert – im gesetzlichen Ausbildungsnachweis deiner Fahrschule erhalten.</p>
+        <button class="danger sm" id="pf-del-account">🗑️ Mein Konto löschen</button>
+      </div>
     </div>`;
   const setOpen = (o) => {
     state.profileOpen = o;
@@ -423,6 +428,28 @@ async function renderProfileCard() {
       renderProfileCard();   // Kopf-Zusammenfassung auffrischen, aufgeklappt lassen
     } catch (e) { const el = $('#pf-err'); if (el) { el.textContent = e.message; el.classList.remove('hidden'); } else toast(e.message, 'err'); }
   };
+  const delBtnA = $('#pf-del-account');
+  if (delBtnA) delBtnA.onclick = () => openDeleteAccountModal();
+}
+// Konto-Löschung: doppelte Sicherung – Passwort bestätigen + „LÖSCHEN" tippen.
+function openDeleteAccountModal() {
+  modal(`<h3>🗑️ Konto wirklich löschen?</h3>
+    <p class="hint">Das kann nicht rückgängig gemacht werden. Dein Login und deine persönlichen Daten werden entfernt. Bereits gefahrene Fahrstunden bleiben anonym im Ausbildungsnachweis deiner Fahrschule.</p>
+    <div class="field"><label>Zur Bestätigung: dein aktuelles Passwort</label><input id="da-pass" type="password" autocomplete="current-password" placeholder="Passwort"></div>
+    <div class="field"><label>Tippe <strong>LÖSCHEN</strong> zum Bestätigen</label><input id="da-word" autocapitalize="characters" placeholder="LÖSCHEN"></div>
+    <div class="actions"><button class="sec" onclick="window.__closeModal()">Abbrechen</button><button class="danger" id="da-go" disabled>Konto endgültig löschen</button></div>`);
+  const chk = () => { $('#da-go').disabled = !($('#da-pass').value && $('#da-word').value.trim().toUpperCase() === 'LÖSCHEN'); };
+  $('#da-pass').oninput = chk; $('#da-word').oninput = chk;
+  $('#da-go').onclick = async () => {
+    const go = $('#da-go'); go.disabled = true; go.textContent = 'Wird gelöscht…';
+    try {
+      await api('/api/my/account/delete', { method: 'POST', body: { password: $('#da-pass').value } });
+      closeModal();
+      alert('Dein Konto wurde gelöscht. Du wirst jetzt abgemeldet.');
+      try { localStorage.removeItem('fsp_token'); } catch {}
+      location.href = '/';
+    } catch (e) { go.disabled = false; go.textContent = 'Konto endgültig löschen'; toast(e.message, 'err'); }
+  };
 }
 // „Mein Profil“ öffnen: Karte oben aufklappen + hinscrollen (statt Popup)
 window.__openProfile = () => {
@@ -468,8 +495,10 @@ function openTour() {
 window.__openTour = openTour;
 
 // ---------- Was ist neu? (Changelog) ----------
-const CHANGELOG_VER = '3.75';
+const CHANGELOG_VER = '3.76';
 const CHANGELOG = [
+  { v: '3.76', d: '30.08.2026', title: '🗑️ Konto selbst löschen', items: [
+    '🗑️ <strong>Konto löschen:</strong> Fahrschüler können ihr Konto jetzt selbst in „Mein Profil“ löschen – Login &amp; persönliche Daten werden entfernt. Gefahrene Fahrstunden bleiben anonym im Ausbildungsnachweis der Fahrschule erhalten.'] },
   { v: '3.75', d: '29.08.2026', title: '📊 Deine Woche im Blick – frei & ausgelastet', items: [
     '📊 <strong>Auslastung & freie Zeiten (Fahrlehrer):</strong> Im KI-Planer siehst du oben, wie voll dein Kalender ist und wo noch Platz für Stunden ist – ein Tipp auf den Tag und du trägst direkt selbst ein.',
     '🧑‍🏫 <strong>Du bleibst der Chef:</strong> Die KI meldet sich nie von selbst – Vorschläge kommen nur, wenn du sie öffnest. Selbst planen geht jederzeit.',

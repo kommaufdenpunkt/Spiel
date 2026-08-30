@@ -879,7 +879,7 @@ async function handleApi(req, res, url) {
     const handle = String(b.login || b.email || '').trim();
     const key = handle.toLowerCase();
     // per Login-Name (Initialen+Jahrgang) ODER E-Mail
-    const st = db.prepare('SELECT * FROM students WHERE username = ? COLLATE NOCASE OR email = ?').get(handle, key);
+    const st = db.prepare('SELECT * FROM students WHERE (username = ? COLLATE NOCASE OR email = ?) AND deleted_at IS NULL').get(handle, key);
     if (!st || !verifyPassword(b.password || '', st.pass)) { noteLoginFail(req); return bad(res, 'Login-Name/E-Mail oder Passwort falsch', 401); }
     noteLoginOk(req);
     const token = createSession(res, 'student', st.id, isHttps(req));
@@ -1155,6 +1155,42 @@ async function handleApi(req, res, url) {
     if (!requireStudent()) return bad(res, 'Bitte anmelden', 401);
     db.prepare('UPDATE notifications SET read = 1 WHERE student_id = ?').run(sess.student_id);
     return ok(res);
+  }
+
+  // Schueler loescht sein eigenes Konto (Apple-Richtlinie 5.1.1). Anonymisierend:
+  // Login wird gesperrt und alle persoenlichen Daten entfernt; die Fahrstunden-
+  // Datensaetze bleiben (anonym) erhalten, weil der Fahrlehrer sie fuer den
+  // gesetzlichen Ausbildungsnachweis aufbewahren muss.
+  if (p === '/api/my/account/delete' && method === 'POST') {
+    if (!requireStudent()) return bad(res, 'Bitte anmelden', 401);
+    const b = await readBody(req);
+    const sid = sess.student_id;
+    const me = db.prepare('SELECT * FROM students WHERE id=?').get(sid);
+    if (!me) return bad(res, 'Konto nicht gefunden', 404);
+    // Sicherheitsabfrage: aktuelles Passwort bestaetigen.
+    if (!verifyPassword(String(b.password || ''), me.pass)) return bad(res, 'Bitte dein aktuelles Passwort zur Bestätigung eingeben.');
+    const stamp = new Date().toISOString();
+    // Persoenliche Daten entfernen, Login sperren (E-Mail muss eindeutig + gesetzt bleiben).
+    db.prepare(`UPDATE students SET
+        name='Gelöschtes Konto', first_name=NULL, last_name=NULL,
+        email=?, phone=NULL, username=NULL, pass=?,
+        birth_year=NULL, birth_date=NULL, street=NULL, house_no=NULL, zip=NULL, city=NULL,
+        home_label=NULL, home_lat=NULL, home_lng=NULL, home_base=NULL, availability=NULL,
+        live_lat=NULL, live_lng=NULL, live_at=NULL, live_active=0,
+        photo=NULL, notes=NULL, deleted_at=?
+      WHERE id=?`).run(`deleted+${sid}@ginoco.invalid`, hashPassword(b64url(randomBytes(24))), stamp, sid);
+    // Persoenliche Nebendaten loeschen (keine Aufbewahrungspflicht).
+    db.prepare('DELETE FROM messages WHERE student_id=?').run(sid);
+    db.prepare('DELETE FROM notifications WHERE student_id=?').run(sid);
+    db.prepare('DELETE FROM push_subscriptions WHERE student_id=?').run(sid);
+    try { db.prepare('DELETE FROM reviews WHERE student_id=?').run(sid); } catch {}
+    try { db.prepare('DELETE FROM offer_declines WHERE student_id=?').run(sid); } catch {}
+    db.prepare('DELETE FROM sessions WHERE student_id=?').run(sid);
+    logEvent('account_deleted', { actor: 'student', studentId: sid, date: todayStr(),
+      detail: `${me.name} hat das eigene Konto gelöscht (Login gesperrt, Daten anonymisiert; Fahrstunden bleiben für den Nachweis).` });
+    pushToInstructor(`🗑️ ${me.name} hat sein Ginoco-Konto selbst gelöscht. Die Fahrstunden bleiben (anonym) für deinen Nachweis erhalten.`);
+    res.setHeader('Set-Cookie', 'fsp=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax');
+    return ok(res, { deleted: true });
   }
 
   if (p === '/api/bookings' && method === 'POST') {
@@ -2028,7 +2064,7 @@ async function handleApi(req, res, url) {
         s.home_label,s.home_lat,s.home_lng,s.travel_min,s.home_base,s.availability,s.archived_at,s.notes,
         (s.photo IS NOT NULL) AS has_photo,
         (SELECT COUNT(*) FROM bookings b WHERE b.student_id=s.id AND b.status='done') AS done_count
-       FROM students s WHERE s.archived_at IS ${archived ? 'NOT NULL' : 'NULL'} ORDER BY s.name`
+       FROM students s WHERE s.archived_at IS ${archived ? 'NOT NULL' : 'NULL'} AND s.deleted_at IS NULL ORDER BY s.name`
     ).all().map((s) => {
       const adk = adkSummary(s.id); const st = lessonStats(s.id);
       return { ...s, ...studentRank(s.id), sonder: sonderCounts(s.id), travel_est: travelMin(s.id),

@@ -254,6 +254,7 @@ ensureColumn('students', 'home_base', 'home_base TEXT');
 // Verfuegbarkeit je Wochentag als JSON, z.B. {"mo":[["08:00","12:00"]],"di":[...],...}
 // Leer/NULL = keine Angabe. Basis fuer die automatischen Terminvorschlaege.
 ensureColumn('students', 'availability', 'availability TEXT');
+ensureColumn('students', 'deleted_at', 'deleted_at TEXT');      // gesetzt = vom Schueler selbst geloescht (Login gesperrt, Daten anonymisiert; Fahrstunden bleiben fuer den Nachweis)
 
 // Live-Standort des Fahrlehrers (genau eine Zeile)
 db.exec(`CREATE TABLE IF NOT EXISTS live_location (

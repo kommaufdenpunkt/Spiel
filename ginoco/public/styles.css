@@ -457,6 +457,8 @@ th{color:var(--muted);font-weight:600;font-size:.78rem;text-transform:uppercase;
   letter-spacing:.03em;margin:0 0 .5rem}
 .pf-sec .field{margin-bottom:.55rem}
 .pf-sec .row{gap:.55rem}
+.pf-danger{margin-top:1rem;border:1px solid var(--bad-bg);border-color:rgba(229,96,95,.35);border-radius:12px;background:rgba(229,96,95,.06);padding:.75rem .85rem}
+.pf-danger .pf-sec-h{color:var(--bad)}
 .geo-btn{display:flex;align-items:center;justify-content:center;gap:.4rem;width:100%;padding:.65rem;
   border-radius:10px;background:var(--card);border:1px dashed var(--brand);color:var(--brand);font-weight:700;cursor:pointer}
 .geo-btn:hover{background:var(--card2)}
