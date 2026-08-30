@@ -769,10 +769,11 @@ th{color:var(--muted);font-weight:600;font-size:.78rem;text-transform:uppercase;
   background:linear-gradient(180deg,rgba(242,160,26,.20),rgba(242,160,26,.07));
   backdrop-filter:blur(9px) saturate(1.15);-webkit-backdrop-filter:blur(9px) saturate(1.15);
   box-shadow:0 4px 16px rgba(0,0,0,.32),inset 0 1px 0 rgba(255,255,255,.22);
-  opacity:.72;transition:opacity .22s,width .2s cubic-bezier(.22,.61,.36,1),background .22s,box-shadow .22s}
-.edge-handle:hover,.edge-handle:focus-visible{opacity:1;width:19px;outline:none;
-  background:linear-gradient(180deg,rgba(242,160,26,.32),rgba(242,160,26,.14));
-  box-shadow:0 8px 24px rgba(0,0,0,.4),0 0 26px -10px var(--brand),inset 0 1px 0 rgba(255,255,255,.34)}
+  opacity:.72;transition:opacity .22s ease,background .22s ease,box-shadow .22s ease,border-color .22s ease}
+/* Hover/Fokus: nur heller + sanfter Schein – KEINE Größenänderung (kein Verschieben) */
+.edge-handle:hover,.edge-handle:focus-visible{opacity:1;outline:none;border-color:rgba(242,160,26,.55);
+  background:linear-gradient(180deg,rgba(242,160,26,.34),rgba(242,160,26,.15));
+  box-shadow:0 6px 22px rgba(0,0,0,.4),0 0 24px -8px var(--brand),inset 0 1px 0 rgba(255,255,255,.34)}
 .edge-handle.left{left:0;border-left:none;border-radius:0 15px 15px 0}
 .edge-handle.right{right:0;border-right:none;border-radius:15px 0 0 15px}
 /* schlanke, mittige Gold-Griffleiste */
