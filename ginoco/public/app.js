@@ -112,6 +112,24 @@ const I18N = {
     nav_week: 'Meine Woche', nav_book: 'Termin buchen', nav_lessons: 'Meine Fahrstunden',
     nav_messages: 'Nachrichten', nav_notif: 'Mitteilungen', nav_offers: 'Angebote', nav_review: 'Bewertung',
     menu: 'Menü', actions: 'Aktionen', menu_open: 'Menü öffnen', menu_close: 'Menü schließen',
+    ml_title: '📖 Meine Fahrstunden',
+    ml_hint: 'Alle deine gefahrenen Stunden – mit Datum &amp; Uhrzeit, Dauer, Art und Vermerk. Bei jeder Stunde kannst du die Ausbildungskarte öffnen: <em>was</em> ihr geübt habt und wie es sitzt.',
+    ml_overview_btn: '📋 Ausbildungs-Übersicht', ml_print_btn: '📄 Nachweis drucken',
+    ml_th_when: 'Datum &amp; Uhrzeit', ml_th_end: 'Ende', ml_th_dur: 'Dauer', ml_th_type: 'Art', ml_th_late: 'Verspät.', ml_th_note: 'Vermerk / Ausbildungskarte',
+    ml_dl_when: 'Wann', ml_dl_late: 'Verspätung', ml_dl_note: 'Vermerk',
+    ml_driven_on: 'gefahren am', ml_entered_on: 'vom Fahrlehrer eingetragen am {date}',
+    ml_on_invoice: '🧾 Auf der Rechnung zu sehen am {date}', ml_on_invoice_time: '🧾 Auf der Rechnung zu sehen am {date} um {time} Uhr',
+    ml_sign_btn: '✍️ Unterschreiben', ml_signed: '✓ unterschrieben',
+    ml_until: 'bis {end}', ml_absent: '🚫 nicht da', ml_late: '⏱️ {late} Min zu spät',
+    ml_adk_card: '📋 Ausbildungskarte ({n})',
+    ml_banner_one: '{n} Fahrstunde wartet auf deine Unterschrift.', ml_banner_many: '{n} Fahrstunden warten auf deine Unterschrift.',
+    ml_banner_sub: 'Dein Fahrlehrer hat sie nachgetragen – bitte kurz bestätigen.', ml_banner_btn: 'Jetzt unterschreiben',
+    sign_title: '✍️ Fahrstunde bestätigen',
+    sign_hint: 'Schau kurz drüber und bestätige mit deiner Unterschrift – sie kommt auf deinen Fahrstunden-Nachweis.',
+    sign_practiced: '📋 Das habt ihr geübt', sign_fl_signed: '✓ Dein Fahrlehrer hat unterschrieben',
+    sign_your: 'Deine Unterschrift', sign_draw: '(mit dem Finger malen)', clear: 'Löschen',
+    sign_confirm_ck: 'Ich bestätige, dass ich diese Fahrstunde gefahren bin.', sign_go: 'Bestätigen ✍️',
+    saving: 'Wird gespeichert …', toast_signed: 'Unterschrieben – danke! ✓',
   },
   en: {
     tagline_student: 'Book driving lessons easily online', tagline_admin: 'Instructor area',
@@ -184,6 +202,24 @@ const I18N = {
     nav_week: 'My week', nav_book: 'Book a lesson', nav_lessons: 'My lessons',
     nav_messages: 'Messages', nav_notif: 'Notifications', nav_offers: 'Offers', nav_review: 'Review',
     menu: 'Menu', actions: 'Actions', menu_open: 'Open menu', menu_close: 'Close menu',
+    ml_title: '📖 My lessons',
+    ml_hint: 'All your driven lessons – with date &amp; time, duration, type and note. For each lesson you can open the training card: <em>what</em> you practised and how well it fits.',
+    ml_overview_btn: '📋 Training overview', ml_print_btn: '📄 Print record',
+    ml_th_when: 'Date &amp; time', ml_th_end: 'End', ml_th_dur: 'Duration', ml_th_type: 'Type', ml_th_late: 'Late', ml_th_note: 'Note / training card',
+    ml_dl_when: 'When', ml_dl_late: 'Late', ml_dl_note: 'Note',
+    ml_driven_on: 'driven on', ml_entered_on: 'entered by your instructor on {date}',
+    ml_on_invoice: '🧾 Appears on the invoice on {date}', ml_on_invoice_time: '🧾 Appears on the invoice on {date} at {time}',
+    ml_sign_btn: '✍️ Sign', ml_signed: '✓ signed',
+    ml_until: 'until {end}', ml_absent: '🚫 not there', ml_late: '⏱️ {late} min late',
+    ml_adk_card: '📋 Training card ({n})',
+    ml_banner_one: '{n} lesson is waiting for your signature.', ml_banner_many: '{n} lessons are waiting for your signature.',
+    ml_banner_sub: 'Your instructor added them – please confirm briefly.', ml_banner_btn: 'Sign now',
+    sign_title: '✍️ Confirm lesson',
+    sign_hint: 'Take a quick look and confirm with your signature – it goes onto your lesson record.',
+    sign_practiced: '📋 What you practised', sign_fl_signed: '✓ Your instructor has signed',
+    sign_your: 'Your signature', sign_draw: '(draw with your finger)', clear: 'Clear',
+    sign_confirm_ck: 'I confirm that I drove this lesson.', sign_go: 'Confirm ✍️',
+    saving: 'Saving …', toast_signed: 'Signed – thank you! ✓',
   },
   tr: {
     tagline_student: 'Direksiyon derslerini kolayca online al', tagline_admin: 'Eğitmen alanı',
@@ -256,6 +292,24 @@ const I18N = {
     nav_week: 'Haftam', nav_book: 'Randevu al', nav_lessons: 'Derslerim',
     nav_messages: 'Mesajlar', nav_notif: 'Bildirimler', nav_offers: 'Teklifler', nav_review: 'Değerlendirme',
     menu: 'Menü', actions: 'İşlemler', menu_open: 'Menüyü aç', menu_close: 'Menüyü kapat',
+    ml_title: '📖 Derslerim',
+    ml_hint: 'Sürdüğün tüm dersler – tarih &amp; saat, süre, tür ve not ile. Her ders için eğitim kartını açabilirsin: <em>ne</em> çalıştığınız ve ne kadar oturduğu.',
+    ml_overview_btn: '📋 Eğitim özeti', ml_print_btn: '📄 Belgeyi yazdır',
+    ml_th_when: 'Tarih &amp; saat', ml_th_end: 'Bitiş', ml_th_dur: 'Süre', ml_th_type: 'Tür', ml_th_late: 'Gecikme', ml_th_note: 'Not / eğitim kartı',
+    ml_dl_when: 'Ne zaman', ml_dl_late: 'Gecikme', ml_dl_note: 'Not',
+    ml_driven_on: 'sürüldüğü gün', ml_entered_on: 'eğitmen tarafından {date} tarihinde girildi',
+    ml_on_invoice: '🧾 Faturada {date} tarihinde görünür', ml_on_invoice_time: '🧾 Faturada {date} saat {time} olarak görünür',
+    ml_sign_btn: '✍️ İmzala', ml_signed: '✓ imzalandı',
+    ml_until: '{end}’e kadar', ml_absent: '🚫 gelmedi', ml_late: '⏱️ {late} dk geç',
+    ml_adk_card: '📋 Eğitim kartı ({n})',
+    ml_banner_one: '{n} ders imzanı bekliyor.', ml_banner_many: '{n} ders imzanı bekliyor.',
+    ml_banner_sub: 'Eğitmenin bunları girdi – lütfen kısaca onayla.', ml_banner_btn: 'Şimdi imzala',
+    sign_title: '✍️ Dersi onayla',
+    sign_hint: 'Kısaca göz at ve imzanla onayla – ders belgene işlenir.',
+    sign_practiced: '📋 Neler çalıştınız', sign_fl_signed: '✓ Eğitmenin imzaladı',
+    sign_your: 'İmzan', sign_draw: '(parmağınla çiz)', clear: 'Sil',
+    sign_confirm_ck: 'Bu dersi sürdüğümü onaylıyorum.', sign_go: 'Onayla ✍️',
+    saving: 'Kaydediliyor …', toast_signed: 'İmzalandı – teşekkürler! ✓',
   },
   ar: {
     tagline_student: 'احجز دروس القيادة بسهولة عبر الإنترنت', tagline_admin: 'منطقة المدرّب',
@@ -328,6 +382,24 @@ const I18N = {
     nav_week: 'أسبوعي', nav_book: 'حجز موعد', nav_lessons: 'دروسي',
     nav_messages: 'الرسائل', nav_notif: 'الإشعارات', nav_offers: 'العروض', nav_review: 'التقييم',
     menu: 'القائمة', actions: 'الإجراءات', menu_open: 'فتح القائمة', menu_close: 'إغلاق القائمة',
+    ml_title: '📖 دروسي',
+    ml_hint: 'كل دروسك التي قدتها – مع التاريخ والوقت والمدة والنوع والملاحظة. لكل درس يمكنك فتح بطاقة التدريب: <em>ماذا</em> تدربتم وكيف رسخ.',
+    ml_overview_btn: '📋 ملخص التدريب', ml_print_btn: '📄 طباعة السجل',
+    ml_th_when: 'التاريخ والوقت', ml_th_end: 'الانتهاء', ml_th_dur: 'المدة', ml_th_type: 'النوع', ml_th_late: 'التأخير', ml_th_note: 'ملاحظة / بطاقة التدريب',
+    ml_dl_when: 'متى', ml_dl_late: 'التأخير', ml_dl_note: 'ملاحظة',
+    ml_driven_on: 'قُدت في', ml_entered_on: 'أدخله مدرّبك في {date}',
+    ml_on_invoice: '🧾 يظهر على الفاتورة في {date}', ml_on_invoice_time: '🧾 يظهر على الفاتورة في {date} الساعة {time}',
+    ml_sign_btn: '✍️ توقيع', ml_signed: '✓ موقّع',
+    ml_until: 'حتى {end}', ml_absent: '🚫 لم يحضر', ml_late: '⏱️ متأخر {late} دقيقة',
+    ml_adk_card: '📋 بطاقة التدريب ({n})',
+    ml_banner_one: '{n} درس بانتظار توقيعك.', ml_banner_many: '{n} دروس بانتظار توقيعك.',
+    ml_banner_sub: 'أدخلها مدرّبك – يرجى التأكيد باختصار.', ml_banner_btn: 'وقّع الآن',
+    sign_title: '✍️ تأكيد الدرس',
+    sign_hint: 'ألقِ نظرة سريعة وأكّد بتوقيعك – سيُدرج في سجل دروسك.',
+    sign_practiced: '📋 ماذا تدربتم', sign_fl_signed: '✓ وقّع مدرّبك',
+    sign_your: 'توقيعك', sign_draw: '(ارسم بإصبعك)', clear: 'مسح',
+    sign_confirm_ck: 'أؤكّد أنني قدت هذا الدرس.', sign_go: 'تأكيد ✍️',
+    saving: 'يتم الحفظ …', toast_signed: 'تم التوقيع – شكراً! ✓',
   },
 };
 function t(key, vars) {
@@ -2043,31 +2115,31 @@ function renderMyLessons(bookings) {
     const nachgetragen = entryDate && entryDate !== b.date;
     const adkN = lessonAdkParse(b.curriculum).length;
     const sign = b.needs_sign
-      ? `<button class="sm ml-sign" data-sign="${b.id}">✍️ Unterschreiben</button>`
-      : (b.signed_at ? `<span class="pill" style="background:var(--good-bg);color:var(--good)">✓ unterschrieben</span>` : '');
+      ? `<button class="sm ml-sign" data-sign="${b.id}">${t('ml_sign_btn')}</button>`
+      : (b.signed_at ? `<span class="pill" style="background:var(--good-bg);color:var(--good)">${t('ml_signed')}</span>` : '');
     return `<tr class="${noshow ? 'ml-noshow' : ''} ${b.needs_sign ? 'ml-tosign' : ''}">
-      <td class="ml-when" data-label="Wann">${nachgetragen ? '<span class="ml-drovelbl">gefahren am</span>' : ''}<strong>${fmtDT(b.date, b.start_time)}</strong>${nachgetragen ? `<span class="ml-entry">vom Fahrlehrer eingetragen am ${fmtEntry(b.created_at)}</span>` : ''}${b.invoice_date ? `<span class="ml-entry ml-inv">🧾 Auf der Rechnung zu sehen am ${fmtDT(b.invoice_date)}${b.invoice_time ? ' um ' + b.invoice_time + ' Uhr' : ''}</span>` : ''}${sign ? `<div class="ml-signcell">${sign}</div>` : ''}</td>
-      <td data-label="Ende">${noshow ? '—' : 'bis ' + addMinHHMM(b.start_time, b.duration_min)}</td>
-      <td data-label="Dauer">${noshow ? '🚫 nicht da' : (b.duration_min + ' Min')}</td>
-      <td data-label="Art">${noshow ? '' : lessonTypeLabel(b.lesson_type)}</td>
-      <td data-label="Verspätung">${late ? `⏱️ ${late} Min zu spät` : ''}</td>
-      <td class="ml-note" data-label="Vermerk">${b.feedback ? esc(b.feedback) : ''}${adkN ? `<button class="linkbtn ml-adk" data-adk="${b.id}">📋 Ausbildungskarte (${adkN})</button>` : ''}</td>
+      <td class="ml-when" data-label="${t('ml_dl_when')}">${nachgetragen ? `<span class="ml-drovelbl">${t('ml_driven_on')}</span>` : ''}<strong>${fmtDT(b.date, b.start_time)}</strong>${nachgetragen ? `<span class="ml-entry">${t('ml_entered_on', { date: fmtEntry(b.created_at) })}</span>` : ''}${b.invoice_date ? `<span class="ml-entry ml-inv">${b.invoice_time ? t('ml_on_invoice_time', { date: fmtDT(b.invoice_date), time: b.invoice_time }) : t('ml_on_invoice', { date: fmtDT(b.invoice_date) })}</span>` : ''}${sign ? `<div class="ml-signcell">${sign}</div>` : ''}</td>
+      <td data-label="${t('ml_th_end')}">${noshow ? '—' : t('ml_until', { end: addMinHHMM(b.start_time, b.duration_min) })}</td>
+      <td data-label="${t('ml_th_dur')}">${noshow ? t('ml_absent') : (b.duration_min + ' ' + t('min'))}</td>
+      <td data-label="${t('ml_th_type')}">${noshow ? '' : lessonTypeLabel(b.lesson_type)}</td>
+      <td data-label="${t('ml_dl_late')}">${late ? t('ml_late', { late }) : ''}</td>
+      <td class="ml-note" data-label="${t('ml_dl_note')}">${b.feedback ? esc(b.feedback) : ''}${adkN ? `<button class="linkbtn ml-adk" data-adk="${b.id}">${t('ml_adk_card', { n: adkN })}</button>` : ''}</td>
     </tr>`;
   }).join('');
   const banner = toSign.length
-    ? `<div class="sign-banner">✍️ <div><strong>${toSign.length} Fahrstunde${toSign.length === 1 ? '' : 'n'} warten auf deine Unterschrift.</strong><br><span>Dein Fahrlehrer hat sie nachgetragen – bitte kurz bestätigen.</span></div><button class="sm" id="ml-sign-first">Jetzt unterschreiben</button></div>`
+    ? `<div class="sign-banner">✍️ <div><strong>${t(toSign.length === 1 ? 'ml_banner_one' : 'ml_banner_many', { n: toSign.length })}</strong><br><span>${t('ml_banner_sub')}</span></div><button class="sm" id="ml-sign-first">${t('ml_banner_btn')}</button></div>`
     : '';
-  card.innerHTML = `<h2>📖 Meine Fahrstunden</h2>
-    <p class="hint">Alle deine gefahrenen Stunden – mit Datum &amp; Uhrzeit, Dauer, Art und Vermerk. Bei jeder Stunde kannst du die Ausbildungskarte öffnen: <em>was</em> ihr geübt habt und wie es sitzt.</p>
+  card.innerHTML = `<h2>${t('ml_title')}</h2>
+    <p class="hint">${t('ml_hint')}</p>
     ${banner}
     ${statStripHtml(myStats)}
     ${adkNeedWorkHtml(myAdk)}
     <div class="inline" style="margin:.4rem 0 .6rem;flex-wrap:wrap">
-      <button class="sec sm" id="ml-adk-all">📋 Ausbildungs-Übersicht</button>
-      <button class="sec sm" id="ml-print" style="margin-left:auto">📄 Nachweis drucken</button>
+      <button class="sec sm" id="ml-adk-all">${t('ml_overview_btn')}</button>
+      <button class="sec sm" id="ml-print" style="margin-left:auto">${t('ml_print_btn')}</button>
     </div>
     <div class="ml-wrap"><table class="ml-table">
-      <thead><tr><th>Datum &amp; Uhrzeit</th><th>Ende</th><th>Dauer</th><th>Art</th><th>Verspät.</th><th>Vermerk / Ausbildungskarte</th></tr></thead>
+      <thead><tr><th>${t('ml_th_when')}</th><th>${t('ml_th_end')}</th><th>${t('ml_th_dur')}</th><th>${t('ml_th_type')}</th><th>${t('ml_th_late')}</th><th>${t('ml_th_note')}</th></tr></thead>
       <tbody>${rows}</tbody>
     </table></div>`;
   const pb = $('#ml-print'); if (pb) pb.onclick = () => printLessonProof(state.user?.name || 'Fahrschüler', done, myAdk, myStats);
@@ -2108,18 +2180,18 @@ function openSignModal(l) {
   if (!l) return;
   const art = (l.lesson_type && l.lesson_type !== 'normal') ? ' · ' + lessonTypeLabel(l.lesson_type) : '';
   const adk = lessonAdkParse(l.curriculum);
-  modal(`<h3>✍️ Fahrstunde bestätigen</h3>
-    <p class="hint">Schau kurz drüber und bestätige mit deiner Unterschrift – sie kommt auf deinen Fahrstunden-Nachweis.</p>
-    <div class="sign-lesson">📅 <strong>${fmtDT(l.date, l.start_time)}</strong> · ${l.duration_min} Min${art}${l.late_minutes ? ` · ⏱️ ${l.late_minutes} Min zu spät` : ''}${l.feedback ? `<div class="sign-note">„${esc(l.feedback)}"</div>` : ''}</div>
-    ${adk.length ? `<div class="sign-adk"><div class="sign-adk-h">📋 Das habt ihr geübt</div>${adk.map((a) => `<div class="sign-adk-i">${currStatusMeta(a.s).dot} ${esc(a.label)}</div>`).join('')}</div>` : ''}
-    ${l.instr_signature ? `<div class="sign-fl">✓ Dein Fahrlehrer hat unterschrieben <img src="${l.instr_signature}" class="sign-fl-img" alt="Unterschrift Fahrlehrer"></div>` : ''}
-    <label class="sign-lb">Deine Unterschrift <span class="muted">(mit dem Finger malen)</span></label>
+  modal(`<h3>${t('sign_title')}</h3>
+    <p class="hint">${t('sign_hint')}</p>
+    <div class="sign-lesson">📅 <strong>${fmtDT(l.date, l.start_time)}</strong> · ${l.duration_min} ${t('min')}${art}${l.late_minutes ? ` · ${t('ml_late', { late: l.late_minutes })}` : ''}${l.feedback ? `<div class="sign-note">„${esc(l.feedback)}"</div>` : ''}</div>
+    ${adk.length ? `<div class="sign-adk"><div class="sign-adk-h">${t('sign_practiced')}</div>${adk.map((a) => `<div class="sign-adk-i">${currStatusMeta(a.s).dot} ${esc(a.label)}</div>`).join('')}</div>` : ''}
+    ${l.instr_signature ? `<div class="sign-fl">${t('sign_fl_signed')} <img src="${l.instr_signature}" class="sign-fl-img" alt="Unterschrift Fahrlehrer"></div>` : ''}
+    <label class="sign-lb">${t('sign_your')} <span class="muted">${t('sign_draw')}</span></label>
     <div class="sign-pad-wrap">
       <canvas id="sign-pad" class="sign-pad"></canvas>
-      <button type="button" class="ghost sm sign-clear" id="sign-clear">Löschen</button>
+      <button type="button" class="ghost sm sign-clear" id="sign-clear">${t('clear')}</button>
     </div>
-    <label class="ck-line" style="justify-content:flex-start"><input type="checkbox" id="sign-ok"> Ich bestätige, dass ich diese Fahrstunde gefahren bin.</label>
-    <div class="actions"><button class="sec" onclick="window.__closeModal()">Später</button><button id="sign-go" disabled>Bestätigen ✍️</button></div>`);
+    <label class="ck-line" style="justify-content:flex-start"><input type="checkbox" id="sign-ok"> ${t('sign_confirm_ck')}</label>
+    <div class="actions"><button class="sec" onclick="window.__closeModal()">${t('gate_later')}</button><button id="sign-go" disabled>${t('sign_go')}</button></div>`);
   const canvas = $('#sign-pad');
   const ctx = canvas.getContext('2d');
   let drawn = false, drawing = false, last = null;
@@ -2144,13 +2216,13 @@ function openSignModal(l) {
   const ok = $('#sign-ok'), go = $('#sign-go');
   ok.onchange = () => { go.disabled = !ok.checked; };
   go.onclick = async () => {
-    go.disabled = true; go.textContent = 'Wird gespeichert …';
+    go.disabled = true; go.textContent = t('saving');
     const body = {};
     if (drawn) { try { body.signature = canvas.toDataURL('image/png'); } catch {} }
     try {
       await api('/api/my/bookings/' + l.id + '/sign', { method: 'POST', body });
-      closeModal(); toast('Unterschrieben – danke! ✓', 'ok'); syncStudent();
-    } catch (e) { go.disabled = false; go.textContent = 'Bestätigen ✍️'; toast(e.message, 'err'); }
+      closeModal(); toast(t('toast_signed'), 'ok'); syncStudent();
+    } catch (e) { go.disabled = false; go.textContent = t('sign_go'); toast(e.message, 'err'); }
   };
 }
 
