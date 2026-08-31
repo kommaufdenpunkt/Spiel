@@ -169,6 +169,15 @@ const I18N = {
     es_live_t: '📍 Treffpunkt', es_live: 'Kurz vor deiner Fahrstunde siehst du hier den Treffpunkt und wo dein Fahrlehrer gerade ist.',
     es_lessons: 'Sobald du deine erste Fahrstunde gefahren bist, erscheint sie hier – mit Datum, Uhrzeit, Dauer und Vermerk. Daraus kannst du dir jederzeit einen Nachweis drucken.',
     es_messages: 'Schreib deinem Fahrlehrer – z. B. eine Frage oder kurz Bescheid, wenn du dich verspätest. Der Chat lädt gleich.',
+    lt_today: 'Heute um <strong>{time} Uhr</strong> · {d} Min Fahrzeit.',
+    lt_press_start: 'Drück auf Start, sobald deine Fahrstunde beginnt – dann läuft deine Fahrzeit.',
+    lt_start: '▶️ Fahrstunde starten', lt_running: '🚗 Fahrstunde läuft',
+    lt_time_up: '✅ Zeit um', lt_done_text: 'Deine {d}-Minuten-Fahrstunde ist abgelaufen. Super gemacht!',
+    lt_remain: 'Fahrzeit übrig', lt_started: 'Start {time} · {d} Min', reset: 'Zurücksetzen',
+    lt_toast_started: 'Fahrstunde gestartet – gute Fahrt! 🚗',
+    lt_reset_confirm: 'Timer zurücksetzen? Die Fahrzeit beginnt dann neu.', lt_toast_reset: 'Zurückgesetzt',
+    live_map_loading: 'Karte lädt …',
+    live_hint: '🛰️ Die Karte aktualisiert sich automatisch – du siehst live, wo dein Fahrlehrer ist und wann du rausgehen musst.',
   },
   en: {
     tagline_student: 'Book driving lessons easily online', tagline_admin: 'Instructor area',
@@ -298,6 +307,15 @@ const I18N = {
     es_live_t: '📍 Meeting point', es_live: 'Shortly before your lesson you’ll see the meeting point and where your instructor currently is.',
     es_lessons: 'Once you’ve driven your first lesson, it appears here – with date, time, duration and note. You can print a record from it any time.',
     es_messages: 'Write to your instructor – e.g. a question or a quick heads-up if you’re running late. The chat loads in a moment.',
+    lt_today: 'Today at <strong>{time}</strong> · {d} min driving time.',
+    lt_press_start: 'Tap start when your lesson begins – then your driving time runs.',
+    lt_start: '▶️ Start lesson', lt_running: '🚗 Lesson in progress',
+    lt_time_up: '✅ Time’s up', lt_done_text: 'Your {d}-minute lesson is over. Well done!',
+    lt_remain: 'driving time left', lt_started: 'Start {time} · {d} min', reset: 'Reset',
+    lt_toast_started: 'Lesson started – drive safely! 🚗',
+    lt_reset_confirm: 'Reset the timer? The driving time starts over.', lt_toast_reset: 'Reset',
+    live_map_loading: 'Map loading …',
+    live_hint: '🛰️ The map updates automatically – you see live where your instructor is and when to head out.',
   },
   tr: {
     tagline_student: 'Direksiyon derslerini kolayca online al', tagline_admin: 'Eğitmen alanı',
@@ -427,6 +445,15 @@ const I18N = {
     es_live_t: '📍 Buluşma noktası', es_live: 'Dersinden kısa süre önce buluşma noktasını ve eğitmeninin nerede olduğunu burada görürsün.',
     es_lessons: 'İlk dersini sürdüğünde burada görünür – tarih, saat, süre ve not ile. İstediğin zaman bundan bir belge yazdırabilirsin.',
     es_messages: 'Eğitmenine yaz – örn. bir soru ya da geç kalacaksan kısa bir haber. Sohbet birazdan yükleniyor.',
+    lt_today: 'Bugün <strong>{time}</strong> · {d} dk sürüş süresi.',
+    lt_press_start: 'Dersin başlayınca başlat’a bas – sürüş süren böyle işler.',
+    lt_start: '▶️ Dersi başlat', lt_running: '🚗 Ders devam ediyor',
+    lt_time_up: '✅ Süre doldu', lt_done_text: '{d} dakikalık dersin bitti. Aferin!',
+    lt_remain: 'kalan sürüş süresi', lt_started: 'Başlangıç {time} · {d} dk', reset: 'Sıfırla',
+    lt_toast_started: 'Ders başladı – iyi sürüşler! 🚗',
+    lt_reset_confirm: 'Sayaç sıfırlansın mı? Sürüş süresi yeniden başlar.', lt_toast_reset: 'Sıfırlandı',
+    live_map_loading: 'Harita yükleniyor …',
+    live_hint: '🛰️ Harita otomatik güncellenir – eğitmeninin nerede olduğunu ve ne zaman çıkman gerektiğini canlı görürsün.',
   },
   ar: {
     tagline_student: 'احجز دروس القيادة بسهولة عبر الإنترنت', tagline_admin: 'منطقة المدرّب',
@@ -556,6 +583,15 @@ const I18N = {
     es_live_t: '📍 نقطة اللقاء', es_live: 'قبل درسك بقليل ترى هنا نقطة اللقاء وأين يوجد مدرّبك حالياً.',
     es_lessons: 'بمجرد أن تقود درسك الأول يظهر هنا – مع التاريخ والوقت والمدة والملاحظة. يمكنك طباعة سجل منه في أي وقت.',
     es_messages: 'راسِل مدرّبك – مثلاً سؤال أو تنبيه سريع إن كنت ستتأخر. تُحمّل المحادثة بعد لحظات.',
+    lt_today: 'اليوم <strong>{time}</strong> · {d} دقيقة قيادة.',
+    lt_press_start: 'اضغط بدء عندما يبدأ درسك – عندها يعمل وقت قيادتك.',
+    lt_start: '▶️ ابدأ الدرس', lt_running: '🚗 الدرس جارٍ',
+    lt_time_up: '✅ انتهى الوقت', lt_done_text: 'انتهى درسك ({d} دقيقة). أحسنت!',
+    lt_remain: 'وقت القيادة المتبقي', lt_started: 'البدء {time} · {d} دقيقة', reset: 'إعادة تعيين',
+    lt_toast_started: 'بدأ الدرس – قيادة آمنة! 🚗',
+    lt_reset_confirm: 'إعادة تعيين المؤقّت؟ سيبدأ وقت القيادة من جديد.', lt_toast_reset: 'أُعيد التعيين',
+    live_map_loading: 'يتم تحميل الخريطة …',
+    live_hint: '🛰️ تُحدَّث الخريطة تلقائياً – ترى مباشرةً أين مدرّبك ومتى عليك الخروج.',
   },
 };
 function t(key, vars) {
@@ -3310,10 +3346,10 @@ async function refreshStudentLive() {
       card.innerHTML = `<h2>🛰️ Dein Fahrlehrer ist unterwegs</h2>
         <div id="live-hero"></div>
         <div class="inline" id="live-pills" style="margin-bottom:.6rem"></div>
-        <div id="live-map" class="live-map"><div class="lm-loading"><span class="tire">🛞</span><span>Karte lädt …</span></div></div>
+        <div id="live-map" class="live-map"><div class="lm-loading"><span class="tire">🛞</span><span>${t('live_map_loading')}</span></div></div>
         <div id="live-meet"></div>
         <div id="live-pickup"></div>
-        <p class="hint" style="margin-top:.4rem">🛰️ Die Karte aktualisiert sich automatisch – du siehst live, wo dein Fahrlehrer ist und wann du rausgehen musst.</p>
+        <p class="hint" style="margin-top:.4rem">${t('live_hint')}</p>
         <div id="live-contact"></div>`;
     }
     applyEta(null);                 // sofort mit der Schätzung anzeigen
@@ -3357,10 +3393,10 @@ function renderLessonTimer(bookings) {
   const b = info.b;
   const draw = () => {
     if (!info.started) {
-      card.innerHTML = `<h2>🚗 Deine Fahrstunde</h2>
-        <p>Heute um <strong>${b.start_time} Uhr</strong> · ${b.duration_min} Min Fahrzeit.</p>
-        <p class="hint">Drück auf Start, sobald deine Fahrstunde beginnt – dann läuft deine Fahrzeit.</p>
-        <button class="lesson-start" id="lt-start">▶️ Fahrstunde starten</button>`;
+      card.innerHTML = `<h2>${t('es_lesson_t')}</h2>
+        <p>${t('lt_today', { time: b.start_time, d: b.duration_min })}</p>
+        <p class="hint">${t('lt_press_start')}</p>
+        <button class="lesson-start" id="lt-start">${t('lt_start')}</button>`;
       $('#lt-start').onclick = () => startLesson(b.id);
       return;
     }
@@ -3370,15 +3406,15 @@ function renderLessonTimer(bookings) {
     const mm = Math.floor(remain / 60), ss = remain % 60;
     const pct = Math.min(100, Math.round(elapsedSec / totalSec * 100));
     const startedLbl = new Date(b.started_at).toLocaleTimeString(LOCALE, { hour: '2-digit', minute: '2-digit' });
-    card.innerHTML = `<h2>🚗 Fahrstunde läuft</h2>
+    card.innerHTML = `<h2>${t('lt_running')}</h2>
       ${remain <= 0
-        ? `<div class="lesson-timer done"><span class="lt-clock">✅ Zeit um</span></div>
-           <p class="hint">Deine ${b.duration_min}-Minuten-Fahrstunde ist abgelaufen. Super gemacht!</p>`
-        : `<div class="lesson-timer"><span class="lt-clock">${mm}:${String(ss).padStart(2, '0')}</span><span class="lt-sub">Fahrzeit übrig</span></div>
+        ? `<div class="lesson-timer done"><span class="lt-clock">${t('lt_time_up')}</span></div>
+           <p class="hint">${t('lt_done_text', { d: b.duration_min })}</p>`
+        : `<div class="lesson-timer"><span class="lt-clock">${mm}:${String(ss).padStart(2, '0')}</span><span class="lt-sub">${t('lt_remain')}</span></div>
            <div class="lt-bar"><div style="width:${pct}%"></div></div>`}
       <div class="inline" style="margin-top:.7rem;justify-content:space-between">
-        <span class="muted" style="font-size:.82rem">Start ${startedLbl} · ${b.duration_min} Min</span>
-        <button class="ghost sm" id="lt-reset">Zurücksetzen</button>
+        <span class="muted" style="font-size:.82rem">${t('lt_started', { time: startedLbl, d: b.duration_min })}</span>
+        <button class="ghost sm" id="lt-reset">${t('reset')}</button>
       </div>`;
     $('#lt-reset').onclick = () => resetLesson(b.id);
   };
@@ -3389,15 +3425,15 @@ async function startLesson(id) {
   try {
     const r = await api('/api/bookings/' + id + '/start', { method: 'POST' });
     const bk = myBookingsCache.find((x) => x.id == id); if (bk) bk.started_at = r.started_at;
-    renderLessonTimer(myBookingsCache); toast('Fahrstunde gestartet – gute Fahrt! 🚗', 'ok');
+    renderLessonTimer(myBookingsCache); toast(t('lt_toast_started'), 'ok');
   } catch (e) { toast(e.message, 'err'); }
 }
 async function resetLesson(id) {
-  if (!confirm('Timer zurücksetzen? Die Fahrzeit beginnt dann neu.')) return;
+  if (!confirm(t('lt_reset_confirm'))) return;
   try {
     await api('/api/bookings/' + id + '/start', { method: 'POST', body: { reset: true } });
     const bk = myBookingsCache.find((x) => x.id == id); if (bk) bk.started_at = null;
-    renderLessonTimer(myBookingsCache); toast('Zurückgesetzt', 'ok');
+    renderLessonTimer(myBookingsCache); toast(t('lt_toast_reset'), 'ok');
   } catch (e) { toast(e.message, 'err'); }
 }
 
