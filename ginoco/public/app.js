@@ -178,6 +178,26 @@ const I18N = {
     lt_reset_confirm: 'Timer zurücksetzen? Die Fahrzeit beginnt dann neu.', lt_toast_reset: 'Zurückgesetzt',
     live_map_loading: 'Karte lädt …',
     live_hint: '🛰️ Die Karte aktualisiert sich automatisch – du siehst live, wo dein Fahrlehrer ist und wann du rausgehen musst.',
+    ap_intro: 'Gestalte ginoco, wie es dir gefällt – alles wird auf diesem Gerät gespeichert.',
+    ap_theme: 'Thema', ap_accent: 'Akzentfarbe', ap_accent_sub: '(Buttons & Reiter)',
+    ap_font: 'Schriftart', ap_ink: 'Textfarbe', ap_edge: 'Menü-Farbe', ap_edge_sub: '(die zwei Menüseiten)',
+    ap_standard: 'Standard', ap_size: 'Schriftgröße', ap_tone: 'Benachrichtigungston',
+    ap_tone_chime: '🔔 Glocke (Standard)', ap_tone_lock: '🚗🔒 Auto-Verriegeln', ap_tone_off: '🔇 Aus',
+    ap_tone_hint: 'Klingt bei neuen Mitteilungen (z. B. „Etwas liegt im Postfach"), solange die App offen ist.',
+    reset_btn: 'Zurücksetzen', done: 'Fertig', ap_reset_toast: 'Auf Standard zurückgesetzt', ap_own_color: 'Eigene Farbe', probe: 'Probe',
+    pf_open: 'Bearbeiten ▾', pf_close: 'Zuklappen ▲', pf_my_profile: 'Mein Profil',
+    pf_summary_empty: 'Tippe zum Vervollständigen', pf_years: '{a} Jahre',
+    pf_change_photo: 'Foto ändern', pf_remove_photo: 'Foto entfernen',
+    pf_privacy: '🔒 Nur dein Fahrlehrer sieht dein Profil – kein anderer Fahrschüler.',
+    pf_personal: '👤 Persönliches', pf_name: 'Name', pf_bdate: 'Geburtsdatum', pf_age: 'Alter',
+    pf_address: '🏠 Adresse', pf_geo: '📍 Aktuellen Standort übernehmen',
+    pf_geo_hint: 'Faul zuhause? Ein Tipp füllt Straße, PLZ und Ort automatisch – du ergänzt nur die Hausnummer.',
+    pf_street: 'Straße', pf_houseno: 'Hausnr.', pf_zip: 'PLZ', pf_city: 'Ort',
+    pf_contact: '📞 Kontakt', pf_phone: 'Handynummer', pf_email: 'E-Mail (optional)',
+    pf_access: '🔑 Zugang', pf_login_fixed: 'Login-Name (fest, ändert sich nicht)', pf_reach_school: 'Fahrschule erreichen',
+    pf_save: 'Speichern', pf_account: '⚠️ Konto', pf_del_account: '🗑️ Mein Konto löschen',
+    pf_account_text: 'Du kannst dein Konto jederzeit selbst löschen. Dein Login und deine persönlichen Daten werden dann entfernt. Deine bereits gefahrenen Fahrstunden bleiben – anonymisiert – im gesetzlichen Ausbildungsnachweis deiner Fahrschule erhalten.',
+    pf_ph_street: 'z.B. Bahnhofstraße', pf_ph_houseno: '12a', pf_ph_zip: '89073', pf_ph_city: 'z.B. Ulm', pf_ph_phone: 'z.B. 0151 23456789', pf_ph_email: 'name@mail.de',
   },
   en: {
     tagline_student: 'Book driving lessons easily online', tagline_admin: 'Instructor area',
@@ -316,6 +336,26 @@ const I18N = {
     lt_reset_confirm: 'Reset the timer? The driving time starts over.', lt_toast_reset: 'Reset',
     live_map_loading: 'Map loading …',
     live_hint: '🛰️ The map updates automatically – you see live where your instructor is and when to head out.',
+    ap_intro: 'Make ginoco your own – everything is saved on this device.',
+    ap_theme: 'Theme', ap_accent: 'Accent colour', ap_accent_sub: '(buttons & tabs)',
+    ap_font: 'Font', ap_ink: 'Text colour', ap_edge: 'Menu colour', ap_edge_sub: '(the two menu sides)',
+    ap_standard: 'Default', ap_size: 'Font size', ap_tone: 'Notification sound',
+    ap_tone_chime: '🔔 Bell (default)', ap_tone_lock: '🚗🔒 Car lock', ap_tone_off: '🔇 Off',
+    ap_tone_hint: 'Sounds for new messages (e.g. “Something is in your mailbox”) while the app is open.',
+    reset_btn: 'Reset', done: 'Done', ap_reset_toast: 'Reset to default', ap_own_color: 'Custom colour', probe: 'Test',
+    pf_open: 'Edit ▾', pf_close: 'Collapse ▲', pf_my_profile: 'My profile',
+    pf_summary_empty: 'Tap to complete', pf_years: '{a} years',
+    pf_change_photo: 'Change photo', pf_remove_photo: 'Remove photo',
+    pf_privacy: '🔒 Only your instructor sees your profile – no other student.',
+    pf_personal: '👤 Personal', pf_name: 'Name', pf_bdate: 'Date of birth', pf_age: 'Age',
+    pf_address: '🏠 Address', pf_geo: '📍 Use current location',
+    pf_geo_hint: 'Feeling lazy at home? One tap fills in street, postcode and city – you only add the house number.',
+    pf_street: 'Street', pf_houseno: 'No.', pf_zip: 'Postcode', pf_city: 'City',
+    pf_contact: '📞 Contact', pf_phone: 'Mobile number', pf_email: 'E-mail (optional)',
+    pf_access: '🔑 Access', pf_login_fixed: 'Login name (fixed, does not change)', pf_reach_school: 'Contact the school',
+    pf_save: 'Save', pf_account: '⚠️ Account', pf_del_account: '🗑️ Delete my account',
+    pf_account_text: 'You can delete your account yourself at any time. Your login and personal data are then removed. Your already driven lessons remain – anonymised – in your driving school\u2019s legally required training record.',
+    pf_ph_street: 'e.g. Bahnhofstraße', pf_ph_houseno: '12a', pf_ph_zip: '89073', pf_ph_city: 'e.g. Ulm', pf_ph_phone: 'e.g. 0151 23456789', pf_ph_email: 'name@mail.com',
   },
   tr: {
     tagline_student: 'Direksiyon derslerini kolayca online al', tagline_admin: 'Eğitmen alanı',
@@ -454,6 +494,26 @@ const I18N = {
     lt_reset_confirm: 'Sayaç sıfırlansın mı? Sürüş süresi yeniden başlar.', lt_toast_reset: 'Sıfırlandı',
     live_map_loading: 'Harita yükleniyor …',
     live_hint: '🛰️ Harita otomatik güncellenir – eğitmeninin nerede olduğunu ve ne zaman çıkman gerektiğini canlı görürsün.',
+    ap_intro: 'ginoco’yu kendine göre yap – her şey bu cihazda saklanır.',
+    ap_theme: 'Tema', ap_accent: 'Vurgu rengi', ap_accent_sub: '(düğmeler & sekmeler)',
+    ap_font: 'Yazı tipi', ap_ink: 'Metin rengi', ap_edge: 'Menü rengi', ap_edge_sub: '(iki menü tarafı)',
+    ap_standard: 'Varsayılan', ap_size: 'Yazı boyutu', ap_tone: 'Bildirim sesi',
+    ap_tone_chime: '🔔 Zil (varsayılan)', ap_tone_lock: '🚗🔒 Araç kilidi', ap_tone_off: '🔇 Kapalı',
+    ap_tone_hint: 'Uygulama açıkken yeni mesajlarda çalar (örn. „Postanda bir şey var").',
+    reset_btn: 'Sıfırla', done: 'Tamam', ap_reset_toast: 'Varsayılana sıfırlandı', ap_own_color: 'Özel renk', probe: 'Dinle',
+    pf_open: 'Düzenle ▾', pf_close: 'Daralt ▲', pf_my_profile: 'Profilim',
+    pf_summary_empty: 'Tamamlamak için dokun', pf_years: '{a} yaşında',
+    pf_change_photo: 'Fotoğrafı değiştir', pf_remove_photo: 'Fotoğrafı kaldır',
+    pf_privacy: '🔒 Profilini yalnızca eğitmenin görür – başka öğrenci görmez.',
+    pf_personal: '👤 Kişisel', pf_name: 'Ad', pf_bdate: 'Doğum tarihi', pf_age: 'Yaş',
+    pf_address: '🏠 Adres', pf_geo: '📍 Mevcut konumu kullan',
+    pf_geo_hint: 'Evde üşengeç mi? Bir dokunuş sokak, posta kodu ve şehri otomatik doldurur – sadece kapı numarasını eklersin.',
+    pf_street: 'Sokak', pf_houseno: 'No.', pf_zip: 'Posta kodu', pf_city: 'Şehir',
+    pf_contact: '📞 İletişim', pf_phone: 'Cep numarası', pf_email: 'E-posta (isteğe bağlı)',
+    pf_access: '🔑 Erişim', pf_login_fixed: 'Kullanıcı adı (sabit, değişmez)', pf_reach_school: 'Okula ulaş',
+    pf_save: 'Kaydet', pf_account: '⚠️ Hesap', pf_del_account: '🗑️ Hesabımı sil',
+    pf_account_text: 'Hesabını istediğin zaman kendin silebilirsin. Girişin ve kişisel verilerin kaldırılır. Sürdüğün dersler – anonim olarak – sürücü okulunun yasal eğitim kaydında kalır.',
+    pf_ph_street: 'örn. Bahnhofstraße', pf_ph_houseno: '12a', pf_ph_zip: '89073', pf_ph_city: 'örn. Ulm', pf_ph_phone: 'örn. 0151 23456789', pf_ph_email: 'ad@mail.com',
   },
   ar: {
     tagline_student: 'احجز دروس القيادة بسهولة عبر الإنترنت', tagline_admin: 'منطقة المدرّب',
@@ -592,6 +652,26 @@ const I18N = {
     lt_reset_confirm: 'إعادة تعيين المؤقّت؟ سيبدأ وقت القيادة من جديد.', lt_toast_reset: 'أُعيد التعيين',
     live_map_loading: 'يتم تحميل الخريطة …',
     live_hint: '🛰️ تُحدَّث الخريطة تلقائياً – ترى مباشرةً أين مدرّبك ومتى عليك الخروج.',
+    ap_intro: 'اجعل ginoco على ذوقك – كل شيء يُحفظ على هذا الجهاز.',
+    ap_theme: 'السمة', ap_accent: 'لون التمييز', ap_accent_sub: '(الأزرار والتبويبات)',
+    ap_font: 'الخط', ap_ink: 'لون النص', ap_edge: 'لون القائمة', ap_edge_sub: '(جانبا القائمة)',
+    ap_standard: 'افتراضي', ap_size: 'حجم الخط', ap_tone: 'صوت الإشعار',
+    ap_tone_chime: '🔔 جرس (افتراضي)', ap_tone_lock: '🚗🔒 قفل السيارة', ap_tone_off: '🔇 إيقاف',
+    ap_tone_hint: 'يُصدر صوتاً عند وصول رسائل جديدة (مثل «شيء ما في صندوقك») أثناء فتح التطبيق.',
+    reset_btn: 'إعادة تعيين', done: 'تم', ap_reset_toast: 'أُعيد إلى الافتراضي', ap_own_color: 'لون مخصّص', probe: 'تجربة',
+    pf_open: 'تعديل ▾', pf_close: 'طي ▲', pf_my_profile: 'ملفي',
+    pf_summary_empty: 'انقر لإكماله', pf_years: '{a} سنة',
+    pf_change_photo: 'تغيير الصورة', pf_remove_photo: 'إزالة الصورة',
+    pf_privacy: '🔒 مدرّبك وحده يرى ملفك – لا طالب آخر.',
+    pf_personal: '👤 المعلومات الشخصية', pf_name: 'الاسم', pf_bdate: 'تاريخ الميلاد', pf_age: 'العمر',
+    pf_address: '🏠 العنوان', pf_geo: '📍 استخدام الموقع الحالي',
+    pf_geo_hint: 'كسول في البيت؟ نقرة واحدة تملأ الشارع والرمز البريدي والمدينة – تضيف رقم المنزل فقط.',
+    pf_street: 'الشارع', pf_houseno: 'رقم', pf_zip: 'الرمز البريدي', pf_city: 'المدينة',
+    pf_contact: '📞 التواصل', pf_phone: 'رقم الجوال', pf_email: 'البريد الإلكتروني (اختياري)',
+    pf_access: '🔑 الدخول', pf_login_fixed: 'اسم الدخول (ثابت، لا يتغيّر)', pf_reach_school: 'التواصل مع المدرسة',
+    pf_save: 'حفظ', pf_account: '⚠️ الحساب', pf_del_account: '🗑️ حذف حسابي',
+    pf_account_text: 'يمكنك حذف حسابك بنفسك في أي وقت. عندها يُزال دخولك وبياناتك الشخصية. تبقى دروسك التي قدتها – مجهّلة الهوية – في سجل التدريب القانوني لمدرسة القيادة.',
+    pf_ph_street: 'مثل Bahnhofstraße', pf_ph_houseno: '12a', pf_ph_zip: '89073', pf_ph_city: 'مثل Ulm', pf_ph_phone: 'مثل 0151 23456789', pf_ph_email: 'name@mail.com',
   },
 };
 function t(key, vars) {
@@ -848,68 +928,68 @@ function openThemePicker() {
   const p = state.prefs || {};
   const accent = p.accent || (THEMES[cur] || THEMES.unternbuchen).dot;
   const swatch = (bg, on, extra = '') => `width:30px;height:30px;border-radius:50%;background:${bg};display:inline-block;border:2px solid ${on ? 'var(--ink)' : 'transparent'};${extra}`;
-  modal(`<h3>🎨 Aussehen</h3>
-    <p class="hint">Gestalte ginoco, wie es dir gefällt – alles wird auf diesem Gerät gespeichert.</p>
+  modal(`<h3>${t('appearance')}</h3>
+    <p class="hint">${t('ap_intro')}</p>
 
     <div class="ap-sec"><div class="ap-label">🌍 Sprache / Language / Dil / اللغة</div>
       <button class="sec" style="width:100%;justify-content:center" onclick="window.__openLangPicker()">${(LANGS[LANG] || LANGS.de).flag} ${esc((LANGS[LANG] || LANGS.de).label)}</button>
     </div>
 
-    <div class="ap-sec"><div class="ap-label">Thema</div>
+    <div class="ap-sec"><div class="ap-label">${t('ap_theme')}</div>
       <div class="ap-grid2">
-        ${Object.entries(THEMES).map(([k, t]) => `<button class="sec" data-theme="${k}" style="justify-content:flex-start;display:flex;align-items:center;gap:.5rem;${k === cur ? 'outline:2px solid ' + t.dot : ''}">
-          <span style="width:16px;height:16px;border-radius:50%;background:${t.dot}"></span>${t.label}${k === cur ? ' ✓' : ''}</button>`).join('')}
+        ${Object.entries(THEMES).map(([k, th]) => `<button class="sec" data-theme="${k}" style="justify-content:flex-start;display:flex;align-items:center;gap:.5rem;${k === cur ? 'outline:2px solid ' + th.dot : ''}">
+          <span style="width:16px;height:16px;border-radius:50%;background:${th.dot}"></span>${th.label}${k === cur ? ' ✓' : ''}</button>`).join('')}
       </div>
     </div>
 
-    <div class="ap-sec"><div class="ap-label">Akzentfarbe <span class="muted">(Buttons & Reiter)</span></div>
+    <div class="ap-sec"><div class="ap-label">${t('ap_accent')} <span class="muted">${t('ap_accent_sub')}</span></div>
       <div class="ap-swatches">
         ${ACCENTS.map((c) => `<button data-accent="${c}" title="${c}" style="${swatch(c, (p.accent || '').toLowerCase() === c.toLowerCase())}"></button>`).join('')}
-        <label class="ap-free" title="Eigene Farbe">🎨<input type="color" id="ap-accent-free" value="${accent}"></label>
+        <label class="ap-free" title="${t('ap_own_color')}">🎨<input type="color" id="ap-accent-free" value="${accent}"></label>
       </div>
     </div>
 
-    <div class="ap-sec"><div class="ap-label">Schriftart</div>
+    <div class="ap-sec"><div class="ap-label">${t('ap_font')}</div>
       <div class="ap-fonts">
         ${Object.entries(FONTS).map(([k, f]) => `<button class="sec" data-font="${k}" style="font-family:${f.stack};${(p.font || 'system') === k ? 'outline:2px solid var(--brand)' : ''}">${f.label}${(p.font || 'system') === k ? ' ✓' : ''}</button>`).join('')}
       </div>
     </div>
 
-    <div class="ap-sec"><div class="ap-label">Textfarbe</div>
+    <div class="ap-sec"><div class="ap-label">${t('ap_ink')}</div>
       <div class="ap-swatches">
         ${Object.entries(INKS).map(([k, i]) => `<button data-ink="${i.val}" title="${i.label}" style="${swatch(i.dot, (p.ink || '') === i.val)}"></button>`).join('')}
       </div>
     </div>
 
-    <div class="ap-sec"><div class="ap-label">Menü-Farbe <span class="muted">(die zwei Menüseiten)</span></div>
+    <div class="ap-sec"><div class="ap-label">${t('ap_edge')} <span class="muted">${t('ap_edge_sub')}</span></div>
       <div class="ap-swatches">
         ${EDGES.map((c) => `<button data-edge="${c}" title="${c}" style="${swatch(c, (p.edge || '').toLowerCase() === c.toLowerCase())}"></button>`).join('')}
-        <label class="ap-free" title="Eigene Farbe">🎨<input type="color" id="ap-edge-free" value="${p.edge || '#111319'}"></label>
-        <button class="ghost sm" data-edge="" style="margin-left:.4rem">Standard</button>
+        <label class="ap-free" title="${t('ap_own_color')}">🎨<input type="color" id="ap-edge-free" value="${p.edge || '#111319'}"></label>
+        <button class="ghost sm" data-edge="" style="margin-left:.4rem">${t('ap_standard')}</button>
       </div>
     </div>
 
-    <div class="ap-sec"><div class="ap-label">Schriftgröße</div>
+    <div class="ap-sec"><div class="ap-label">${t('ap_size')}</div>
       <div class="ap-grid2">
         ${Object.keys(SIZES).map((k) => `<button class="sec" data-size="${k}" style="${(p.size || 'normal') === k ? 'outline:2px solid var(--brand)' : ''}">${SIZE_LABEL[k]}${(p.size || 'normal') === k ? ' ✓' : ''}</button>`).join('')}
       </div>
     </div>
 
-    <div class="ap-sec"><div class="ap-label">Benachrichtigungston</div>
+    <div class="ap-sec"><div class="ap-label">${t('ap_tone')}</div>
       <div class="tone-row">
         <select id="ap-tone" class="tone-sel">
-          <option value="chime">🔔 Glocke (Standard)</option>
-          <option value="carlock">🚗🔒 Auto-Verriegeln</option>
-          <option value="off">🔇 Aus</option>
+          <option value="chime">${t('ap_tone_chime')}</option>
+          <option value="carlock">${t('ap_tone_lock')}</option>
+          <option value="off">${t('ap_tone_off')}</option>
         </select>
-        <button class="ghost sm" id="ap-tone-test" type="button">▶︎ Probe</button>
+        <button class="ghost sm" id="ap-tone-test" type="button">▶︎ ${t('probe')}</button>
       </div>
-      <div class="ap-hint">Klingt bei neuen Mitteilungen (z. B. „Etwas liegt im Postfach"), solange die App offen ist.</div>
+      <div class="ap-hint">${t('ap_tone_hint')}</div>
     </div>
 
     <div class="actions" style="justify-content:space-between">
-      <button class="ghost sm" id="ap-reset">Zurücksetzen</button>
-      <button class="sec" onclick="window.__closeModal()">Fertig</button>
+      <button class="ghost sm" id="ap-reset">${t('reset_btn')}</button>
+      <button class="sec" onclick="window.__closeModal()">${t('done')}</button>
     </div>`, 'wide');
 
   // Auswahl NUR in-place markieren (kein Neuaufbau des Fensters -> kein „Hängen"/Flackern)
@@ -944,7 +1024,7 @@ function openThemePicker() {
   const toneTest = $('#ap-tone-test');
   if (toneTest) toneTest.onclick = () => { unlockAudio(); const prev = NOTIFY_TONE; NOTIFY_TONE = (toneSel && toneSel.value) || NOTIFY_TONE; playChime(); NOTIFY_TONE = prev; };
   const rst = $('#ap-reset');
-  if (rst) rst.onclick = () => { resetAppearance(); toast('Auf Standard zurückgesetzt', 'ok'); mkTheme(); mkAccent(); mkFont(); mkInk(); mkEdge(); mkSize(); };
+  if (rst) rst.onclick = () => { resetAppearance(); toast(t('ap_reset_toast'), 'ok'); mkTheme(); mkAccent(); mkFont(); mkInk(); mkEdge(); mkSize(); };
 }
 window.__openThemePicker = openThemePicker;
 
@@ -1001,77 +1081,77 @@ async function renderProfileCard() {
   try { const r = await api('/api/my/profile'); if (r.profile) pr = { ...pr, ...r.profile }; } catch {}
   const open = !!state.profileOpen;
   const age = ageFromDate(pr.birth_date);
-  const ageBadge = (bd) => { const a = ageFromDate(bd); return a == null ? '' : `${a} Jahre`; };
+  const ageBadge = (bd) => { const a = ageFromDate(bd); return a == null ? '' : t('pf_years', { a }); };
   const avatarInner = pr.has_photo
     ? `<img src="/api/my/photo?t=${Date.now()}" alt="Profilfoto">`
     : `<span>${esc(initials(pr.name))}</span>`;
-  const summary = [pr.username, age != null ? age + ' Jahre' : null, pr.city].filter(Boolean).join(' · ') || 'Tippe zum Vervollständigen';
+  const summary = [pr.username, age != null ? t('pf_years', { a: age }) : null, pr.city].filter(Boolean).join(' · ') || t('pf_summary_empty');
   card.classList.remove('hidden');
   card.innerHTML = `
     <div class="pfc-head" id="pfc-head">
       <span class="pfc-av">${avatarInner}</span>
       <div class="pfc-meta">
-        <div class="pfc-name">${esc(pr.name || 'Mein Profil')}</div>
+        <div class="pfc-name">${esc(pr.name || t('pf_my_profile'))}</div>
         <div class="pfc-sub">${esc(summary)}</div>
       </div>
-      <button class="sec sm" id="pfc-toggle">${open ? 'Zuklappen ▲' : 'Bearbeiten ▾'}</button>
+      <button class="sec sm" id="pfc-toggle">${open ? t('pf_close') : t('pf_open')}</button>
     </div>
     <div class="pfc-body ${open ? '' : 'hidden'}" id="pfc-body">
       <div class="pf-hero" style="margin-top:.6rem">
         <div class="pf-avatar-lg">
           <span class="pf-av-inner" id="pf-av-inner">${avatarInner}</span>
-          <label class="pf-cam" title="Foto ändern">📷<input type="file" id="pf-file" accept="image/*" hidden></label>
+          <label class="pf-cam" title="${t('pf_change_photo')}">📷<input type="file" id="pf-file" accept="image/*" hidden></label>
         </div>
-        <button class="ghost sm ${pr.has_photo ? '' : 'hidden'}" id="pf-photo-del" style="margin-top:.4rem">Foto entfernen</button>
+        <button class="ghost sm ${pr.has_photo ? '' : 'hidden'}" id="pf-photo-del" style="margin-top:.4rem">${t('pf_remove_photo')}</button>
       </div>
-      <div class="pf-privacy">🔒 Nur dein Fahrlehrer sieht dein Profil – kein anderer Fahrschüler.</div>
+      <div class="pf-privacy">${t('pf_privacy')}</div>
       <div class="err hidden" id="pf-err"></div>
       <div class="pf-sec">
-        <div class="pf-sec-h">👤 Persönliches</div>
-        <div class="field"><label>Name</label><input id="pf-name" value="${esc(pr.name || '')}" placeholder="Vor- und Nachname"></div>
+        <div class="pf-sec-h">${t('pf_personal')}</div>
+        <div class="field"><label>${t('pf_name')}</label><input id="pf-name" value="${esc(pr.name || '')}" placeholder="${t('reg_name_ph')}"></div>
         <div class="row">
-          <div class="field"><label>Geburtsdatum</label><input id="pf-bdate" type="date" value="${esc(pr.birth_date || '')}" max="2015-12-31"></div>
-          <div class="field" style="max-width:110px"><label>Alter</label><input id="pf-age" value="${ageBadge(pr.birth_date)}" placeholder="—" readonly></div>
+          <div class="field"><label>${t('pf_bdate')}</label><input id="pf-bdate" type="date" value="${esc(pr.birth_date || '')}" max="2015-12-31"></div>
+          <div class="field" style="max-width:110px"><label>${t('pf_age')}</label><input id="pf-age" value="${ageBadge(pr.birth_date)}" placeholder="—" readonly></div>
         </div>
       </div>
       <div class="pf-sec">
-        <div class="pf-sec-h">🏠 Adresse</div>
-        <button class="geo-btn" id="pf-geo" type="button">📍 Aktuellen Standort übernehmen</button>
-        <div class="hint" style="margin:.35rem 0 .7rem">Faul zuhause? Ein Tipp füllt Straße, PLZ und Ort automatisch – du ergänzt nur die Hausnummer.</div>
+        <div class="pf-sec-h">${t('pf_address')}</div>
+        <button class="geo-btn" id="pf-geo" type="button">${t('pf_geo')}</button>
+        <div class="hint" style="margin:.35rem 0 .7rem">${t('pf_geo_hint')}</div>
         <div class="row">
-          <div class="field" style="flex:2"><label>Straße</label><input id="pf-street" value="${esc(pr.street || '')}" placeholder="z.B. Bahnhofstraße"></div>
-          <div class="field" style="max-width:110px"><label>Hausnr.</label><input id="pf-houseno" value="${esc(pr.house_no || '')}" placeholder="12a"></div>
+          <div class="field" style="flex:2"><label>${t('pf_street')}</label><input id="pf-street" value="${esc(pr.street || '')}" placeholder="${t('pf_ph_street')}"></div>
+          <div class="field" style="max-width:110px"><label>${t('pf_houseno')}</label><input id="pf-houseno" value="${esc(pr.house_no || '')}" placeholder="${t('pf_ph_houseno')}"></div>
         </div>
         <div class="row">
-          <div class="field" style="max-width:130px"><label>PLZ</label><input id="pf-zip" inputmode="numeric" value="${esc(pr.zip || '')}" placeholder="89073"></div>
-          <div class="field" style="flex:2"><label>Ort</label><input id="pf-city" value="${esc(pr.city || '')}" placeholder="z.B. Ulm"></div>
+          <div class="field" style="max-width:130px"><label>${t('pf_zip')}</label><input id="pf-zip" inputmode="numeric" value="${esc(pr.zip || '')}" placeholder="${t('pf_ph_zip')}"></div>
+          <div class="field" style="flex:2"><label>${t('pf_city')}</label><input id="pf-city" value="${esc(pr.city || '')}" placeholder="${t('pf_ph_city')}"></div>
         </div>
       </div>
       <div class="pf-sec">
-        <div class="pf-sec-h">📞 Kontakt</div>
-        <div class="field"><label>Handynummer</label><input id="pf-phone" inputmode="tel" value="${esc(pr.phone || '')}" placeholder="z.B. 0151 23456789"></div>
-        <div class="field"><label>E-Mail (optional)</label><input id="pf-email" type="email" value="${esc(pr.email || '')}" placeholder="name@mail.de"></div>
+        <div class="pf-sec-h">${t('pf_contact')}</div>
+        <div class="field"><label>${t('pf_phone')}</label><input id="pf-phone" inputmode="tel" value="${esc(pr.phone || '')}" placeholder="${t('pf_ph_phone')}"></div>
+        <div class="field"><label>${t('pf_email')}</label><input id="pf-email" type="email" value="${esc(pr.email || '')}" placeholder="${t('pf_ph_email')}"></div>
       </div>
       <div class="pf-sec">
-        <div class="pf-sec-h">🔑 Zugang</div>
-        <div class="field"><label>Login-Name (fest, ändert sich nicht)</label><input value="${esc(pr.username || '')}" readonly></div>
-        ${ip ? `<div class="field"><label>Fahrschule erreichen</label><div class="inline">${contactButtons(ip)}</div></div>` : ''}
+        <div class="pf-sec-h">${t('pf_access')}</div>
+        <div class="field"><label>${t('pf_login_fixed')}</label><input value="${esc(pr.username || '')}" readonly></div>
+        ${ip ? `<div class="field"><label>${t('pf_reach_school')}</label><div class="inline">${contactButtons(ip)}</div></div>` : ''}
       </div>
-      <div class="actions"><button id="pf-save">Speichern</button></div>
+      <div class="actions"><button id="pf-save">${t('pf_save')}</button></div>
       <div class="pf-danger">
-        <div class="pf-sec-h">⚠️ Konto</div>
-        <p class="hint" style="margin:.1rem 0 .5rem">Du kannst dein Konto jederzeit selbst löschen. Dein Login und deine persönlichen Daten werden dann entfernt. Deine bereits gefahrenen Fahrstunden bleiben – anonymisiert – im gesetzlichen Ausbildungsnachweis deiner Fahrschule erhalten.</p>
-        <button class="danger sm" id="pf-del-account">🗑️ Mein Konto löschen</button>
+        <div class="pf-sec-h">${t('pf_account')}</div>
+        <p class="hint" style="margin:.1rem 0 .5rem">${t('pf_account_text')}</p>
+        <button class="danger sm" id="pf-del-account">${t('pf_del_account')}</button>
       </div>
     </div>`;
   const setOpen = (o) => {
     state.profileOpen = o;
     $('#pfc-body').classList.toggle('hidden', !o);
-    $('#pfc-toggle').textContent = o ? 'Zuklappen ▲' : 'Bearbeiten ▾';
+    $('#pfc-toggle').textContent = o ? t('pf_close') : t('pf_open');
   };
   $('#pfc-head').onclick = () => setOpen(!state.profileOpen);
   const avEl = $('#pf-av-inner'), delBtn = $('#pf-photo-del');
-  $('#pf-bdate').oninput = () => { const a = ageFromDate($('#pf-bdate').value); $('#pf-age').value = a == null ? '' : a + ' Jahre'; };
+  $('#pf-bdate').oninput = () => { const a = ageFromDate($('#pf-bdate').value); $('#pf-age').value = a == null ? '' : t('pf_years', { a }); };
   $('#pf-file').onchange = async (e) => {
     const file = e.target.files && e.target.files[0];
     if (!file) return;
