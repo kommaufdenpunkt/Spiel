@@ -130,6 +130,16 @@ const I18N = {
     sign_your: 'Deine Unterschrift', sign_draw: '(mit dem Finger malen)', clear: 'Löschen',
     sign_confirm_ck: 'Ich bestätige, dass ich diese Fahrstunde gefahren bin.', sign_go: 'Bestätigen ✍️',
     saving: 'Wird gespeichert …', toast_signed: 'Unterschrieben – danke! ✓',
+    greet_welcome: 'Schön, dass du da bist', greet_morning: 'Guten Morgen', greet_day: 'Guten Tag', greet_evening: 'Guten Abend',
+    cd_now: 'jetzt', cd_in_days: 'in {d} Tagen', cd_in_hours: 'in {h} Std', cd_in_min: 'in {m} Min',
+    wk_next_label: 'Deine nächste Fahrstunde',
+    wk_title: 'Meine Fahrstunden', wk_sub: 'diese Woche ({from}–{to})',
+    wk_reserve_one: '🔶 <strong>{n} Termin</strong> von deinem Fahrlehrer vorgeschlagen – bitte unten <strong>✅ Annehmen</strong> oder <strong>✕ Ablehnen</strong>.',
+    wk_reserve_many: '🔶 <strong>{n} Termine</strong> von deinem Fahrlehrer vorgeschlagen – bitte unten <strong>✅ Annehmen</strong> oder <strong>✕ Ablehnen</strong>.',
+    wk_pill: '{count} von {max} gebucht · noch {remaining} frei',
+    wk_ical: '📅 Zum Kalender hinzufügen',
+    wk_empty_title: 'Noch keine Fahrstunde gebucht',
+    wk_empty_text: 'Bereit für die nächste Stunde? Ich springe dir direkt zum nächsten freien Termin – dann nur noch Uhrzeit antippen und buchen.',
   },
   en: {
     tagline_student: 'Book driving lessons easily online', tagline_admin: 'Instructor area',
@@ -220,6 +230,16 @@ const I18N = {
     sign_your: 'Your signature', sign_draw: '(draw with your finger)', clear: 'Clear',
     sign_confirm_ck: 'I confirm that I drove this lesson.', sign_go: 'Confirm ✍️',
     saving: 'Saving …', toast_signed: 'Signed – thank you! ✓',
+    greet_welcome: 'Great to see you', greet_morning: 'Good morning', greet_day: 'Hello', greet_evening: 'Good evening',
+    cd_now: 'now', cd_in_days: 'in {d} days', cd_in_hours: 'in {h} h', cd_in_min: 'in {m} min',
+    wk_next_label: 'Your next lesson',
+    wk_title: 'My lessons', wk_sub: 'this week ({from}–{to})',
+    wk_reserve_one: '🔶 <strong>{n} slot</strong> proposed by your instructor – please <strong>✅ Accept</strong> or <strong>✕ Decline</strong> below.',
+    wk_reserve_many: '🔶 <strong>{n} slots</strong> proposed by your instructor – please <strong>✅ Accept</strong> or <strong>✕ Decline</strong> below.',
+    wk_pill: '{count} of {max} booked · {remaining} left',
+    wk_ical: '📅 Add to calendar',
+    wk_empty_title: 'No lesson booked yet',
+    wk_empty_text: 'Ready for your next lesson? I’ll jump you straight to the next free slot – just tap a time and book.',
   },
   tr: {
     tagline_student: 'Direksiyon derslerini kolayca online al', tagline_admin: 'Eğitmen alanı',
@@ -310,6 +330,16 @@ const I18N = {
     sign_your: 'İmzan', sign_draw: '(parmağınla çiz)', clear: 'Sil',
     sign_confirm_ck: 'Bu dersi sürdüğümü onaylıyorum.', sign_go: 'Onayla ✍️',
     saving: 'Kaydediliyor …', toast_signed: 'İmzalandı – teşekkürler! ✓',
+    greet_welcome: 'Geldiğine sevindim', greet_morning: 'Günaydın', greet_day: 'Merhaba', greet_evening: 'İyi akşamlar',
+    cd_now: 'şimdi', cd_in_days: '{d} gün sonra', cd_in_hours: '{h} saat sonra', cd_in_min: '{m} dk sonra',
+    wk_next_label: 'Bir sonraki dersin',
+    wk_title: 'Derslerim', wk_sub: 'bu hafta ({from}–{to})',
+    wk_reserve_one: '🔶 <strong>{n} randevu</strong> eğitmenin tarafından önerildi – lütfen aşağıda <strong>✅ Kabul et</strong> ya da <strong>✕ Reddet</strong>.',
+    wk_reserve_many: '🔶 <strong>{n} randevu</strong> eğitmenin tarafından önerildi – lütfen aşağıda <strong>✅ Kabul et</strong> ya da <strong>✕ Reddet</strong>.',
+    wk_pill: '{max} içinden {count} alındı · {remaining} boş',
+    wk_ical: '📅 Takvime ekle',
+    wk_empty_title: 'Henüz ders alınmadı',
+    wk_empty_text: 'Sıradaki derse hazır mısın? Seni doğrudan bir sonraki boş randevuya götürürüm – sadece saati seç ve al.',
   },
   ar: {
     tagline_student: 'احجز دروس القيادة بسهولة عبر الإنترنت', tagline_admin: 'منطقة المدرّب',
@@ -400,6 +430,16 @@ const I18N = {
     sign_your: 'توقيعك', sign_draw: '(ارسم بإصبعك)', clear: 'مسح',
     sign_confirm_ck: 'أؤكّد أنني قدت هذا الدرس.', sign_go: 'تأكيد ✍️',
     saving: 'يتم الحفظ …', toast_signed: 'تم التوقيع – شكراً! ✓',
+    greet_welcome: 'سعيد بوجودك', greet_morning: 'صباح الخير', greet_day: 'مرحباً', greet_evening: 'مساء الخير',
+    cd_now: 'الآن', cd_in_days: 'خلال {d} أيام', cd_in_hours: 'خلال {h} ساعة', cd_in_min: 'خلال {m} دقيقة',
+    wk_next_label: 'درسك التالي',
+    wk_title: 'دروسي', wk_sub: 'هذا الأسبوع ({from}–{to})',
+    wk_reserve_one: '🔶 <strong>{n} موعد</strong> اقترحه مدرّبك – يرجى <strong>✅ القبول</strong> أو <strong>✕ الرفض</strong> أدناه.',
+    wk_reserve_many: '🔶 <strong>{n} مواعيد</strong> اقترحها مدرّبك – يرجى <strong>✅ القبول</strong> أو <strong>✕ الرفض</strong> أدناه.',
+    wk_pill: '{count} من {max} محجوز · {remaining} متبقٍ',
+    wk_ical: '📅 أضف إلى التقويم',
+    wk_empty_title: 'لا يوجد درس محجوز بعد',
+    wk_empty_text: 'مستعد لدرسك التالي؟ سأنقلك مباشرة إلى أقرب موعد متاح – فقط انقر على الوقت واحجز.',
   },
 };
 function t(key, vars) {
@@ -2649,10 +2689,10 @@ async function renderBookingCalendar() {
 
 function greetWord() {
   const h = new Date().getHours();
-  if (h < 5) return 'Schön, dass du da bist';
-  if (h < 11) return 'Guten Morgen';
-  if (h < 18) return 'Guten Tag';
-  return 'Guten Abend';
+  if (h < 5) return t('greet_welcome');
+  if (h < 11) return t('greet_morning');
+  if (h < 18) return t('greet_day');
+  return t('greet_evening');
 }
 function firstName(n) { return String(n || '').trim().split(/\s+/)[0] || ''; }
 
@@ -2683,27 +2723,27 @@ function renderWeekCard(wi, bookings, progress) {
     ${next ? `<div class="next-hero">
       <div class="nh-ic">🚗</div>
       <div class="nh-body">
-        <div class="nh-label">Deine nächste Fahrstunde</div>
+        <div class="nh-label">${t('wk_next_label')}</div>
         <div class="nh-when">${WD_LONG[isoDow(next.date) - 1]}, ${fmtShort(next.date)}</div>
-        <div class="nh-time">🕐 ${next.start_time} Uhr · ${next.duration_min} Min${next.meet_label ? ` · 📍 ${esc(next.meet_label)}` : ''}</div>
+        <div class="nh-time">🕐 ${next.start_time}${t('oclock')} · ${next.duration_min} ${t('min')}${next.meet_label ? ` · 📍 ${esc(next.meet_label)}` : ''}</div>
       </div>
       <div class="nh-count">${countdownLabel(next.date, next.start_time)}</div>
     </div>` : ''}
-    <h2>Meine Fahrstunden <span class="sub">diese Woche (${fmtShort(wi.from)}–${fmtShort(wi.to)})</span></h2>
-    ${reservedCount ? `<div class="reserve-note">🔶 <strong>${reservedCount} Termin${reservedCount === 1 ? '' : 'e'}</strong> von deinem Fahrlehrer vorgeschlagen – bitte unten <strong>✅ Annehmen</strong> oder <strong>✕ Ablehnen</strong>.</div>` : ''}
+    <h2>${t('wk_title')} <span class="sub">${t('wk_sub', { from: fmtShort(wi.from), to: fmtShort(wi.to) })}</span></h2>
+    ${reservedCount ? `<div class="reserve-note">${t(reservedCount === 1 ? 'wk_reserve_one' : 'wk_reserve_many', { n: reservedCount })}</div>` : ''}
     <div class="inline" style="margin-bottom:1rem">
       <span class="pill" style="background:${wi.remaining > 0 ? 'var(--good-bg)' : 'var(--bad-bg)'};color:var(--${remainColor})">
-        ${wi.count} von ${wi.max} gebucht · noch ${wi.remaining} frei
+        ${t('wk_pill', { count: wi.count, max: wi.max, remaining: wi.remaining })}
       </span>
-      ${upcoming.length ? '<button class="ghost sm" id="ical-btn">📅 Zum Kalender hinzufügen</button>' : ''}
+      ${upcoming.length ? `<button class="ghost sm" id="ical-btn">${t('wk_ical')}</button>` : ''}
     </div>
     ${progress ? studentProgress(progress) : ''}
     ${upcoming.length ? `<div class="blist">${upcoming.map(studentBookingItem).join('')}</div>`
       : `<div class="empty-book">
           <div class="eb-icon">🚗</div>
-          <div class="eb-title">Noch keine Fahrstunde gebucht</div>
-          <p class="eb-text">Bereit für die nächste Stunde? Ich springe dir direkt zum nächsten freien Termin – dann nur noch Uhrzeit antippen und buchen.</p>
-          <button id="eb-find">🔎 Nächsten freien Termin finden</button>
+          <div class="eb-title">${t('wk_empty_title')}</div>
+          <p class="eb-text">${t('wk_empty_text')}</p>
+          <button id="eb-find">${t('find_free_long')}</button>
         </div>`}`;
   const c = $('#week-card');
   c.querySelectorAll('[data-confirm]').forEach((b) => b.onclick = () => confirmBooking(b.dataset.confirm));
@@ -2804,11 +2844,11 @@ window.__openSonderBooking = openSonderBooking;
 
 function countdownLabel(date, start) {
   const h = hoursUntil(date, start);
-  if (h <= 0) return 'jetzt';
+  if (h <= 0) return t('cd_now');
   const days = Math.floor(h / 24);
-  if (days >= 1) { const rh = Math.round(h - days * 24); return `in ${days} Tag${days > 1 ? 'en' : ''}${rh ? ` ${rh} Std` : ''}`; }
-  if (h >= 1) return `in ${Math.round(h)} Std`;
-  return `in ${Math.max(1, Math.round(h * 60))} Min`;
+  if (days >= 1) return t('cd_in_days', { d: days });
+  if (h >= 1) return t('cd_in_hours', { h: Math.round(h) });
+  return t('cd_in_min', { m: Math.max(1, Math.round(h * 60)) });
 }
 
 // ---------- Datei-Download / iCal ----------
