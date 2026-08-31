@@ -58,6 +58,8 @@ const I18N = {
     gate_text: 'Bevor du loslegst: Bitte lies kurz unsere <strong>Nutzungsbedingungen</strong> und den <strong>Datenschutz</strong>. Mit „Verstanden &amp; akzeptieren" bestätigst du, dass du sie zur Kenntnis genommen hast.',
     gate_terms: '📄 Nutzungsbedingungen', gate_privacy: '🔒 Datenschutz',
     gate_fallback: 'Lädt nicht? Direkt öffnen:', gate_later: 'Später', gate_ok: 'Verstanden & akzeptieren',
+    book_title: 'Termin buchen', today: 'Heute', find_free: '🔎 Nächsten freien Termin',
+    horizon_note: '(bis {d} Tage im Voraus)', horizon_note_rank: '(bis {d} Tage im Voraus · Rang {r})',
   },
   en: {
     tagline_student: 'Book driving lessons easily online', tagline_admin: 'Instructor area',
@@ -78,6 +80,8 @@ const I18N = {
     gate_text: 'Before you start: please take a moment to read our <strong>Terms of Use</strong> and <strong>Privacy Policy</strong>. By tapping “Understood &amp; accept” you confirm you have read them.',
     gate_terms: '📄 Terms of Use', gate_privacy: '🔒 Privacy',
     gate_fallback: 'Not loading? Open directly:', gate_later: 'Later', gate_ok: 'Understood & accept',
+    book_title: 'Book a lesson', today: 'Today', find_free: '🔎 Next free slot',
+    horizon_note: '(up to {d} days ahead)', horizon_note_rank: '(up to {d} days ahead · rank {r})',
   },
   tr: {
     tagline_student: 'Direksiyon derslerini kolayca online al', tagline_admin: 'Eğitmen alanı',
@@ -98,6 +102,8 @@ const I18N = {
     gate_text: 'Başlamadan önce: lütfen kısaca <strong>Kullanım Koşulları</strong> ve <strong>Gizlilik</strong> metnimizi oku. “Anladım ve kabul ediyorum”a dokunarak bunları okuduğunu onaylarsın.',
     gate_terms: '📄 Kullanım Koşulları', gate_privacy: '🔒 Gizlilik',
     gate_fallback: 'Yüklenmiyor mu? Doğrudan aç:', gate_later: 'Sonra', gate_ok: 'Anladım ve kabul ediyorum',
+    book_title: 'Randevu al', today: 'Bugün', find_free: '🔎 En yakın boş randevu',
+    horizon_note: '({d} güne kadar önceden)', horizon_note_rank: '({d} güne kadar önceden · Sınıf {r})',
   },
   ar: {
     tagline_student: 'احجز دروس القيادة بسهولة عبر الإنترنت', tagline_admin: 'منطقة المدرّب',
@@ -118,6 +124,8 @@ const I18N = {
     gate_text: 'قبل أن تبدأ: يُرجى قراءة <strong>شروط الاستخدام</strong> و<strong>سياسة الخصوصية</strong> باختصار. بالنقر على «فهمت وأوافق» تؤكد أنك اطّلعت عليها.',
     gate_terms: '📄 شروط الاستخدام', gate_privacy: '🔒 الخصوصية',
     gate_fallback: 'لا يتم التحميل؟ افتح مباشرة:', gate_later: 'لاحقاً', gate_ok: 'فهمت وأوافق',
+    book_title: 'حجز موعد', today: 'اليوم', find_free: '🔎 أقرب موعد متاح',
+    horizon_note: '(حتى {d} يوماً مسبقاً)', horizon_note_rank: '(حتى {d} يوماً مسبقاً · المستوى {r})',
   },
 };
 function t(key, vars) {
@@ -1690,7 +1698,7 @@ async function renderStudent() {
     <div class="card hidden" id="review-card"></div>
     <div class="card hidden" id="offers-card"></div>
     <div class="card">
-      <h2>Termin buchen <span class="sub" id="horizon-note"></span></h2>
+      <h2>${t('book_title')} <span class="sub" id="horizon-note"></span></h2>
       <div class="hint hidden" id="away-note"></div>
       <div class="dateline">
         <button class="sec sm" id="prev">‹</button>
@@ -1699,8 +1707,8 @@ async function renderStudent() {
         <input type="date" id="dpick" style="max-width:170px">
       </div>
       <div class="inline" style="margin:.1rem 0 .7rem">
-        <button class="sec sm" id="find-free">🔎 Nächsten freien Termin</button>
-        <button class="ghost sm" id="go-today">Heute</button>
+        <button class="sec sm" id="find-free">${t('find_free')}</button>
+        <button class="ghost sm" id="go-today">${t('today')}</button>
       </div>
       <div id="book-cal"></div>
       <div class="slots" id="slots"></div>
@@ -1708,7 +1716,7 @@ async function renderStudent() {
   </main>`;
   state.calMonth = firstOfMonth(state.date);
   const horizon = state.settings?.booking_horizon_days || 14;
-  $('#horizon-note').textContent = `(bis ${horizon} Tage im Voraus)`;
+  $('#horizon-note').textContent = t('horizon_note', { d: horizon });
   wireLogout();
   $('#dpick').value = state.date;
   $('#prev').onclick = () => { state.date = addDays(state.date, -1); syncStudent(); };
@@ -1746,7 +1754,7 @@ async function syncStudent() {
     renderMyLessons(mine.bookings);
     renderReviewCard(mine.progress);
     renderStudentMessages();
-    { const hn = $('#horizon-note'); if (hn && mine.progress) hn.textContent = `(bis ${mine.progress.horizon} Tage im Voraus · Rang ${mine.progress.rank})`; }
+    { const hn = $('#horizon-note'); if (hn && mine.progress) hn.textContent = t('horizon_note_rank', { d: mine.progress.horizon, r: mine.progress.rank }); }
     renderOffers(off.offers, mine.weekInfo);
     state.lastSlotStart = day.slots.length ? day.slots[day.slots.length - 1].start : null;
     renderSlots(day.slots, mine.bookings);
