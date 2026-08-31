@@ -155,6 +155,20 @@ const I18N = {
     pc_book_min: '+ {dur} Min buchen',
     pc_sonder_hint: 'Sonderfahrten kannst du ab <strong>Rang 2</strong> ({n} Fahrstunden) selbst buchen.',
     pc_adk: '📋 Ausbildungskarte', pc_exam: '🎓 Prüfungsreife',
+    msg_you: 'Du', msg_title: '✉️ Nachrichten', msg_to: 'an {who}', msg_placeholder: 'Nachricht schreiben …', send: 'Senden',
+    msg_none: 'Noch keine Nachrichten. Schreib deinem Fahrlehrer – z. B. eine Frage oder Bescheid, wenn du dich verspätest.',
+    rev_title: '⭐ Bewertung',
+    rev_passed_t: 'Herzlichen Glückwunsch – bestanden!', rev_passed_s: 'Deine Akte bleibt erhalten. Magst du anderen erzählen, wie deine Ausbildung war?',
+    rev_invite: 'Wenn du magst, hinterlass eine Bewertung – sie erscheint als Empfehlung auf der Startseite von Ginoco.',
+    rev_mode_full: 'mit vollem Namen', rev_mode_initials: 'mit abgekürztem Namen', rev_mode_anon: 'anonym',
+    rev_shown: 'Angezeigt {mode}', rev_with_photo: ' · mit Foto', rev_pending: ' · wird gerade geprüft',
+    rev_edit: 'Bewertung bearbeiten', rev_new: '⭐ Bewertung schreiben',
+    es_offers: 'Gerade gibt niemand eine Fahrstunde ab. Schau später wieder rein – hier erscheinen freie Stunden, die du übernehmen kannst.',
+    es_notif: 'Keine neuen Mitteilungen. Hier landen z.B. neue Termine, Verschiebungen oder Angebote.',
+    es_lesson_t: '🚗 Deine Fahrstunde', es_lesson: 'Rund um deine nächste Fahrstunde erscheint hier der Start-Knopf und der Fahrzeit-Timer.',
+    es_live_t: '📍 Treffpunkt', es_live: 'Kurz vor deiner Fahrstunde siehst du hier den Treffpunkt und wo dein Fahrlehrer gerade ist.',
+    es_lessons: 'Sobald du deine erste Fahrstunde gefahren bist, erscheint sie hier – mit Datum, Uhrzeit, Dauer und Vermerk. Daraus kannst du dir jederzeit einen Nachweis drucken.',
+    es_messages: 'Schreib deinem Fahrlehrer – z. B. eine Frage oder kurz Bescheid, wenn du dich verspätest. Der Chat lädt gleich.',
   },
   en: {
     tagline_student: 'Book driving lessons easily online', tagline_admin: 'Instructor area',
@@ -270,6 +284,20 @@ const I18N = {
     pc_book_min: '+ book {dur} min',
     pc_sonder_hint: 'You can book special drives yourself from <strong>rank 2</strong> ({n} lessons).',
     pc_adk: '📋 Training card', pc_exam: '🎓 Test readiness',
+    msg_you: 'You', msg_title: '✉️ Messages', msg_to: 'to {who}', msg_placeholder: 'Write a message …', send: 'Send',
+    msg_none: 'No messages yet. Write to your instructor – e.g. a question or to let them know if you’re running late.',
+    rev_title: '⭐ Review',
+    rev_passed_t: 'Congratulations – you passed!', rev_passed_s: 'Your file stays intact. Would you like to tell others how your training was?',
+    rev_invite: 'If you like, leave a review – it appears as a recommendation on the Ginoco home page.',
+    rev_mode_full: 'with full name', rev_mode_initials: 'with abbreviated name', rev_mode_anon: 'anonymous',
+    rev_shown: 'Shown {mode}', rev_with_photo: ' · with photo', rev_pending: ' · under review',
+    rev_edit: 'Edit review', rev_new: '⭐ Write a review',
+    es_offers: 'No one is giving up a lesson right now. Check back later – free lessons you can take over appear here.',
+    es_notif: 'No new messages. New slots, reschedules or offers land here.',
+    es_lesson_t: '🚗 Your lesson', es_lesson: 'Around your next lesson, the start button and the driving timer appear here.',
+    es_live_t: '📍 Meeting point', es_live: 'Shortly before your lesson you’ll see the meeting point and where your instructor currently is.',
+    es_lessons: 'Once you’ve driven your first lesson, it appears here – with date, time, duration and note. You can print a record from it any time.',
+    es_messages: 'Write to your instructor – e.g. a question or a quick heads-up if you’re running late. The chat loads in a moment.',
   },
   tr: {
     tagline_student: 'Direksiyon derslerini kolayca online al', tagline_admin: 'Eğitmen alanı',
@@ -385,6 +413,20 @@ const I18N = {
     pc_book_min: '+ {dur} dk al',
     pc_sonder_hint: 'Özel sürüşleri <strong>Sınıf 2</strong>’den ({n} ders) itibaren kendin alabilirsin.',
     pc_adk: '📋 Eğitim kartı', pc_exam: '🎓 Sınav hazırlığı',
+    msg_you: 'Sen', msg_title: '✉️ Mesajlar', msg_to: '{who} kişisine', msg_placeholder: 'Mesaj yaz …', send: 'Gönder',
+    msg_none: 'Henüz mesaj yok. Eğitmenine yaz – örn. bir soru ya da geç kalacaksan haber ver.',
+    rev_title: '⭐ Değerlendirme',
+    rev_passed_t: 'Tebrikler – geçtin!', rev_passed_s: 'Dosyan saklı kalır. Eğitimin nasıldı, başkalarına anlatmak ister misin?',
+    rev_invite: 'İstersen bir değerlendirme bırak – Ginoco ana sayfasında öneri olarak görünür.',
+    rev_mode_full: 'tam adla', rev_mode_initials: 'kısaltılmış adla', rev_mode_anon: 'anonim',
+    rev_shown: '{mode} gösteriliyor', rev_with_photo: ' · fotoğraflı', rev_pending: ' · inceleniyor',
+    rev_edit: 'Değerlendirmeyi düzenle', rev_new: '⭐ Değerlendirme yaz',
+    es_offers: 'Şu an kimse ders bırakmıyor. Sonra tekrar bak – devralabileceğin boş dersler burada görünür.',
+    es_notif: 'Yeni mesaj yok. Yeni randevular, ertelemeler veya teklifler burada belirir.',
+    es_lesson_t: '🚗 Dersin', es_lesson: 'Bir sonraki dersinin çevresinde başlat düğmesi ve sürüş sayacı burada görünür.',
+    es_live_t: '📍 Buluşma noktası', es_live: 'Dersinden kısa süre önce buluşma noktasını ve eğitmeninin nerede olduğunu burada görürsün.',
+    es_lessons: 'İlk dersini sürdüğünde burada görünür – tarih, saat, süre ve not ile. İstediğin zaman bundan bir belge yazdırabilirsin.',
+    es_messages: 'Eğitmenine yaz – örn. bir soru ya da geç kalacaksan kısa bir haber. Sohbet birazdan yükleniyor.',
   },
   ar: {
     tagline_student: 'احجز دروس القيادة بسهولة عبر الإنترنت', tagline_admin: 'منطقة المدرّب',
@@ -500,6 +542,20 @@ const I18N = {
     pc_book_min: '+ احجز {dur} دقيقة',
     pc_sonder_hint: 'يمكنك حجز الرحلات الخاصة بنفسك من <strong>المستوى 2</strong> ({n} درساً).',
     pc_adk: '📋 بطاقة التدريب', pc_exam: '🎓 جاهزية الاختبار',
+    msg_you: 'أنت', msg_title: '✉️ الرسائل', msg_to: 'إلى {who}', msg_placeholder: 'اكتب رسالة …', send: 'إرسال',
+    msg_none: 'لا رسائل بعد. راسِل مدرّبك – مثلاً سؤال أو أخبره إن كنت ستتأخر.',
+    rev_title: '⭐ التقييم',
+    rev_passed_t: 'مبروك – نجحت!', rev_passed_s: 'يبقى ملفك محفوظاً. هل تودّ أن تخبر الآخرين كيف كان تدريبك؟',
+    rev_invite: 'إن أردت، اترك تقييماً – يظهر كتوصية على صفحة Ginoco الرئيسية.',
+    rev_mode_full: 'بالاسم الكامل', rev_mode_initials: 'بالاسم المختصر', rev_mode_anon: 'مجهول',
+    rev_shown: 'يظهر {mode}', rev_with_photo: ' · بصورة', rev_pending: ' · قيد المراجعة',
+    rev_edit: 'تعديل التقييم', rev_new: '⭐ اكتب تقييماً',
+    es_offers: 'لا أحد يتنازل عن درس الآن. عد لاحقاً – الدروس المتاحة التي يمكنك استلامها تظهر هنا.',
+    es_notif: 'لا رسائل جديدة. المواعيد الجديدة أو التأجيلات أو العروض تظهر هنا.',
+    es_lesson_t: '🚗 درسك', es_lesson: 'حول درسك التالي يظهر هنا زر البدء ومؤقّت القيادة.',
+    es_live_t: '📍 نقطة اللقاء', es_live: 'قبل درسك بقليل ترى هنا نقطة اللقاء وأين يوجد مدرّبك حالياً.',
+    es_lessons: 'بمجرد أن تقود درسك الأول يظهر هنا – مع التاريخ والوقت والمدة والملاحظة. يمكنك طباعة سجل منه في أي وقت.',
+    es_messages: 'راسِل مدرّبك – مثلاً سؤال أو تنبيه سريع إن كنت ستتأخر. تُحمّل المحادثة بعد لحظات.',
   },
 };
 function t(key, vars) {
@@ -1667,12 +1723,12 @@ function mountEdgeMenus(role) {
   // freundlich mit Leer-Zustand zeigen. Beim nächsten Sync werden sie – falls
   // weiterhin leer – wieder ausgeblendet.
   const EMPTY_SECTION = {
-    'offers-card': '<h2>🎁 Angebote</h2><p class="muted">Gerade gibt niemand eine Fahrstunde ab. Schau später wieder rein – hier erscheinen freie Stunden, die du übernehmen kannst.</p>',
-    'notif-card': '<h2>🔔 Mitteilungen</h2><p class="muted">Keine neuen Mitteilungen. Hier landen z.B. neue Termine, Verschiebungen oder Angebote.</p>',
-    'lesson-card': '<h2>🚗 Deine Fahrstunde</h2><p class="muted">Rund um deine nächste Fahrstunde erscheint hier der Start-Knopf und der Fahrzeit-Timer.</p>',
-    'live-card': '<h2>📍 Treffpunkt</h2><p class="muted">Kurz vor deiner Fahrstunde siehst du hier den Treffpunkt und wo dein Fahrlehrer gerade ist.</p>',
-    'lessons-card': '<h2>📖 Meine Fahrstunden</h2><p class="muted">Sobald du deine erste Fahrstunde gefahren bist, erscheint sie hier – mit Datum, Uhrzeit, Dauer und Vermerk. Daraus kannst du dir jederzeit einen Nachweis drucken.</p>',
-    'messages-card': '<h2>✉️ Nachrichten</h2><p class="muted">Schreib deinem Fahrlehrer – z. B. eine Frage oder kurz Bescheid, wenn du dich verspätest. Der Chat lädt gleich.</p>',
+    'offers-card': `<h2>${t('offers_title')}</h2><p class="muted">${t('es_offers')}</p>`,
+    'notif-card': `<h2>${t('notif_title')}</h2><p class="muted">${t('es_notif')}</p>`,
+    'lesson-card': `<h2>${t('es_lesson_t')}</h2><p class="muted">${t('es_lesson')}</p>`,
+    'live-card': `<h2>${t('es_live_t')}</h2><p class="muted">${t('es_live')}</p>`,
+    'lessons-card': `<h2>${t('ml_title')}</h2><p class="muted">${t('es_lessons')}</p>`,
+    'messages-card': `<h2>${t('msg_title')}</h2><p class="muted">${t('es_messages')}</p>`,
     'review-card': '<h2>⭐ Bewertung</h2><p class="muted">Hier kannst du Ginoco und deine Fahrschule bewerten. Nach bestandener Prüfung wirst du freundlich um eine Empfehlung gebeten.</p>',
   };
   root.querySelectorAll('[data-scroll]').forEach((b) => b.onclick = () => {
@@ -2336,17 +2392,17 @@ async function renderStudentMessages() {
   try { data = await api('/api/my/messages'); } catch { card.classList.add('hidden'); return; }
   card.classList.remove('hidden');
   const msgs = data.messages || [];
-  const who = data.instructorName || 'Fahrlehrer';
+  const who = data.instructorName || t('role_instructor');
   const bubbles = msgs.length
     ? msgs.map((m) => `<div class="msg ${m.sender === 'student' ? 'me' : 'them'}">
-        <div class="msg-b">${esc(m.body)}</div><div class="msg-t">${m.sender === 'student' ? 'Du' : esc(who)} · ${msgTime(m.created_at)}</div>
+        <div class="msg-b">${esc(m.body)}</div><div class="msg-t">${m.sender === 'student' ? t('msg_you') : esc(who)} · ${msgTime(m.created_at)}</div>
       </div>`).join('')
-    : `<p class="hint">Noch keine Nachrichten. Schreib deinem Fahrlehrer – z. B. eine Frage oder Bescheid, wenn du dich verspätest.</p>`;
-  card.innerHTML = `<h2>✉️ Nachrichten <span class="sub">an ${esc(who)}</span></h2>
+    : `<p class="hint">${t('msg_none')}</p>`;
+  card.innerHTML = `<h2>${t('msg_title')} <span class="sub">${t('msg_to', { who: esc(who) })}</span></h2>
     <div class="msg-list" id="msg-list">${bubbles}</div>
     <div class="msg-compose">
-      <textarea id="msg-in" rows="2" maxlength="2000" placeholder="Nachricht schreiben …"></textarea>
-      <button class="sm" id="msg-send">Senden</button>
+      <textarea id="msg-in" rows="2" maxlength="2000" placeholder="${t('msg_placeholder')}"></textarea>
+      <button class="sm" id="msg-send">${t('send')}</button>
     </div>`;
   const list = $('#msg-list'); if (list) list.scrollTop = list.scrollHeight;
   const send = async () => {
@@ -2387,10 +2443,10 @@ async function renderReviewCard(progress) {
   const r = data.review;
   const passed = data.passed;
   card.classList.remove('hidden');
-  const modeLabel = { full: 'mit vollem Namen', initials: 'mit abgekürztem Namen', anon: 'anonym' };
+  const modeLabel = { full: t('rev_mode_full'), initials: t('rev_mode_initials'), anon: t('rev_mode_anon') };
   const head = passed
-    ? `<div class="rev-pass">🎉 <div><strong>Herzlichen Glückwunsch – bestanden!</strong><br><span>Deine Akte bleibt erhalten. Magst du anderen erzählen, wie deine Ausbildung war?</span></div></div>`
-    : `<p class="hint">Wenn du magst, hinterlass eine Bewertung – sie erscheint als Empfehlung auf der Startseite von Ginoco.</p>`;
+    ? `<div class="rev-pass">🎉 <div><strong>${t('rev_passed_t')}</strong><br><span>${t('rev_passed_s')}</span></div></div>`
+    : `<p class="hint">${t('rev_invite')}</p>`;
   const chips = r && r.ratings
     ? `<div class="rev-mine-chips">${REVIEW_CATS.filter((c) => r.ratings[c.k]).map((c) => `<span class="rev-chip">${c.icon} ${esc(c.label)} <b>${r.ratings[c.k]}★</b></span>`).join('')}</div>`
     : '';
@@ -2399,12 +2455,12 @@ async function renderReviewCard(progress) {
         <div class="rev-stars">${REV_STARS(r.rating)}</div>
         ${chips}
         <div class="rev-text">„${esc(r.text)}"</div>
-        <div class="hint" style="margin-top:.4rem">Angezeigt ${modeLabel[r.author_mode] || ''}${r.show_photo ? ' · mit Foto' : ''}${r.published ? '' : ' · wird gerade geprüft'}${r.reply ? '' : ''}</div>
+        <div class="hint" style="margin-top:.4rem">${t('rev_shown', { mode: modeLabel[r.author_mode] || '' })}${r.show_photo ? t('rev_with_photo') : ''}${r.published ? '' : t('rev_pending')}</div>
         ${r.reply ? `<div class="rev-reply">↩︎ <em>${esc(r.reply)}</em></div>` : ''}
-        <button class="sec sm" id="rev-edit" style="margin-top:.6rem">Bewertung bearbeiten</button>
+        <button class="sec sm" id="rev-edit" style="margin-top:.6rem">${t('rev_edit')}</button>
       </div>`
-    : `<button id="rev-new">⭐ Bewertung schreiben</button>`;
-  card.innerHTML = `<h2>⭐ Bewertung</h2>${head}${body}`;
+    : `<button id="rev-new">${t('rev_new')}</button>`;
+  card.innerHTML = `<h2>${t('rev_title')}</h2>${head}${body}`;
   const open = () => openReviewModal(r, !!data.hasPhoto);
   const n = $('#rev-new'); if (n) n.onclick = open;
   const e = $('#rev-edit'); if (e) e.onclick = open;
