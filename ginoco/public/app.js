@@ -199,6 +199,11 @@ const I18N = {
     pf_account_text: 'Du kannst dein Konto jederzeit selbst löschen. Dein Login und deine persönlichen Daten werden dann entfernt. Deine bereits gefahrenen Fahrstunden bleiben – anonymisiert – im gesetzlichen Ausbildungsnachweis deiner Fahrschule erhalten.',
     pf_ph_street: 'z.B. Bahnhofstraße', pf_ph_houseno: '12a', pf_ph_zip: '89073', pf_ph_city: 'z.B. Ulm', pf_ph_phone: 'z.B. 0151 23456789', pf_ph_email: 'name@mail.de',
     tour_skip: 'Überspringen', tour_prev: 'Zurück', tour_next: 'Weiter ›', tour_start: 'Los geht’s 🚗',
+    da_title: '🗑️ Konto wirklich löschen?', da_text: 'Das kann nicht rückgängig gemacht werden. Dein Login und deine persönlichen Daten werden entfernt. Bereits gefahrene Fahrstunden bleiben anonym im Ausbildungsnachweis deiner Fahrschule.',
+    da_pass_label: 'Zur Bestätigung: dein aktuelles Passwort', da_pass_ph: 'Passwort', da_word: 'LÖSCHEN', da_word_label: 'Tippe <strong>{w}</strong> zum Bestätigen',
+    da_go: 'Konto endgültig löschen', da_deleting: 'Wird gelöscht…', da_done_alert: 'Dein Konto wurde gelöscht. Du wirst jetzt abgemeldet.',
+    pf_photo_removed: 'Foto entfernt', pf_geo_searching: '📍 Suche deinen Standort …', pf_addr_notfound: 'Adresse nicht gefunden – bitte manuell eintragen.',
+    pf_geo_ok: 'Standort übernommen ✓', pf_geo_ok_house: 'Standort übernommen ✓ – bitte Hausnummer ergänzen.', pf_geo_unavail: 'Standort nicht verfügbar: {e}', pf_saved: 'Profil gespeichert ✓',
     tour_t0: 'Willkommen bei ginoco', tour_x0: 'Hier buchst du deine Fahrstunden selbst – schnell und von überall. In ein paar kurzen Schritten zeige ich dir, wie es geht. Du kannst jederzeit auf „Überspringen“ tippen.',
     tour_t1: '1. Fahrstunde buchen', tour_x1: 'Am schnellsten geht’s mit <strong>🔎 Nächster freier Termin</strong> – ein Tipp und du landest beim nächsten freien Tag. Freie Zeiten sind <strong>grün</strong>. Tippe auf <strong>Buchen</strong>, wähle die Dauer und bestätige. Fertig! ✅',
     tour_t2: '2. Deine Termine', tour_x2: 'Oben unter <strong>„Meine Termine“</strong> siehst du alle gebuchten Stunden mit Datum, Uhrzeit und Treffpunkt. Über <strong>„Zum Kalender hinzufügen“</strong> landen sie in deinem Handy-Kalender.',
@@ -364,6 +369,11 @@ const I18N = {
     pf_account_text: 'You can delete your account yourself at any time. Your login and personal data are then removed. Your already driven lessons remain – anonymised – in your driving school\u2019s legally required training record.',
     pf_ph_street: 'e.g. Bahnhofstraße', pf_ph_houseno: '12a', pf_ph_zip: '89073', pf_ph_city: 'e.g. Ulm', pf_ph_phone: 'e.g. 0151 23456789', pf_ph_email: 'name@mail.com',
     tour_skip: 'Skip', tour_prev: 'Back', tour_next: 'Next ›', tour_start: 'Let’s go 🚗',
+    da_title: '🗑️ Really delete account?', da_text: 'This cannot be undone. Your login and personal data are removed. Already driven lessons remain anonymously in your driving school’s training record.',
+    da_pass_label: 'To confirm: your current password', da_pass_ph: 'Password', da_word: 'DELETE', da_word_label: 'Type <strong>{w}</strong> to confirm',
+    da_go: 'Delete account permanently', da_deleting: 'Deleting…', da_done_alert: 'Your account has been deleted. You will now be signed out.',
+    pf_photo_removed: 'Photo removed', pf_geo_searching: '📍 Finding your location …', pf_addr_notfound: 'Address not found – please enter manually.',
+    pf_geo_ok: 'Location applied ✓', pf_geo_ok_house: 'Location applied ✓ – please add the house number.', pf_geo_unavail: 'Location unavailable: {e}', pf_saved: 'Profile saved ✓',
     tour_t0: 'Welcome to ginoco', tour_x0: 'Here you book your driving lessons yourself – quickly and from anywhere. In a few short steps I’ll show you how. You can tap “Skip” any time.',
     tour_t1: '1. Book a lesson', tour_x1: 'Quickest via <strong>🔎 Next free slot</strong> – one tap takes you to the next free day. Free times are <strong>green</strong>. Tap <strong>Book</strong>, choose the duration and confirm. Done! ✅',
     tour_t2: '2. Your appointments', tour_x2: 'At the top under <strong>“My appointments”</strong> you see all booked lessons with date, time and meeting point. <strong>“Add to calendar”</strong> puts them in your phone calendar.',
@@ -529,6 +539,11 @@ const I18N = {
     pf_account_text: 'Hesabını istediğin zaman kendin silebilirsin. Girişin ve kişisel verilerin kaldırılır. Sürdüğün dersler – anonim olarak – sürücü okulunun yasal eğitim kaydında kalır.',
     pf_ph_street: 'örn. Bahnhofstraße', pf_ph_houseno: '12a', pf_ph_zip: '89073', pf_ph_city: 'örn. Ulm', pf_ph_phone: 'örn. 0151 23456789', pf_ph_email: 'ad@mail.com',
     tour_skip: 'Atla', tour_prev: 'Geri', tour_next: 'İleri ›', tour_start: 'Başlayalım 🚗',
+    da_title: '🗑️ Hesap gerçekten silinsin mi?', da_text: 'Bu geri alınamaz. Girişin ve kişisel verilerin kaldırılır. Sürdüğün dersler sürücü okulunun eğitim kaydında anonim olarak kalır.',
+    da_pass_label: 'Onay için: mevcut şifren', da_pass_ph: 'Şifre', da_word: 'SİL', da_word_label: 'Onaylamak için <strong>{w}</strong> yaz',
+    da_go: 'Hesabı kalıcı olarak sil', da_deleting: 'Siliniyor…', da_done_alert: 'Hesabın silindi. Şimdi çıkış yapılıyor.',
+    pf_photo_removed: 'Fotoğraf kaldırıldı', pf_geo_searching: '📍 Konumun aranıyor …', pf_addr_notfound: 'Adres bulunamadı – lütfen elle gir.',
+    pf_geo_ok: 'Konum alındı ✓', pf_geo_ok_house: 'Konum alındı ✓ – lütfen kapı numarasını ekle.', pf_geo_unavail: 'Konum kullanılamıyor: {e}', pf_saved: 'Profil kaydedildi ✓',
     tour_t0: 'ginoco’ya hoş geldin', tour_x0: 'Burada direksiyon derslerini kendin alırsın – hızlı ve her yerden. Birkaç kısa adımda nasıl olduğunu göstereyim. İstediğin an „Atla“ya dokunabilirsin.',
     tour_t1: '1. Ders al', tour_x1: 'En hızlısı <strong>🔎 En yakın boş randevu</strong> – bir dokunuşla en yakın boş güne gidersin. Boş saatler <strong>yeşil</strong>. <strong>Rezerve et</strong>’e dokun, süreyi seç ve onayla. Bitti! ✅',
     tour_t2: '2. Randevuların', tour_x2: 'Üstte <strong>„Randevularım“</strong> altında tüm dersleri tarih, saat ve buluşma noktasıyla görürsün. <strong>„Takvime ekle“</strong> ile telefonundaki takvime eklenir.',
@@ -694,6 +709,11 @@ const I18N = {
     pf_account_text: 'يمكنك حذف حسابك بنفسك في أي وقت. عندها يُزال دخولك وبياناتك الشخصية. تبقى دروسك التي قدتها – مجهّلة الهوية – في سجل التدريب القانوني لمدرسة القيادة.',
     pf_ph_street: 'مثل Bahnhofstraße', pf_ph_houseno: '12a', pf_ph_zip: '89073', pf_ph_city: 'مثل Ulm', pf_ph_phone: 'مثل 0151 23456789', pf_ph_email: 'name@mail.com',
     tour_skip: 'تخطٍّ', tour_prev: 'رجوع', tour_next: 'التالي ›', tour_start: 'لنبدأ 🚗',
+    da_title: '🗑️ حذف الحساب فعلاً؟', da_text: 'لا يمكن التراجع عن ذلك. يُزال دخولك وبياناتك الشخصية. تبقى الدروس التي قدتها بشكل مجهول في سجل التدريب لمدرسة القيادة.',
+    da_pass_label: 'للتأكيد: كلمة مرورك الحالية', da_pass_ph: 'كلمة المرور', da_word: 'حذف', da_word_label: 'اكتب <strong>{w}</strong> للتأكيد',
+    da_go: 'حذف الحساب نهائياً', da_deleting: 'يتم الحذف…', da_done_alert: 'تم حذف حسابك. سيتم تسجيل خروجك الآن.',
+    pf_photo_removed: 'أُزيلت الصورة', pf_geo_searching: '📍 يتم تحديد موقعك …', pf_addr_notfound: 'العنوان غير موجود – يرجى الإدخال يدوياً.',
+    pf_geo_ok: 'تم أخذ الموقع ✓', pf_geo_ok_house: 'تم أخذ الموقع ✓ – يرجى إضافة رقم المنزل.', pf_geo_unavail: 'الموقع غير متاح: {e}', pf_saved: 'تم حفظ الملف ✓',
     tour_t0: 'مرحباً بك في ginoco', tour_x0: 'هنا تحجز دروس القيادة بنفسك – بسرعة ومن أي مكان. في خطوات قصيرة سأريك كيف. يمكنك النقر على «تخطٍّ» في أي وقت.',
     tour_t1: '1. احجز درساً', tour_x1: 'الأسرع عبر <strong>🔎 أقرب موعد متاح</strong> – نقرة واحدة تأخذك لأقرب يوم متاح. الأوقات المتاحة <strong>خضراء</strong>. انقر <strong>احجز</strong>، اختر المدة وأكّد. تم! ✅',
     tour_t2: '2. مواعيدك', tour_x2: 'في الأعلى ضمن <strong>«مواعيدي»</strong> ترى كل الدروس بالتاريخ والوقت ونقطة اللقاء. عبر <strong>«أضف إلى التقويم»</strong> تُضاف إلى تقويم هاتفك.',
@@ -1201,23 +1221,23 @@ async function renderProfileCard() {
       avEl.innerHTML = `<span>${esc(initials($('#pf-name').value || pr.name))}</span>`;
       const hav = card.querySelector('.pfc-av'); if (hav) hav.innerHTML = `<span>${esc(initials($('#pf-name').value || pr.name))}</span>`;
       delBtn.classList.add('hidden');
-      toast('Foto entfernt', 'ok');
+      toast(t('pf_photo_removed'), 'ok');
     } catch (err) { toast(err.message, 'err'); }
   };
   const geoBtn = $('#pf-geo');
   if (geoBtn) geoBtn.onclick = async () => {
     const orig = geoBtn.textContent;
-    geoBtn.disabled = true; geoBtn.textContent = '📍 Suche deinen Standort …';
+    geoBtn.disabled = true; geoBtn.textContent = t('pf_geo_searching');
     try {
       const c = await getPosOnce();
       const parts = await geocodeAddressParts(c.latitude, c.longitude);
-      if (!parts || (!parts.street && !parts.city)) { toast('Adresse nicht gefunden – bitte manuell eintragen.', 'err'); return; }
+      if (!parts || (!parts.street && !parts.city)) { toast(t('pf_addr_notfound'), 'err'); return; }
       if (parts.street) $('#pf-street').value = parts.street;
       if (parts.house_no) $('#pf-houseno').value = parts.house_no;
       if (parts.zip) $('#pf-zip').value = parts.zip;
       if (parts.city) $('#pf-city').value = parts.city;
-      toast(parts.house_no ? 'Standort übernommen ✓' : 'Standort übernommen ✓ – bitte Hausnummer ergänzen.', 'ok');
-    } catch (e) { toast('Standort nicht verfügbar: ' + e.message, 'err'); }
+      toast(parts.house_no ? t('pf_geo_ok') : t('pf_geo_ok_house'), 'ok');
+    } catch (e) { toast(t('pf_geo_unavail', { e: e.message }), 'err'); }
     finally { geoBtn.disabled = false; geoBtn.textContent = orig; }
   };
   $('#pf-save').onclick = async () => {
@@ -1229,7 +1249,7 @@ async function renderProfileCard() {
         street: $('#pf-street').value || null, house_no: $('#pf-houseno').value || null,
         zip: $('#pf-zip').value || null, city: $('#pf-city').value || null } });
       state.user.name = $('#pf-name').value.trim(); state.user.phone = $('#pf-phone').value.trim();
-      toast('Profil gespeichert ✓', 'ok');
+      toast(t('pf_saved'), 'ok');
       renderProfileCard();   // Kopf-Zusammenfassung auffrischen, aufgeklappt lassen
     } catch (e) { const el = $('#pf-err'); if (el) { el.textContent = e.message; el.classList.remove('hidden'); } else toast(e.message, 'err'); }
   };
@@ -1238,22 +1258,23 @@ async function renderProfileCard() {
 }
 // Konto-Löschung: doppelte Sicherung – Passwort bestätigen + „LÖSCHEN" tippen.
 function openDeleteAccountModal() {
-  modal(`<h3>🗑️ Konto wirklich löschen?</h3>
-    <p class="hint">Das kann nicht rückgängig gemacht werden. Dein Login und deine persönlichen Daten werden entfernt. Bereits gefahrene Fahrstunden bleiben anonym im Ausbildungsnachweis deiner Fahrschule.</p>
-    <div class="field"><label>Zur Bestätigung: dein aktuelles Passwort</label><input id="da-pass" type="password" autocomplete="current-password" placeholder="Passwort"></div>
-    <div class="field"><label>Tippe <strong>LÖSCHEN</strong> zum Bestätigen</label><input id="da-word" autocapitalize="characters" placeholder="LÖSCHEN"></div>
-    <div class="actions"><button class="sec" onclick="window.__closeModal()">Abbrechen</button><button class="danger" id="da-go" disabled>Konto endgültig löschen</button></div>`);
-  const chk = () => { $('#da-go').disabled = !($('#da-pass').value && $('#da-word').value.trim().toUpperCase() === 'LÖSCHEN'); };
+  const word = t('da_word');
+  modal(`<h3>${t('da_title')}</h3>
+    <p class="hint">${t('da_text')}</p>
+    <div class="field"><label>${t('da_pass_label')}</label><input id="da-pass" type="password" autocomplete="current-password" placeholder="${t('da_pass_ph')}"></div>
+    <div class="field"><label>${t('da_word_label', { w: word })}</label><input id="da-word" autocapitalize="characters" placeholder="${word}"></div>
+    <div class="actions"><button class="sec" onclick="window.__closeModal()">${t('abort')}</button><button class="danger" id="da-go" disabled>${t('da_go')}</button></div>`);
+  const chk = () => { $('#da-go').disabled = !($('#da-pass').value && $('#da-word').value.trim().toUpperCase() === word.toUpperCase()); };
   $('#da-pass').oninput = chk; $('#da-word').oninput = chk;
   $('#da-go').onclick = async () => {
-    const go = $('#da-go'); go.disabled = true; go.textContent = 'Wird gelöscht…';
+    const go = $('#da-go'); go.disabled = true; go.textContent = t('da_deleting');
     try {
       await api('/api/my/account/delete', { method: 'POST', body: { password: $('#da-pass').value } });
       closeModal();
-      alert('Dein Konto wurde gelöscht. Du wirst jetzt abgemeldet.');
+      alert(t('da_done_alert'));
       try { localStorage.removeItem('fsp_token'); } catch {}
       location.href = '/';
-    } catch (e) { go.disabled = false; go.textContent = 'Konto endgültig löschen'; toast(e.message, 'err'); }
+    } catch (e) { go.disabled = false; go.textContent = t('da_go'); toast(e.message, 'err'); }
   };
 }
 // „Mein Profil“ öffnen: Karte oben aufklappen + hinscrollen (statt Popup)
