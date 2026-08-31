@@ -140,6 +140,21 @@ const I18N = {
     wk_ical: '📅 Zum Kalender hinzufügen',
     wk_empty_title: 'Noch keine Fahrstunde gebucht',
     wk_empty_text: 'Bereit für die nächste Stunde? Ich springe dir direkt zum nächsten freien Termin – dann nur noch Uhrzeit antippen und buchen.',
+    bk_gear_manual: 'Schalter', bk_gear_auto: 'Automatik',
+    bk_done: 'gefahren', bk_offered: '🎁 im Angebot', bk_withdraw: 'Zurücknehmen',
+    bk_reserved: '🔶 reserviert', bk_accept: '✅ Annehmen', bk_reject: '✕ Ablehnen',
+    bk_due: '⏳ Bitte bis <strong>{when}</strong> antworten – sonst wird der Termin wieder frei.',
+    bk_confirmed: '✅ bestätigt', bk_locked: '🔒 fest gebucht', bk_offer_btn: '🎁 Ins Angebot geben',
+    bk_offer_title: 'Kostenfreies Storno nur bis {h} h vorher – gib die Stunde stattdessen ins Angebot',
+    bk_in_h: '· in {h} h',
+    pc_rank: '🏅 Rang {r}', pc_drives: '<strong>{n}</strong> Fahrstunden gefahren',
+    pc_to_rank2: 'Weg zu Rang 2', pc_to_rank2_hint: 'Noch <strong>{n}</strong> Fahrstunden – dann siehst du <strong>{d} Tage</strong> im Voraus.',
+    pc_rank2_ok: '✅ Rang 2 – du siehst {d} Tage im Voraus',
+    pc_sonder: 'Sonderfahrten', pc_sonder_r2: 'ab Rang 2 buchbar',
+    pc_sonder_help: 'Pflichtfahrten für die Führerscheinprüfung: Überlandfahrten, Autobahn und Nachtfahrt. Die Zahlen zeigen, wie viele du schon hast.',
+    pc_book_min: '+ {dur} Min buchen',
+    pc_sonder_hint: 'Sonderfahrten kannst du ab <strong>Rang 2</strong> ({n} Fahrstunden) selbst buchen.',
+    pc_adk: '📋 Ausbildungskarte', pc_exam: '🎓 Prüfungsreife',
   },
   en: {
     tagline_student: 'Book driving lessons easily online', tagline_admin: 'Instructor area',
@@ -240,6 +255,21 @@ const I18N = {
     wk_ical: '📅 Add to calendar',
     wk_empty_title: 'No lesson booked yet',
     wk_empty_text: 'Ready for your next lesson? I’ll jump you straight to the next free slot – just tap a time and book.',
+    bk_gear_manual: 'Manual', bk_gear_auto: 'Automatic',
+    bk_done: 'driven', bk_offered: '🎁 offered', bk_withdraw: 'Withdraw',
+    bk_reserved: '🔶 reserved', bk_accept: '✅ Accept', bk_reject: '✕ Decline',
+    bk_due: '⏳ Please reply by <strong>{when}</strong> – otherwise the slot is released again.',
+    bk_confirmed: '✅ confirmed', bk_locked: '🔒 fixed', bk_offer_btn: '🎁 Offer this lesson',
+    bk_offer_title: 'Free cancellation only up to {h} h before – offer the lesson instead',
+    bk_in_h: '· in {h} h',
+    pc_rank: '🏅 Rank {r}', pc_drives: '<strong>{n}</strong> lessons driven',
+    pc_to_rank2: 'On the way to rank 2', pc_to_rank2_hint: '<strong>{n}</strong> more lessons – then you can see <strong>{d} days</strong> ahead.',
+    pc_rank2_ok: '✅ Rank 2 – you can see {d} days ahead',
+    pc_sonder: 'Special drives', pc_sonder_r2: 'bookable from rank 2',
+    pc_sonder_help: 'Mandatory drives for the driving test: cross-country, motorway and night drive. The numbers show how many you already have.',
+    pc_book_min: '+ book {dur} min',
+    pc_sonder_hint: 'You can book special drives yourself from <strong>rank 2</strong> ({n} lessons).',
+    pc_adk: '📋 Training card', pc_exam: '🎓 Test readiness',
   },
   tr: {
     tagline_student: 'Direksiyon derslerini kolayca online al', tagline_admin: 'Eğitmen alanı',
@@ -340,6 +370,21 @@ const I18N = {
     wk_ical: '📅 Takvime ekle',
     wk_empty_title: 'Henüz ders alınmadı',
     wk_empty_text: 'Sıradaki derse hazır mısın? Seni doğrudan bir sonraki boş randevuya götürürüm – sadece saati seç ve al.',
+    bk_gear_manual: 'Düz vites', bk_gear_auto: 'Otomatik',
+    bk_done: 'sürüldü', bk_offered: '🎁 teklifte', bk_withdraw: 'Geri al',
+    bk_reserved: '🔶 ayrıldı', bk_accept: '✅ Kabul et', bk_reject: '✕ Reddet',
+    bk_due: '⏳ Lütfen <strong>{when}</strong> kadar yanıtla – yoksa randevu tekrar boşa çıkar.',
+    bk_confirmed: '✅ onaylandı', bk_locked: '🔒 kesin', bk_offer_btn: '🎁 Teklife koy',
+    bk_offer_title: 'Ücretsiz iptal yalnızca {h} saat öncesine kadar – bunun yerine dersi teklife koy',
+    bk_in_h: '· {h} saat içinde',
+    pc_rank: '🏅 Sınıf {r}', pc_drives: '<strong>{n}</strong> ders sürüldü',
+    pc_to_rank2: 'Sınıf 2 yolunda', pc_to_rank2_hint: '<strong>{n}</strong> ders daha – sonra <strong>{d} gün</strong> öncesini görürsün.',
+    pc_rank2_ok: '✅ Sınıf 2 – {d} gün öncesini görüyorsun',
+    pc_sonder: 'Özel sürüşler', pc_sonder_r2: 'Sınıf 2’den itibaren alınabilir',
+    pc_sonder_help: 'Sürücü sınavı için zorunlu sürüşler: şehirlerarası, otoyol ve gece sürüşü. Sayılar kaç tane olduğunu gösterir.',
+    pc_book_min: '+ {dur} dk al',
+    pc_sonder_hint: 'Özel sürüşleri <strong>Sınıf 2</strong>’den ({n} ders) itibaren kendin alabilirsin.',
+    pc_adk: '📋 Eğitim kartı', pc_exam: '🎓 Sınav hazırlığı',
   },
   ar: {
     tagline_student: 'احجز دروس القيادة بسهولة عبر الإنترنت', tagline_admin: 'منطقة المدرّب',
@@ -440,6 +485,21 @@ const I18N = {
     wk_ical: '📅 أضف إلى التقويم',
     wk_empty_title: 'لا يوجد درس محجوز بعد',
     wk_empty_text: 'مستعد لدرسك التالي؟ سأنقلك مباشرة إلى أقرب موعد متاح – فقط انقر على الوقت واحجز.',
+    bk_gear_manual: 'يدوي', bk_gear_auto: 'أوتوماتيك',
+    bk_done: 'تمّ', bk_offered: '🎁 معروض', bk_withdraw: 'سحب',
+    bk_reserved: '🔶 محجوز مبدئياً', bk_accept: '✅ قبول', bk_reject: '✕ رفض',
+    bk_due: '⏳ يرجى الرد قبل <strong>{when}</strong> – وإلا يعود الموعد متاحاً.',
+    bk_confirmed: '✅ مؤكّد', bk_locked: '🔒 مثبّت', bk_offer_btn: '🎁 اعرض هذا الدرس',
+    bk_offer_title: 'الإلغاء المجاني حتى {h} ساعة قبل الموعد فقط – اعرض الدرس بدلاً من ذلك',
+    bk_in_h: '· خلال {h} ساعة',
+    pc_rank: '🏅 المستوى {r}', pc_drives: '<strong>{n}</strong> درساً مُنجَزاً',
+    pc_to_rank2: 'الطريق إلى المستوى 2', pc_to_rank2_hint: '<strong>{n}</strong> درساً إضافياً – ثم ترى <strong>{d} يوماً</strong> مسبقاً.',
+    pc_rank2_ok: '✅ المستوى 2 – ترى {d} يوماً مسبقاً',
+    pc_sonder: 'رحلات خاصة', pc_sonder_r2: 'قابلة للحجز من المستوى 2',
+    pc_sonder_help: 'رحلات إلزامية لاختبار القيادة: خارج المدينة، الطريق السريع، والقيادة الليلية. الأرقام تُظهر كم أنجزت.',
+    pc_book_min: '+ احجز {dur} دقيقة',
+    pc_sonder_hint: 'يمكنك حجز الرحلات الخاصة بنفسك من <strong>المستوى 2</strong> ({n} درساً).',
+    pc_adk: '📋 بطاقة التدريب', pc_exam: '🎓 جاهزية الاختبار',
   },
 };
 function t(key, vars) {
@@ -2767,19 +2827,19 @@ function studentProgress(p) {
     ['autobahn', p.sonder?.autobahn || 0, p.req.autobahn], ['nacht', p.sonder?.nacht || 0, p.req.nacht]];
   return `<div class="progress-card">
     <div class="pc-head">
-      <span class="rank-badge ${p.rank >= 2 ? 'r2' : ''}">🏅 Rang ${p.rank}</span>
-      <span class="pc-drives"><strong>${p.doneCount}</strong> Fahrstunden gefahren</span>
+      <span class="rank-badge ${p.rank >= 2 ? 'r2' : ''}">${t('pc_rank', { r: p.rank })}</span>
+      <span class="pc-drives">${t('pc_drives', { n: p.doneCount })}</span>
     </div>
     ${p.rank < 2
       ? `<div class="pc-block">
-          <div class="pc-line"><span>Weg zu Rang 2</span><span class="muted">${p.doneCount}/${p.rank2Min}</span></div>
+          <div class="pc-line"><span>${t('pc_to_rank2')}</span><span class="muted">${p.doneCount}/${p.rank2Min}</span></div>
           ${pbar(p.doneCount, p.rank2Min, 'var(--brand)')}
-          <div class="hint" style="margin:.3rem 0 0">Noch <strong>${toRank2}</strong> Fahrstunde${toRank2 === 1 ? '' : 'n'} – dann siehst du <strong>${state.settings?.booking_horizon_days_rank2 || 21} Tage</strong> im Voraus.</div>
+          <div class="hint" style="margin:.3rem 0 0">${t('pc_to_rank2_hint', { n: toRank2, d: state.settings?.booking_horizon_days_rank2 || 21 })}</div>
         </div>`
-      : `<div class="pc-block"><span class="pill" style="background:var(--good-bg);color:var(--good)">✅ Rang 2 – du siehst ${p.horizon} Tage im Voraus</span></div>`}
+      : `<div class="pc-block"><span class="pill" style="background:var(--good-bg);color:var(--good)">${t('pc_rank2_ok', { d: p.horizon })}</span></div>`}
     <div class="pc-sonder">
-      <div class="pc-sonder-title">Sonderfahrten ${helpDot('Pflichtfahrten für die Führerscheinprüfung: Überlandfahrten, Autobahn und Nachtfahrt. Die Zahlen zeigen, wie viele du schon hast.')}
-        ${p.rank >= 2 ? '<span class="pill" style="background:var(--good-bg);color:var(--good);margin-left:.3rem">ab Rang 2 buchbar</span>' : ''}</div>
+      <div class="pc-sonder-title">${t('pc_sonder')} ${helpDot(t('pc_sonder_help'))}
+        ${p.rank >= 2 ? `<span class="pill" style="background:var(--good-bg);color:var(--good);margin-left:.3rem">${t('pc_sonder_r2')}</span>` : ''}</div>
       <div class="pc-tiles">
       ${sonder.map(([k, have, need]) => {
         const done = have >= need;
@@ -2789,15 +2849,15 @@ function studentProgress(p) {
           <span class="pc-tile-lb">${TYPE_LABEL[k]}</span>
           <span class="pc-tile-count">${done ? '✓ ' : ''}${have}/${need}</span>
           ${pbar(have, need, done ? 'var(--good)' : TYPE_COLORS[k])}
-          ${p.rank >= 2 && !done ? `<button class="sf-book" onclick="window.__openSonderBooking('${k}')">+ ${dur} Min buchen</button>` : ''}
+          ${p.rank >= 2 && !done ? `<button class="sf-book" onclick="window.__openSonderBooking('${k}')">${t('pc_book_min', { dur })}</button>` : ''}
         </div>`;
       }).join('')}
       </div>
-      ${p.rank < 2 ? `<div class="hint" style="margin:.3rem 0 0">Sonderfahrten kannst du ab <strong>Rang 2</strong> (${p.rank2Min} Fahrstunden) selbst buchen.</div>` : ''}
+      ${p.rank < 2 ? `<div class="hint" style="margin:.3rem 0 0">${t('pc_sonder_hint', { n: p.rank2Min })}</div>` : ''}
     </div>
     <div class="pc-actions">
-      <button class="pc-adk" onclick="window.__openMyTraining()">📋 Ausbildungskarte</button>
-      <button class="pc-adk" onclick="window.__openExamReadiness()">🎓 Prüfungsreife</button>
+      <button class="pc-adk" onclick="window.__openMyTraining()">${t('pc_adk')}</button>
+      <button class="pc-adk" onclick="window.__openExamReadiness()">${t('pc_exam')}</button>
     </div>
   </div>`;
 }
@@ -2876,21 +2936,21 @@ function exportICS(bookings) {
 }
 
 function studentBookingItem(b) {
-  const gear = b.gearbox ? `<span class="badge ${b.gearbox}">${b.gearbox === 'schalt' ? 'Schalter' : 'Automatik'}</span>` : '';
+  const gear = b.gearbox ? `<span class="badge ${b.gearbox}">${b.gearbox === 'schalt' ? t('bk_gear_manual') : t('bk_gear_auto')}</span>` : '';
   const cancelH = state.settings?.cancel_hours || 24;
   const h = hoursUntil(b.date, b.start_time);
   const soon = h < cancelH;
   let st, actions = '', reserveHint = '';
   if (b.status === 'done') {
-    st = '<span class="badge done">gefahren</span>';
+    st = `<span class="badge done">${t('bk_done')}</span>`;
   } else if (b.status === 'offered') {
-    st = '<span class="badge offer">🎁 im Angebot</span>';
-    actions = `<button class="ghost sm" data-withdraw="${b.id}">Zurücknehmen</button>`;
+    st = `<span class="badge offer">${t('bk_offered')}</span>`;
+    actions = `<button class="ghost sm" data-withdraw="${b.id}">${t('bk_withdraw')}</button>`;
   } else if (b.confirmed === 0) {
     // Vom Fahrlehrer reservierter Termin – der Schüler bestätigt ihn zuerst.
-    st = '<span class="badge reserved">🔶 reserviert</span>';
-    actions = `<button class="sm" data-confirm="${b.id}">✅ Annehmen</button>`
-      + ` <button class="ghost sm" data-reject="${b.id}">✕ Ablehnen</button>`;
+    st = `<span class="badge reserved">${t('bk_reserved')}</span>`;
+    actions = `<button class="sm" data-confirm="${b.id}">${t('bk_accept')}</button>`
+      + ` <button class="ghost sm" data-reject="${b.id}">${t('bk_reject')}</button>`;
     // Frist zum Antworten (created_at + reserve_expire_min), gedeckelt durch den Termin.
     const rm = Number(state.settings?.reserve_expire_min) || 0;
     if (rm > 0 && b.created_at) {
@@ -2900,29 +2960,30 @@ function studentBookingItem(b) {
       if (due.getTime() > Date.now()) {
         const dueTime = due.toLocaleTimeString(LOCALE, { hour: '2-digit', minute: '2-digit' });
         const sameDay = due.toDateString() === new Date().toDateString();
-        reserveHint = `<div class="resv-due">⏳ Bitte bis <strong>${sameDay ? '' : fmtShort(due.toISOString().slice(0, 10)) + ' · '}${dueTime} Uhr</strong> antworten – sonst wird der Termin wieder frei.</div>`;
+        const when = `${sameDay ? '' : fmtShort(due.toISOString().slice(0, 10)) + ' · '}${dueTime}${t('oclock')}`;
+        reserveHint = `<div class="resv-due">${t('bk_due', { when })}</div>`;
       }
     }
   } else {
-    st = '<span class="badge booked">✅ bestätigt</span>';
+    st = `<span class="badge booked">${t('bk_confirmed')}</span>`;
     const lockH = state.settings?.lock_hours || 36;
     if (h < lockH) {
       // gesperrt: Termin steht fest
-      actions = `<span class="pill">🔒 fest gebucht</span>`;
+      actions = `<span class="pill">${t('bk_locked')}</span>`;
     } else if (soon) {
       // zwischen Sperr- und Storno-Frist: nur noch ins Angebot geben
-      actions = `<button class="sm" data-offer="${b.id}" title="Kostenfreies Storno nur bis ${cancelH} h vorher – gib die Stunde stattdessen ins Angebot">🎁 Ins Angebot geben</button>`;
+      actions = `<button class="sm" data-offer="${b.id}" title="${t('bk_offer_title', { h: cancelH })}">${t('bk_offer_btn')}</button>`;
     } else {
-      actions = `<button class="sm" data-offer="${b.id}">🎁 Ins Angebot geben</button>
-        <button class="ghost sm" data-cancel="${b.id}">Stornieren</button>`;
+      actions = `<button class="sm" data-offer="${b.id}">${t('bk_offer_btn')}</button>
+        <button class="ghost sm" data-cancel="${b.id}">${t('cancel')}</button>`;
     }
   }
   const fb = (b.status === 'done' && b.feedback) ? `<div class="lesson-fb">📝 ${esc(b.feedback)}</div>` : '';
   return `<div class="bitem">
     <div>
-      <div class="when">${WD[isoDow(b.date) - 1]} ${fmtShort(b.date)} · ${b.start_time} <span class="muted" style="font-weight:400">(${b.duration_min} Min)</span></div>
+      <div class="when">${WD[isoDow(b.date) - 1]} ${fmtShort(b.date)} · ${b.start_time} <span class="muted" style="font-weight:400">(${b.duration_min} ${t('min')})</span></div>
       <div class="meta">${st} ${typeBadge(b.lesson_type)} ${gear} ${b.plate ? '· ' + esc(b.plate) : ''}
-        ${b.status === 'booked' && soon ? `<span class="muted">· in ${h < 1 ? '<1' : Math.round(h)} h</span>` : ''}</div>
+        ${b.status === 'booked' && soon ? `<span class="muted">${t('bk_in_h', { h: h < 1 ? '<1' : Math.round(h) })}</span>` : ''}</div>
       ${reserveHint}${fb}
     </div>
     <div class="inline">${actions}</div>
