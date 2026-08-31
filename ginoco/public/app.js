@@ -105,6 +105,13 @@ const I18N = {
     offer_anon_btn: '🕶️ Anonym abgeben', offer_anon_sub: 'Niemand sieht, dass die Stunde von dir ist',
     offer_named_btn: '🙋 Mit „{name}" abgeben', offer_named_sub: 'Andere sehen nur deinen Vornamen',
     toast_offered: 'Ins Angebot gestellt ✓',
+    role_student: 'Fahrschüler', role_instructor: 'Fahrlehrer', logout: 'Abmelden',
+    tip_tour: 'Kurze Einführung', tip_profile: 'Mein Profil', tip_appearance: 'Aussehen & Farben',
+    tip_live_stop: 'Standort-Teilen beenden', live_stop: '🛰️ Live · Stopp',
+    nav_grp_overview: 'Übersicht', nav_grp_more: 'Mehr',
+    nav_week: 'Meine Woche', nav_book: 'Termin buchen', nav_lessons: 'Meine Fahrstunden',
+    nav_messages: 'Nachrichten', nav_notif: 'Mitteilungen', nav_offers: 'Angebote', nav_review: 'Bewertung',
+    menu: 'Menü', actions: 'Aktionen', menu_open: 'Menü öffnen', menu_close: 'Menü schließen',
   },
   en: {
     tagline_student: 'Book driving lessons easily online', tagline_admin: 'Instructor area',
@@ -170,6 +177,13 @@ const I18N = {
     offer_anon_btn: '🕶️ Give up anonymously', offer_anon_sub: 'Nobody sees the lesson is yours',
     offer_named_btn: '🙋 Give up as “{name}”', offer_named_sub: 'Others only see your first name',
     toast_offered: 'Added to offers ✓',
+    role_student: 'Student', role_instructor: 'Instructor', logout: 'Sign out',
+    tip_tour: 'Quick intro', tip_profile: 'My profile', tip_appearance: 'Appearance & colours',
+    tip_live_stop: 'Stop sharing location', live_stop: '🛰️ Live · Stop',
+    nav_grp_overview: 'Overview', nav_grp_more: 'More',
+    nav_week: 'My week', nav_book: 'Book a lesson', nav_lessons: 'My lessons',
+    nav_messages: 'Messages', nav_notif: 'Notifications', nav_offers: 'Offers', nav_review: 'Review',
+    menu: 'Menu', actions: 'Actions', menu_open: 'Open menu', menu_close: 'Close menu',
   },
   tr: {
     tagline_student: 'Direksiyon derslerini kolayca online al', tagline_admin: 'Eğitmen alanı',
@@ -235,6 +249,13 @@ const I18N = {
     offer_anon_btn: '🕶️ Anonim bırak', offer_anon_sub: 'Dersin sana ait olduğunu kimse görmez',
     offer_named_btn: '🙋 „{name}" olarak bırak', offer_named_sub: 'Diğerleri yalnızca adını görür',
     toast_offered: 'Teklife eklendi ✓',
+    role_student: 'Öğrenci', role_instructor: 'Eğitmen', logout: 'Çıkış',
+    tip_tour: 'Kısa tanıtım', tip_profile: 'Profilim', tip_appearance: 'Görünüm ve renkler',
+    tip_live_stop: 'Konum paylaşımını durdur', live_stop: '🛰️ Canlı · Durdur',
+    nav_grp_overview: 'Genel bakış', nav_grp_more: 'Daha fazla',
+    nav_week: 'Haftam', nav_book: 'Randevu al', nav_lessons: 'Derslerim',
+    nav_messages: 'Mesajlar', nav_notif: 'Bildirimler', nav_offers: 'Teklifler', nav_review: 'Değerlendirme',
+    menu: 'Menü', actions: 'İşlemler', menu_open: 'Menüyü aç', menu_close: 'Menüyü kapat',
   },
   ar: {
     tagline_student: 'احجز دروس القيادة بسهولة عبر الإنترنت', tagline_admin: 'منطقة المدرّب',
@@ -300,6 +321,13 @@ const I18N = {
     offer_anon_btn: '🕶️ التنازل بشكل مجهول', offer_anon_sub: 'لا أحد يرى أن الدرس منك',
     offer_named_btn: '🙋 التنازل باسم «{name}»', offer_named_sub: 'يرى الآخرون اسمك الأول فقط',
     toast_offered: 'أُضيف إلى العروض ✓',
+    role_student: 'طالب', role_instructor: 'المدرّب', logout: 'تسجيل الخروج',
+    tip_tour: 'مقدمة سريعة', tip_profile: 'ملفي', tip_appearance: 'المظهر والألوان',
+    tip_live_stop: 'إيقاف مشاركة الموقع', live_stop: '🛰️ مباشر · إيقاف',
+    nav_grp_overview: 'نظرة عامة', nav_grp_more: 'المزيد',
+    nav_week: 'أسبوعي', nav_book: 'حجز موعد', nav_lessons: 'دروسي',
+    nav_messages: 'الرسائل', nav_notif: 'الإشعارات', nav_offers: 'العروض', nav_review: 'التقييم',
+    menu: 'القائمة', actions: 'الإجراءات', menu_open: 'فتح القائمة', menu_close: 'إغلاق القائمة',
   },
 };
 function t(key, vars) {
@@ -1370,13 +1398,13 @@ function header() {
   return `<header>
     <div class="brand"><img class="logo" src="/logo.svg?v=3630" alt="" width="24" height="24" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'logo',textContent:'🚗'}))"> <span class="brandname">ginoco</span></div>
     <div class="who">
-      <span class="role">${u.role === 'instructor' ? 'Fahrlehrer' : 'Fahrschüler'}</span>
+      <span class="role">${u.role === 'instructor' ? t('role_instructor') : t('role_student')}</span>
       ${u.role === 'instructor' ? '' : `<strong>${esc(u.name || '')}</strong>`}${u.username ? `<span class="pill">${esc(u.username)}</span>` : ''}
-      ${state.liveSharing ? '<button class="ghost sm" onclick="window.__stopLive()" title="Standort-Teilen beenden" style="color:var(--good)">🛰️ Live · Stopp</button>' : ''}
-      ${u.role === 'student' ? '<button class="ghost sm" onclick="window.__openTour()" title="Kurze Einführung">❓</button>' : ''}
-      ${u.role === 'student' ? '<button class="ghost sm" onclick="window.__openProfile()" title="Mein Profil">👤</button>' : ''}
-      <button class="ghost sm" onclick="window.__openThemePicker()" title="Aussehen & Farben">🎨</button>
-      <button class="ghost sm" id="logout">Abmelden</button>
+      ${state.liveSharing ? `<button class="ghost sm" onclick="window.__stopLive()" title="${t('tip_live_stop')}" style="color:var(--good)">${t('live_stop')}</button>` : ''}
+      ${u.role === 'student' ? `<button class="ghost sm" onclick="window.__openTour()" title="${t('tip_tour')}">❓</button>` : ''}
+      ${u.role === 'student' ? `<button class="ghost sm" onclick="window.__openProfile()" title="${t('tip_profile')}">👤</button>` : ''}
+      <button class="ghost sm" onclick="window.__openThemePicker()" title="${t('tip_appearance')}">🎨</button>
+      <button class="ghost sm" id="logout">${t('logout')}</button>
     </div>
   </header>`;
 }
@@ -1402,13 +1430,13 @@ const INSTR_NAV = [
   ['protokoll', '📋', 'Protokoll'], ['einstellungen', '⚙️', 'Einstellungen'],
 ];
 const STUDENT_NAV = [
-  ['__group', 'Übersicht'],
-  ['week-card', '📅', 'Meine Woche'], ['slots', '🚗', 'Termin buchen'],
-  ['lessons-card', '📖', 'Meine Fahrstunden'],
-  ['__group', 'Mehr'],
-  ['messages-card', '✉️', 'Nachrichten'],
-  ['notif-card', '🔔', 'Mitteilungen'], ['offers-card', '🎁', 'Angebote'],
-  ['review-card', '⭐', 'Bewertung'],
+  ['__group', 'nav_grp_overview'],
+  ['week-card', '📅', 'nav_week'], ['slots', '🚗', 'nav_book'],
+  ['lessons-card', '📖', 'nav_lessons'],
+  ['__group', 'nav_grp_more'],
+  ['messages-card', '✉️', 'nav_messages'],
+  ['notif-card', '🔔', 'nav_notif'], ['offers-card', '🎁', 'nav_offers'],
+  ['review-card', '⭐', 'nav_review'],
 ];
 // Flache Liste (mit '__group'-Markern) -> gruppierte Kacheln
 function edgeTilesHTML(items, attr) {
@@ -1416,12 +1444,12 @@ function edgeTilesHTML(items, attr) {
   for (const it of items) {
     if (it[0] === '__group') {
       if (open) html += '</div></div>';
-      html += `<div class="edge-groupwrap"><div class="edge-group">${esc(it[1])}</div><div class="edge-tiles">`;
+      html += `<div class="edge-groupwrap"><div class="edge-group">${esc(t(it[1]))}</div><div class="edge-tiles">`;
       open = true;
     } else {
       const [key, icon, label] = it;
       const badge = key === 'protokoll' ? '<span id="ev-badge" class="et-badge"></span>' : '';
-      html += `<button class="edge-tile" ${attr}="${key}"><span class="et-ic">${icon}</span><span class="et-lb">${esc(label)}</span>${badge}</button>`;
+      html += `<button class="edge-tile" ${attr}="${key}"><span class="et-ic">${icon}</span><span class="et-lb">${esc(t(label))}</span>${badge}</button>`;
     }
   }
   if (open) html += '</div></div>';
@@ -1442,12 +1470,12 @@ function mountEdgeMenus(role) {
   const root = document.createElement('div');
   root.className = 'edge-root';
   root.innerHTML = `
-    <button class="edge-handle left" aria-label="Menü öffnen">☰</button>
-    <button class="edge-handle right" aria-label="Menü öffnen">⋯</button>
+    <button class="edge-handle left" aria-label="${t('menu_open')}">☰</button>
+    <button class="edge-handle right" aria-label="${t('menu_open')}">⋯</button>
     <div class="edge-overlay"></div>
-    <button class="edge-x" aria-label="Menü schließen">✕</button>
-    <aside class="edge-panel left"><div class="edge-title">Menü</div>${leftItems}</aside>
-    <aside class="edge-panel right"><div class="edge-title">Aktionen</div>${rightItems}</aside>`;
+    <button class="edge-x" aria-label="${t('menu_close')}">✕</button>
+    <aside class="edge-panel left"><div class="edge-title">${t('menu')}</div>${leftItems}</aside>
+    <aside class="edge-panel right"><div class="edge-title">${t('actions')}</div>${rightItems}</aside>`;
   document.body.appendChild(root);
   // Beide Seiten öffnen sich zeitgleich; das ✕ in der Mitte schließt beide.
   const open = () => root.classList.add('open-both');
