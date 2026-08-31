@@ -573,8 +573,10 @@ function openTour() {
 window.__openTour = openTour;
 
 // ---------- Was ist neu? (Changelog) ----------
-const CHANGELOG_VER = '3.87';
+const CHANGELOG_VER = '3.88';
 const CHANGELOG = [
+  { v: '3.88', d: '31.08.2026', title: '📄 Rechtstexte gleich beim Start', items: [
+    '📄 <strong>Nutzungsbedingungen &amp; Datenschutz beim ersten Öffnen:</strong> Ganz am Anfang zeigen wir dir beide Texte einmal direkt in der App – kurz drüberschauen, „Verstanden &amp; akzeptieren", fertig. Danach erscheint das nicht mehr; die Links bleiben unten im Anmelde-Bildschirm.'] },
   { v: '3.87', d: '31.08.2026', title: '🚗 Das große Update – alles Neue auf einen Blick', items: [
     '<strong>Ein rundum edleres, smarteres ginoco.</strong> Hier die lange Liste mit allem, was in den letzten Tagen dazugekommen ist:',
     '✅ <strong>Fahrstunde abschließen &amp; abhaken:</strong> Nach jeder Stunde führt dich ein gläserner, animierter Ablauf in Schritten durch – 1. Stattgefunden? · 2. Was habt ihr gemacht? · 3. Was übt ihr als Nächstes? · 4. Unterschriften. Die Ausbildungskarte (Klasse B) ist gleich aufgeklappt, jeder Punkt wird abgehakt (🔴 muss noch · 🟡 geübt · 🟢 sitzt).',
@@ -1222,6 +1224,40 @@ function renderAuth() {
     if (mode !== 'admin') loadReviewMarquee();
   };
   draw();
+  maybeShowLegalGate(); // beim ersten Start Rechtstexte einmal zeigen
+}
+
+// Beim allerersten Öffnen Nutzungsbedingungen & Datenschutz einmal einblenden –
+// für neue Nutzer (einmalig, danach nie wieder) und damit die App-Prüfung sie
+// direkt lesen kann. Inline über same-origin-iframe (X-Frame-Options: SAMEORIGIN).
+let _legalShown = false;
+function maybeShowLegalGate() {
+  if (_legalShown) return;
+  let ack = false;
+  try { ack = localStorage.getItem('ginoco-legal-ack') === '1'; } catch {}
+  if (ack) return;
+  _legalShown = true;
+  modal(`<h3 style="margin:.1rem 0 .5rem">👋 Willkommen bei ginoco</h3>
+    <p class="hint" style="margin:0 0 .7rem">Bevor du loslegst: Bitte lies kurz unsere <strong>Nutzungsbedingungen</strong> und den <strong>Datenschutz</strong>. Mit „Verstanden &amp; akzeptieren" bestätigst du, dass du sie zur Kenntnis genommen hast.</p>
+    <div class="legal-tabs">
+      <button data-lg="nb" class="active">📄 Nutzungsbedingungen</button>
+      <button data-lg="ds">🔒 Datenschutz</button>
+    </div>
+    <iframe id="legal-frame" class="legal-frame" src="/nutzungsbedingungen.html" title="Rechtstext"></iframe>
+    <div class="legal-fallback">Lädt nicht? Direkt öffnen:
+      <a href="/nutzungsbedingungen.html">Nutzungsbedingungen</a> · <a href="/datenschutz.html">Datenschutz</a></div>
+    <div class="actions">
+      <button class="sec" id="legal-later">Später</button>
+      <button id="legal-ok">Verstanden &amp; akzeptieren</button>
+    </div>`, 'wide');
+  const frame = document.getElementById('legal-frame');
+  document.querySelectorAll('.legal-tabs button').forEach((b) => b.onclick = () => {
+    document.querySelectorAll('.legal-tabs button').forEach((x) => x.classList.toggle('active', x === b));
+    if (frame) frame.src = b.dataset.lg === 'ds' ? '/datenschutz.html' : '/nutzungsbedingungen.html';
+  });
+  const done = () => { try { localStorage.setItem('ginoco-legal-ack', '1'); } catch {} closeModal(); };
+  const ok = document.getElementById('legal-ok'); if (ok) ok.onclick = done;
+  const later = document.getElementById('legal-later'); if (later) later.onclick = done;
 }
 
 // Bewertungen als Laufschrift (rechts -> links) auf der Startseite.
