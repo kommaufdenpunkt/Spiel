@@ -198,6 +198,13 @@ const I18N = {
     pf_save: 'Speichern', pf_account: '⚠️ Konto', pf_del_account: '🗑️ Mein Konto löschen',
     pf_account_text: 'Du kannst dein Konto jederzeit selbst löschen. Dein Login und deine persönlichen Daten werden dann entfernt. Deine bereits gefahrenen Fahrstunden bleiben – anonymisiert – im gesetzlichen Ausbildungsnachweis deiner Fahrschule erhalten.',
     pf_ph_street: 'z.B. Bahnhofstraße', pf_ph_houseno: '12a', pf_ph_zip: '89073', pf_ph_city: 'z.B. Ulm', pf_ph_phone: 'z.B. 0151 23456789', pf_ph_email: 'name@mail.de',
+    tour_skip: 'Überspringen', tour_prev: 'Zurück', tour_next: 'Weiter ›', tour_start: 'Los geht’s 🚗',
+    tour_t0: 'Willkommen bei ginoco', tour_x0: 'Hier buchst du deine Fahrstunden selbst – schnell und von überall. In ein paar kurzen Schritten zeige ich dir, wie es geht. Du kannst jederzeit auf „Überspringen“ tippen.',
+    tour_t1: '1. Fahrstunde buchen', tour_x1: 'Am schnellsten geht’s mit <strong>🔎 Nächster freier Termin</strong> – ein Tipp und du landest beim nächsten freien Tag. Freie Zeiten sind <strong>grün</strong>. Tippe auf <strong>Buchen</strong>, wähle die Dauer und bestätige. Fertig! ✅',
+    tour_t2: '2. Deine Termine', tour_x2: 'Oben unter <strong>„Meine Termine“</strong> siehst du alle gebuchten Stunden mit Datum, Uhrzeit und Treffpunkt. Über <strong>„Zum Kalender hinzufügen“</strong> landen sie in deinem Handy-Kalender.',
+    tour_t3: '3. Doch keine Zeit?', tour_x3: 'Kannst du an dem Tag nicht: Tippe auf <strong>„🎁 Ins Angebot geben“</strong> – ein anderer Fahrschüler kann sie übernehmen (auf Wunsch anonym). Übernimmt niemand, bleibt sie bei dir. Früh genug geht auch <strong>„Stornieren“</strong>.',
+    tour_t4: '4. Dein Profil', tour_x4: 'Tippe oben auf <strong>👤</strong> und vervollständige deine Daten. Die sieht <strong>nur dein Fahrlehrer</strong> – kein anderer Fahrschüler.',
+    tour_t5: 'Los geht’s!', tour_x5: 'Das war’s schon. Viel Erfolg beim Üben! 🚗 Diese Einführung findest du jederzeit über das <strong>❓</strong> oben rechts.',
   },
   en: {
     tagline_student: 'Book driving lessons easily online', tagline_admin: 'Instructor area',
@@ -356,6 +363,13 @@ const I18N = {
     pf_save: 'Save', pf_account: '⚠️ Account', pf_del_account: '🗑️ Delete my account',
     pf_account_text: 'You can delete your account yourself at any time. Your login and personal data are then removed. Your already driven lessons remain – anonymised – in your driving school\u2019s legally required training record.',
     pf_ph_street: 'e.g. Bahnhofstraße', pf_ph_houseno: '12a', pf_ph_zip: '89073', pf_ph_city: 'e.g. Ulm', pf_ph_phone: 'e.g. 0151 23456789', pf_ph_email: 'name@mail.com',
+    tour_skip: 'Skip', tour_prev: 'Back', tour_next: 'Next ›', tour_start: 'Let’s go 🚗',
+    tour_t0: 'Welcome to ginoco', tour_x0: 'Here you book your driving lessons yourself – quickly and from anywhere. In a few short steps I’ll show you how. You can tap “Skip” any time.',
+    tour_t1: '1. Book a lesson', tour_x1: 'Quickest via <strong>🔎 Next free slot</strong> – one tap takes you to the next free day. Free times are <strong>green</strong>. Tap <strong>Book</strong>, choose the duration and confirm. Done! ✅',
+    tour_t2: '2. Your appointments', tour_x2: 'At the top under <strong>“My appointments”</strong> you see all booked lessons with date, time and meeting point. <strong>“Add to calendar”</strong> puts them in your phone calendar.',
+    tour_t3: '3. No time after all?', tour_x3: 'Can’t make it that day: tap <strong>“🎁 Offer this lesson”</strong> – another student can take it over (anonymously if you like). If nobody does, it stays yours. Early enough, you can also <strong>“Cancel”</strong>.',
+    tour_t4: '4. Your profile', tour_x4: 'Tap <strong>👤</strong> at the top and complete your details. Only <strong>your instructor</strong> sees them – no other student.',
+    tour_t5: 'Let’s go!', tour_x5: 'That’s it. Good luck practising! 🚗 You can reopen this intro any time via the <strong>❓</strong> at the top right.',
   },
   tr: {
     tagline_student: 'Direksiyon derslerini kolayca online al', tagline_admin: 'Eğitmen alanı',
@@ -514,6 +528,13 @@ const I18N = {
     pf_save: 'Kaydet', pf_account: '⚠️ Hesap', pf_del_account: '🗑️ Hesabımı sil',
     pf_account_text: 'Hesabını istediğin zaman kendin silebilirsin. Girişin ve kişisel verilerin kaldırılır. Sürdüğün dersler – anonim olarak – sürücü okulunun yasal eğitim kaydında kalır.',
     pf_ph_street: 'örn. Bahnhofstraße', pf_ph_houseno: '12a', pf_ph_zip: '89073', pf_ph_city: 'örn. Ulm', pf_ph_phone: 'örn. 0151 23456789', pf_ph_email: 'ad@mail.com',
+    tour_skip: 'Atla', tour_prev: 'Geri', tour_next: 'İleri ›', tour_start: 'Başlayalım 🚗',
+    tour_t0: 'ginoco’ya hoş geldin', tour_x0: 'Burada direksiyon derslerini kendin alırsın – hızlı ve her yerden. Birkaç kısa adımda nasıl olduğunu göstereyim. İstediğin an „Atla“ya dokunabilirsin.',
+    tour_t1: '1. Ders al', tour_x1: 'En hızlısı <strong>🔎 En yakın boş randevu</strong> – bir dokunuşla en yakın boş güne gidersin. Boş saatler <strong>yeşil</strong>. <strong>Rezerve et</strong>’e dokun, süreyi seç ve onayla. Bitti! ✅',
+    tour_t2: '2. Randevuların', tour_x2: 'Üstte <strong>„Randevularım“</strong> altında tüm dersleri tarih, saat ve buluşma noktasıyla görürsün. <strong>„Takvime ekle“</strong> ile telefonundaki takvime eklenir.',
+    tour_t3: '3. Vaktin mi yok?', tour_x3: 'O gün gelemiyorsan: <strong>„🎁 Teklife koy“</strong>ya dokun – başka bir öğrenci devralabilir (istersen anonim). Kimse almazsa sende kalır. Erkense <strong>„İptal“</strong> de edebilirsin.',
+    tour_t4: '4. Profilin', tour_x4: 'Üstte <strong>👤</strong>’a dokun ve bilgilerini tamamla. Onları yalnızca <strong>eğitmenin</strong> görür – başka öğrenci görmez.',
+    tour_t5: 'Başlayalım!', tour_x5: 'Hepsi bu. Bol şans! 🚗 Bu tanıtımı istediğin an sağ üstteki <strong>❓</strong> ile tekrar açabilirsin.',
   },
   ar: {
     tagline_student: 'احجز دروس القيادة بسهولة عبر الإنترنت', tagline_admin: 'منطقة المدرّب',
@@ -672,6 +693,13 @@ const I18N = {
     pf_save: 'حفظ', pf_account: '⚠️ الحساب', pf_del_account: '🗑️ حذف حسابي',
     pf_account_text: 'يمكنك حذف حسابك بنفسك في أي وقت. عندها يُزال دخولك وبياناتك الشخصية. تبقى دروسك التي قدتها – مجهّلة الهوية – في سجل التدريب القانوني لمدرسة القيادة.',
     pf_ph_street: 'مثل Bahnhofstraße', pf_ph_houseno: '12a', pf_ph_zip: '89073', pf_ph_city: 'مثل Ulm', pf_ph_phone: 'مثل 0151 23456789', pf_ph_email: 'name@mail.com',
+    tour_skip: 'تخطٍّ', tour_prev: 'رجوع', tour_next: 'التالي ›', tour_start: 'لنبدأ 🚗',
+    tour_t0: 'مرحباً بك في ginoco', tour_x0: 'هنا تحجز دروس القيادة بنفسك – بسرعة ومن أي مكان. في خطوات قصيرة سأريك كيف. يمكنك النقر على «تخطٍّ» في أي وقت.',
+    tour_t1: '1. احجز درساً', tour_x1: 'الأسرع عبر <strong>🔎 أقرب موعد متاح</strong> – نقرة واحدة تأخذك لأقرب يوم متاح. الأوقات المتاحة <strong>خضراء</strong>. انقر <strong>احجز</strong>، اختر المدة وأكّد. تم! ✅',
+    tour_t2: '2. مواعيدك', tour_x2: 'في الأعلى ضمن <strong>«مواعيدي»</strong> ترى كل الدروس بالتاريخ والوقت ونقطة اللقاء. عبر <strong>«أضف إلى التقويم»</strong> تُضاف إلى تقويم هاتفك.',
+    tour_t3: '3. لا وقت لديك؟', tour_x3: 'إن تعذّر عليك ذلك اليوم: انقر <strong>«🎁 اعرض هذا الدرس»</strong> – يمكن لطالب آخر استلامه (بشكل مجهول إن أردت). إن لم يستلمه أحد يبقى لك. وإن كان الوقت مبكراً يمكنك أيضاً <strong>«الإلغاء»</strong>.',
+    tour_t4: '4. ملفك', tour_x4: 'انقر <strong>👤</strong> في الأعلى وأكمِل بياناتك. يراها <strong>مدرّبك</strong> وحده – لا طالب آخر.',
+    tour_t5: 'لنبدأ!', tour_x5: 'هذا كل شيء. بالتوفيق في التدريب! 🚗 يمكنك فتح هذه المقدمة في أي وقت عبر <strong>❓</strong> أعلى اليمين.',
   },
 };
 function t(key, vars) {
@@ -1237,15 +1265,18 @@ window.__openProfile = () => {
 window.__openPhone = window.__openProfile;   // Alias (alte Aufrufe)
 
 // ---------- Geführter Einstieg (Tutorial) für Fahrschüler ----------
-const TOUR = [
-  { icon: '👋', title: 'Willkommen bei ginoco', text: 'Hier buchst du deine Fahrstunden selbst – schnell und von überall. In ein paar kurzen Schritten zeige ich dir, wie es geht. Du kannst jederzeit auf „Überspringen“ tippen.' },
-  { icon: '📅', title: '1. Fahrstunde buchen', text: 'Am schnellsten geht’s mit <strong>🔎 Nächster freier Termin</strong> – ein Tipp und du landest direkt beim nächsten freien Tag. Oder blättere mit ‹ › durch die Tage. Freie Zeiten sind <strong>grün</strong> und mit „FREI“ markiert. Tippe auf <strong>Buchen</strong>, wähle die Dauer (z. B. 80 Min) und bestätige mit „Ja, verbindlich buchen“. Fertig! ✅' },
-  { icon: '📋', title: '2. Deine Termine', text: 'Oben unter <strong>„Meine Termine“</strong> siehst du alle gebuchten Stunden mit Datum, Uhrzeit und Treffpunkt. Über <strong>„Zum Kalender hinzufügen“</strong> landen sie in deinem Handy-Kalender.' },
-  { icon: '🎁', title: '3. Doch keine Zeit?', text: 'Kannst du an dem Tag nicht: Tippe bei der Stunde auf <strong>„🎁 Ins Angebot geben“</strong> – deine Stunde landet dann in den <strong>Angeboten</strong>, und ein anderer Fahrschüler kann sie übernehmen (auf Wunsch anonym – keiner muss deinen Namen sehen). Übernimmt niemand, bleibt sie einfach bei dir. Ist es noch früh genug, kannst du auch <strong>„Stornieren“</strong>.' },
-  { icon: '👤', title: '4. Dein Profil', text: 'Tippe oben auf <strong>👤</strong> und vervollständige deine Daten (Name, Handynummer, Jahrgang). Die sieht <strong>nur dein Fahrlehrer</strong> – kein anderer Fahrschüler.' },
-  { icon: '🎉', title: 'Los geht’s!', text: 'Das war’s schon. Viel Erfolg beim Üben! 🚗 Diese Einführung findest du jederzeit wieder über das <strong>❓</strong> oben rechts.' },
-];
+function getTourSteps() {
+  return [
+    { icon: '👋', title: t('tour_t0'), text: t('tour_x0') },
+    { icon: '📅', title: t('tour_t1'), text: t('tour_x1') },
+    { icon: '📋', title: t('tour_t2'), text: t('tour_x2') },
+    { icon: '🎁', title: t('tour_t3'), text: t('tour_x3') },
+    { icon: '👤', title: t('tour_t4'), text: t('tour_x4') },
+    { icon: '🎉', title: t('tour_t5'), text: t('tour_x5') },
+  ];
+}
 function openTour() {
+  const TOUR = getTourSteps();
   let i = 0;
   const finish = () => { try { localStorage.setItem('ginoco-tour-done', '1'); } catch {} closeModal(); };
   const draw = () => {
@@ -1257,10 +1288,10 @@ function openTour() {
         <div class="tour-dots">${TOUR.map((_, k) => `<span class="${k === i ? 'on' : ''}"></span>`).join('')}</div>
       </div>
       <div class="actions" style="justify-content:space-between;align-items:center">
-        <button class="ghost sm" id="tour-skip">Überspringen</button>
+        <button class="ghost sm" id="tour-skip">${t('tour_skip')}</button>
         <div class="inline" style="gap:.4rem">
-          ${i > 0 ? '<button class="sec sm" id="tour-prev">Zurück</button>' : ''}
-          <button class="sm" id="tour-next">${i < TOUR.length - 1 ? 'Weiter ›' : 'Los geht’s 🚗'}</button>
+          ${i > 0 ? `<button class="sec sm" id="tour-prev">${t('tour_prev')}</button>` : ''}
+          <button class="sm" id="tour-next">${i < TOUR.length - 1 ? t('tour_next') : t('tour_start')}</button>
         </div>
       </div>`);
     $('#tour-skip').onclick = finish;
