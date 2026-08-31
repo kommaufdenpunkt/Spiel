@@ -16,10 +16,12 @@
 // ====================== Fahrschulportal – Frontend ======================
 const $ = (s, r = document) => r.querySelector(s);
 const app = $('#app');
-const WD = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
-const WD_LONG = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
-const MON = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
-const MON_LONG = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
+// Wochentags-/Monatsnamen werden je Sprache aufgebaut (siehe applyDateNames()).
+let WD = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
+let WD_LONG = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
+let MON = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
+let MON_LONG = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
+let LOCALE = 'de-DE';
 
 const state = { user: null, settings: null, date: todayStr(), instrTab: 'heute' };
 
@@ -60,6 +62,31 @@ const I18N = {
     gate_fallback: 'Lädt nicht? Direkt öffnen:', gate_later: 'Später', gate_ok: 'Verstanden & akzeptieren',
     book_title: 'Termin buchen', today: 'Heute', find_free: '🔎 Nächsten freien Termin',
     horizon_note: '(bis {d} Tage im Voraus)', horizon_note_rank: '(bis {d} Tage im Voraus · Rang {r})',
+    min: 'Min', oclock: ' Uhr', at_time: 'um ',
+    slots_none_title: '{day}: keine Fahrstunden',
+    slots_none_text: 'An diesem Tag bietet dein Fahrlehrer keine Termine an. Lass mich den nächsten freien Tag für dich suchen.',
+    find_free_long: '🔎 Nächsten freien Termin finden',
+    slot_dur: '{start}–{end} · {dur} Min',
+    slot_free_from_multi: 'frei ab {start} Uhr · {durs} Min wählbar',
+    slot_free_from: 'frei ab {start} Uhr · {dur} Min',
+    slot_mine: 'Dein Termin', slot_locked: '🔒 gebucht',
+    free: 'frei', book: 'Buchen', taken: 'belegt', offered_out: 'wird abgegeben',
+    past: 'vorbei', toofar: 'noch nicht buchbar', closed: 'geschlossen',
+    slots_none_free: 'An diesem Tag ist gerade nichts frei.',
+    cancel: 'Stornieren', abort: 'Abbrechen', close: 'Schließen',
+    choose_duration: 'Dauer wählen', minutes_opt: '{d} Minuten',
+    book_nofit: 'An diesem Start passt keine deiner Fahrstunden-Längen mehr in den Tag{cap}. Bitte wähle einen früheren Start.',
+    book_nofit_cap: ' (nur noch {n} Min bis Feierabend)',
+    book_confirm_title: 'Termin verbindlich buchen?',
+    book_confirm_text: 'Bist du wirklich sicher, dass du diesen Termin nehmen willst?',
+    book_rule1: 'Kostenfrei stornieren nur bis {h} Std. vorher.',
+    book_rule2: 'Ab {h} Std. vorher steht der Termin fest – dann keine Absage mehr.',
+    book_rule3: 'Im Zeitfenster dazwischen kannst du die Stunde anderen zur Übernahme anbieten.',
+    book_go: 'Ja, verbindlich buchen',
+    toast_booked: 'Termin gebucht ✓', celebrate_booked: 'Termin gebucht',
+    cancel_confirm: 'Diesen Termin wirklich stornieren?', toast_cancelled: 'Storniert',
+    toast_accepted: 'Termin angenommen ✓', toast_taken: 'Fahrstunde übernommen ✓',
+    celebrate_taken: 'Übernommen', toast_declined: 'Abgelehnt',
   },
   en: {
     tagline_student: 'Book driving lessons easily online', tagline_admin: 'Instructor area',
@@ -82,6 +109,31 @@ const I18N = {
     gate_fallback: 'Not loading? Open directly:', gate_later: 'Later', gate_ok: 'Understood & accept',
     book_title: 'Book a lesson', today: 'Today', find_free: '🔎 Next free slot',
     horizon_note: '(up to {d} days ahead)', horizon_note_rank: '(up to {d} days ahead · rank {r})',
+    min: 'min', oclock: '', at_time: 'at ',
+    slots_none_title: 'No lessons on {day}',
+    slots_none_text: 'Your instructor offers no slots on this day. Let me find the next free day for you.',
+    find_free_long: '🔎 Find the next free slot',
+    slot_dur: '{start}–{end} · {dur} min',
+    slot_free_from_multi: 'free from {start} · {durs} min available',
+    slot_free_from: 'free from {start} · {dur} min',
+    slot_mine: 'Your lesson', slot_locked: '🔒 booked',
+    free: 'free', book: 'Book', taken: 'taken', offered_out: 'being offered',
+    past: 'past', toofar: 'not yet bookable', closed: 'closed',
+    slots_none_free: 'Nothing free on this day right now.',
+    cancel: 'Cancel', abort: 'Cancel', close: 'Close',
+    choose_duration: 'Choose duration', minutes_opt: '{d} minutes',
+    book_nofit: 'None of your lesson lengths fit into the day at this start{cap}. Please pick an earlier start.',
+    book_nofit_cap: ' (only {n} min left until closing)',
+    book_confirm_title: 'Book this lesson?',
+    book_confirm_text: 'Are you sure you want to take this slot?',
+    book_rule1: 'Free cancellation only up to {h} h before.',
+    book_rule2: 'From {h} h before it is fixed – no more cancellation.',
+    book_rule3: 'In between you can offer the lesson to others.',
+    book_go: 'Yes, book it',
+    toast_booked: 'Lesson booked ✓', celebrate_booked: 'Lesson booked',
+    cancel_confirm: 'Really cancel this lesson?', toast_cancelled: 'Cancelled',
+    toast_accepted: 'Lesson accepted ✓', toast_taken: 'Lesson taken over ✓',
+    celebrate_taken: 'Taken over', toast_declined: 'Declined',
   },
   tr: {
     tagline_student: 'Direksiyon derslerini kolayca online al', tagline_admin: 'Eğitmen alanı',
@@ -104,6 +156,31 @@ const I18N = {
     gate_fallback: 'Yüklenmiyor mu? Doğrudan aç:', gate_later: 'Sonra', gate_ok: 'Anladım ve kabul ediyorum',
     book_title: 'Randevu al', today: 'Bugün', find_free: '🔎 En yakın boş randevu',
     horizon_note: '({d} güne kadar önceden)', horizon_note_rank: '({d} güne kadar önceden · Sınıf {r})',
+    min: 'dk', oclock: '', at_time: 'saat ',
+    slots_none_title: '{day}: ders yok',
+    slots_none_text: 'Eğitmenin bu gün randevu sunmuyor. Senin için bir sonraki boş günü bulayım.',
+    find_free_long: '🔎 Bir sonraki boş randevuyu bul',
+    slot_dur: '{start}–{end} · {dur} dk',
+    slot_free_from_multi: '{start}’ten itibaren boş · {durs} dk seçilebilir',
+    slot_free_from: '{start}’ten itibaren boş · {dur} dk',
+    slot_mine: 'Randevun', slot_locked: '🔒 rezerve',
+    free: 'boş', book: 'Rezerve et', taken: 'dolu', offered_out: 'devrediliyor',
+    past: 'geçti', toofar: 'henüz açılmadı', closed: 'kapalı',
+    slots_none_free: 'Bu gün şu an boş yer yok.',
+    cancel: 'İptal et', abort: 'Vazgeç', close: 'Kapat',
+    choose_duration: 'Süre seç', minutes_opt: '{d} dakika',
+    book_nofit: 'Bu başlangıçta ders sürelerinden hiçbiri güne sığmıyor{cap}. Lütfen daha erken bir başlangıç seç.',
+    book_nofit_cap: ' (gün sonuna yalnızca {n} dk)',
+    book_confirm_title: 'Randevuyu kesin al?',
+    book_confirm_text: 'Bu randevuyu almak istediğine emin misin?',
+    book_rule1: 'Ücretsiz iptal yalnızca {h} saat öncesine kadar.',
+    book_rule2: '{h} saat kala randevu kesinleşir – artık iptal yok.',
+    book_rule3: 'Aradaki sürede dersi başkalarına devredebilirsin.',
+    book_go: 'Evet, kesin al',
+    toast_booked: 'Randevu alındı ✓', celebrate_booked: 'Randevu alındı',
+    cancel_confirm: 'Bu randevu gerçekten iptal edilsin mi?', toast_cancelled: 'İptal edildi',
+    toast_accepted: 'Randevu kabul edildi ✓', toast_taken: 'Ders devralındı ✓',
+    celebrate_taken: 'Devralındı', toast_declined: 'Reddedildi',
   },
   ar: {
     tagline_student: 'احجز دروس القيادة بسهولة عبر الإنترنت', tagline_admin: 'منطقة المدرّب',
@@ -126,6 +203,31 @@ const I18N = {
     gate_fallback: 'لا يتم التحميل؟ افتح مباشرة:', gate_later: 'لاحقاً', gate_ok: 'فهمت وأوافق',
     book_title: 'حجز موعد', today: 'اليوم', find_free: '🔎 أقرب موعد متاح',
     horizon_note: '(حتى {d} يوماً مسبقاً)', horizon_note_rank: '(حتى {d} يوماً مسبقاً · المستوى {r})',
+    min: 'دقيقة', oclock: '', at_time: 'الساعة ',
+    slots_none_title: 'لا دروس يوم {day}',
+    slots_none_text: 'مدرّبك لا يقدّم مواعيد في هذا اليوم. دعني أبحث لك عن أقرب يوم متاح.',
+    find_free_long: '🔎 ابحث عن أقرب موعد متاح',
+    slot_dur: '{start}–{end} · {dur} دقيقة',
+    slot_free_from_multi: 'متاح من {start} · {durs} دقيقة',
+    slot_free_from: 'متاح من {start} · {dur} دقيقة',
+    slot_mine: 'موعدك', slot_locked: '🔒 محجوز',
+    free: 'متاح', book: 'احجز', taken: 'محجوز', offered_out: 'يُعرض للتنازل',
+    past: 'انتهى', toofar: 'غير متاح بعد', closed: 'مغلق',
+    slots_none_free: 'لا يوجد وقت متاح في هذا اليوم حالياً.',
+    cancel: 'إلغاء', abort: 'إلغاء', close: 'إغلاق',
+    choose_duration: 'اختر المدة', minutes_opt: '{d} دقيقة',
+    book_nofit: 'لا تتّسع أيّ من مدد دروسك في اليوم عند هذا الوقت{cap}. يرجى اختيار وقت أبكر.',
+    book_nofit_cap: ' (بقي {n} دقيقة حتى نهاية اليوم)',
+    book_confirm_title: 'تأكيد حجز الموعد؟',
+    book_confirm_text: 'هل أنت متأكد أنك تريد هذا الموعد؟',
+    book_rule1: 'الإلغاء المجاني حتى {h} ساعة قبل الموعد فقط.',
+    book_rule2: 'قبل {h} ساعة يصبح الموعد نهائياً – لا إلغاء بعدها.',
+    book_rule3: 'في الفترة بينهما يمكنك عرض الدرس على الآخرين.',
+    book_go: 'نعم، احجز',
+    toast_booked: 'تم الحجز ✓', celebrate_booked: 'تم الحجز',
+    cancel_confirm: 'هل تريد إلغاء هذا الموعد فعلاً؟', toast_cancelled: 'تم الإلغاء',
+    toast_accepted: 'تم قبول الموعد ✓', toast_taken: 'تم استلام الدرس ✓',
+    celebrate_taken: 'تم الاستلام', toast_declined: 'تم الرفض',
   },
 };
 function t(key, vars) {
@@ -141,8 +243,26 @@ function setLang(l) {
   LANG = LANGS[l] ? l : 'de';
   try { localStorage.setItem('fsp-lang', LANG); } catch {}
   applyLangDir();
+  applyDateNames();
   render(); // Oberfläche in der neuen Sprache neu aufbauen
 }
+// Wochentags-/Monatsnamen + Datums-Locale je Sprache aufbauen (über Intl).
+function applyDateNames() {
+  const loc = LANG === 'de' ? 'de-DE' : LANG === 'tr' ? 'tr-TR' : LANG === 'ar' ? 'ar' : 'en-GB';
+  LOCALE = loc;
+  try {
+    const sh = new Intl.DateTimeFormat(loc, { weekday: 'short' });
+    const lo = new Intl.DateTimeFormat(loc, { weekday: 'long' });
+    const ms = new Intl.DateTimeFormat(loc, { month: 'short' });
+    const ml = new Intl.DateTimeFormat(loc, { month: 'long' });
+    const wd = [], wdl = [];
+    for (let i = 0; i < 7; i++) { const d = new Date(Date.UTC(2024, 0, 1 + i)); wd.push(sh.format(d)); wdl.push(lo.format(d)); } // 2024-01-01 = Montag
+    const mo = [], mol = [];
+    for (let i = 0; i < 12; i++) { const d = new Date(Date.UTC(2024, i, 15)); mo.push(ms.format(d)); mol.push(ml.format(d)); }
+    WD = wd; WD_LONG = wdl; MON = mo; MON_LONG = mol;
+  } catch { /* Fallback: deutsche Standardnamen bleiben */ }
+}
+applyDateNames();
 // Sprachauswahl (Fenster). Tippt man eine Sprache an, wird sofort umgeschaltet.
 function openLangPicker() {
   modal(`<h3 style="margin:.1rem 0 .7rem">${t('lang_section')}</h3>
@@ -1047,7 +1167,7 @@ function startLiveShare() {
   if (!navigator.geolocation) { toast('GPS nicht verfügbar', 'err'); return; }
   liveWatchId = navigator.geolocation.watchPosition(async (p) => {
     try { await api('/api/instructor/location', { method: 'POST', body: { lat: p.coords.latitude, lng: p.coords.longitude } }); } catch {}
-    if (state.instrTab === 'heute') { const el = $('#live-instr'); if (el) el.dataset.ts = new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }); }
+    if (state.instrTab === 'heute') { const el = $('#live-instr'); if (el) el.dataset.ts = new Date().toLocaleTimeString(LOCALE, { hour: '2-digit', minute: '2-digit' }); }
   }, (e) => { toast('Standort-Fehler: ' + e.message, 'err'); stopLiveShare(); },
     { enableHighAccuracy: true, maximumAge: 8000, timeout: 20000 });
   state.liveSharing = true;
@@ -1798,14 +1918,14 @@ function addMinHHMM(hhmm, min) {
 function lessonTypeLabel(t) { return { ueberland: '🌄 Überland', autobahn: '🛣️ Autobahn', nacht: '🌙 Nachtfahrt' }[t] || 'Normal'; }
 function fmtDT(date, time) {
   const d = parseD(date);
-  return d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }) + (time ? ', ' + time + ' Uhr' : '');
+  return d.toLocaleDateString(LOCALE, { day: '2-digit', month: '2-digit', year: 'numeric' }) + (time ? ', ' + time + ' Uhr' : '');
 }
 // Eintrag-Zeitpunkt (created_at, ISO) als lokales „TT.MM.JJJJ, HH:MM Uhr“.
 function fmtEntry(ts) {
   if (!ts) return '';
   const d = new Date(ts);
   if (isNaN(d.getTime())) return fmtDT(String(ts).slice(0, 10));
-  return d.toLocaleString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) + ' Uhr';
+  return d.toLocaleString(LOCALE, { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) + ' Uhr';
 }
 function renderMyLessons(bookings) {
   const card = $('#lessons-card'); if (!card) return;
@@ -1936,7 +2056,7 @@ function openSignModal(l) {
 
 // ---------- Nachrichten an den Fahrlehrer (Schüler) ----------
 function msgTime(iso) {
-  try { return new Date(iso).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }); } catch { return ''; }
+  try { return new Date(iso).toLocaleString(LOCALE, { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }); } catch { return ''; }
 }
 async function renderStudentMessages() {
   const card = $('#messages-card'); if (!card) return;
@@ -2219,7 +2339,7 @@ function revRatingWord(n) { return ['', 'geht so', 'okay', 'gut', 'sehr gut', 't
 // Druckbarer Fahrstunden-Nachweis (Tabelle + Unterschriften) + optional ADK-Zusammenfassung
 function printLessonProof(name, done, adk, stats) {
   const school = esc(state.settings?.instructor_name || 'Fahrschule');
-  const today = new Date().toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  const today = new Date().toLocaleDateString(LOCALE, { day: '2-digit', month: '2-digit', year: 'numeric' });
   const list = (done || []).slice().sort((a, z) => (a.date + a.start_time).localeCompare(z.date + z.start_time));
   const driven = list.filter((b) => b.attended !== 0);
   const totalMin = driven.reduce((s, b) => s + (b.duration_min || 0), 0);
@@ -2566,7 +2686,7 @@ function studentBookingItem(b) {
       let due = new Date(new Date(b.created_at).getTime() + rm * 60000);
       if (lessonAt < due) due = lessonAt;
       if (due.getTime() > Date.now()) {
-        const dueTime = due.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+        const dueTime = due.toLocaleTimeString(LOCALE, { hour: '2-digit', minute: '2-digit' });
         const sameDay = due.toDateString() === new Date().toDateString();
         reserveHint = `<div class="resv-due">⏳ Bitte bis <strong>${sameDay ? '' : fmtShort(due.toISOString().slice(0, 10)) + ' · '}${dueTime} Uhr</strong> antworten – sonst wird der Termin wieder frei.</div>`;
       }
@@ -2835,7 +2955,7 @@ async function refreshStudentLive() {
       <p class="hint">${note}</p>${contact}`;
   } else {
     const loc = d.location;
-    const upd = new Date(loc.updated_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+    const upd = new Date(loc.updated_at).toLocaleTimeString(LOCALE, { hour: '2-digit', minute: '2-digit' });
     const meetPill = d.meet?.label ? `<div class="inline" style="margin-top:.5rem"><span class="pill">📍 Treffpunkt: ${esc(d.meet.label)}</span></div>` : '';
     const setEl = (id, html) => { const e = document.getElementById(id); if (e) e.innerHTML = html; };
     // Hero + Kacheln aus den besten verfügbaren Werten bauen.
@@ -2920,7 +3040,7 @@ function renderLessonTimer(bookings) {
     const remain = Math.max(0, totalSec - elapsedSec);
     const mm = Math.floor(remain / 60), ss = remain % 60;
     const pct = Math.min(100, Math.round(elapsedSec / totalSec * 100));
-    const startedLbl = new Date(b.started_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+    const startedLbl = new Date(b.started_at).toLocaleTimeString(LOCALE, { hour: '2-digit', minute: '2-digit' });
     card.innerHTML = `<h2>🚗 Fahrstunde läuft</h2>
       ${remain <= 0
         ? `<div class="lesson-timer done"><span class="lt-clock">✅ Zeit um</span></div>
@@ -3061,7 +3181,7 @@ function renderNotifications(notifs, unread) {
         return `<div class="notif ${n.read ? '' : 'unread'}">
         <span class="notif-ic">${icon(n.kind)}</span>
         <div class="notif-body"><div class="notif-msg">${esc(n.message)}</div>
-          <div class="notif-time">${new Date(n.created_at).toLocaleString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</div>
+          <div class="notif-time">${new Date(n.created_at).toLocaleString(LOCALE, { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</div>
           ${needsSign ? `<button class="sm notif-sign" data-sign="${n.ref_booking_id}" style="margin-top:.5rem">✍️ Jetzt unterschreiben</button>` : ''}</div>
         ${n.read ? '' : '<span class="notif-dot"></span>'}
       </div>`; }).join('')}</div>
@@ -3119,11 +3239,11 @@ async function withdrawOffer(id) {
   catch (e) { toast(e.message, 'err'); }
 }
 async function takeOffer(id) {
-  try { await api('/api/bookings/' + id + '/take', { method: 'POST' }); celebrate('Übernommen'); toast('Fahrstunde übernommen ✓', 'ok'); syncStudent(); }
+  try { await api('/api/bookings/' + id + '/take', { method: 'POST' }); celebrate(t('celebrate_taken')); toast(t('toast_taken'), 'ok'); syncStudent(); }
   catch (e) { toast(e.message, 'err'); }
 }
 async function declineOffer(id) {
-  try { await api('/api/bookings/' + id + '/decline', { method: 'POST' }); toast('Abgelehnt', 'ok'); syncStudent(); }
+  try { await api('/api/bookings/' + id + '/decline', { method: 'POST' }); toast(t('toast_declined'), 'ok'); syncStudent(); }
   catch (e) { toast(e.message, 'err'); }
 }
 
@@ -3134,9 +3254,9 @@ function renderSlots(slots, mine) {
   if (!slots.length) {
     el.innerHTML = `<div class="empty-book">
       <div class="eb-icon">📅</div>
-      <div class="eb-title">${dayName} keine Fahrstunden</div>
-      <p class="eb-text">An diesem Tag bietet dein Fahrlehrer keine Termine an. Lass mich den nächsten freien Tag für dich suchen.</p>
-      <button data-find-next="${state.date}">🔎 Nächsten freien Termin finden</button>
+      <div class="eb-title">${esc(t('slots_none_title', { day: dayName }))}</div>
+      <p class="eb-text">${t('slots_none_text')}</p>
+      <button data-find-next="${state.date}">${t('find_free_long')}</button>
     </div>`;
     el.querySelector('[data-find-next]').onclick = () => jumpToNextFree(addDays(state.date, 1));
     return;
@@ -3144,36 +3264,36 @@ function renderSlots(slots, mine) {
   el.innerHTML = slots.map((s) => {
     const mineHere = mineToday.has(s.start);
     let cls = s.state, inner = '';
-    let sub = `${s.start}–${s.end} · ${s.duration} Min`;
+    let sub = t('slot_dur', { start: s.start, end: s.end, dur: s.duration });
     // Freier (fliessender) Start: Dauer waehlt der Schüler selbst -> passende Beschriftung.
     if (s.state === 'free' && !mineHere) {
       const md = Number(s.maxDur || s.duration);
       const my = String(state.user?.allowed_durations || '80').split(',').map(Number).filter((n) => n > 0 && n <= md).sort((a, b) => a - b);
-      sub = my.length > 1 ? `frei ab ${s.start} Uhr · ${my.join('/')} Min wählbar` : `frei ab ${s.start} Uhr · ${my[0] || s.duration} Min`;
+      sub = my.length > 1 ? t('slot_free_from_multi', { start: s.start, durs: my.join('/') }) : t('slot_free_from', { start: s.start, dur: my[0] || s.duration });
     }
     if (mineHere) {
       // Nur frei stornierbar, solange die Storno-Frist nicht erreicht ist –
       // sonst 🔒 (Verwalten/Anbieten geht oben unter „Meine Fahrstunden").
       const cancelH = state.settings?.cancel_hours || 48;
       const freeCancel = hoursUntil(state.date, s.start) >= cancelH;
-      inner = `<span class="tag b">Dein Termin</span>`
-        + (freeCancel ? `<button class="ghost sm" data-cancel-time="${s.start}">Stornieren</button>`
-                      : `<span class="pill">🔒 gebucht</span>`);
+      inner = `<span class="tag b">${t('slot_mine')}</span>`
+        + (freeCancel ? `<button class="ghost sm" data-cancel-time="${s.start}">${t('cancel')}</button>`
+                      : `<span class="pill">${t('slot_locked')}</span>`);
       cls = 'booked';
     } else if (s.state === 'free') {
-      inner = `<span class="tag g">frei</span><button class="sm" data-book="${s.start}" data-dur="${s.duration}" data-maxdur="${s.maxDur || s.duration}">Buchen</button>`;
+      inner = `<span class="tag g">${t('free')}</span><button class="sm" data-book="${s.start}" data-dur="${s.duration}" data-maxdur="${s.maxDur || s.duration}">${t('book')}</button>`;
     } else if (s.state === 'booked') {
-      inner = `<span class="tag x">belegt</span>`;
+      inner = `<span class="tag x">${t('taken')}</span>`;
     } else if (s.state === 'offered') {
-      inner = `<span class="tag x">wird abgegeben</span>`;
+      inner = `<span class="tag x">${t('offered_out')}</span>`;
     } else if (s.state === 'blocked') {
-      inner = `<span class="tag x">${esc(s.blockTitle || 'belegt')}</span>`;
+      inner = `<span class="tag x">${esc(s.blockTitle || t('taken'))}</span>`;
     } else if (s.state === 'past') {
-      inner = `<span class="tag x">vorbei</span>`;
+      inner = `<span class="tag x">${t('past')}</span>`;
     } else if (s.state === 'toofar') {
-      inner = `<span class="tag x">noch nicht buchbar</span>`;
+      inner = `<span class="tag x">${t('toofar')}</span>`;
     } else {
-      inner = `<span class="tag x">geschlossen</span>`;
+      inner = `<span class="tag x">${t('closed')}</span>`;
     }
     return `<div class="slot ${cls}">
       <div class="time">${s.start}</div>
@@ -3187,8 +3307,8 @@ function renderSlots(slots, mine) {
   const anyMine = slots.some((s) => mineToday.has(s.start));
   if (!anyFree && !anyMine) {
     el.insertAdjacentHTML('beforeend', `<div class="slots-hint">
-      An diesem Tag ist gerade nichts frei.
-      <button class="sec sm" data-find-next>🔎 Nächsten freien Termin</button>
+      ${t('slots_none_free')}
+      <button class="sec sm" data-find-next>${t('find_free')}</button>
     </div>`);
     el.querySelector('[data-find-next]').onclick = () => jumpToNextFree(addDays(state.date, 1));
   }
@@ -3207,47 +3327,48 @@ function bookSlot(start, dur, maxDur) {
   const cap = Number(maxDur) > 0 ? Number(maxDur) : Infinity;
   const fits = allowed.filter((d) => d <= cap);
   if (!fits.length) {
-    modal(`<h3>Termin buchen</h3>
-      <div class="warnbox">An diesem Start passt keine deiner freigegebenen Fahrstunden-Längen mehr in den Tag${cap < Infinity ? ` (nur noch ${cap} Min bis Feierabend)` : ''}. Bitte wähle einen früheren Start.</div>
-      <div class="actions"><button class="sec" onclick="window.__closeModal()">Schließen</button></div>`);
+    const capTxt = cap < Infinity ? t('book_nofit_cap', { n: cap }) : '';
+    modal(`<h3>${t('book_title')}</h3>
+      <div class="warnbox">${t('book_nofit', { cap: capTxt })}</div>
+      <div class="actions"><button class="sec" onclick="window.__closeModal()">${t('close')}</button></div>`);
     return;
   }
   allowed = fits;
   const defDur = allowed.includes(80) ? 80 : allowed[allowed.length - 1];
   const durSelect = allowed.length > 1
-    ? `<div class="field"><label>Dauer wählen</label><select id="bk-dur">${allowed.map((d) => `<option value="${d}" ${d === defDur ? 'selected' : ''}>${d} Minuten</option>`).join('')}</select></div>`
+    ? `<div class="field"><label>${t('choose_duration')}</label><select id="bk-dur">${allowed.map((d) => `<option value="${d}" ${d === defDur ? 'selected' : ''}>${t('minutes_opt', { d })}</option>`).join('')}</select></div>`
     : '';
-  modal(`<h3>Termin verbindlich buchen?</h3>
+  modal(`<h3>${t('book_confirm_title')}</h3>
     <div class="warnbox">
-      Bist du wirklich sicher, dass du diesen Termin nehmen willst?
+      ${t('book_confirm_text')}
     </div>
-    <p style="margin:.6rem 0 .2rem"><strong>${WD_LONG[isoDow(state.date) - 1]}, ${fmtShort(state.date)} um ${start} Uhr</strong>${allowed.length > 1 ? '' : ` · ${allowed[0]} Min`}</p>
+    <p style="margin:.6rem 0 .2rem"><strong>${WD_LONG[isoDow(state.date) - 1]}, ${fmtShort(state.date)} ${t('at_time')}${start}${t('oclock')}</strong>${allowed.length > 1 ? '' : ` · ${allowed[0]} ${t('min')}`}</p>
     ${durSelect}
-    <ul class="hint" style="margin:.4rem 0 .4rem;padding-left:1.1rem">
-      <li>Kostenfrei stornieren nur bis <strong>${cancelH} Std.</strong> vorher.</li>
-      <li>Ab <strong>${lockH} Std.</strong> vorher steht der Termin fest – dann keine Absage mehr.</li>
-      <li>Im Zeitfenster dazwischen kannst du die Stunde anderen zur Übernahme anbieten.</li>
+    <ul class="hint" style="margin:.4rem 0 .4rem;padding-inline-start:1.1rem">
+      <li>${t('book_rule1', { h: `<strong>${cancelH}</strong>` })}</li>
+      <li>${t('book_rule2', { h: `<strong>${lockH}</strong>` })}</li>
+      <li>${t('book_rule3')}</li>
     </ul>
     ${state.settings?.policy_text ? `<div class="hint" style="border-top:1px solid var(--line);padding-top:.5rem;white-space:pre-line">${esc(state.settings.policy_text)}</div>` : ''}
     <div class="actions">
-      <button class="sec" onclick="window.__closeModal()">Abbrechen</button>
-      <button id="bk-confirm">Ja, verbindlich buchen</button>
+      <button class="sec" onclick="window.__closeModal()">${t('abort')}</button>
+      <button id="bk-confirm">${t('book_go')}</button>
     </div>`);
   $('#bk-confirm').onclick = async () => {
     const chosen = $('#bk-dur') ? Number($('#bk-dur').value) : allowed[0];
     try {
       await api('/api/bookings', { method: 'POST', body: { date: state.date, start_time: start, duration_min: chosen } });
-      closeModal(); celebrate('Termin gebucht'); toast('Termin gebucht ✓', 'ok'); syncStudent();
+      closeModal(); celebrate(t('celebrate_booked')); toast(t('toast_booked'), 'ok'); syncStudent();
     } catch (e) { toast(e.message, 'err'); }
   };
 }
 async function cancelBooking(id) {
-  if (!confirm('Diesen Termin wirklich stornieren?')) return;
-  try { await api('/api/bookings/' + id, { method: 'DELETE' }); toast('Storniert', 'ok'); syncStudent(); }
+  if (!confirm(t('cancel_confirm'))) return;
+  try { await api('/api/bookings/' + id, { method: 'DELETE' }); toast(t('toast_cancelled'), 'ok'); syncStudent(); }
   catch (e) { toast(e.message, 'err'); }
 }
 async function confirmBooking(id) {
-  try { await api('/api/bookings/' + id + '/confirm', { method: 'POST' }); toast('Termin angenommen ✓', 'ok'); syncStudent(); }
+  try { await api('/api/bookings/' + id + '/confirm', { method: 'POST' }); toast(t('toast_accepted'), 'ok'); syncStudent(); }
   catch (e) { toast(e.message, 'err'); }
 }
 async function rejectBooking(id) {
@@ -3723,7 +3844,7 @@ async function renderLiveInstr() {
       <div class="pb-line"><span class="muted">Abholort ${vn}:</span> <strong>${m.label ? esc(m.label) : '– noch nicht gesetzt –'}</strong></div>`;
     if (sl) {
       const route = `https://www.google.com/maps/dir/?api=1&destination=${sl.lat},${sl.lng}`;
-      const upd = new Date(sl.updated_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+      const upd = new Date(sl.updated_at).toLocaleTimeString(LOCALE, { hour: '2-digit', minute: '2-digit' });
       studentBox += `<div class="inline" style="margin:.45rem 0"><span class="pill" style="background:var(--good-bg);color:var(--good)">📍 ${vn} teilt Standort · ${upd}</span></div>
         <div id="instr-live-map" class="live-map" style="height:220px"><div class="lm-loading"><span class="tire">🛞</span><span>Karte lädt …</span></div></div>
         <a class="pill" href="${route}" target="_blank" rel="noopener" style="text-decoration:none;background:var(--brand);color:#fff;margin-top:.5rem;display:inline-block">🧭 Route zu ${vn} (Navi öffnen)</a>`;
@@ -3916,11 +4037,11 @@ function renderContract(stats) {
   const minH = Number(m.contractMinH) || 80;
   const paidH = Number(m.contractPaidH) || 130;
   const targetH = Number(m.targetH) || minH;
-  const fmt = (x) => (Math.round(x * 10) / 10).toLocaleString('de-DE');
+  const fmt = (x) => (Math.round(x * 10) / 10).toLocaleString(LOCALE);
   // Skala: bis zum größten relevanten Wert + etwas Luft.
   const scale = Math.max(paidH, targetH, totalH) * 1.06;
   const pct = (x) => Math.max(0, Math.min(100, (x / scale) * 100));
-  const monName = new Date(m.from || todayStr()).toLocaleDateString('de-DE', { month: 'long', year: 'numeric' });
+  const monName = new Date(m.from || todayStr()).toLocaleDateString(LOCALE, { month: 'long', year: 'numeric' });
   // Ampel: unter Minimum = amber, ab Minimum = blau, ab 130 = grün (alles extra)
   const fillCls = totalH >= paidH ? 'ct-fill-good' : (totalH >= minH ? 'ct-fill-ok' : 'ct-fill-lo');
   // Status-Zeilen
@@ -5229,7 +5350,7 @@ const CURR_STATUS = {
 const currStatusMeta = (s) => CURR_STATUS[s] || CURR_STATUS.geuebt;
 // Zahl mit deutschem Komma, „,0" weglassen (14, 14,5)
 function fmtUnits(u) { const n = Math.round((Number(u) || 0) * 10) / 10; return (Number.isInteger(n) ? String(n) : n.toFixed(1)).replace('.', ','); }
-function fmtDMY2(d) { try { return parseD(d).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' }); } catch { return d; } }
+function fmtDMY2(d) { try { return parseD(d).toLocaleDateString(LOCALE, { day: '2-digit', month: '2-digit', year: '2-digit' }); } catch { return d; } }
 // Statistik-Kacheln: Fahrstunden (à 80 Min), Termine, Schalt/Automatik, Zeit
 function statStripHtml(stats) {
   if (!stats) return '';
@@ -5351,7 +5472,7 @@ async function openTrainingCard(id, name) {
       <summary>${esc(s.title)} <span class="pill" data-secpill="${s.key}">${done}/${s.items.length}</span></summary>
       <div class="tc-items">${s.items.map((it, i) => {
         const k = currKey(s.key, i); const v = training[k];
-        const dt = (typeof v === 'number' && v > 1e12) ? `<span class="tc-date">${new Date(v).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' })}</span>` : '';
+        const dt = (typeof v === 'number' && v > 1e12) ? `<span class="tc-date">${new Date(v).toLocaleDateString(LOCALE, { day: '2-digit', month: '2-digit', year: '2-digit' })}</span>` : '';
         return `<label class="tc-item"><input type="checkbox" data-tc="${k}" data-sk="${s.key}" ${v ? 'checked' : ''}> <span>${esc(it)}</span>${dt}</label>`;
       }).join('')}</div>
     </details>`;
@@ -5417,7 +5538,7 @@ async function openTrainingCard(id, name) {
 function printTrainingCard(name, training) {
   const done = Object.values(training).filter(Boolean).length;
   const pct = CURR_TOTAL ? Math.round((done / CURR_TOTAL) * 100) : 0;
-  const today = new Date().toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  const today = new Date().toLocaleDateString(LOCALE, { day: '2-digit', month: '2-digit', year: 'numeric' });
   const school = esc(state.settings?.instructor_name || 'Fahrschule');
   const secs = CURRICULUM.map((s) => {
     const dn = s.items.filter((_, i) => training[currKey(s.key, i)]).length;
@@ -5994,7 +6115,7 @@ async function loadProtokoll() {
       <tr><th>Wann</th><th>Vorgang</th><th>Fahrschüler</th><th>Details</th></tr>
       ${events.map((e) => {
         const [ic, lbl] = EV_META[e.type] || ['•', e.type];
-        const d = new Date(e.at).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' });
+        const d = new Date(e.at).toLocaleString(LOCALE, { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' });
         return `<tr>
           <td class="muted" style="white-space:nowrap">${d}</td>
           <td>${ic} ${lbl}</td>
@@ -6018,7 +6139,7 @@ async function exportProtokollCSV() {
     const rows = [['Datum/Zeit', 'Vorgang', 'Fahrschüler', 'Details'].map(cell).join(';')];
     for (const e of events) {
       const [, lbl] = EV_META[e.type] || ['', e.type];
-      rows.push([new Date(e.at).toLocaleString('de-DE'), lbl, e.student_name || '', e.detail || ''].map(cell).join(';'));
+      rows.push([new Date(e.at).toLocaleString(LOCALE), lbl, e.student_name || '', e.detail || ''].map(cell).join(';'));
     }
     downloadFile('protokoll.csv', '﻿' + rows.join('\r\n'), 'text/csv;charset=utf-8');
     toast('Protokoll als CSV heruntergeladen ✓', 'ok');
