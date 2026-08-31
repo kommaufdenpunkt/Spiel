@@ -23,6 +23,129 @@ const MON_LONG = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 
 
 const state = { user: null, settings: null, date: todayStr(), instrTab: 'heute' };
 
+// ====================== Sprachen (i18n) ======================
+// Deutsch ist die Grundsprache; Englisch, Türkisch und Arabisch (RTL) sind wählbar.
+// Fehlt eine Übersetzung, wird automatisch der deutsche Text genommen.
+const LANGS = {
+  de: { label: 'Deutsch', flag: '🇩🇪', dir: 'ltr' },
+  en: { label: 'English', flag: '🇬🇧', dir: 'ltr' },
+  tr: { label: 'Türkçe', flag: '🇹🇷', dir: 'ltr' },
+  ar: { label: 'العربية', flag: '🇸🇦', dir: 'rtl' },
+};
+let LANG = 'de';
+try {
+  const saved = localStorage.getItem('fsp-lang');
+  if (saved && LANGS[saved]) LANG = saved;
+  else { const n = (navigator.language || '').slice(0, 2).toLowerCase(); if (LANGS[n]) LANG = n; }
+} catch {}
+const I18N = {
+  de: {
+    tagline_student: 'Fahrstunden einfach online buchen', tagline_admin: 'Fahrlehrer-Bereich',
+    feat_book: '📅 Selbst buchen', feat_swap: '🎁 Tauschen', feat_pickup: '📍 Live-Abholung',
+    feat_day: '📅 Tagesplan', feat_students: '🧑‍🎓 Fahrschüler', feat_reviews: '⭐ Bewertungen', feat_push: '🔔 Push',
+    tab_login: 'Anmelden', tab_register: 'Neu (mit Code)', tab_instr: 'Fahrlehrer',
+    appearance: '🎨 Aussehen', lang_section: '🌍 Sprache', terms: 'Nutzungsbedingungen', privacy: 'Datenschutz', imprint: 'Impressum', or: 'oder',
+    login_id: 'Login-Name oder E-Mail', login_pw: 'Passwort', login_go: 'Anmelden',
+    login_forgot_q: 'Passwort vergessen?', login_forgot_link: 'Neues anfordern', login_forgot_tail: '– dein Fahrlehrer setzt dir dann eins.',
+    reg_intro: 'Du hast von deinem Fahrlehrer einen Zugangscode bekommen? Damit legst du hier einmalig dein Konto an. Deinen Login-Namen bekommst du danach angezeigt.',
+    reg_code: 'Zugangscode', reg_name: 'Name', reg_name_ph: 'Vor- und Nachname', reg_year: 'Jahrgang',
+    reg_email: 'E-Mail (optional)', reg_phone: 'Telefon (optional)', reg_pw: 'Passwort',
+    reg_pw_hint: 'Mind. 8 Zeichen, mit Buchstabe, Zahl und Sonderzeichen (z. B. ! ? # @).', reg_go: 'Konto erstellen',
+    instr_intro: 'Zugang nur für den Fahrlehrer.', instr_pin: 'PIN oder Passwort', instr_code: 'Authenticator-Code',
+    instr_code_ph: '6-stelliger Code', instr_remember: 'Angemeldet bleiben', instr_go: 'Anmelden',
+    instr_passkey: '🔓 Mit Face ID / Passkey anmelden', instr_forgot: 'Passwort vergessen?',
+    gate_title: '👋 Willkommen bei ginoco',
+    gate_text: 'Bevor du loslegst: Bitte lies kurz unsere <strong>Nutzungsbedingungen</strong> und den <strong>Datenschutz</strong>. Mit „Verstanden &amp; akzeptieren" bestätigst du, dass du sie zur Kenntnis genommen hast.',
+    gate_terms: '📄 Nutzungsbedingungen', gate_privacy: '🔒 Datenschutz',
+    gate_fallback: 'Lädt nicht? Direkt öffnen:', gate_later: 'Später', gate_ok: 'Verstanden & akzeptieren',
+  },
+  en: {
+    tagline_student: 'Book driving lessons easily online', tagline_admin: 'Instructor area',
+    feat_book: '📅 Book yourself', feat_swap: '🎁 Swap', feat_pickup: '📍 Live pick-up',
+    feat_day: '📅 Day plan', feat_students: '🧑‍🎓 Students', feat_reviews: '⭐ Reviews', feat_push: '🔔 Push',
+    tab_login: 'Sign in', tab_register: 'New (with code)', tab_instr: 'Instructor',
+    appearance: '🎨 Appearance', lang_section: '🌍 Language', terms: 'Terms of Use', privacy: 'Privacy', imprint: 'Legal notice', or: 'or',
+    login_id: 'Login name or e-mail', login_pw: 'Password', login_go: 'Sign in',
+    login_forgot_q: 'Forgot your password?', login_forgot_link: 'Request a new one', login_forgot_tail: '– your instructor will set one for you.',
+    reg_intro: 'Got an access code from your instructor? Use it to create your account once here. Your login name will be shown afterwards.',
+    reg_code: 'Access code', reg_name: 'Name', reg_name_ph: 'First and last name', reg_year: 'Birth year',
+    reg_email: 'E-mail (optional)', reg_phone: 'Phone (optional)', reg_pw: 'Password',
+    reg_pw_hint: 'At least 8 characters, with a letter, a number and a special character (e.g. ! ? # @).', reg_go: 'Create account',
+    instr_intro: 'For the instructor only.', instr_pin: 'PIN or password', instr_code: 'Authenticator code',
+    instr_code_ph: '6-digit code', instr_remember: 'Stay signed in', instr_go: 'Sign in',
+    instr_passkey: '🔓 Sign in with Face ID / passkey', instr_forgot: 'Forgot your password?',
+    gate_title: '👋 Welcome to ginoco',
+    gate_text: 'Before you start: please take a moment to read our <strong>Terms of Use</strong> and <strong>Privacy Policy</strong>. By tapping “Understood &amp; accept” you confirm you have read them.',
+    gate_terms: '📄 Terms of Use', gate_privacy: '🔒 Privacy',
+    gate_fallback: 'Not loading? Open directly:', gate_later: 'Later', gate_ok: 'Understood & accept',
+  },
+  tr: {
+    tagline_student: 'Direksiyon derslerini kolayca online al', tagline_admin: 'Eğitmen alanı',
+    feat_book: '📅 Kendin rezerve et', feat_swap: '🎁 Takas', feat_pickup: '📍 Canlı buluşma',
+    feat_day: '📅 Günlük plan', feat_students: '🧑‍🎓 Öğrenciler', feat_reviews: '⭐ Değerlendirmeler', feat_push: '🔔 Bildirim',
+    tab_login: 'Giriş yap', tab_register: 'Yeni (kodla)', tab_instr: 'Eğitmen',
+    appearance: '🎨 Görünüm', lang_section: '🌍 Dil', terms: 'Kullanım Koşulları', privacy: 'Gizlilik', imprint: 'Künye', or: 'veya',
+    login_id: 'Kullanıcı adı veya e-posta', login_pw: 'Şifre', login_go: 'Giriş yap',
+    login_forgot_q: 'Şifreni mi unuttun?', login_forgot_link: 'Yeni iste', login_forgot_tail: '– eğitmenin sana yeni bir şifre belirler.',
+    reg_intro: 'Eğitmeninden bir erişim kodu mu aldın? Onunla hesabını bir kez burada oluştur. Kullanıcı adın sonra gösterilir.',
+    reg_code: 'Erişim kodu', reg_name: 'Ad', reg_name_ph: 'Ad ve soyad', reg_year: 'Doğum yılı',
+    reg_email: 'E-posta (isteğe bağlı)', reg_phone: 'Telefon (isteğe bağlı)', reg_pw: 'Şifre',
+    reg_pw_hint: 'En az 8 karakter; bir harf, bir rakam ve bir özel karakter (örn. ! ? # @).', reg_go: 'Hesap oluştur',
+    instr_intro: 'Yalnızca eğitmen için.', instr_pin: 'PIN veya şifre', instr_code: 'Authenticator kodu',
+    instr_code_ph: '6 haneli kod', instr_remember: 'Oturumu açık tut', instr_go: 'Giriş yap',
+    instr_passkey: '🔓 Face ID / passkey ile giriş', instr_forgot: 'Şifreni mi unuttun?',
+    gate_title: '👋 ginoco’ya hoş geldin',
+    gate_text: 'Başlamadan önce: lütfen kısaca <strong>Kullanım Koşulları</strong> ve <strong>Gizlilik</strong> metnimizi oku. “Anladım ve kabul ediyorum”a dokunarak bunları okuduğunu onaylarsın.',
+    gate_terms: '📄 Kullanım Koşulları', gate_privacy: '🔒 Gizlilik',
+    gate_fallback: 'Yüklenmiyor mu? Doğrudan aç:', gate_later: 'Sonra', gate_ok: 'Anladım ve kabul ediyorum',
+  },
+  ar: {
+    tagline_student: 'احجز دروس القيادة بسهولة عبر الإنترنت', tagline_admin: 'منطقة المدرّب',
+    feat_book: '📅 احجز بنفسك', feat_swap: '🎁 تبادل', feat_pickup: '📍 لقاء مباشر',
+    feat_day: '📅 خطة اليوم', feat_students: '🧑‍🎓 الطلاب', feat_reviews: '⭐ التقييمات', feat_push: '🔔 إشعارات',
+    tab_login: 'تسجيل الدخول', tab_register: 'جديد (برمز)', tab_instr: 'المدرّب',
+    appearance: '🎨 المظهر', lang_section: '🌍 اللغة', terms: 'شروط الاستخدام', privacy: 'الخصوصية', imprint: 'بيانات النشر', or: 'أو',
+    login_id: 'اسم الدخول أو البريد الإلكتروني', login_pw: 'كلمة المرور', login_go: 'تسجيل الدخول',
+    login_forgot_q: 'هل نسيت كلمة المرور؟', login_forgot_link: 'اطلب واحدة جديدة', login_forgot_tail: '– سيقوم مدرّبك بتعيين كلمة مرور لك.',
+    reg_intro: 'هل حصلت على رمز وصول من مدرّبك؟ استخدمه لإنشاء حسابك مرة واحدة هنا. سيظهر اسم الدخول الخاص بك بعد ذلك.',
+    reg_code: 'رمز الوصول', reg_name: 'الاسم', reg_name_ph: 'الاسم الأول والأخير', reg_year: 'سنة الميلاد',
+    reg_email: 'البريد الإلكتروني (اختياري)', reg_phone: 'الهاتف (اختياري)', reg_pw: 'كلمة المرور',
+    reg_pw_hint: '‏8 أحرف على الأقل، مع حرف ورقم ورمز خاص (مثل ! ? # @).', reg_go: 'إنشاء حساب',
+    instr_intro: 'للمدرّب فقط.', instr_pin: 'رمز PIN أو كلمة المرور', instr_code: 'رمز المصادقة',
+    instr_code_ph: 'رمز من 6 أرقام', instr_remember: 'ابقَ مسجّلاً', instr_go: 'تسجيل الدخول',
+    instr_passkey: '🔓 الدخول عبر Face ID / مفتاح المرور', instr_forgot: 'هل نسيت كلمة المرور؟',
+    gate_title: '👋 مرحباً بك في ginoco',
+    gate_text: 'قبل أن تبدأ: يُرجى قراءة <strong>شروط الاستخدام</strong> و<strong>سياسة الخصوصية</strong> باختصار. بالنقر على «فهمت وأوافق» تؤكد أنك اطّلعت عليها.',
+    gate_terms: '📄 شروط الاستخدام', gate_privacy: '🔒 الخصوصية',
+    gate_fallback: 'لا يتم التحميل؟ افتح مباشرة:', gate_later: 'لاحقاً', gate_ok: 'فهمت وأوافق',
+  },
+};
+function t(key, vars) {
+  let s = (I18N[LANG] && I18N[LANG][key] != null) ? I18N[LANG][key] : (I18N.de[key] != null ? I18N.de[key] : key);
+  if (vars) for (const k in vars) s = String(s).split('{' + k + '}').join(vars[k]);
+  return s;
+}
+function applyLangDir() {
+  const d = (LANGS[LANG] || LANGS.de).dir;
+  try { document.documentElement.lang = LANG; document.documentElement.dir = d; } catch {}
+}
+function setLang(l) {
+  LANG = LANGS[l] ? l : 'de';
+  try { localStorage.setItem('fsp-lang', LANG); } catch {}
+  applyLangDir();
+  render(); // Oberfläche in der neuen Sprache neu aufbauen
+}
+// Sprachauswahl (Fenster). Tippt man eine Sprache an, wird sofort umgeschaltet.
+function openLangPicker() {
+  modal(`<h3 style="margin:.1rem 0 .7rem">${t('lang_section')}</h3>
+    <div class="lang-list">
+      ${Object.entries(LANGS).map(([k, v]) => `<button class="lang-opt${k === LANG ? ' active' : ''}" data-l="${k}">
+        <span class="lang-flag">${v.flag}</span><span class="lang-name">${esc(v.label)}</span>${k === LANG ? '<span class="lang-chk">✓</span>' : ''}</button>`).join('')}
+    </div>`);
+  document.querySelectorAll('.lang-opt').forEach((b) => b.onclick = () => { closeModal(); setLang(b.dataset.l); });
+}
+window.__openLangPicker = openLangPicker;
+
 // ---------- Farb-Themes (dunkel, augenschonend) ----------
 // Kein reines Schwarz (weniger Halo/Blendung), Text kontrastreich (>= WCAG AA).
 const THEMES = {
@@ -235,6 +358,10 @@ function openThemePicker() {
   const swatch = (bg, on, extra = '') => `width:30px;height:30px;border-radius:50%;background:${bg};display:inline-block;border:2px solid ${on ? 'var(--ink)' : 'transparent'};${extra}`;
   modal(`<h3>🎨 Aussehen</h3>
     <p class="hint">Gestalte ginoco, wie es dir gefällt – alles wird auf diesem Gerät gespeichert.</p>
+
+    <div class="ap-sec"><div class="ap-label">🌍 Sprache / Language / Dil / اللغة</div>
+      <button class="sec" style="width:100%;justify-content:center" onclick="window.__openLangPicker()">${(LANGS[LANG] || LANGS.de).flag} ${esc((LANGS[LANG] || LANGS.de).label)}</button>
+    </div>
 
     <div class="ap-sec"><div class="ap-label">Thema</div>
       <div class="ap-grid2">
@@ -573,8 +700,11 @@ function openTour() {
 window.__openTour = openTour;
 
 // ---------- Was ist neu? (Changelog) ----------
-const CHANGELOG_VER = '3.88';
+const CHANGELOG_VER = '3.89';
 const CHANGELOG = [
+  { v: '3.89', d: '31.08.2026', title: '🌍 Mehrsprachig: Deutsch, English, Türkçe, العربية', items: [
+    '🌍 <strong>Sprache wählbar:</strong> ginoco spricht jetzt <strong>Deutsch, Englisch, Türkisch und Arabisch</strong> – Arabisch mit korrekter Rechts-nach-links-Darstellung. Umschalten unten im Anmelde-Bildschirm oder unter „🎨 Aussehen → Sprache".',
+    '🚀 Der Anmelde-Bereich, die Rechtstexte-Begrüßung und die Formulare sind bereits übersetzt; die weiteren Bereiche folgen Schritt für Schritt.'] },
   { v: '3.88', d: '31.08.2026', title: '📄 Rechtstexte gleich beim Start', items: [
     '📄 <strong>Nutzungsbedingungen &amp; Datenschutz beim ersten Öffnen:</strong> Ganz am Anfang zeigen wir dir beide Texte einmal direkt in der App – kurz drüberschauen, „Verstanden &amp; akzeptieren", fertig. Danach erscheint das nicht mehr; die Links bleiben unten im Anmelde-Bildschirm.'] },
   { v: '3.87', d: '31.08.2026', title: '🚗 Das große Update – alles Neue auf einen Blick', items: [
@@ -1014,6 +1144,7 @@ function closeModal() {
     const [me, s] = await Promise.all([api('/api/auth/me'), api('/api/settings')]);
     state.user = me.user; state.settings = s.settings;
   } catch (e) { /* settings evtl. ohne login */ }
+  applyLangDir();
   render();
 })();
 
@@ -1185,14 +1316,15 @@ function portalMode() {
 function renderAuth() {
   const mode = portalMode();
   const regOpen = state.settings?.registration_open === '1'; // privat, wenn geschlossen
-  const reg = regOpen ? [['register', 'Neu (mit Code)']] : [];
+  const reg = regOpen ? [['register', 'tab_register']] : [];
   const TABS = mode === 'admin'
-    ? [['instr', 'Fahrlehrer']]
+    ? [['instr', 'tab_instr']]
     : mode === 'student'
-      ? [['login', 'Anmelden'], ...reg]
-      : [['login', 'Anmelden'], ...reg, ['instr', 'Fahrlehrer']];
+      ? [['login', 'tab_login'], ...reg]
+      : [['login', 'tab_login'], ...reg, ['instr', 'tab_instr']];
   let tab = TABS[0][0];
-  const tagline = mode === 'admin' ? 'Fahrlehrer-Bereich' : 'Fahrstunden einfach online buchen';
+  const tagline = mode === 'admin' ? t('tagline_admin') : t('tagline_student');
+  const lg = LANGS[LANG] || LANGS.de;
   const draw = () => {
     app.innerHTML = `<div class="auth-wrap"><div class="auth">
       <div class="auth-hero">
@@ -1201,18 +1333,21 @@ function renderAuth() {
         <div class="tag">${tagline}</div>
       </div>
       ${mode === 'admin' ? `<div class="auth-feats">
-        <span>📅 Tagesplan</span><span>🧑‍🎓 Fahrschüler</span><span>⭐ Bewertungen</span><span>🔔 Push</span>
+        <span>${t('feat_day')}</span><span>${t('feat_students')}</span><span>${t('feat_reviews')}</span><span>${t('feat_push')}</span>
       </div>` : `<div class="auth-feats">
-        <span>📅 Selbst buchen</span><span>🎁 Tauschen</span><span>📍 Live-Abholung</span>
+        <span>${t('feat_book')}</span><span>${t('feat_swap')}</span><span>${t('feat_pickup')}</span>
       </div>`}
       <div class="card">
         ${TABS.length > 1 ? `<div class="tabs">
-          ${TABS.map(([t, l]) => `<button data-t="${t}" class="${tab === t ? 'active' : ''}">${l}</button>`).join('')}
+          ${TABS.map(([tk, lk]) => `<button data-t="${tk}" class="${tab === tk ? 'active' : ''}">${t(lk)}</button>`).join('')}
         </div>` : ''}
         <div id="authbody"></div>
       </div>
-      <div class="center"><button class="ghost sm" onclick="window.__openThemePicker()">🎨 Aussehen</button></div>
-      <div class="center legal-links"><a href="/nutzungsbedingungen.html">Nutzungsbedingungen</a> · <a href="/datenschutz.html">Datenschutz</a> · <a href="/impressum.html">Impressum</a></div>
+      <div class="center auth-tools">
+        <button class="ghost sm" onclick="window.__openThemePicker()">${t('appearance')}</button>
+        <button class="ghost sm" onclick="window.__openLangPicker()">${lg.flag} ${esc(lg.label)}</button>
+      </div>
+      <div class="center legal-links"><a href="/nutzungsbedingungen.html">${t('terms')}</a> · <a href="/datenschutz.html">${t('privacy')}</a> · <a href="/impressum.html">${t('imprint')}</a></div>
       ${mode !== 'admin' ? '<div class="rev-marquee" id="rev-marquee" hidden></div>' : ''}
     </div></div>`;
     app.querySelectorAll('.tabs button').forEach((b) => b.onclick = () => { tab = b.dataset.t; draw(); });
@@ -1237,18 +1372,18 @@ function maybeShowLegalGate() {
   try { ack = localStorage.getItem('ginoco-legal-ack') === '1'; } catch {}
   if (ack) return;
   _legalShown = true;
-  modal(`<h3 style="margin:.1rem 0 .5rem">👋 Willkommen bei ginoco</h3>
-    <p class="hint" style="margin:0 0 .7rem">Bevor du loslegst: Bitte lies kurz unsere <strong>Nutzungsbedingungen</strong> und den <strong>Datenschutz</strong>. Mit „Verstanden &amp; akzeptieren" bestätigst du, dass du sie zur Kenntnis genommen hast.</p>
+  modal(`<h3 style="margin:.1rem 0 .5rem">${t('gate_title')}</h3>
+    <p class="hint" style="margin:0 0 .7rem">${t('gate_text')}</p>
     <div class="legal-tabs">
-      <button data-lg="nb" class="active">📄 Nutzungsbedingungen</button>
-      <button data-lg="ds">🔒 Datenschutz</button>
+      <button data-lg="nb" class="active">${t('gate_terms')}</button>
+      <button data-lg="ds">${t('gate_privacy')}</button>
     </div>
     <iframe id="legal-frame" class="legal-frame" src="/nutzungsbedingungen.html" title="Rechtstext"></iframe>
-    <div class="legal-fallback">Lädt nicht? Direkt öffnen:
-      <a href="/nutzungsbedingungen.html">Nutzungsbedingungen</a> · <a href="/datenschutz.html">Datenschutz</a></div>
+    <div class="legal-fallback">${t('gate_fallback')}
+      <a href="/nutzungsbedingungen.html">${t('terms')}</a> · <a href="/datenschutz.html">${t('privacy')}</a></div>
     <div class="actions">
-      <button class="sec" id="legal-later">Später</button>
-      <button id="legal-ok">Verstanden &amp; akzeptieren</button>
+      <button class="sec" id="legal-later">${t('gate_later')}</button>
+      <button id="legal-ok">${t('gate_ok')}</button>
     </div>`, 'wide');
   const frame = document.getElementById('legal-frame');
   document.querySelectorAll('.legal-tabs button').forEach((b) => b.onclick = () => {
@@ -1285,10 +1420,10 @@ function showErr(msg) { const e = $('#autherr'); if (e) { e.textContent = msg; e
 
 function loginForm() {
   return `${errBox()}
-    <div class="field"><label>Login-Name oder E-Mail</label><input id="l-email" autocomplete="username" placeholder="z.B. MM1997"></div>
-    <div class="field"><label>Passwort</label><input id="l-pw" type="password" autocomplete="current-password"></div>
-    <div class="form-actions"><button id="l-go">Anmelden</button></div>
-    <p class="hint" style="margin-top:.6rem">Passwort vergessen? <a href="#" id="l-forgot" class="linklike">Neues anfordern</a> – dein Fahrlehrer setzt dir dann eins.</p>`;
+    <div class="field"><label>${t('login_id')}</label><input id="l-email" autocomplete="username" placeholder="z.B. MM1997"></div>
+    <div class="field"><label>${t('login_pw')}</label><input id="l-pw" type="password" autocomplete="current-password"></div>
+    <div class="form-actions"><button id="l-go">${t('login_go')}</button></div>
+    <p class="hint" style="margin-top:.6rem">${t('login_forgot_q')} <a href="#" id="l-forgot" class="linklike">${t('login_forgot_link')}</a> ${t('login_forgot_tail')}</p>`;
 }
 function openForgotModal() {
   modal(`<h3>Passwort vergessen</h3>
@@ -1311,28 +1446,28 @@ function openForgotModal() {
 }
 function registerForm() {
   return `${errBox()}
-    <p class="hint">Du hast von deinem Fahrlehrer einen Zugangscode bekommen? Damit legst du hier einmalig dein Konto an. Deinen Login-Namen bekommst du danach angezeigt.</p>
-    <div class="field"><label>Zugangscode</label><input id="r-code" placeholder="XXXX-XXXX" style="text-transform:uppercase"></div>
+    <p class="hint">${t('reg_intro')}</p>
+    <div class="field"><label>${t('reg_code')}</label><input id="r-code" placeholder="XXXX-XXXX" style="text-transform:uppercase"></div>
     <div class="row">
-      <div class="field"><label>Name</label><input id="r-name" autocomplete="name" placeholder="Vor- und Nachname"></div>
-      <div class="field" style="max-width:130px"><label>Jahrgang</label><input id="r-year" type="number" placeholder="1997" min="1930" max="2015"></div>
+      <div class="field"><label>${t('reg_name')}</label><input id="r-name" autocomplete="name" placeholder="${t('reg_name_ph')}"></div>
+      <div class="field" style="max-width:130px"><label>${t('reg_year')}</label><input id="r-year" type="number" placeholder="1997" min="1930" max="2015"></div>
     </div>
     <div class="row">
-      <div class="field"><label>E-Mail (optional)</label><input id="r-email" type="email"></div>
-      <div class="field"><label>Telefon (optional)</label><input id="r-phone"></div>
+      <div class="field"><label>${t('reg_email')}</label><input id="r-email" type="email"></div>
+      <div class="field"><label>${t('reg_phone')}</label><input id="r-phone"></div>
     </div>
-    <div class="field"><label>Passwort</label><input id="r-pw" type="password"><div class="hint" style="margin:.3rem 0 0">Mind. 8 Zeichen, mit Buchstabe, Zahl und Sonderzeichen (z. B. ! ? # @).</div></div>
-    <div class="form-actions"><button id="r-go">Konto erstellen</button></div>`;
+    <div class="field"><label>${t('reg_pw')}</label><input id="r-pw" type="password"><div class="hint" style="margin:.3rem 0 0">${t('reg_pw_hint')}</div></div>
+    <div class="form-actions"><button id="r-go">${t('reg_go')}</button></div>`;
 }
 function instrForm() {
   return `${errBox()}
-    <p class="hint">Zugang nur für den Fahrlehrer.</p>
-    <div class="field"><label>PIN oder Passwort</label><input id="i-pin" type="password" autocomplete="current-password"></div>
-    <div class="field hidden" id="i-2fa-wrap"><label>Authenticator-Code</label><input id="i-code" inputmode="numeric" autocomplete="one-time-code" placeholder="6-stelliger Code"></div>
-    <label class="ck-line" style="justify-content:flex-start;margin:.1rem 0 .3rem"><input type="checkbox" id="i-remember" checked> Angemeldet bleiben</label>
-    <div class="form-actions"><button id="i-go">Anmelden</button></div>
-    ${state.settings?.passkey_enabled ? '<div class="or-sep">oder</div><button id="i-passkey" class="sec" type="button" style="width:100%">🔓 Mit Face ID / Passkey anmelden</button>' : ''}
-    <p class="hint" style="margin-top:.6rem"><a href="#" id="i-recover" class="linklike">Passwort vergessen?</a></p>`;
+    <p class="hint">${t('instr_intro')}</p>
+    <div class="field"><label>${t('instr_pin')}</label><input id="i-pin" type="password" autocomplete="current-password"></div>
+    <div class="field hidden" id="i-2fa-wrap"><label>${t('instr_code')}</label><input id="i-code" inputmode="numeric" autocomplete="one-time-code" placeholder="${t('instr_code_ph')}"></div>
+    <label class="ck-line" style="justify-content:flex-start;margin:.1rem 0 .3rem"><input type="checkbox" id="i-remember" checked> ${t('instr_remember')}</label>
+    <div class="form-actions"><button id="i-go">${t('instr_go')}</button></div>
+    ${state.settings?.passkey_enabled ? `<div class="or-sep">${t('or')}</div><button id="i-passkey" class="sec" type="button" style="width:100%">${t('instr_passkey')}</button>` : ''}
+    <p class="hint" style="margin-top:.6rem"><a href="#" id="i-recover" class="linklike">${t('instr_forgot')}</a></p>`;
 }
 // Authenticator-Bereich in den Einstellungen (Status + Aktionen).
 function renderAuthSection() {
