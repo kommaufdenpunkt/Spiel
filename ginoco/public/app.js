@@ -87,6 +87,24 @@ const I18N = {
     cancel_confirm: 'Diesen Termin wirklich stornieren?', toast_cancelled: 'Storniert',
     toast_accepted: 'Termin angenommen ✓', toast_taken: 'Fahrstunde übernommen ✓',
     celebrate_taken: 'Übernommen', toast_declined: 'Abgelehnt',
+    ds_rush: 'Berufsverkehr', ds_jam: 'Stau', ds_snow: 'Schnee', ds_ice: 'Glatteis', ds_weather: 'Witterung', ds_other: 'Sonstiges',
+    ds_reason_label: 'Grund: ',
+    ds_delay_title: 'Heute etwas später — ca. {min} Min',
+    ds_delay_text: 'Deine Uhrzeit bleibt – bitte trotzdem pünktlich da sein.',
+    ds_ok_title: 'Heute läuft alles planmäßig', ds_ok_text: 'Dein Fahrlehrer ist im Plan. Bis später!',
+    away_vacation: '🌴 <strong>Fahrlehrer im Urlaub:</strong> {dates} – an diesen Tagen keine Fahrstunden.',
+    notif_title: '🔔 Mitteilungen', notif_new: '{n} neu', notif_sign_btn: '✍️ Jetzt unterschreiben',
+    notif_mark_read: 'Alle als gelesen markieren', notif_none: 'Keine Mitteilungen.', lesson_not_found: 'Fahrstunde nicht gefunden',
+    offers_title: '🎁 Angebote', offers_sub: 'Fahrstunden, die andere abgeben',
+    offers_limit: 'Du hast diese Woche schon dein Limit erreicht – Übernahme aus dieser Woche ist gesperrt.',
+    offers_from: '🙋 von {name}', offers_anon: '🕶️ anonym', offers_take_q: '· möchtest du übernehmen?',
+    take: 'Übernehmen', no_time: 'Keine Zeit',
+    offer_give_title: '🎁 Ins Angebot geben',
+    offer_give_text: 'Deine Stunde kommt in die <strong>Angebote</strong> – andere Fahrschüler können sie übernehmen. Übernimmt niemand, bleibt sie ganz normal bei dir.',
+    offer_recognizable_q: 'Möchtest du dabei erkennbar sein?',
+    offer_anon_btn: '🕶️ Anonym abgeben', offer_anon_sub: 'Niemand sieht, dass die Stunde von dir ist',
+    offer_named_btn: '🙋 Mit „{name}" abgeben', offer_named_sub: 'Andere sehen nur deinen Vornamen',
+    toast_offered: 'Ins Angebot gestellt ✓',
   },
   en: {
     tagline_student: 'Book driving lessons easily online', tagline_admin: 'Instructor area',
@@ -134,6 +152,24 @@ const I18N = {
     cancel_confirm: 'Really cancel this lesson?', toast_cancelled: 'Cancelled',
     toast_accepted: 'Lesson accepted ✓', toast_taken: 'Lesson taken over ✓',
     celebrate_taken: 'Taken over', toast_declined: 'Declined',
+    ds_rush: 'Rush hour', ds_jam: 'Traffic jam', ds_snow: 'Snow', ds_ice: 'Black ice', ds_weather: 'Weather', ds_other: 'Other',
+    ds_reason_label: 'Reason: ',
+    ds_delay_title: 'A bit later today — approx. {min} min',
+    ds_delay_text: 'Your time stays the same – please still be there on time.',
+    ds_ok_title: 'Everything on schedule today', ds_ok_text: 'Your instructor is on track. See you later!',
+    away_vacation: '🌴 <strong>Instructor on holiday:</strong> {dates} – no lessons on these days.',
+    notif_title: '🔔 Messages', notif_new: '{n} new', notif_sign_btn: '✍️ Sign now',
+    notif_mark_read: 'Mark all as read', notif_none: 'No messages.', lesson_not_found: 'Lesson not found',
+    offers_title: '🎁 Offers', offers_sub: 'Lessons others are giving up',
+    offers_limit: 'You’ve already reached your limit this week – taking over from this week is locked.',
+    offers_from: '🙋 from {name}', offers_anon: '🕶️ anonymous', offers_take_q: '· want to take it?',
+    take: 'Take over', no_time: 'No time',
+    offer_give_title: '🎁 Offer this lesson',
+    offer_give_text: 'Your lesson goes into the <strong>offers</strong> – other students can take it. If nobody does, it simply stays yours.',
+    offer_recognizable_q: 'Do you want to be recognizable?',
+    offer_anon_btn: '🕶️ Give up anonymously', offer_anon_sub: 'Nobody sees the lesson is yours',
+    offer_named_btn: '🙋 Give up as “{name}”', offer_named_sub: 'Others only see your first name',
+    toast_offered: 'Added to offers ✓',
   },
   tr: {
     tagline_student: 'Direksiyon derslerini kolayca online al', tagline_admin: 'Eğitmen alanı',
@@ -181,6 +217,24 @@ const I18N = {
     cancel_confirm: 'Bu randevu gerçekten iptal edilsin mi?', toast_cancelled: 'İptal edildi',
     toast_accepted: 'Randevu kabul edildi ✓', toast_taken: 'Ders devralındı ✓',
     celebrate_taken: 'Devralındı', toast_declined: 'Reddedildi',
+    ds_rush: 'Yoğun trafik', ds_jam: 'Trafik sıkışıklığı', ds_snow: 'Kar', ds_ice: 'Buzlanma', ds_weather: 'Hava koşulları', ds_other: 'Diğer',
+    ds_reason_label: 'Sebep: ',
+    ds_delay_title: 'Bugün biraz daha geç — yaklaşık {min} dk',
+    ds_delay_text: 'Saatin değişmiyor – yine de lütfen zamanında orada ol.',
+    ds_ok_title: 'Bugün her şey planlandığı gibi', ds_ok_text: 'Eğitmenin programında. Sonra görüşürüz!',
+    away_vacation: '🌴 <strong>Eğitmen tatilde:</strong> {dates} – bu günlerde ders yok.',
+    notif_title: '🔔 Bildirimler', notif_new: '{n} yeni', notif_sign_btn: '✍️ Şimdi imzala',
+    notif_mark_read: 'Tümünü okundu işaretle', notif_none: 'Bildirim yok.', lesson_not_found: 'Ders bulunamadı',
+    offers_title: '🎁 Teklifler', offers_sub: 'Başkalarının bıraktığı dersler',
+    offers_limit: 'Bu hafta limitine ulaştın – bu haftadan devralma kapalı.',
+    offers_from: '🙋 {name}’den', offers_anon: '🕶️ anonim', offers_take_q: '· devralmak ister misin?',
+    take: 'Devral', no_time: 'Zamanım yok',
+    offer_give_title: '🎁 Teklife koy',
+    offer_give_text: 'Dersin <strong>tekliflere</strong> düşer – diğer öğrenciler devralabilir. Kimse almazsa ders sende kalır.',
+    offer_recognizable_q: 'Görünür olmak ister misin?',
+    offer_anon_btn: '🕶️ Anonim bırak', offer_anon_sub: 'Dersin sana ait olduğunu kimse görmez',
+    offer_named_btn: '🙋 „{name}" olarak bırak', offer_named_sub: 'Diğerleri yalnızca adını görür',
+    toast_offered: 'Teklife eklendi ✓',
   },
   ar: {
     tagline_student: 'احجز دروس القيادة بسهولة عبر الإنترنت', tagline_admin: 'منطقة المدرّب',
@@ -228,6 +282,24 @@ const I18N = {
     cancel_confirm: 'هل تريد إلغاء هذا الموعد فعلاً؟', toast_cancelled: 'تم الإلغاء',
     toast_accepted: 'تم قبول الموعد ✓', toast_taken: 'تم استلام الدرس ✓',
     celebrate_taken: 'تم الاستلام', toast_declined: 'تم الرفض',
+    ds_rush: 'ازدحام ساعة الذروة', ds_jam: 'ازدحام مروري', ds_snow: 'ثلوج', ds_ice: 'جليد', ds_weather: 'الأحوال الجوية', ds_other: 'أخرى',
+    ds_reason_label: 'السبب: ',
+    ds_delay_title: 'أبطأ قليلاً اليوم — حوالي {min} دقيقة',
+    ds_delay_text: 'موعدك يبقى كما هو – يرجى الحضور في الوقت المحدد.',
+    ds_ok_title: 'كل شيء يسير حسب الخطة اليوم', ds_ok_text: 'مدرّبك ملتزم بالخطة. إلى اللقاء لاحقاً!',
+    away_vacation: '🌴 <strong>المدرّب في إجازة:</strong> {dates} – لا دروس في هذه الأيام.',
+    notif_title: '🔔 الإشعارات', notif_new: '{n} جديد', notif_sign_btn: '✍️ وقّع الآن',
+    notif_mark_read: 'وضع الكل كمقروء', notif_none: 'لا إشعارات.', lesson_not_found: 'الدرس غير موجود',
+    offers_title: '🎁 العروض', offers_sub: 'دروس يتنازل عنها آخرون',
+    offers_limit: 'لقد بلغت حدّك هذا الأسبوع – الاستلام من هذا الأسبوع مُقفل.',
+    offers_from: '🙋 من {name}', offers_anon: '🕶️ مجهول', offers_take_q: '· هل تريد استلامه؟',
+    take: 'استلام', no_time: 'لا وقت لدي',
+    offer_give_title: '🎁 اعرض هذا الدرس',
+    offer_give_text: 'يذهب درسك إلى <strong>العروض</strong> – يمكن لطلاب آخرين استلامه. إن لم يستلمه أحد يبقى لك كالمعتاد.',
+    offer_recognizable_q: 'هل تريد أن تكون معروفاً؟',
+    offer_anon_btn: '🕶️ التنازل بشكل مجهول', offer_anon_sub: 'لا أحد يرى أن الدرس منك',
+    offer_named_btn: '🙋 التنازل باسم «{name}»', offer_named_sub: 'يرى الآخرون اسمك الأول فقط',
+    toast_offered: 'أُضيف إلى العروض ✓',
   },
 };
 function t(key, vars) {
@@ -3079,12 +3151,12 @@ function renderAway(away) {
   if (!vac.length) { el.classList.add('hidden'); return; }
   el.classList.remove('hidden');
   const dates = vac.map((a) => `${WD[isoDow(a.date) - 1]} ${fmtShort(a.date)}`).join(', ');
-  el.innerHTML = `🌴 <strong>Fahrlehrer im Urlaub:</strong> ${dates} – an diesen Tagen keine Fahrstunden.`;
+  el.innerHTML = t('away_vacation', { dates });
 }
 
 // Tagesstatus (läuft planmäßig / Verzögerung) – Gründe zentral.
 const DS_REASONS = [['rush', '🚗', 'Berufsverkehr'], ['jam', '🚧', 'Stau'], ['snow', '❄️', 'Schnee'], ['ice', '🧊', 'Glatteis'], ['weather', '🌧️', 'Witterung'], ['other', '⏳', 'Sonstiges']];
-function dsReason(key) { const r = DS_REASONS.find((x) => x[0] === key); return r ? r[1] + ' ' + r[2] : ''; }
+function dsReason(key) { const r = DS_REASONS.find((x) => x[0] === key); return r ? r[1] + ' ' + t('ds_' + key) : ''; }
 // Schüler-Banner: nur zeigen, wenn heute ein Status gesetzt ist (und der Schüler heute eine Stunde hat).
 function renderDayStatusBanner(status, bookings) {
   const el = $('#daystatus-banner'); if (!el) return;
@@ -3095,14 +3167,14 @@ function renderDayStatusBanner(status, bookings) {
     const r = status.reason ? dsReason(status.reason) : '';
     el.innerHTML = `<div class="ds-banner ds-delay">
       <div class="ds-ic">⏳</div>
-      <div><div class="ds-t">Heute etwas später — ca. ${status.minutes} Min</div>
-        <div class="ds-s">${r ? 'Grund: ' + esc(r) + '. ' : ''}${status.note ? esc(status.note) + ' ' : ''}Deine Uhrzeit bleibt – bitte trotzdem pünktlich da sein.</div></div>
+      <div><div class="ds-t">${t('ds_delay_title', { min: status.minutes })}</div>
+        <div class="ds-s">${r ? t('ds_reason_label') + esc(r) + '. ' : ''}${status.note ? esc(status.note) + ' ' : ''}${t('ds_delay_text')}</div></div>
     </div>`;
   } else {
     el.innerHTML = `<div class="ds-banner ds-ok">
       <div class="ds-ic">✅</div>
-      <div><div class="ds-t">Heute läuft alles planmäßig</div>
-        <div class="ds-s">Dein Fahrlehrer ist im Plan. Bis später!</div></div>
+      <div><div class="ds-t">${t('ds_ok_title')}</div>
+        <div class="ds-s">${t('ds_ok_text')}</div></div>
     </div>`;
   }
 }
@@ -3182,19 +3254,19 @@ function renderNotifications(notifs, unread) {
         <span class="notif-ic">${icon(n.kind)}</span>
         <div class="notif-body"><div class="notif-msg">${esc(n.message)}</div>
           <div class="notif-time">${new Date(n.created_at).toLocaleString(LOCALE, { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</div>
-          ${needsSign ? `<button class="sm notif-sign" data-sign="${n.ref_booking_id}" style="margin-top:.5rem">✍️ Jetzt unterschreiben</button>` : ''}</div>
+          ${needsSign ? `<button class="sm notif-sign" data-sign="${n.ref_booking_id}" style="margin-top:.5rem">${t('notif_sign_btn')}</button>` : ''}</div>
         ${n.read ? '' : '<span class="notif-dot"></span>'}
       </div>`; }).join('')}</div>
-      ${unread ? '<div style="margin-top:.8rem"><button class="sec sm" id="notif-read">Alle als gelesen markieren</button></div>' : ''}`
-    : '<p class="hint">Keine Mitteilungen.</p>';
-  card.innerHTML = `<h2>🔔 Mitteilungen ${unread ? `<span class="badge offer">${unread} neu</span>` : ''}</h2>
+      ${unread ? `<div style="margin-top:.8rem"><button class="sec sm" id="notif-read">${t('notif_mark_read')}</button></div>` : ''}`
+    : `<p class="hint">${t('notif_none')}</p>`;
+  card.innerHTML = `<h2>${t('notif_title')} ${unread ? `<span class="badge offer">${t('notif_new', { n: unread })}</span>` : ''}</h2>
     <div class="push-ctl" id="push-ctl"></div>
     ${list}`;
   const b = $('#notif-read');
   if (b) b.onclick = async () => { try { await api('/api/my/notifications/read', { method: 'POST' }); syncStudent(); } catch (e) { toast(e.message, 'err'); } };
   card.querySelectorAll('[data-sign]').forEach((btn) => btn.onclick = () => {
     const bk = (myBookingsCache || []).find((x) => x.id === Number(btn.dataset.sign));
-    if (bk) openSignModal(bk); else toast('Fahrstunde nicht gefunden', 'err');
+    if (bk) openSignModal(bk); else toast(t('lesson_not_found'), 'err');
   });
   refreshPushCtl();
 }
@@ -3204,14 +3276,14 @@ function renderOffers(offers, wi) {
   if (!offers.length) { card.classList.add('hidden'); return; }
   card.classList.remove('hidden');
   const canTake = wi.remaining > 0;
-  card.innerHTML = `<h2>🎁 Angebote <span class="sub">Fahrstunden, die andere abgeben</span></h2>
-    ${!canTake ? '<p class="hint">Du hast diese Woche schon dein Limit erreicht – Übernahme aus dieser Woche ist gesperrt.</p>' : ''}
+  card.innerHTML = `<h2>${t('offers_title')} <span class="sub">${t('offers_sub')}</span></h2>
+    ${!canTake ? `<p class="hint">${t('offers_limit')}</p>` : ''}
     <div class="blist">${offers.map((o) => `<div class="bitem warm">
-      <div><div class="when">${WD[isoDow(o.date) - 1]} ${fmtShort(o.date)} · ${o.start_time} <span class="muted" style="font-weight:400">(${o.duration_min} Min)</span></div>
-      <div class="meta">${o.from ? `<span class="pill">🙋 von ${esc(o.from)}</span>` : '<span class="pill">🕶️ anonym</span>'} <span class="muted">· möchtest du übernehmen?</span></div></div>
+      <div><div class="when">${WD[isoDow(o.date) - 1]} ${fmtShort(o.date)} · ${o.start_time} <span class="muted" style="font-weight:400">(${o.duration_min} ${t('min')})</span></div>
+      <div class="meta">${o.from ? `<span class="pill">${t('offers_from', { name: esc(o.from) })}</span>` : `<span class="pill">${t('offers_anon')}</span>`} <span class="muted">${t('offers_take_q')}</span></div></div>
       <div class="inline">
-        ${canTake ? `<button class="sm" data-take="${o.id}">Übernehmen</button>` : ''}
-        <button class="ghost sm" data-decline="${o.id}">Keine Zeit</button>
+        ${canTake ? `<button class="sm" data-take="${o.id}">${t('take')}</button>` : ''}
+        <button class="ghost sm" data-decline="${o.id}">${t('no_time')}</button>
       </div></div>`).join('')}</div>`;
   card.querySelectorAll('[data-take]').forEach((b) => b.onclick = () => takeOffer(b.dataset.take));
   card.querySelectorAll('[data-decline]').forEach((b) => b.onclick = () => declineOffer(b.dataset.decline));
@@ -3219,16 +3291,16 @@ function renderOffers(offers, wi) {
 
 function offerBooking(id) {
   const vorname = firstName(state.user?.name);
-  modal(`<h3>🎁 Ins Angebot geben</h3>
-    <p class="hint">Deine Stunde kommt in die <strong>Angebote</strong> – andere Fahrschüler können sie übernehmen. Übernimmt niemand, bleibt sie ganz normal bei dir.</p>
-    <p style="margin:.5rem 0 .3rem">Möchtest du dabei erkennbar sein?</p>
+  modal(`<h3>${t('offer_give_title')}</h3>
+    <p class="hint">${t('offer_give_text')}</p>
+    <p style="margin:.5rem 0 .3rem">${t('offer_recognizable_q')}</p>
     <div class="offer-choice">
-      <button class="sec" id="of-anon">🕶️ Anonym abgeben<span class="oc-sub">Niemand sieht, dass die Stunde von dir ist</span></button>
-      ${vorname ? `<button class="sec" id="of-named">🙋 Mit „${esc(vorname)}" abgeben<span class="oc-sub">Andere sehen nur deinen Vornamen</span></button>` : ''}
+      <button class="sec" id="of-anon">${t('offer_anon_btn')}<span class="oc-sub">${t('offer_anon_sub')}</span></button>
+      ${vorname ? `<button class="sec" id="of-named">${t('offer_named_btn', { name: esc(vorname) })}<span class="oc-sub">${t('offer_named_sub')}</span></button>` : ''}
     </div>
-    <div class="actions"><button class="sec" onclick="window.__closeModal()">Abbrechen</button></div>`);
+    <div class="actions"><button class="sec" onclick="window.__closeModal()">${t('abort')}</button></div>`);
   const go = async (named) => {
-    try { await api('/api/bookings/' + id + '/offer', { method: 'POST', body: { named } }); closeModal(); toast('Ins Angebot gestellt ✓', 'ok'); syncStudent(); }
+    try { await api('/api/bookings/' + id + '/offer', { method: 'POST', body: { named } }); closeModal(); toast(t('toast_offered'), 'ok'); syncStudent(); }
     catch (e) { toast(e.message, 'err'); }
   };
   $('#of-anon').onclick = () => go(false);
