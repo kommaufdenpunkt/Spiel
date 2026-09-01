@@ -204,6 +204,10 @@ const I18N = {
     da_go: 'Konto endgültig löschen', da_deleting: 'Wird gelöscht…', da_done_alert: 'Dein Konto wurde gelöscht. Du wirst jetzt abgemeldet.',
     pf_photo_removed: 'Foto entfernt', pf_geo_searching: '📍 Suche deinen Standort …', pf_addr_notfound: 'Adresse nicht gefunden – bitte manuell eintragen.',
     pf_geo_ok: 'Standort übernommen ✓', pf_geo_ok_house: 'Standort übernommen ✓ – bitte Hausnummer ergänzen.', pf_geo_unavail: 'Standort nicht verfügbar: {e}', pf_saved: 'Profil gespeichert ✓',
+    fg_title: 'Passwort vergessen', fg_text: 'Gib deinen Login-Namen oder deine E-Mail ein. Dein Fahrlehrer bekommt Bescheid und setzt dir ein neues Passwort – er teilt es dir persönlich mit.', fg_request: 'Anfordern', fg_need: 'Bitte Login-Name oder E-Mail eingeben.', fg_done: 'Angefragt ✓ – dein Fahrlehrer meldet sich mit einem neuen Passwort.',
+    sf_book_title: '{label} buchen', sf_intro: 'Sonderfahrt mit fester Länge: <strong>{dur} Min</strong>. Wähle einen Tag – ich zeige dir die freien Startzeiten, an denen die {label} noch komplett in den Tag passt.', sf_day: 'Tag', sf_choose_day: 'Wähle einen Tag …', loading_short: 'Lädt…', sf_nofit: 'An diesem Tag passt die {label} ({dur} Min) nicht mehr in den Tagesplan. Wähle einen anderen, freieren Tag – am besten früh am Tag, damit der lange Block Platz hat.', sf_ends: '– endet {end}', sf_confirm_title: '{label} verbindlich buchen?', sf_confirm_dur: '{dur} Min · endet {end}', sf_confirm_note: 'Sonderfahrten sind Pflichtfahrten für die Prüfung. Die Buchung ist verbindlich.', sf_booked: '{label} gebucht',
+    gps_unavail: 'GPS nicht verfügbar', loc_error: 'Standort-Fehler: {e}', loc_sharing: 'Dein Standort wird geteilt 📍',
+    pk_title: '📍 Wo sollen wir dich abholen?', pk_text: 'Sag deinem Fahrlehrer, von wo du abgeholt werden möchtest. Du kannst auch deinen aktuellen Standort übernehmen.', pk_label: 'Abholort', pk_ph: 'z.B. vor der Schule, am Bahnhof …', pk_taken: '✓ Standort übernommen ({lat}, {lng})', pk_saved: 'Abholort gespeichert ✓',
     tour_t0: 'Willkommen bei ginoco', tour_x0: 'Hier buchst du deine Fahrstunden selbst – schnell und von überall. In ein paar kurzen Schritten zeige ich dir, wie es geht. Du kannst jederzeit auf „Überspringen“ tippen.',
     tour_t1: '1. Fahrstunde buchen', tour_x1: 'Am schnellsten geht’s mit <strong>🔎 Nächster freier Termin</strong> – ein Tipp und du landest beim nächsten freien Tag. Freie Zeiten sind <strong>grün</strong>. Tippe auf <strong>Buchen</strong>, wähle die Dauer und bestätige. Fertig! ✅',
     tour_t2: '2. Deine Termine', tour_x2: 'Oben unter <strong>„Meine Termine“</strong> siehst du alle gebuchten Stunden mit Datum, Uhrzeit und Treffpunkt. Über <strong>„Zum Kalender hinzufügen“</strong> landen sie in deinem Handy-Kalender.',
@@ -374,6 +378,10 @@ const I18N = {
     da_go: 'Delete account permanently', da_deleting: 'Deleting…', da_done_alert: 'Your account has been deleted. You will now be signed out.',
     pf_photo_removed: 'Photo removed', pf_geo_searching: '📍 Finding your location …', pf_addr_notfound: 'Address not found – please enter manually.',
     pf_geo_ok: 'Location applied ✓', pf_geo_ok_house: 'Location applied ✓ – please add the house number.', pf_geo_unavail: 'Location unavailable: {e}', pf_saved: 'Profile saved ✓',
+    fg_title: 'Forgot password', fg_text: 'Enter your login name or e-mail. Your instructor is notified and sets you a new password – they’ll tell you in person.', fg_request: 'Request', fg_need: 'Please enter your login name or e-mail.', fg_done: 'Requested ✓ – your instructor will get back to you with a new password.',
+    sf_book_title: 'Book {label}', sf_intro: 'Special drive with a fixed length: <strong>{dur} min</strong>. Pick a day – I’ll show the free start times where the {label} still fits fully into the day.', sf_day: 'Day', sf_choose_day: 'Pick a day …', loading_short: 'Loading…', sf_nofit: 'The {label} ({dur} min) no longer fits into this day’s schedule. Pick another, freer day – ideally early in the day so the long block has room.', sf_ends: '– ends {end}', sf_confirm_title: 'Book {label}?', sf_confirm_dur: '{dur} min · ends {end}', sf_confirm_note: 'Special drives are mandatory for the test. The booking is binding.', sf_booked: '{label} booked',
+    gps_unavail: 'GPS not available', loc_error: 'Location error: {e}', loc_sharing: 'Your location is being shared 📍',
+    pk_title: '📍 Where should we pick you up?', pk_text: 'Tell your instructor where you’d like to be picked up. You can also use your current location.', pk_label: 'Pick-up spot', pk_ph: 'e.g. in front of school, at the station …', pk_taken: '✓ Location taken ({lat}, {lng})', pk_saved: 'Pick-up spot saved ✓',
     tour_t0: 'Welcome to ginoco', tour_x0: 'Here you book your driving lessons yourself – quickly and from anywhere. In a few short steps I’ll show you how. You can tap “Skip” any time.',
     tour_t1: '1. Book a lesson', tour_x1: 'Quickest via <strong>🔎 Next free slot</strong> – one tap takes you to the next free day. Free times are <strong>green</strong>. Tap <strong>Book</strong>, choose the duration and confirm. Done! ✅',
     tour_t2: '2. Your appointments', tour_x2: 'At the top under <strong>“My appointments”</strong> you see all booked lessons with date, time and meeting point. <strong>“Add to calendar”</strong> puts them in your phone calendar.',
@@ -544,6 +552,10 @@ const I18N = {
     da_go: 'Hesabı kalıcı olarak sil', da_deleting: 'Siliniyor…', da_done_alert: 'Hesabın silindi. Şimdi çıkış yapılıyor.',
     pf_photo_removed: 'Fotoğraf kaldırıldı', pf_geo_searching: '📍 Konumun aranıyor …', pf_addr_notfound: 'Adres bulunamadı – lütfen elle gir.',
     pf_geo_ok: 'Konum alındı ✓', pf_geo_ok_house: 'Konum alındı ✓ – lütfen kapı numarasını ekle.', pf_geo_unavail: 'Konum kullanılamıyor: {e}', pf_saved: 'Profil kaydedildi ✓',
+    fg_title: 'Şifremi unuttum', fg_text: 'Kullanıcı adını veya e-postanı gir. Eğitmenin haberdar edilir ve sana yeni bir şifre belirler – bunu sana bizzat söyler.', fg_request: 'İste', fg_need: 'Lütfen kullanıcı adını veya e-postanı gir.', fg_done: 'İstendi ✓ – eğitmenin yeni bir şifreyle sana dönecek.',
+    sf_book_title: '{label} al', sf_intro: 'Sabit uzunlukta özel sürüş: <strong>{dur} dk</strong>. Bir gün seç – {label} güne tam sığdığı boş başlangıç saatlerini göstereyim.', sf_day: 'Gün', sf_choose_day: 'Bir gün seç …', loading_short: 'Yükleniyor…', sf_nofit: '{label} ({dur} dk) bu günün planına artık sığmıyor. Daha boş başka bir gün seç – uzun blok için yer olsun diye tercihen günün erken saatinde.', sf_ends: '– bitiş {end}', sf_confirm_title: '{label} kesin alınsın mı?', sf_confirm_dur: '{dur} dk · bitiş {end}', sf_confirm_note: 'Özel sürüşler sınav için zorunludur. Rezervasyon bağlayıcıdır.', sf_booked: '{label} alındı',
+    gps_unavail: 'GPS kullanılamıyor', loc_error: 'Konum hatası: {e}', loc_sharing: 'Konumun paylaşılıyor 📍',
+    pk_title: '📍 Seni nereden alalım?', pk_text: 'Nereden alınmak istediğini eğitmenine söyle. Mevcut konumunu da kullanabilirsin.', pk_label: 'Buluşma yeri', pk_ph: 'örn. okulun önü, istasyonda …', pk_taken: '✓ Konum alındı ({lat}, {lng})', pk_saved: 'Buluşma yeri kaydedildi ✓',
     tour_t0: 'ginoco’ya hoş geldin', tour_x0: 'Burada direksiyon derslerini kendin alırsın – hızlı ve her yerden. Birkaç kısa adımda nasıl olduğunu göstereyim. İstediğin an „Atla“ya dokunabilirsin.',
     tour_t1: '1. Ders al', tour_x1: 'En hızlısı <strong>🔎 En yakın boş randevu</strong> – bir dokunuşla en yakın boş güne gidersin. Boş saatler <strong>yeşil</strong>. <strong>Rezerve et</strong>’e dokun, süreyi seç ve onayla. Bitti! ✅',
     tour_t2: '2. Randevuların', tour_x2: 'Üstte <strong>„Randevularım“</strong> altında tüm dersleri tarih, saat ve buluşma noktasıyla görürsün. <strong>„Takvime ekle“</strong> ile telefonundaki takvime eklenir.',
@@ -714,6 +726,10 @@ const I18N = {
     da_go: 'حذف الحساب نهائياً', da_deleting: 'يتم الحذف…', da_done_alert: 'تم حذف حسابك. سيتم تسجيل خروجك الآن.',
     pf_photo_removed: 'أُزيلت الصورة', pf_geo_searching: '📍 يتم تحديد موقعك …', pf_addr_notfound: 'العنوان غير موجود – يرجى الإدخال يدوياً.',
     pf_geo_ok: 'تم أخذ الموقع ✓', pf_geo_ok_house: 'تم أخذ الموقع ✓ – يرجى إضافة رقم المنزل.', pf_geo_unavail: 'الموقع غير متاح: {e}', pf_saved: 'تم حفظ الملف ✓',
+    fg_title: 'نسيت كلمة المرور', fg_text: 'أدخل اسم الدخول أو بريدك الإلكتروني. سيُبلَّغ مدرّبك ويعيّن لك كلمة مرور جديدة – سيخبرك بها شخصياً.', fg_request: 'طلب', fg_need: 'يرجى إدخال اسم الدخول أو البريد الإلكتروني.', fg_done: 'تم الطلب ✓ – سيعود إليك مدرّبك بكلمة مرور جديدة.',
+    sf_book_title: 'حجز {label}', sf_intro: 'رحلة خاصة بمدة ثابتة: <strong>{dur} دقيقة</strong>. اختر يوماً – سأعرض أوقات البدء المتاحة التي تتّسع فيها {label} في اليوم بالكامل.', sf_day: 'اليوم', sf_choose_day: 'اختر يوماً …', loading_short: 'يتم التحميل…', sf_nofit: 'لم تعد {label} ({dur} دقيقة) تتّسع في جدول هذا اليوم. اختر يوماً آخر أكثر فراغاً – ويُفضّل في وقت مبكر ليتوفّر مكان للكتلة الطويلة.', sf_ends: '– ينتهي {end}', sf_confirm_title: 'تأكيد حجز {label}؟', sf_confirm_dur: '{dur} دقيقة · ينتهي {end}', sf_confirm_note: 'الرحلات الخاصة إلزامية للاختبار. الحجز مُلزِم.', sf_booked: 'تم حجز {label}',
+    gps_unavail: 'GPS غير متاح', loc_error: 'خطأ في الموقع: {e}', loc_sharing: 'تتم مشاركة موقعك 📍',
+    pk_title: '📍 من أين نأخذك؟', pk_text: 'أخبر مدرّبك من أين تريد أن يأخذك. يمكنك أيضاً استخدام موقعك الحالي.', pk_label: 'مكان الالتقاء', pk_ph: 'مثل أمام المدرسة، عند المحطة …', pk_taken: '✓ تم أخذ الموقع ({lat}, {lng})', pk_saved: 'تم حفظ مكان الالتقاء ✓',
     tour_t0: 'مرحباً بك في ginoco', tour_x0: 'هنا تحجز دروس القيادة بنفسك – بسرعة ومن أي مكان. في خطوات قصيرة سأريك كيف. يمكنك النقر على «تخطٍّ» في أي وقت.',
     tour_t1: '1. احجز درساً', tour_x1: 'الأسرع عبر <strong>🔎 أقرب موعد متاح</strong> – نقرة واحدة تأخذك لأقرب يوم متاح. الأوقات المتاحة <strong>خضراء</strong>. انقر <strong>احجز</strong>، اختر المدة وأكّد. تم! ✅',
     tour_t2: '2. مواعيدك', tour_x2: 'في الأعلى ضمن <strong>«مواعيدي»</strong> ترى كل الدروس بالتاريخ والوقت ونقطة اللقاء. عبر <strong>«أضف إلى التقويم»</strong> تُضاف إلى تقويم هاتفك.',
@@ -1660,11 +1676,11 @@ async function geocodeAddressParts(lat, lng) {
 // Live-Standort teilen (Fahrlehrer)
 let liveWatchId = null;
 function startLiveShare() {
-  if (!navigator.geolocation) { toast('GPS nicht verfügbar', 'err'); return; }
+  if (!navigator.geolocation) { toast(t('gps_unavail'), 'err'); return; }
   liveWatchId = navigator.geolocation.watchPosition(async (p) => {
     try { await api('/api/instructor/location', { method: 'POST', body: { lat: p.coords.latitude, lng: p.coords.longitude } }); } catch {}
     if (state.instrTab === 'heute') { const el = $('#live-instr'); if (el) el.dataset.ts = new Date().toLocaleTimeString(LOCALE, { hour: '2-digit', minute: '2-digit' }); }
-  }, (e) => { toast('Standort-Fehler: ' + e.message, 'err'); stopLiveShare(); },
+  }, (e) => { toast(t('loc_error', { e: e.message }), 'err'); stopLiveShare(); },
     { enableHighAccuracy: true, maximumAge: 8000, timeout: 20000 });
   state.liveSharing = true;
   if (state.user?.role === 'instructor') renderInstructor();
@@ -2050,21 +2066,21 @@ function loginForm() {
     <p class="hint" style="margin-top:.6rem">${t('login_forgot_q')} <a href="#" id="l-forgot" class="linklike">${t('login_forgot_link')}</a> ${t('login_forgot_tail')}</p>`;
 }
 function openForgotModal() {
-  modal(`<h3>Passwort vergessen</h3>
-    <p class="hint">Gib deinen Login-Namen oder deine E-Mail ein. Dein Fahrlehrer bekommt Bescheid und setzt dir ein neues Passwort – er teilt es dir persönlich mit.</p>
+  modal(`<h3>${t('fg_title')}</h3>
+    <p class="hint">${t('fg_text')}</p>
     ${errBox()}
-    <div class="field"><label>Login-Name oder E-Mail</label><input id="fg-login" autocomplete="username" placeholder="z.B. MM1997"></div>
+    <div class="field"><label>${t('login_id')}</label><input id="fg-login" autocomplete="username" placeholder="z.B. MM1997"></div>
     <div class="actions">
-      <button class="sec" onclick="window.__closeModal()">Abbrechen</button>
-      <button id="fg-go">Anfordern</button>
+      <button class="sec" onclick="window.__closeModal()">${t('abort')}</button>
+      <button id="fg-go">${t('fg_request')}</button>
     </div>`);
   $('#fg-go').onclick = async () => {
     const login = $('#fg-login').value.trim();
-    if (!login) { showErr('Bitte Login-Name oder E-Mail eingeben.'); return; }
+    if (!login) { showErr(t('fg_need')); return; }
     try {
       await api('/api/auth/reset-request', { method: 'POST', body: { login } });
       closeModal();
-      toast('Angefragt ✓ – dein Fahrlehrer meldet sich mit einem neuen Passwort.', 'ok');
+      toast(t('fg_done'), 'ok');
     } catch (e) { showErr(e.message); }
   };
 }
@@ -3090,37 +3106,38 @@ function studentProgress(p) {
 function openSonderBooking(type) {
   const dur = Number(state.settings?.['sonder_min_' + type]) || { ueberland: 225, autobahn: 180, nacht: 135 }[type];
   const label = TYPE_LABEL[type], icon = TYPE_ICON[type];
-  modal(`<h3>${icon} ${label} buchen</h3>
-    <p class="hint">Sonderfahrt mit fester Länge: <strong>${dur} Min</strong>. Wähle einen Tag – ich zeige dir die freien Startzeiten, an denen die ${label} noch komplett in den Tag passt.</p>
-    <div class="field"><label>Tag</label><input type="date" id="sf-date" value="${state.date}" min="${todayStr()}"></div>
-    <div id="sf-slots" class="sf-slots"><span class="hint">Wähle einen Tag …</span></div>
-    <div class="actions"><button onclick="window.__closeModal()">Schließen</button></div>`);
+  modal(`<h3>${icon} ${t('sf_book_title', { label })}</h3>
+    <p class="hint">${t('sf_intro', { dur, label })}</p>
+    <div class="field"><label>${t('sf_day')}</label><input type="date" id="sf-date" value="${state.date}" min="${todayStr()}"></div>
+    <div id="sf-slots" class="sf-slots"><span class="hint">${t('sf_choose_day')}</span></div>
+    <div class="actions"><button onclick="window.__closeModal()">${t('close')}</button></div>`);
   const load = async () => {
     const d = $('#sf-date').value; const box = $('#sf-slots');
     if (!d) return;
-    box.innerHTML = '<span class="hint">Lädt…</span>';
+    box.innerHTML = `<span class="hint">${t('loading_short')}</span>`;
     try {
       const r = await api('/api/slots?date=' + d);
       const fits = (r.slots || []).filter((s) => s.state === 'free' && Number(s.maxDur || s.duration) >= dur);
       if (!fits.length) {
-        box.innerHTML = `<div class="warnbox">An diesem Tag passt die ${esc(label)} (${dur} Min) nicht mehr in den Tagesplan. Wähle einen anderen, freieren Tag – am besten früh am Tag, damit der lange Block Platz hat.</div>`;
+        box.innerHTML = `<div class="warnbox">${t('sf_nofit', { label: esc(label), dur })}</div>`;
         return;
       }
-      box.innerHTML = `<div class="sf-list">${fits.map((s) => `<button class="sec sf-pick" data-start="${s.start}">🕒 ${s.start} Uhr <span class="muted">– endet ${addMinHHMM(s.start, dur)}</span></button>`).join('')}</div>`;
+      box.innerHTML = `<div class="sf-list">${fits.map((s) => `<button class="sec sf-pick" data-start="${s.start}">🕒 ${s.start}${t('oclock')} <span class="muted">${t('sf_ends', { end: addMinHHMM(s.start, dur) })}</span></button>`).join('')}</div>`;
       box.querySelectorAll('[data-start]').forEach((b) => b.onclick = () => confirmSonder(type, dur, d, b.dataset.start));
     } catch (e) { box.innerHTML = `<div class="warnbox">${esc(e.message)}</div>`; }
   };
   $('#sf-date').onchange = load; load();
 }
 function confirmSonder(type, dur, date, start) {
-  modal(`<h3>${TYPE_ICON[type]} ${TYPE_LABEL[type]} verbindlich buchen?</h3>
-    <p style="margin:.5rem 0"><strong>${WD_LONG[isoDow(date) - 1]}, ${fmtShort(date)} um ${start} Uhr</strong><br>${dur} Min · endet ${addMinHHMM(start, dur)} Uhr</p>
-    <div class="warnbox">Sonderfahrten sind Pflichtfahrten für die Prüfung. Die Buchung ist verbindlich.</div>
-    <div class="actions"><button class="sec" onclick="window.__closeModal()">Abbrechen</button><button id="sf-go">Ja, verbindlich buchen</button></div>`);
+  const label = TYPE_LABEL[type];
+  modal(`<h3>${TYPE_ICON[type]} ${t('sf_confirm_title', { label })}</h3>
+    <p style="margin:.5rem 0"><strong>${WD_LONG[isoDow(date) - 1]}, ${fmtShort(date)} ${t('at_time')}${start}${t('oclock')}</strong><br>${t('sf_confirm_dur', { dur, end: addMinHHMM(start, dur) })}</p>
+    <div class="warnbox">${t('sf_confirm_note')}</div>
+    <div class="actions"><button class="sec" onclick="window.__closeModal()">${t('abort')}</button><button id="sf-go">${t('book_go')}</button></div>`);
   $('#sf-go').onclick = async () => {
     try {
       await api('/api/bookings', { method: 'POST', body: { date, start_time: start, sonder: type } });
-      closeModal(); celebrate(TYPE_LABEL[type] + ' gebucht'); toast(TYPE_LABEL[type] + ' gebucht ✓', 'ok'); syncStudent();
+      closeModal(); celebrate(t('sf_booked', { label })); toast(t('sf_booked', { label }) + ' ✓', 'ok'); syncStudent();
     } catch (e) { toast(e.message, 'err'); }
   };
 }
@@ -3217,13 +3234,13 @@ function studentBookingItem(b) {
 // ---------- Abholung: Schüler teilt Standort / setzt Abholort ----------
 let myWatchId = null;
 function startMyShare() {
-  if (!navigator.geolocation) { toast('GPS nicht verfügbar', 'err'); return; }
+  if (!navigator.geolocation) { toast(t('gps_unavail'), 'err'); return; }
   myWatchId = navigator.geolocation.watchPosition(async (pos) => {
     try { await api('/api/my/location', { method: 'POST', body: { lat: pos.coords.latitude, lng: pos.coords.longitude } }); } catch {}
-  }, (e) => { toast('Standort-Fehler: ' + e.message, 'err'); stopMyShare(); },
+  }, (e) => { toast(t('loc_error', { e: e.message }), 'err'); stopMyShare(); },
     { enableHighAccuracy: true, maximumAge: 8000, timeout: 20000 });
   state.myShareActive = true;
-  toast('Dein Standort wird geteilt 📍', 'ok');
+  toast(t('loc_sharing'), 'ok');
   refreshStudentLive();
 }
 function stopMyShare() {
@@ -3235,25 +3252,25 @@ function stopMyShare() {
 window.__startMyShare = startMyShare;
 window.__stopMyShare = stopMyShare;
 async function openPickupModal(cur) {
-  modal(`<h3>📍 Wo sollen wir dich abholen?</h3>
-    <p class="hint">Sag deinem Fahrlehrer, von wo du abgeholt werden möchtest. Du kannst auch deinen aktuellen Standort übernehmen.</p>
-    <div class="field"><label>Abholort</label><input id="pk-label" value="${esc(cur || '')}" placeholder="z.B. vor der Schule, am Bahnhof …"></div>
-    <button class="sec sm" id="pk-here" type="button">📍 Aktuellen Standort übernehmen</button>
+  modal(`<h3>${t('pk_title')}</h3>
+    <p class="hint">${t('pk_text')}</p>
+    <div class="field"><label>${t('pk_label')}</label><input id="pk-label" value="${esc(cur || '')}" placeholder="${t('pk_ph')}"></div>
+    <button class="sec sm" id="pk-here" type="button">${t('pf_geo')}</button>
     <div class="hint" id="pk-info" style="margin:.4rem 0 0"></div>
-    <div class="actions"><button class="sec" onclick="window.__closeModal()">Abbrechen</button><button id="pk-save">Speichern</button></div>`);
+    <div class="actions"><button class="sec" onclick="window.__closeModal()">${t('abort')}</button><button id="pk-save">${t('pf_save')}</button></div>`);
   let lat = null, lng = null;
   $('#pk-here').onclick = async () => {
     try {
       const c = await getPosOnce(); lat = c.latitude; lng = c.longitude;
       const addr = await reverseGeocode(lat, lng);
       if (addr && !$('#pk-label').value.trim()) $('#pk-label').value = addr;
-      $('#pk-info').innerHTML = `✓ Standort übernommen (${lat.toFixed(4)}, ${lng.toFixed(4)})`;
+      $('#pk-info').innerHTML = t('pk_taken', { lat: lat.toFixed(4), lng: lng.toFixed(4) });
     } catch (e) { toast(e.message, 'err'); }
   };
   $('#pk-save').onclick = async () => {
     try {
       await api('/api/my/pickup', { method: 'POST', body: { label: $('#pk-label').value, lat, lng } });
-      closeModal(); toast('Abholort gespeichert ✓', 'ok'); refreshStudentLive();
+      closeModal(); toast(t('pk_saved'), 'ok'); refreshStudentLive();
     } catch (e) { toast(e.message, 'err'); }
   };
 }
