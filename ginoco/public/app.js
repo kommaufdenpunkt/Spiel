@@ -208,6 +208,20 @@ const I18N = {
     sf_book_title: '{label} buchen', sf_intro: 'Sonderfahrt mit fester Länge: <strong>{dur} Min</strong>. Wähle einen Tag – ich zeige dir die freien Startzeiten, an denen die {label} noch komplett in den Tag passt.', sf_day: 'Tag', sf_choose_day: 'Wähle einen Tag …', loading_short: 'Lädt…', sf_nofit: 'An diesem Tag passt die {label} ({dur} Min) nicht mehr in den Tagesplan. Wähle einen anderen, freieren Tag – am besten früh am Tag, damit der lange Block Platz hat.', sf_ends: '– endet {end}', sf_confirm_title: '{label} verbindlich buchen?', sf_confirm_dur: '{dur} Min · endet {end}', sf_confirm_note: 'Sonderfahrten sind Pflichtfahrten für die Prüfung. Die Buchung ist verbindlich.', sf_booked: '{label} gebucht',
     gps_unavail: 'GPS nicht verfügbar', loc_error: 'Standort-Fehler: {e}', loc_sharing: 'Dein Standort wird geteilt 📍',
     pk_title: '📍 Wo sollen wir dich abholen?', pk_text: 'Sag deinem Fahrlehrer, von wo du abgeholt werden möchtest. Du kannst auch deinen aktuellen Standort übernehmen.', pk_label: 'Abholort', pk_ph: 'z.B. vor der Schule, am Bahnhof …', pk_taken: '✓ Standort übernommen ({lat}, {lng})', pk_saved: 'Abholort gespeichert ✓',
+    rc_geduld_label:'Geduld & Ruhe', rc_geduld_q:'Wie geduldig war dein Fahrlehrer?', rc_geduld_hint:'Ruhe bewahrt, auch wenn’s mal hakt?',
+    rc_erklaerung_label:'Erklärungen', rc_erklaerung_q:'Wie verständlich waren die Erklärungen?', rc_erklaerung_hint:'Alles gut erklärt, sodass es Klick gemacht hat?',
+    rc_puenktlich_label:'Zuverlässigkeit', rc_puenktlich_q:'Wie zuverlässig & pünktlich war er?', rc_puenktlich_hint:'Termine gehalten, pünktlich da?',
+    rc_freundlich_label:'Freundlichkeit', rc_freundlich_q:'Wie freundlich war der Umgang?', rc_freundlich_hint:'Nett, motivierend, auf Augenhöhe?',
+    rc_sicher_label:'Sicheres Gefühl', rc_sicher_q:'Wie sicher hast du dich beim Fahren gefühlt?', rc_sicher_hint:'Gut aufgehoben und sicher unterwegs?',
+    rw_1:'geht so', rw_2:'okay', rw_3:'gut', rw_4:'sehr gut', rw_5:'top!',
+    rw_intro_new:'Erzähl, wie deine Ausbildung war', rw_intro_p:'In ein paar kurzen Fragen bewertest du deinen Fahrlehrer – Stern antippen, fertig. Dauert unter einer Minute.',
+    rw_intro_l1:'🧩 Schritt für Schritt – eine Frage nach der anderen', rw_intro_l2:'📸 Wenn du magst, direkt ein Foto dazu', rw_intro_l3:'🙈 Du bestimmst, ob dein Name erscheint (auch anonym)',
+    rw_intro_why:'Deine echte Rückmeldung hilft anderen Fahrschülern – und deinem Fahrlehrer, noch besser zu werden.', rw_start:'Los geht’s →',
+    rw_qn:'Frage {i} von {n}', rw_tap_star:'Tippe einen Stern an', rw_back:'← Zurück', rw_next:'Weiter →',
+    rw_words_t:'💬 Deine Worte', rw_words_p:'Was möchtest du anderen mitgeben? Ein, zwei ehrliche Sätze reichen völlig.', rw_words_ph:'z. B. Super Fahrlehrer, sehr geduldig, erklärt alles ruhig – klare Empfehlung!',
+    rw_photo_t:'📸 Foto dazu? (freiwillig)', rw_photo_p:'Mit Foto wirkt deine Empfehlung persönlicher. Ganz wie du magst.', rw_photo_other:'Anderes Foto', rw_photo_pick:'📷 Foto auswählen', rw_photo_none:'Kein Foto', rw_photo_show:'Foto bei meiner Bewertung anzeigen',
+    rw_name_t:'🙋 Wie soll dein Name erscheinen?', rw_name_p:'Öffentlich sichtbar auf der Startseite. Du entscheidest.', rw_name_full:'Voller Name', rw_name_init:'Abgekürzt', rw_name_anon:'Anonym', rw_anon_student:'Ein Fahrschüler', rw_name_anon_nophoto:'Bei „Anonym" wird kein Foto angezeigt.',
+    rw_sum_t:'✅ Passt das so?', rw_sum_nochips:'Keine Einzelnoten – kein Problem.', rw_submit:'Bewertung abschicken', rw_need_text:'Bitte schreib kurz ein, zwei Sätze.', rw_sending:'Wird gesendet …', rw_thanks:'Danke für deine Bewertung ⭐',
     tour_t0: 'Willkommen bei ginoco', tour_x0: 'Hier buchst du deine Fahrstunden selbst – schnell und von überall. In ein paar kurzen Schritten zeige ich dir, wie es geht. Du kannst jederzeit auf „Überspringen“ tippen.',
     tour_t1: '1. Fahrstunde buchen', tour_x1: 'Am schnellsten geht’s mit <strong>🔎 Nächster freier Termin</strong> – ein Tipp und du landest beim nächsten freien Tag. Freie Zeiten sind <strong>grün</strong>. Tippe auf <strong>Buchen</strong>, wähle die Dauer und bestätige. Fertig! ✅',
     tour_t2: '2. Deine Termine', tour_x2: 'Oben unter <strong>„Meine Termine“</strong> siehst du alle gebuchten Stunden mit Datum, Uhrzeit und Treffpunkt. Über <strong>„Zum Kalender hinzufügen“</strong> landen sie in deinem Handy-Kalender.',
@@ -382,6 +396,20 @@ const I18N = {
     sf_book_title: 'Book {label}', sf_intro: 'Special drive with a fixed length: <strong>{dur} min</strong>. Pick a day – I’ll show the free start times where the {label} still fits fully into the day.', sf_day: 'Day', sf_choose_day: 'Pick a day …', loading_short: 'Loading…', sf_nofit: 'The {label} ({dur} min) no longer fits into this day’s schedule. Pick another, freer day – ideally early in the day so the long block has room.', sf_ends: '– ends {end}', sf_confirm_title: 'Book {label}?', sf_confirm_dur: '{dur} min · ends {end}', sf_confirm_note: 'Special drives are mandatory for the test. The booking is binding.', sf_booked: '{label} booked',
     gps_unavail: 'GPS not available', loc_error: 'Location error: {e}', loc_sharing: 'Your location is being shared 📍',
     pk_title: '📍 Where should we pick you up?', pk_text: 'Tell your instructor where you’d like to be picked up. You can also use your current location.', pk_label: 'Pick-up spot', pk_ph: 'e.g. in front of school, at the station …', pk_taken: '✓ Location taken ({lat}, {lng})', pk_saved: 'Pick-up spot saved ✓',
+    rc_geduld_label:'Patience & calm', rc_geduld_q:'How patient was your instructor?', rc_geduld_hint:'Stayed calm even when things got tricky?',
+    rc_erklaerung_label:'Explanations', rc_erklaerung_q:'How clear were the explanations?', rc_erklaerung_hint:'Explained so it clicked?',
+    rc_puenktlich_label:'Reliability', rc_puenktlich_q:'How reliable & punctual were they?', rc_puenktlich_hint:'Kept appointments, on time?',
+    rc_freundlich_label:'Friendliness', rc_freundlich_q:'How friendly was the interaction?', rc_freundlich_hint:'Kind, motivating, at eye level?',
+    rc_sicher_label:'Feeling safe', rc_sicher_q:'How safe did you feel while driving?', rc_sicher_hint:'In good hands and safe on the road?',
+    rw_1:'so-so', rw_2:'okay', rw_3:'good', rw_4:'very good', rw_5:'top!',
+    rw_intro_new:'Tell us how your training was', rw_intro_p:'In a few short questions you rate your instructor – tap a star, done. Takes under a minute.',
+    rw_intro_l1:'🧩 Step by step – one question at a time', rw_intro_l2:'📸 Add a photo if you like', rw_intro_l3:'🙈 You decide whether your name appears (anonymous too)',
+    rw_intro_why:'Your honest feedback helps other students – and your instructor to get even better.', rw_start:'Let’s go →',
+    rw_qn:'Question {i} of {n}', rw_tap_star:'Tap a star', rw_back:'← Back', rw_next:'Next →',
+    rw_words_t:'💬 Your words', rw_words_p:'What would you like to tell others? One or two honest sentences are plenty.', rw_words_ph:'e.g. Great instructor, very patient, explains everything calmly – highly recommended!',
+    rw_photo_t:'📸 Add a photo? (optional)', rw_photo_p:'A photo makes your recommendation more personal. Entirely up to you.', rw_photo_other:'Another photo', rw_photo_pick:'📷 Choose photo', rw_photo_none:'No photo', rw_photo_show:'Show photo with my review',
+    rw_name_t:'🙋 How should your name appear?', rw_name_p:'Publicly visible on the home page. You decide.', rw_name_full:'Full name', rw_name_init:'Abbreviated', rw_name_anon:'Anonymous', rw_anon_student:'A student', rw_name_anon_nophoto:'With “Anonymous”, no photo is shown.',
+    rw_sum_t:'✅ Does this look right?', rw_sum_nochips:'No individual ratings – no problem.', rw_submit:'Submit review', rw_need_text:'Please write a sentence or two.', rw_sending:'Sending …', rw_thanks:'Thanks for your review ⭐',
     tour_t0: 'Welcome to ginoco', tour_x0: 'Here you book your driving lessons yourself – quickly and from anywhere. In a few short steps I’ll show you how. You can tap “Skip” any time.',
     tour_t1: '1. Book a lesson', tour_x1: 'Quickest via <strong>🔎 Next free slot</strong> – one tap takes you to the next free day. Free times are <strong>green</strong>. Tap <strong>Book</strong>, choose the duration and confirm. Done! ✅',
     tour_t2: '2. Your appointments', tour_x2: 'At the top under <strong>“My appointments”</strong> you see all booked lessons with date, time and meeting point. <strong>“Add to calendar”</strong> puts them in your phone calendar.',
@@ -556,6 +584,20 @@ const I18N = {
     sf_book_title: '{label} al', sf_intro: 'Sabit uzunlukta özel sürüş: <strong>{dur} dk</strong>. Bir gün seç – {label} güne tam sığdığı boş başlangıç saatlerini göstereyim.', sf_day: 'Gün', sf_choose_day: 'Bir gün seç …', loading_short: 'Yükleniyor…', sf_nofit: '{label} ({dur} dk) bu günün planına artık sığmıyor. Daha boş başka bir gün seç – uzun blok için yer olsun diye tercihen günün erken saatinde.', sf_ends: '– bitiş {end}', sf_confirm_title: '{label} kesin alınsın mı?', sf_confirm_dur: '{dur} dk · bitiş {end}', sf_confirm_note: 'Özel sürüşler sınav için zorunludur. Rezervasyon bağlayıcıdır.', sf_booked: '{label} alındı',
     gps_unavail: 'GPS kullanılamıyor', loc_error: 'Konum hatası: {e}', loc_sharing: 'Konumun paylaşılıyor 📍',
     pk_title: '📍 Seni nereden alalım?', pk_text: 'Nereden alınmak istediğini eğitmenine söyle. Mevcut konumunu da kullanabilirsin.', pk_label: 'Buluşma yeri', pk_ph: 'örn. okulun önü, istasyonda …', pk_taken: '✓ Konum alındı ({lat}, {lng})', pk_saved: 'Buluşma yeri kaydedildi ✓',
+    rc_geduld_label:'Sabır & sükûnet', rc_geduld_q:'Eğitmenin ne kadar sabırlıydı?', rc_geduld_hint:'Zorlansa bile sakin kaldı mı?',
+    rc_erklaerung_label:'Anlatım', rc_erklaerung_q:'Anlatımlar ne kadar anlaşılırdı?', rc_erklaerung_hint:'Her şeyi iyi anlattı mı?',
+    rc_puenktlich_label:'Güvenilirlik', rc_puenktlich_q:'Ne kadar güvenilir & dakikti?', rc_puenktlich_hint:'Randevulara uydu, zamanında mıydı?',
+    rc_freundlich_label:'Cana yakınlık', rc_freundlich_q:'İletişim ne kadar cana yakındı?', rc_freundlich_hint:'Kibar, motive edici, eşit seviyede mi?',
+    rc_sicher_label:'Güven hissi', rc_sicher_q:'Sürerken kendini ne kadar güvende hissettin?', rc_sicher_hint:'İyi ellerde ve güvende miydin?',
+    rw_1:'idare eder', rw_2:'fena değil', rw_3:'iyi', rw_4:'çok iyi', rw_5:'harika!',
+    rw_intro_new:'Eğitimin nasıldı anlat', rw_intro_p:'Birkaç kısa soruyla eğitmenini değerlendir – yıldıza dokun, bitti. Bir dakikadan az sürer.',
+    rw_intro_l1:'🧩 Adım adım – soru soru', rw_intro_l2:'📸 İstersen bir de fotoğraf ekle', rw_intro_l3:'🙈 Adının görünüp görünmeyeceğine sen karar ver (anonim de olur)',
+    rw_intro_why:'Dürüst geri bildirimin diğer öğrencilere – ve eğitmeninin daha da iyi olmasına yardım eder.', rw_start:'Başla →',
+    rw_qn:'Soru {i} / {n}', rw_tap_star:'Bir yıldıza dokun', rw_back:'← Geri', rw_next:'İleri →',
+    rw_words_t:'💬 Senin sözlerin', rw_words_p:'Başkalarına ne söylemek istersin? Bir iki dürüst cümle yeter.', rw_words_ph:'örn. Harika eğitmen, çok sabırlı, her şeyi sakince anlatıyor – kesinlikle tavsiye ederim!',
+    rw_photo_t:'📸 Fotoğraf eklensin mi? (isteğe bağlı)', rw_photo_p:'Fotoğrafla önerin daha kişisel görünür. Tamamen sana kalmış.', rw_photo_other:'Başka fotoğraf', rw_photo_pick:'📷 Fotoğraf seç', rw_photo_none:'Fotoğraf yok', rw_photo_show:'Değerlendirmemde fotoğrafı göster',
+    rw_name_t:'🙋 Adın nasıl görünsün?', rw_name_p:'Ana sayfada herkese açık görünür. Sen karar ver.', rw_name_full:'Tam ad', rw_name_init:'Kısaltılmış', rw_name_anon:'Anonim', rw_anon_student:'Bir öğrenci', rw_name_anon_nophoto:'„Anonim“ seçilince fotoğraf gösterilmez.',
+    rw_sum_t:'✅ Böyle uygun mu?', rw_sum_nochips:'Tekil puan yok – sorun değil.', rw_submit:'Değerlendirmeyi gönder', rw_need_text:'Lütfen bir iki cümle yaz.', rw_sending:'Gönderiliyor …', rw_thanks:'Değerlendirmen için teşekkürler ⭐',
     tour_t0: 'ginoco’ya hoş geldin', tour_x0: 'Burada direksiyon derslerini kendin alırsın – hızlı ve her yerden. Birkaç kısa adımda nasıl olduğunu göstereyim. İstediğin an „Atla“ya dokunabilirsin.',
     tour_t1: '1. Ders al', tour_x1: 'En hızlısı <strong>🔎 En yakın boş randevu</strong> – bir dokunuşla en yakın boş güne gidersin. Boş saatler <strong>yeşil</strong>. <strong>Rezerve et</strong>’e dokun, süreyi seç ve onayla. Bitti! ✅',
     tour_t2: '2. Randevuların', tour_x2: 'Üstte <strong>„Randevularım“</strong> altında tüm dersleri tarih, saat ve buluşma noktasıyla görürsün. <strong>„Takvime ekle“</strong> ile telefonundaki takvime eklenir.',
@@ -730,6 +772,20 @@ const I18N = {
     sf_book_title: 'حجز {label}', sf_intro: 'رحلة خاصة بمدة ثابتة: <strong>{dur} دقيقة</strong>. اختر يوماً – سأعرض أوقات البدء المتاحة التي تتّسع فيها {label} في اليوم بالكامل.', sf_day: 'اليوم', sf_choose_day: 'اختر يوماً …', loading_short: 'يتم التحميل…', sf_nofit: 'لم تعد {label} ({dur} دقيقة) تتّسع في جدول هذا اليوم. اختر يوماً آخر أكثر فراغاً – ويُفضّل في وقت مبكر ليتوفّر مكان للكتلة الطويلة.', sf_ends: '– ينتهي {end}', sf_confirm_title: 'تأكيد حجز {label}؟', sf_confirm_dur: '{dur} دقيقة · ينتهي {end}', sf_confirm_note: 'الرحلات الخاصة إلزامية للاختبار. الحجز مُلزِم.', sf_booked: 'تم حجز {label}',
     gps_unavail: 'GPS غير متاح', loc_error: 'خطأ في الموقع: {e}', loc_sharing: 'تتم مشاركة موقعك 📍',
     pk_title: '📍 من أين نأخذك؟', pk_text: 'أخبر مدرّبك من أين تريد أن يأخذك. يمكنك أيضاً استخدام موقعك الحالي.', pk_label: 'مكان الالتقاء', pk_ph: 'مثل أمام المدرسة، عند المحطة …', pk_taken: '✓ تم أخذ الموقع ({lat}, {lng})', pk_saved: 'تم حفظ مكان الالتقاء ✓',
+    rc_geduld_label:'الصبر والهدوء', rc_geduld_q:'كم كان مدرّبك صبوراً؟', rc_geduld_hint:'هل بقي هادئاً حتى عند التعثّر؟',
+    rc_erklaerung_label:'الشرح', rc_erklaerung_q:'كم كانت الشروحات واضحة؟', rc_erklaerung_hint:'هل شرح كل شيء حتى فهمت؟',
+    rc_puenktlich_label:'الاعتمادية', rc_puenktlich_q:'كم كان موثوقاً ودقيقاً في المواعيد؟', rc_puenktlich_hint:'هل التزم بالمواعيد وحضر في الوقت؟',
+    rc_freundlich_label:'اللطف', rc_freundlich_q:'كم كان التعامل ودّياً؟', rc_freundlich_hint:'لطيف ومحفّز وعلى قدم المساواة؟',
+    rc_sicher_label:'الشعور بالأمان', rc_sicher_q:'كم شعرت بالأمان أثناء القيادة؟', rc_sicher_hint:'في أيدٍ أمينة وآمن على الطريق؟',
+    rw_1:'مقبول', rw_2:'لا بأس', rw_3:'جيد', rw_4:'جيد جداً', rw_5:'ممتاز!',
+    rw_intro_new:'أخبِرنا كيف كان تدريبك', rw_intro_p:'بأسئلة قصيرة تقيّم مدرّبك – انقر نجمة، تم. يستغرق أقل من دقيقة.',
+    rw_intro_l1:'🧩 خطوة بخطوة – سؤال تلو الآخر', rw_intro_l2:'📸 أضِف صورة إن أردت', rw_intro_l3:'🙈 أنت تقرّر إن كان اسمك سيظهر (يمكن مجهولاً)',
+    rw_intro_why:'ملاحظتك الصادقة تساعد طلاباً آخرين – وتساعد مدرّبك على التحسّن أكثر.', rw_start:'لنبدأ →',
+    rw_qn:'سؤال {i} من {n}', rw_tap_star:'انقر نجمة', rw_back:'← رجوع', rw_next:'التالي →',
+    rw_words_t:'💬 كلماتك', rw_words_p:'ماذا تودّ أن تقول للآخرين؟ جملة أو جملتان صادقتان تكفيان.', rw_words_ph:'مثل: مدرّب رائع، صبور جداً، يشرح كل شيء بهدوء – أنصح به بشدة!',
+    rw_photo_t:'📸 إضافة صورة؟ (اختياري)', rw_photo_p:'الصورة تجعل توصيتك أكثر شخصية. كما تحبّ تماماً.', rw_photo_other:'صورة أخرى', rw_photo_pick:'📷 اختر صورة', rw_photo_none:'بدون صورة', rw_photo_show:'إظهار الصورة مع تقييمي',
+    rw_name_t:'🙋 كيف يظهر اسمك؟', rw_name_p:'ظاهر للعموم على الصفحة الرئيسية. أنت تقرّر.', rw_name_full:'الاسم الكامل', rw_name_init:'مختصر', rw_name_anon:'مجهول', rw_anon_student:'أحد الطلاب', rw_name_anon_nophoto:'مع «مجهول» لا تُعرض أي صورة.',
+    rw_sum_t:'✅ هل هذا صحيح؟', rw_sum_nochips:'لا تقييمات فردية – لا مشكلة.', rw_submit:'إرسال التقييم', rw_need_text:'يرجى كتابة جملة أو جملتين.', rw_sending:'يتم الإرسال …', rw_thanks:'شكراً لتقييمك ⭐',
     tour_t0: 'مرحباً بك في ginoco', tour_x0: 'هنا تحجز دروس القيادة بنفسك – بسرعة ومن أي مكان. في خطوات قصيرة سأريك كيف. يمكنك النقر على «تخطٍّ» في أي وقت.',
     tour_t1: '1. احجز درساً', tour_x1: 'الأسرع عبر <strong>🔎 أقرب موعد متاح</strong> – نقرة واحدة تأخذك لأقرب يوم متاح. الأوقات المتاحة <strong>خضراء</strong>. انقر <strong>احجز</strong>، اختر المدة وأكّد. تم! ✅',
     tour_t2: '2. مواعيدك', tour_x2: 'في الأعلى ضمن <strong>«مواعيدي»</strong> ترى كل الدروس بالتاريخ والوقت ونقطة اللقاء. عبر <strong>«أضف إلى التقويم»</strong> تُضاف إلى تقويم هاتفك.',
@@ -2611,11 +2667,11 @@ const REVIEW_CATS = [
   { k: 'freundlich', icon: '😊', q: 'Wie freundlich war der Umgang?',               label: 'Freundlichkeit',       hint: 'Nett, motivierend, auf Augenhöhe?' },
   { k: 'sicher',     icon: '🚗', q: 'Wie sicher hast du dich beim Fahren gefühlt?', label: 'Sicheres Gefühl',      hint: 'Gut aufgehoben und sicher unterwegs?' },
 ];
-const revCatLabel = (k) => (REVIEW_CATS.find((c) => c.k === k) || {}).label || k;
+const revCatLabel = (k) => t('rc_' + k + '_label');
 const revCatIcon = (k) => (REVIEW_CATS.find((c) => c.k === k) || {}).icon || '⭐';
 function revNamePreview(mode) {
   const nm = (state.user?.name || '').trim();
-  if (mode === 'anon' || !nm) return mode === 'anon' ? 'Anonym' : 'Ein Fahrschüler';
+  if (mode === 'anon' || !nm) return mode === 'anon' ? t('rw_name_anon') : t('rw_anon_student');
   if (mode === 'full') return nm;
   const parts = nm.split(/\s+/);
   return parts.length > 1 ? `${parts[0]} ${parts[parts.length - 1][0]}.` : parts[0];
@@ -2632,7 +2688,7 @@ async function renderReviewCard(progress) {
     ? `<div class="rev-pass">🎉 <div><strong>${t('rev_passed_t')}</strong><br><span>${t('rev_passed_s')}</span></div></div>`
     : `<p class="hint">${t('rev_invite')}</p>`;
   const chips = r && r.ratings
-    ? `<div class="rev-mine-chips">${REVIEW_CATS.filter((c) => r.ratings[c.k]).map((c) => `<span class="rev-chip">${c.icon} ${esc(c.label)} <b>${r.ratings[c.k]}★</b></span>`).join('')}</div>`
+    ? `<div class="rev-mine-chips">${REVIEW_CATS.filter((c) => r.ratings[c.k]).map((c) => `<span class="rev-chip">${c.icon} ${esc(t('rc_' + c.k + '_label'))} <b>${r.ratings[c.k]}★</b></span>`).join('')}</div>`
     : '';
   const body = r
     ? `<div class="rev-mine">
@@ -2683,8 +2739,8 @@ function openReviewModal(existing, hasPhoto) {
   }
 
   async function submit() {
-    if ((S.text || '').trim().length < 5) { S.step = steps.indexOf('text'); draw(); toast('Bitte schreib kurz ein, zwei Sätze.', 'err'); return; }
-    const btn = $('#rev-go'); if (btn) { btn.disabled = true; btn.textContent = 'Wird gesendet …'; }
+    if ((S.text || '').trim().length < 5) { S.step = steps.indexOf('text'); draw(); toast(t('rw_need_text'), 'err'); return; }
+    const btn = $('#rev-go'); if (btn) { btn.disabled = true; btn.textContent = t('rw_sending'); }
     const body = {
       rating: overall() || undefined,
       ratings: S.ratings,
@@ -2693,8 +2749,8 @@ function openReviewModal(existing, hasPhoto) {
       show_photo: S.mode !== 'anon' ? S.showPhoto : false,
     };
     if (S.photoData) body.photo = S.photoData;
-    try { await api('/api/my/review', { method: 'POST', body }); closeModal(); toast('Danke für deine Bewertung ⭐', 'ok'); syncStudent(); }
-    catch (e) { if (btn) { btn.disabled = false; btn.textContent = 'Bewertung abschicken'; } toast(e.message, 'err'); }
+    try { await api('/api/my/review', { method: 'POST', body }); closeModal(); toast(t('rw_thanks'), 'ok'); syncStudent(); }
+    catch (e) { if (btn) { btn.disabled = false; btn.textContent = t('rw_submit'); } toast(e.message, 'err'); }
   }
 
   function draw() {
@@ -2704,44 +2760,44 @@ function openReviewModal(existing, hasPhoto) {
     if (kind.startsWith('cat:')) {
       const idx = REVIEW_CATS.findIndex((c) => 'cat:' + c.k === kind);
       html += `<div class="rev-prog"><div class="rev-prog-bar" style="width:${Math.round(((idx + 1) / catCount) * 100)}%"></div></div>
-        <div class="rev-prog-tx">Frage ${idx + 1} von ${catCount}</div>`;
+        <div class="rev-prog-tx">${t('rw_qn', { i: idx + 1, n: catCount })}</div>`;
     }
 
     if (kind === 'intro') {
       html += `<div class="rev-intro">
         <div class="rev-intro-emoji">⭐</div>
-        <h3>${existing ? 'Bewertung bearbeiten' : 'Erzähl, wie deine Ausbildung war'}</h3>
-        <p>In ein paar kurzen Fragen bewertest du deinen Fahrlehrer – Stern antippen, fertig. Dauert unter einer Minute.</p>
+        <h3>${existing ? t('rev_edit') : t('rw_intro_new')}</h3>
+        <p>${t('rw_intro_p')}</p>
         <ul class="rev-intro-list">
-          <li>🧩 Schritt für Schritt – eine Frage nach der anderen</li>
-          <li>📸 Wenn du magst, direkt ein Foto dazu</li>
-          <li>🙈 Du bestimmst, ob dein Name erscheint (auch anonym)</li>
+          <li>${t('rw_intro_l1')}</li>
+          <li>${t('rw_intro_l2')}</li>
+          <li>${t('rw_intro_l3')}</li>
         </ul>
-        <p class="rev-intro-why">Deine echte Rückmeldung hilft anderen Fahrschülern – und deinem Fahrlehrer, noch besser zu werden.</p>
+        <p class="rev-intro-why">${t('rw_intro_why')}</p>
       </div>
       <div class="actions">
-        <button class="sec" onclick="window.__closeModal()">Später</button>
-        <button id="rev-go">Los geht’s →</button>
+        <button class="sec" onclick="window.__closeModal()">${t('gate_later')}</button>
+        <button id="rev-go">${t('rw_start')}</button>
       </div>`;
     } else if (kind.startsWith('cat:')) {
       const c = REVIEW_CATS.find((x) => 'cat:' + x.k === kind);
       const cur = S.ratings[c.k] || 0;
       html += `<div class="rev-catq">
         <div class="rev-cat-ic">${c.icon}</div>
-        <h3>${esc(c.q)}</h3>
-        <p class="rev-cat-hint">${esc(c.hint)}</p>
+        <h3>${esc(t('rc_' + c.k + '_q'))}</h3>
+        <p class="rev-cat-hint">${esc(t('rc_' + c.k + '_hint'))}</p>
         <div id="rev-stars-mount"></div>
-        <div class="rev-cat-val" id="rev-cat-val">${cur ? '★'.repeat(cur) + ' – ' + revRatingWord(cur) : 'Tippe einen Stern an'}</div>
+        <div class="rev-cat-val" id="rev-cat-val">${cur ? '★'.repeat(cur) + ' – ' + revRatingWord(cur) : t('rw_tap_star')}</div>
       </div>
       <div class="actions">
-        <button class="sec" id="rev-back">← Zurück</button>
-        ${cur ? `<button id="rev-go">Weiter →</button>` : `<button class="ghost" id="rev-skip">Überspringen</button>`}
+        <button class="sec" id="rev-back">${t('rw_back')}</button>
+        ${cur ? `<button id="rev-go">${t('rw_next')}</button>` : `<button class="ghost" id="rev-skip">${t('tour_skip')}</button>`}
       </div>`;
     } else if (kind === 'text') {
       html += `<div class="rev-step">
-        <h3>💬 Deine Worte</h3>
-        <p class="hint">Was möchtest du anderen mitgeben? Ein, zwei ehrliche Sätze reichen völlig.</p>
-        <textarea id="rev-text" rows="5" maxlength="800" placeholder="z. B. Super Fahrlehrer, sehr geduldig, erklärt alles ruhig – Fahrschule Untern Buchen in Eberswalde. Klare Empfehlung!" style="resize:vertical">${esc(S.text)}</textarea>
+        <h3>${t('rw_words_t')}</h3>
+        <p class="hint">${t('rw_words_p')}</p>
+        <textarea id="rev-text" rows="5" maxlength="800" placeholder="${t('rw_words_ph')}" style="resize:vertical">${esc(S.text)}</textarea>
         <div class="rev-count"><span id="rev-count">${(S.text || '').length}</span>/800</div>
       </div>
       <div class="actions">
@@ -2754,15 +2810,15 @@ function openReviewModal(existing, hasPhoto) {
         : (S.hasPhoto ? `<img src="/api/my/photo?t=${Date.now()}" alt="Dein Foto">` : `<span class="rev-photo-ph">🙂</span>`);
       const have = S.photoData || S.hasPhoto;
       html += `<div class="rev-step rev-photo-step">
-        <h3>📸 Foto dazu? (freiwillig)</h3>
-        <p class="hint">Mit Foto wirkt deine Empfehlung persönlicher. Ganz wie du magst.</p>
+        <h3>${t('rw_photo_t')}</h3>
+        <p class="hint">${t('rw_photo_p')}</p>
         <div class="rev-photo-prev" id="rev-photo-prev">${prev}</div>
         <input type="file" id="rev-file" accept="image/*" hidden>
         <div class="rev-photo-btns">
-          <button class="sec sm" id="rev-pick">${have ? 'Anderes Foto' : '📷 Foto auswählen'}</button>
-          ${have ? `<button class="ghost sm" id="rev-photo-clear">Kein Foto</button>` : ''}
+          <button class="sec sm" id="rev-pick">${have ? t('rw_photo_other') : t('rw_photo_pick')}</button>
+          ${have ? `<button class="ghost sm" id="rev-photo-clear">${t('rw_photo_none')}</button>` : ''}
         </div>
-        ${have ? `<label class="ck-line" id="rev-show-line"><input type="checkbox" id="rev-show" ${S.showPhoto ? 'checked' : ''}> Foto bei meiner Bewertung anzeigen</label>` : ''}
+        ${have ? `<label class="ck-line" id="rev-show-line"><input type="checkbox" id="rev-show" ${S.showPhoto ? 'checked' : ''}> ${t('rw_photo_show')}</label>` : ''}
       </div>
       <div class="actions">
         <button class="sec" id="rev-back">← Zurück</button>
@@ -2772,14 +2828,14 @@ function openReviewModal(existing, hasPhoto) {
       const card = (v, title, sub) => `<button type="button" class="rev-namecard ${S.mode === v ? 'on' : ''}" data-mode="${v}">
         <div class="rev-nc-t">${title}</div><div class="rev-nc-s">${sub}</div></button>`;
       html += `<div class="rev-step">
-        <h3>🙋 Wie soll dein Name erscheinen?</h3>
-        <p class="hint">Öffentlich sichtbar auf der Startseite. Du entscheidest.</p>
+        <h3>${t('rw_name_t')}</h3>
+        <p class="hint">${t('rw_name_p')}</p>
         <div class="rev-namecards">
-          ${card('full', 'Voller Name', esc(revNamePreview('full')))}
-          ${card('initials', 'Abgekürzt', esc(revNamePreview('initials')))}
-          ${card('anon', 'Anonym', 'Ein Fahrschüler')}
+          ${card('full', t('rw_name_full'), esc(revNamePreview('full')))}
+          ${card('initials', t('rw_name_init'), esc(revNamePreview('initials')))}
+          ${card('anon', t('rw_name_anon'), t('rw_anon_student'))}
         </div>
-        ${S.mode === 'anon' && (S.photoData || S.hasPhoto) ? '<p class="hint">Bei „Anonym" wird kein Foto angezeigt.</p>' : ''}
+        ${S.mode === 'anon' && (S.photoData || S.hasPhoto) ? `<p class="hint">${t('rw_name_anon_nophoto')}</p>` : ''}
       </div>
       <div class="actions">
         <button class="sec" id="rev-back">← Zurück</button>
@@ -2788,11 +2844,11 @@ function openReviewModal(existing, hasPhoto) {
     } else if (kind === 'summary') {
       const ov = overall();
       const chips = REVIEW_CATS.filter((c) => S.ratings[c.k]).map((c) =>
-        `<span class="rev-chip">${c.icon} ${esc(c.label)} <b>${S.ratings[c.k]}★</b></span>`).join('') || '<span class="hint">Keine Einzelnoten – kein Problem.</span>';
+        `<span class="rev-chip">${c.icon} ${esc(t('rc_' + c.k + '_label'))} <b>${S.ratings[c.k]}★</b></span>`).join('') || `<span class="hint">${t('rw_sum_nochips')}</span>`;
       const showPic = S.mode !== 'anon' && S.showPhoto && (S.photoData || S.hasPhoto);
       const pic = showPic ? (S.photoData ? `<img src="${S.photoData}" alt="">` : `<img src="/api/my/photo?t=${Date.now()}" alt="">`) : `<span class="rev-photo-ph sm">🙂</span>`;
       html += `<div class="rev-step rev-summary">
-        <h3>✅ Passt das so?</h3>
+        <h3>${t('rw_sum_t')}</h3>
         <div class="rev-sum-head">
           <div class="rev-sum-stars">${ov ? '★'.repeat(ov) + '☆'.repeat(5 - ov) : '—'}</div>
           <div class="rev-sum-name">${pic}<span>${esc(revNamePreview(S.mode))}</span></div>
@@ -2801,8 +2857,8 @@ function openReviewModal(existing, hasPhoto) {
         <div class="rev-sum-text">„${esc(S.text.trim() || '…')}"</div>
       </div>
       <div class="actions">
-        <button class="sec" id="rev-back">← Zurück</button>
-        <button id="rev-go">Bewertung abschicken</button>
+        <button class="sec" id="rev-back">${t('rw_back')}</button>
+        <button id="rev-go">${t('rw_submit')}</button>
       </div>`;
     }
 
@@ -2847,7 +2903,7 @@ function openReviewModal(existing, hasPhoto) {
 
   draw();
 }
-function revRatingWord(n) { return ['', 'geht so', 'okay', 'gut', 'sehr gut', 'top!'][n] || ''; }
+function revRatingWord(n) { return n >= 1 && n <= 5 ? t('rw_' + n) : ''; }
 // Druckbarer Fahrstunden-Nachweis (Tabelle + Unterschriften) + optional ADK-Zusammenfassung
 function printLessonProof(name, done, adk, stats) {
   const school = esc(state.settings?.instructor_name || 'Fahrschule');
@@ -4194,7 +4250,7 @@ async function tabBewertungen() {
       <span class="hint" style="margin-left:auto">${r.created_at ? r.created_at.slice(0, 10) : ''}</span>
     </div>
     <div class="rev-text">„${esc(r.text)}"</div>
-    ${r.ratings ? `<div class="rev-mine-chips">${REVIEW_CATS.filter((c) => r.ratings[c.k]).map((c) => `<span class="rev-chip">${c.icon} ${esc(c.label)} <b>${r.ratings[c.k]}★</b></span>`).join('')}</div>` : ''}
+    ${r.ratings ? `<div class="rev-mine-chips">${REVIEW_CATS.filter((c) => r.ratings[c.k]).map((c) => `<span class="rev-chip">${c.icon} ${esc(t('rc_' + c.k + '_label'))} <b>${r.ratings[c.k]}★</b></span>`).join('')}</div>` : ''}
     ${r.reply ? `<div class="rev-reply">↩︎ <em>${esc(r.reply)}</em></div>` : ''}
     <div class="rev-mod-who">
       <span class="pill">${esc(r.author_name || 'Ein Fahrschüler')}</span>
