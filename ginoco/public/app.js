@@ -221,7 +221,7 @@ const I18N = {
     rw_words_t:'💬 Deine Worte', rw_words_p:'Was möchtest du anderen mitgeben? Ein, zwei ehrliche Sätze reichen völlig.', rw_words_ph:'z. B. Super Fahrlehrer, sehr geduldig, erklärt alles ruhig – klare Empfehlung!',
     rw_photo_t:'📸 Foto dazu? (freiwillig)', rw_photo_p:'Mit Foto wirkt deine Empfehlung persönlicher. Ganz wie du magst.', rw_photo_other:'Anderes Foto', rw_photo_pick:'📷 Foto auswählen', rw_photo_none:'Kein Foto', rw_photo_show:'Foto bei meiner Bewertung anzeigen',
     rw_name_t:'🙋 Wie soll dein Name erscheinen?', rw_name_p:'Öffentlich sichtbar auf der Startseite. Du entscheidest.', rw_name_full:'Voller Name', rw_name_init:'Abgekürzt', rw_name_anon:'Anonym', rw_anon_student:'Ein Fahrschüler', rw_name_anon_nophoto:'Bei „Anonym" wird kein Foto angezeigt.',
-    rw_sum_t:'✅ Passt das so?', rw_sum_nochips:'Keine Einzelnoten – kein Problem.', rw_submit:'Bewertung abschicken', rw_need_text:'Bitte schreib kurz ein, zwei Sätze.', rw_sending:'Wird gesendet …', rw_thanks:'Danke für deine Bewertung ⭐',
+    rw_sum_t:'✅ Passt das so?', rw_sum_nochips:'Keine Einzelnoten – kein Problem.', rw_submit:'Bewertung abschicken', rw_need_text:'Bitte schreib kurz ein, zwei Sätze.', rw_sending:'Wird gesendet …', rw_thanks:'Danke für deine Bewertung ⭐', actual_time:'Tatsächliche Zeit', sign_confirm_time:'Ich bestätige die Fahrstunde und die angezeigte Zeit.', both_confirmed:'✓ Zeit von Fahrlehrer &amp; Fahrschüler bestätigt', ml_actual:'🕒 Tatsächlich gefahren: {begin}–{end}', ml_actual_open:'🕒 Gestartet: {begin}',
     tour_t0: 'Willkommen bei ginoco', tour_x0: 'Hier buchst du deine Fahrstunden selbst – schnell und von überall. In ein paar kurzen Schritten zeige ich dir, wie es geht. Du kannst jederzeit auf „Überspringen“ tippen.',
     tour_t1: '1. Fahrstunde buchen', tour_x1: 'Am schnellsten geht’s mit <strong>🔎 Nächster freier Termin</strong> – ein Tipp und du landest beim nächsten freien Tag. Freie Zeiten sind <strong>grün</strong>. Tippe auf <strong>Buchen</strong>, wähle die Dauer und bestätige. Fertig! ✅',
     tour_t2: '2. Deine Termine', tour_x2: 'Oben unter <strong>„Meine Termine“</strong> siehst du alle gebuchten Stunden mit Datum, Uhrzeit und Treffpunkt. Über <strong>„Zum Kalender hinzufügen“</strong> landen sie in deinem Handy-Kalender.',
@@ -409,7 +409,7 @@ const I18N = {
     rw_words_t:'💬 Your words', rw_words_p:'What would you like to tell others? One or two honest sentences are plenty.', rw_words_ph:'e.g. Great instructor, very patient, explains everything calmly – highly recommended!',
     rw_photo_t:'📸 Add a photo? (optional)', rw_photo_p:'A photo makes your recommendation more personal. Entirely up to you.', rw_photo_other:'Another photo', rw_photo_pick:'📷 Choose photo', rw_photo_none:'No photo', rw_photo_show:'Show photo with my review',
     rw_name_t:'🙋 How should your name appear?', rw_name_p:'Publicly visible on the home page. You decide.', rw_name_full:'Full name', rw_name_init:'Abbreviated', rw_name_anon:'Anonymous', rw_anon_student:'A student', rw_name_anon_nophoto:'With “Anonymous”, no photo is shown.',
-    rw_sum_t:'✅ Does this look right?', rw_sum_nochips:'No individual ratings – no problem.', rw_submit:'Submit review', rw_need_text:'Please write a sentence or two.', rw_sending:'Sending …', rw_thanks:'Thanks for your review ⭐',
+    rw_sum_t:'✅ Does this look right?', rw_sum_nochips:'No individual ratings – no problem.', rw_submit:'Submit review', rw_need_text:'Please write a sentence or two.', rw_sending:'Sending …', rw_thanks:'Thanks for your review ⭐', actual_time:'Actual time', sign_confirm_time:'I confirm the lesson and the time shown.', both_confirmed:'✓ Time confirmed by instructor &amp; student', ml_actual:'🕒 Actually driven: {begin}–{end}', ml_actual_open:'🕒 Started: {begin}',
     tour_t0: 'Welcome to ginoco', tour_x0: 'Here you book your driving lessons yourself – quickly and from anywhere. In a few short steps I’ll show you how. You can tap “Skip” any time.',
     tour_t1: '1. Book a lesson', tour_x1: 'Quickest via <strong>🔎 Next free slot</strong> – one tap takes you to the next free day. Free times are <strong>green</strong>. Tap <strong>Book</strong>, choose the duration and confirm. Done! ✅',
     tour_t2: '2. Your appointments', tour_x2: 'At the top under <strong>“My appointments”</strong> you see all booked lessons with date, time and meeting point. <strong>“Add to calendar”</strong> puts them in your phone calendar.',
@@ -597,7 +597,7 @@ const I18N = {
     rw_words_t:'💬 Senin sözlerin', rw_words_p:'Başkalarına ne söylemek istersin? Bir iki dürüst cümle yeter.', rw_words_ph:'örn. Harika eğitmen, çok sabırlı, her şeyi sakince anlatıyor – kesinlikle tavsiye ederim!',
     rw_photo_t:'📸 Fotoğraf eklensin mi? (isteğe bağlı)', rw_photo_p:'Fotoğrafla önerin daha kişisel görünür. Tamamen sana kalmış.', rw_photo_other:'Başka fotoğraf', rw_photo_pick:'📷 Fotoğraf seç', rw_photo_none:'Fotoğraf yok', rw_photo_show:'Değerlendirmemde fotoğrafı göster',
     rw_name_t:'🙋 Adın nasıl görünsün?', rw_name_p:'Ana sayfada herkese açık görünür. Sen karar ver.', rw_name_full:'Tam ad', rw_name_init:'Kısaltılmış', rw_name_anon:'Anonim', rw_anon_student:'Bir öğrenci', rw_name_anon_nophoto:'„Anonim“ seçilince fotoğraf gösterilmez.',
-    rw_sum_t:'✅ Böyle uygun mu?', rw_sum_nochips:'Tekil puan yok – sorun değil.', rw_submit:'Değerlendirmeyi gönder', rw_need_text:'Lütfen bir iki cümle yaz.', rw_sending:'Gönderiliyor …', rw_thanks:'Değerlendirmen için teşekkürler ⭐',
+    rw_sum_t:'✅ Böyle uygun mu?', rw_sum_nochips:'Tekil puan yok – sorun değil.', rw_submit:'Değerlendirmeyi gönder', rw_need_text:'Lütfen bir iki cümle yaz.', rw_sending:'Gönderiliyor …', rw_thanks:'Değerlendirmen için teşekkürler ⭐', actual_time:'Gerçek süre', sign_confirm_time:'Dersi ve gösterilen zamanı onaylıyorum.', both_confirmed:'✓ Zaman eğitmen ve öğrenci tarafından onaylandı', ml_actual:'🕒 Gerçekte sürülen: {begin}–{end}', ml_actual_open:'🕒 Başladı: {begin}',
     tour_t0: 'ginoco’ya hoş geldin', tour_x0: 'Burada direksiyon derslerini kendin alırsın – hızlı ve her yerden. Birkaç kısa adımda nasıl olduğunu göstereyim. İstediğin an „Atla“ya dokunabilirsin.',
     tour_t1: '1. Ders al', tour_x1: 'En hızlısı <strong>🔎 En yakın boş randevu</strong> – bir dokunuşla en yakın boş güne gidersin. Boş saatler <strong>yeşil</strong>. <strong>Rezerve et</strong>’e dokun, süreyi seç ve onayla. Bitti! ✅',
     tour_t2: '2. Randevuların', tour_x2: 'Üstte <strong>„Randevularım“</strong> altında tüm dersleri tarih, saat ve buluşma noktasıyla görürsün. <strong>„Takvime ekle“</strong> ile telefonundaki takvime eklenir.',
@@ -785,7 +785,7 @@ const I18N = {
     rw_words_t:'💬 كلماتك', rw_words_p:'ماذا تودّ أن تقول للآخرين؟ جملة أو جملتان صادقتان تكفيان.', rw_words_ph:'مثل: مدرّب رائع، صبور جداً، يشرح كل شيء بهدوء – أنصح به بشدة!',
     rw_photo_t:'📸 إضافة صورة؟ (اختياري)', rw_photo_p:'الصورة تجعل توصيتك أكثر شخصية. كما تحبّ تماماً.', rw_photo_other:'صورة أخرى', rw_photo_pick:'📷 اختر صورة', rw_photo_none:'بدون صورة', rw_photo_show:'إظهار الصورة مع تقييمي',
     rw_name_t:'🙋 كيف يظهر اسمك؟', rw_name_p:'ظاهر للعموم على الصفحة الرئيسية. أنت تقرّر.', rw_name_full:'الاسم الكامل', rw_name_init:'مختصر', rw_name_anon:'مجهول', rw_anon_student:'أحد الطلاب', rw_name_anon_nophoto:'مع «مجهول» لا تُعرض أي صورة.',
-    rw_sum_t:'✅ هل هذا صحيح؟', rw_sum_nochips:'لا تقييمات فردية – لا مشكلة.', rw_submit:'إرسال التقييم', rw_need_text:'يرجى كتابة جملة أو جملتين.', rw_sending:'يتم الإرسال …', rw_thanks:'شكراً لتقييمك ⭐',
+    rw_sum_t:'✅ هل هذا صحيح؟', rw_sum_nochips:'لا تقييمات فردية – لا مشكلة.', rw_submit:'إرسال التقييم', rw_need_text:'يرجى كتابة جملة أو جملتين.', rw_sending:'يتم الإرسال …', rw_thanks:'شكراً لتقييمك ⭐', actual_time:'الوقت الفعلي', sign_confirm_time:'أؤكّد الدرس والوقت المعروض.', both_confirmed:'✓ أكّد الوقت المدرّب والطالب', ml_actual:'🕒 القيادة الفعلية: {begin}–{end}', ml_actual_open:'🕒 بدأ: {begin}',
     tour_t0: 'مرحباً بك في ginoco', tour_x0: 'هنا تحجز دروس القيادة بنفسك – بسرعة ومن أي مكان. في خطوات قصيرة سأريك كيف. يمكنك النقر على «تخطٍّ» في أي وقت.',
     tour_t1: '1. احجز درساً', tour_x1: 'الأسرع عبر <strong>🔎 أقرب موعد متاح</strong> – نقرة واحدة تأخذك لأقرب يوم متاح. الأوقات المتاحة <strong>خضراء</strong>. انقر <strong>احجز</strong>، اختر المدة وأكّد. تم! ✅',
     tour_t2: '2. مواعيدك', tour_x2: 'في الأعلى ضمن <strong>«مواعيدي»</strong> ترى كل الدروس بالتاريخ والوقت ونقطة اللقاء. عبر <strong>«أضف إلى التقويم»</strong> تُضاف إلى تقويم هاتفك.',
@@ -1396,8 +1396,11 @@ function openTour() {
 window.__openTour = openTour;
 
 // ---------- Was ist neu? (Changelog) ----------
-const CHANGELOG_VER = '3.89';
+const CHANGELOG_VER = '3.90';
 const CHANGELOG = [
+  { v: '3.90', d: '01.09.2026', title: '🕒 Genaue Fahrzeit – von beiden bestätigt', items: [
+    '🕒 <strong>Haargenaue Zeit:</strong> Wenn die Fahrstunde beginnt, wird der exakte Startzeitpunkt festgehalten (Start-Knopf – von Fahrschüler oder Fahrlehrer), beim Abschließen die echte Endzeit.',
+    '✍️ <strong>Beide bestätigen:</strong> Du siehst die tatsächliche Zeit direkt beim Unterschreiben – mit deiner Unterschrift bestätigst du sie. Dein Fahrlehrer bestätigt sie mit seiner. Im Nachweis steht sie schwarz auf weiß, von beiden bestätigt.'] },
   { v: '3.89', d: '31.08.2026', title: '🌍 Mehrsprachig: Deutsch, English, Türkçe, العربية', items: [
     '🌍 <strong>Sprache wählbar:</strong> ginoco spricht jetzt <strong>Deutsch, Englisch, Türkisch und Arabisch</strong> – Arabisch mit korrekter Rechts-nach-links-Darstellung. Umschalten unten im Anmelde-Bildschirm oder unter „🎨 Aussehen → Sprache".',
     '🚀 Der Anmelde-Bereich, die Rechtstexte-Begrüßung und die Formulare sind bereits übersetzt; die weiteren Bereiche folgen Schritt für Schritt.'] },
@@ -2484,6 +2487,15 @@ function addMinHHMM(hhmm, min) {
   return String(Math.floor(t / 60) % 24).padStart(2, '0') + ':' + String(((t % 60) + 60) % 60).padStart(2, '0');
 }
 function lessonTypeLabel(t) { return { ueberland: '🌄 Überland', autobahn: '🛣️ Autobahn', nacht: '🌙 Nachtfahrt' }[t] || 'Normal'; }
+// Tatsächlich gefahrene Zeit aus den Zeitstempeln (Start/Ende), lokal formatiert.
+function actualTime(l) {
+  if (!l || !l.started_at) return null;
+  const s = new Date(l.started_at); if (isNaN(s)) return null;
+  const e = l.ended_at ? new Date(l.ended_at) : null;
+  const hm = (d) => d.toLocaleTimeString(LOCALE, { hour: '2-digit', minute: '2-digit' });
+  const mins = (e && !isNaN(e)) ? Math.max(0, Math.round((e - s) / 60000)) : null;
+  return { begin: hm(s), end: (e && !isNaN(e)) ? hm(e) : null, mins };
+}
 function fmtDT(date, time) {
   const d = parseD(date);
   return d.toLocaleDateString(LOCALE, { day: '2-digit', month: '2-digit', year: 'numeric' }) + (time ? ', ' + time + ' Uhr' : '');
@@ -2514,7 +2526,7 @@ function renderMyLessons(bookings) {
       ? `<button class="sm ml-sign" data-sign="${b.id}">${t('ml_sign_btn')}</button>`
       : (b.signed_at ? `<span class="pill" style="background:var(--good-bg);color:var(--good)">${t('ml_signed')}</span>` : '');
     return `<tr class="${noshow ? 'ml-noshow' : ''} ${b.needs_sign ? 'ml-tosign' : ''}">
-      <td class="ml-when" data-label="${t('ml_dl_when')}">${nachgetragen ? `<span class="ml-drovelbl">${t('ml_driven_on')}</span>` : ''}<strong>${fmtDT(b.date, b.start_time)}</strong>${nachgetragen ? `<span class="ml-entry">${t('ml_entered_on', { date: fmtEntry(b.created_at) })}</span>` : ''}${b.invoice_date ? `<span class="ml-entry ml-inv">${b.invoice_time ? t('ml_on_invoice_time', { date: fmtDT(b.invoice_date), time: b.invoice_time }) : t('ml_on_invoice', { date: fmtDT(b.invoice_date) })}</span>` : ''}${sign ? `<div class="ml-signcell">${sign}</div>` : ''}</td>
+      <td class="ml-when" data-label="${t('ml_dl_when')}">${nachgetragen ? `<span class="ml-drovelbl">${t('ml_driven_on')}</span>` : ''}<strong>${fmtDT(b.date, b.start_time)}</strong>${nachgetragen ? `<span class="ml-entry">${t('ml_entered_on', { date: fmtEntry(b.created_at) })}</span>` : ''}${b.invoice_date ? `<span class="ml-entry ml-inv">${b.invoice_time ? t('ml_on_invoice_time', { date: fmtDT(b.invoice_date), time: b.invoice_time }) : t('ml_on_invoice', { date: fmtDT(b.invoice_date) })}</span>` : ''}${(() => { const a = actualTime(b); return a ? `<span class="ml-entry ml-time">${a.end ? t('ml_actual', { begin: a.begin, end: a.end }) : t('ml_actual_open', { begin: a.begin })}${a.mins != null ? ` · ${a.mins} ${t('min')}` : ''}</span>` : ''; })()}${(b.instr_signature && b.signed_at) ? `<span class="ml-entry ml-both">${t('both_confirmed')}</span>` : ''}${sign ? `<div class="ml-signcell">${sign}</div>` : ''}</td>
       <td data-label="${t('ml_th_end')}">${noshow ? '—' : t('ml_until', { end: addMinHHMM(b.start_time, b.duration_min) })}</td>
       <td data-label="${t('ml_th_dur')}">${noshow ? t('ml_absent') : (b.duration_min + ' ' + t('min'))}</td>
       <td data-label="${t('ml_th_type')}">${noshow ? '' : lessonTypeLabel(b.lesson_type)}</td>
@@ -2576,9 +2588,11 @@ function openSignModal(l) {
   if (!l) return;
   const art = (l.lesson_type && l.lesson_type !== 'normal') ? ' · ' + lessonTypeLabel(l.lesson_type) : '';
   const adk = lessonAdkParse(l.curriculum);
+  const at = actualTime(l);
   modal(`<h3>${t('sign_title')}</h3>
     <p class="hint">${t('sign_hint')}</p>
     <div class="sign-lesson">📅 <strong>${fmtDT(l.date, l.start_time)}</strong> · ${l.duration_min} ${t('min')}${art}${l.late_minutes ? ` · ${t('ml_late', { late: l.late_minutes })}` : ''}${l.feedback ? `<div class="sign-note">„${esc(l.feedback)}"</div>` : ''}</div>
+    ${at ? `<div class="sign-time">🕒 <strong>${t('actual_time')}:</strong> ${at.begin}${at.end ? '–' + at.end : ''}${t('oclock')}${at.mins != null ? ` · ${at.mins} ${t('min')}` : ''}</div>` : ''}
     ${adk.length ? `<div class="sign-adk"><div class="sign-adk-h">${t('sign_practiced')}</div>${adk.map((a) => `<div class="sign-adk-i">${currStatusMeta(a.s).dot} ${esc(a.label)}</div>`).join('')}</div>` : ''}
     ${l.instr_signature ? `<div class="sign-fl">${t('sign_fl_signed')} <img src="${l.instr_signature}" class="sign-fl-img" alt="Unterschrift Fahrlehrer"></div>` : ''}
     <label class="sign-lb">${t('sign_your')} <span class="muted">${t('sign_draw')}</span></label>
@@ -2586,7 +2600,7 @@ function openSignModal(l) {
       <canvas id="sign-pad" class="sign-pad"></canvas>
       <button type="button" class="ghost sm sign-clear" id="sign-clear">${t('clear')}</button>
     </div>
-    <label class="ck-line" style="justify-content:flex-start"><input type="checkbox" id="sign-ok"> ${t('sign_confirm_ck')}</label>
+    <label class="ck-line" style="justify-content:flex-start"><input type="checkbox" id="sign-ok"> ${at ? t('sign_confirm_time') : t('sign_confirm_ck')}</label>
     <div class="actions"><button class="sec" onclick="window.__closeModal()">${t('gate_later')}</button><button id="sign-go" disabled>${t('sign_go')}</button></div>`);
   const canvas = $('#sign-pad');
   const ctx = canvas.getContext('2d');
@@ -2919,7 +2933,7 @@ function printLessonProof(name, done, adk, stats) {
     const artL = { ueberland: 'Überland', autobahn: 'Autobahn', nacht: 'Nachtfahrt' }[b.lesson_type] || 'Normal';
     return `<tr>
       <td class="c">${i + 1}</td>
-      <td>${nachgetragen ? '<span class="entry-lbl">gefahren am</span> ' : ''}${fmtDT(b.date, b.start_time)}${nachgetragen ? `<br><span class="entry">vom Fahrlehrer eingetragen am ${fmtEntry(b.created_at)}</span>` : ''}</td>
+      <td>${nachgetragen ? '<span class="entry-lbl">gefahren am</span> ' : ''}${fmtDT(b.date, b.start_time)}${(() => { const a = actualTime(b); return a ? `<br><span class="entry">tatsächlich ${a.begin}${a.end ? '–' + a.end : ''} Uhr${a.mins != null ? ' · ' + a.mins + ' Min' : ''}</span>` : ''; })()}${nachgetragen ? `<br><span class="entry">vom Fahrlehrer eingetragen am ${fmtEntry(b.created_at)}</span>` : ''}</td>
       <td class="c inv-col">${b.invoice_date ? `<strong>${fmtDT(b.invoice_date)}</strong>${b.invoice_time ? '<br>' + b.invoice_time + ' Uhr' : ''}` : '<span class="wg">wie gefahren</span>'}</td>
       <td class="c">${noshow ? '—' : addMinHHMM(b.start_time, b.duration_min)}</td>
       <td class="c">${noshow ? 'nicht erschienen' : b.duration_min + ' Min'}</td>
@@ -4689,6 +4703,15 @@ function renderInstrDay(el, date, bookings, blocks) {
   el.querySelectorAll('[data-mark]').forEach((b) => b.onclick = () => openMarkModal(b.dataset.mark));
   el.querySelectorAll('[data-cancel]').forEach((b) => b.onclick = () => instrCancel(b.dataset.cancel));
   el.querySelectorAll('[data-delblock]').forEach((b) => b.onclick = () => delBlock(b.dataset.delblock));
+  el.querySelectorAll('[data-startlesson]').forEach((b) => b.onclick = () => instrStartLesson(b.dataset.startlesson));
+}
+// Fahrlehrer stempelt den genauen Startzeitpunkt der Fahrstunde.
+async function instrStartLesson(id) {
+  try {
+    await api('/api/bookings/' + id + '/start', { method: 'POST' });
+    toast('Startzeit festgehalten ▶️', 'ok');
+    drawInstrTab();
+  } catch (e) { toast(e.message, 'err'); }
 }
 
 function instrBookingItem(b) {
@@ -4703,9 +4726,11 @@ function instrBookingItem(b) {
     <div>
       <div class="when">${b.start_time}–${end} <span class="muted" style="font-weight:400">(${b.duration_min} Min)</span></div>
       <div class="meta"><strong>${who}</strong> ${b.student_phone ? '· ' + esc(b.student_phone) + ' ' + contactButtons(b.student_phone, `Hallo ${(b.student_name || '').split(' ')[0]}, wegen deiner Fahrstunde am ${fmtShort(b.date)} um ${b.start_time} Uhr:`) : ''}</div>
-      <div class="meta">${st} ${typeBadge(b.lesson_type)} ${gear} ${b.plate ? '· 🚘 ' + esc(b.plate) : ''} ${b.meet_label ? '· 📍 ' + esc(b.meet_label) : ''} ${b.note ? '· ' + esc(b.note) : ''}</div>
+      <div class="meta">${st} ${typeBadge(b.lesson_type)} ${gear} ${b.plate ? '· 🚘 ' + esc(b.plate) : ''} ${b.meet_label ? '· 📍 ' + esc(b.meet_label) : ''} ${b.note ? '· ' + esc(b.note) : ''}${b.started_at ? ' · 🕒 gestartet ' + new Date(b.started_at).toLocaleTimeString(LOCALE, { hour: '2-digit', minute: '2-digit' }) + ' Uhr' : ''}</div>
     </div>
     <div class="inline">
+      ${b.student_id && b.status !== 'done' && b.confirmed !== 0 && !b.started_at
+        ? `<button class="ghost sm" data-startlesson="${b.id}" title="Genauen Startzeitpunkt festhalten">▶️ Start</button>` : ''}
       ${b.student_id && b.status !== 'done'
         ? `<button class="sm" data-mark="${b.id}">✅ Abschließen &amp; abhaken</button>`
         : `<button class="sec sm" data-mark="${b.id}">Bearbeiten</button>`}
@@ -5025,13 +5050,13 @@ function openInvoiceModal(sid, name) {
       const chip = (label, val, on) => `<button class="inv-chip${on ? ' on' : ''}" data-set="${val}">${label}</button>`;
       return `<div class="inv-row" data-id="${l.id}">
         <div class="inv-pair">
-          <span class="inv-tag drove">🚗 Gefahren</span>
+          <span class="inv-tag drove">🚗 Gefahren am</span>
           <input type="date" class="inv-gd" value="${l.date}" aria-label="Fahrdatum">
           <input type="time" class="inv-gt" value="${padT(l.start_time)}" aria-label="Fahr-Uhrzeit">
           <span class="inv-dur">${l.duration_min} Min${art}</span>
         </div>
         <div class="inv-pair">
-          <span class="inv-tag bill">🧾 Rechnung</span>
+          <span class="inv-tag bill">🧾 Auf der Rechnung zu sehen am:</span>
           <div class="inv-chips">
             ${chip('wie gefahren', '', !cur)}
             ${chip('+1 Tag', p1, cur === p1)}

@@ -568,6 +568,9 @@ th{color:var(--muted);font-weight:600;font-size:.78rem;text-transform:uppercase;
 .ml-when strong{color:var(--ink)}
 .ml-drovelbl{display:block;font-size:.66rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:.06rem}
 .ml-entry{display:block;font-size:.72rem;color:var(--warn);margin-top:.15rem}
+.ml-entry.ml-time{color:var(--muted)}
+.ml-entry.ml-both{color:var(--good);font-weight:600}
+.sign-time{background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:.5rem .75rem;margin:.5rem 0;font-size:.9rem}
 .ml-note{color:var(--muted);max-width:260px}
 .ml-noshow td{opacity:.7}
 /* Am Handy: keine seitliche Tabelle – jede Fahrstunde als Karte, alles untereinander */
