@@ -3,7 +3,8 @@
 import { createServer } from 'node:http';
 import { request as httpsRequest } from 'node:https';
 import { randomBytes, createECDH, hkdfSync, createCipheriv, createPrivateKey, createPublicKey, sign as cryptoSign, verify as cryptoVerify, createHash, createHmac } from 'node:crypto';
-import { readFile } from 'node:fs/promises';
+import { readFile, stat } from 'node:fs/promises';
+import { gzipSync, brotliCompressSync, constants as zlibConstants } from 'node:zlib';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, extname, normalize } from 'node:path';
 import {
@@ -60,8 +61,17 @@ function isHttps(req) {
 
 // ---------- kleine Helfer ----------
 const json = (res, code, data) => {
-  const body = JSON.stringify(data);
-  res.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8' });
+  const raw = Buffer.from(JSON.stringify(data));
+  const headers = { 'Content-Type': 'application/json; charset=utf-8' };
+  let body = raw;
+  const ae = res._ae || '';
+  if (raw.length > 1400) { // erst ab ~1,4 KB lohnt Kompression
+    try {
+      if (/\bbr\b/.test(ae)) { body = brotliCompressSync(raw, { params: { [zlibConstants.BROTLI_PARAM_QUALITY]: 5 } }); headers['Content-Encoding'] = 'br'; headers.Vary = 'Accept-Encoding'; }
+      else if (/\bgzip\b/.test(ae)) { body = gzipSync(raw, { level: 6 }); headers['Content-Encoding'] = 'gzip'; headers.Vary = 'Accept-Encoding'; }
+    } catch { body = raw; delete headers['Content-Encoding']; delete headers.Vary; }
+  }
+  res.writeHead(code, headers);
   res.end(body);
 };
 const ok = (res, data = {}) => json(res, 200, data);
@@ -3450,20 +3460,52 @@ const MIME = {
   '.webmanifest': 'application/manifest+json; charset=utf-8',
   '.png': 'image/png', '.jpg': 'image/jpeg', '.webp': 'image/webp',
 };
+// Text-Dateien werden komprimiert ausgeliefert (spart ~75 % Datenmenge).
+const COMPRESSIBLE = new Set(['.html', '.css', '.js', '.svg', '.json', '.webmanifest']);
+// „Hülle" (immer frisch über den Service Worker) kurz, echte Assets lange cachen.
+const SHELL_FILES = new Set(['.html', '.js', '.css', '.webmanifest']);
+// In-Memory-Cache: Datei + vorkomprimierte Varianten, invalidiert über mtime.
+const _staticCache = new Map();
+async function loadStatic(full) {
+  const st = await stat(full);
+  if (!st.isFile()) throw new Error('not a file');
+  const hit = _staticCache.get(full);
+  if (hit && hit.mtimeMs === st.mtimeMs && hit.size === st.size) return hit;
+  const raw = await readFile(full);
+  const ext = extname(full);
+  const ent = { mtimeMs: st.mtimeMs, size: st.size, mime: MIME[ext] || 'application/octet-stream', raw, gz: null, br: null, ext };
+  if (COMPRESSIBLE.has(ext) && raw.length > 512) {
+    try { ent.gz = gzipSync(raw, { level: 6 }); } catch {}
+    try { ent.br = brotliCompressSync(raw, { params: { [zlibConstants.BROTLI_PARAM_QUALITY]: 6 } }); } catch {}
+  }
+  _staticCache.set(full, ent);
+  return ent;
+}
 async function serveStatic(req, res, url) {
   let path = decodeURIComponent(url.pathname);
   if (path === '/') path = '/index.html';
   const full = normalize(join(PUBLIC, path));
   if (!full.startsWith(PUBLIC)) return bad(res, 'Verboten', 403);
   try {
-    const data = await readFile(full);
-    res.writeHead(200, { 'Content-Type': MIME[extname(full)] || 'application/octet-stream' });
-    res.end(data);
+    const ent = await loadStatic(full);
+    const ae = String(req.headers['accept-encoding'] || '');
+    const headers = {
+      'Content-Type': ent.mime,
+      'Cache-Control': SHELL_FILES.has(ent.ext) ? 'no-cache' : 'public, max-age=86400',
+    };
+    let body = ent.raw;
+    if (COMPRESSIBLE.has(ent.ext)) {
+      headers.Vary = 'Accept-Encoding';
+      if (ent.br && /\bbr\b/.test(ae)) { headers['Content-Encoding'] = 'br'; body = ent.br; }
+      else if (ent.gz && /\bgzip\b/.test(ae)) { headers['Content-Encoding'] = 'gzip'; body = ent.gz; }
+    }
+    res.writeHead(200, headers);
+    res.end(req.method === 'HEAD' ? undefined : body);
   } catch {
     // SPA-Fallback
     try {
       const data = await readFile(join(PUBLIC, 'index.html'));
-      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' });
       res.end(data);
     } catch { bad(res, 'Nicht gefunden', 404); }
   }
@@ -3471,6 +3513,7 @@ async function serveStatic(req, res, url) {
 
 // ---------- Server ----------
 function setSecurityHeaders(req, res) {
+  res._ae = String(req.headers['accept-encoding'] || ''); // für JSON-Kompression gemerkt
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'SAMEORIGIN');          // Schutz gegen Clickjacking
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
