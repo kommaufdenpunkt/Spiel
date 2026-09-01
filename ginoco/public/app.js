@@ -1396,8 +1396,11 @@ function openTour() {
 window.__openTour = openTour;
 
 // ---------- Was ist neu? (Changelog) ----------
-const CHANGELOG_VER = '3.90';
+const CHANGELOG_VER = '3.91';
 const CHANGELOG = [
+  { v: '3.91', d: '01.09.2026', title: '🗺️ Karte lädt zuverlässiger', items: [
+    '🗺️ <strong>Live-Karte:</strong> Die Straßenkarte (Treffpunkt/Abholung) lädt jetzt stabiler – lädt ein Kartenanbieter mal nicht, wird automatisch auf einen Ersatz umgeschaltet, und die Karte bleibt nicht mehr grau.',
+    '🚀 Außerdem: alles lädt spürbar schneller (die App wird jetzt komprimiert ausgeliefert – rund 70 % weniger Datenmenge).'] },
   { v: '3.90', d: '01.09.2026', title: '🕒 Genaue Fahrzeit – von beiden bestätigt', items: [
     '🕒 <strong>Haargenaue Zeit:</strong> Wenn die Fahrstunde beginnt, wird der exakte Startzeitpunkt festgehalten (Start-Knopf – von Fahrschüler oder Fahrlehrer), beim Abschließen die echte Endzeit.',
     '✍️ <strong>Beide bestätigen:</strong> Du siehst die tatsächliche Zeit direkt beim Unterschreiben – mit deiner Unterschrift bestätigst du sie. Dein Fahrlehrer bestätigt sie mit seiner. Im Nachweis steht sie schwarz auf weiß, von beiden bestätigt.'] },
@@ -3377,17 +3380,43 @@ function _fitLive(m) {
   else m.map.setView(m.pts[0], 15);
   m.map.once('moveend', () => { m._prog = false; });
 }
+// Karten-Kacheln: zuerst OpenStreetMap (ohne {s}-Subdomains – zuverlässiger),
+// bei Fehlern automatisch Ersatz-Anbieter (CARTO). Beide brauchen keinen Schlüssel.
+const TILE_SOURCES = [
+  { url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png', opt: { maxZoom: 19, attribution: '© OpenStreetMap' } },
+  { url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', opt: { maxZoom: 20, subdomains: 'abcd', attribution: '© OpenStreetMap, © CARTO' } },
+];
 async function initLiveMap(id) {
   await ensureLeaflet();
   const el = document.getElementById(id);
   if (!el || !window.L) return null;
   destroyLiveMap(id);
   const map = L.map(el, { zoomControl: true, attributionControl: true, scrollWheelZoom: false });
-  const tl = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-    { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(map);
-  const m = { map, tl, car: null, meet: null, route: null, routeKey: '', fitted: false,
+  const m = { map, tl: null, car: null, meet: null, route: null, routeKey: '', fitted: false,
     userMoved: false, _prog: false, pts: null, routeInfo: null, onRoute: null };
   _liveMaps[id] = m;
+  const dropLoader = () => { const l = el.querySelector('.lm-loading'); if (l) l.remove(); };
+  // Kacheln laden – lädt der erste Anbieter nicht, automatisch auf den nächsten wechseln.
+  let srcIdx = 0;
+  const addTiles = () => {
+    const src = TILE_SOURCES[srcIdx];
+    const tl = L.tileLayer(src.url, src.opt).addTo(map);
+    let okT = 0, errT = 0;
+    tl.on('tileload', () => { okT++; dropLoader(); });
+    tl.on('tileerror', () => {
+      errT++;
+      if (okT === 0 && errT >= 3 && srcIdx < TILE_SOURCES.length - 1) {
+        srcIdx++; try { map.removeLayer(tl); } catch {}
+        m.tl = addTiles(); // auf Ersatz-Anbieter umschalten
+      } else if (okT === 0 && errT >= 4 && !m._hinted) {
+        m._hinted = true; dropLoader();
+        const h = L.DomUtil.create('div', 'lm-hint', el);
+        h.textContent = '🛰️ Karte lädt gerade nicht – Internetverbindung?';
+      }
+    });
+    return tl;
+  };
+  m.tl = addTiles();
   // Schaut der Nutzer selbst herum, wird die Ansicht nicht mehr automatisch verschoben.
   map.on('dragstart', () => { m.userMoved = true; });
   map.on('zoomstart', () => { if (!m._prog) m.userMoved = true; });
@@ -3400,15 +3429,10 @@ async function initLiveMap(id) {
     return b;
   } });
   map.addControl(new Rc());
-  const dropLoader = () => { const l = el.querySelector('.lm-loading'); if (l) l.remove(); };
-  // Falls die Kacheln nicht laden (kein Internet): kurzer Hinweis.
-  let okT = 0, errT = 0;
-  tl.on('tileload', () => { okT++; dropLoader(); });
-  tl.on('tileerror', () => { errT++; if (okT === 0 && errT >= 3 && !m._hinted) {
-    m._hinted = true; dropLoader(); const h = L.DomUtil.create('div', 'lm-hint', el);
-    h.textContent = '🛰️ Karte lädt gerade nicht – Internetverbindung?'; } });
-  setTimeout(dropLoader, 4000); // Notausstieg, damit der Reifen nicht ewig dreht
-  setTimeout(() => { try { map.invalidateSize(); } catch {} }, 60);
+  setTimeout(dropLoader, 5000); // Notausstieg, damit der Reifen nicht ewig dreht
+  // Größe mehrfach neu vermessen – falls der Container beim Aufbau noch nicht
+  // (voll) sichtbar war, bleibt die Karte sonst grau.
+  [60, 300, 800, 1600].forEach((ms) => setTimeout(() => { try { map.invalidateSize(); if (m.pts && !m.userMoved) _fitLive(m); } catch {} }, ms));
   return m;
 }
 function destroyLiveMap(id) {
