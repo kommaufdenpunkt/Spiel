@@ -597,6 +597,13 @@ th{color:var(--muted);font-weight:600;font-size:.78rem;text-transform:uppercase;
 .pickup-box .pb-line{font-size:.95rem}
 .pickup-box .pb-line strong{color:var(--ink)}
 .pickup-box .pk-locked{color:var(--ink);opacity:.85}
+/* Cockpit-Navigation: Abhol-Status je Fahrschüler */
+.pu-badge{display:inline-block;margin-top:.3rem;font-size:.82rem;font-weight:600;
+  padding:.15rem .5rem;border-radius:999px;border:1px solid var(--line);background:var(--card2);color:var(--ink)}
+.pu-badge .muted{font-weight:400}
+.pu-badge.pu-fix{border-color:rgba(44,107,70,.5);background:var(--good-bg);color:var(--good)}
+.pu-badge.pu-live{border-color:rgba(230,147,77,.5);background:rgba(230,147,77,.14)}
+.pu-badge.pu-flex{border-color:rgba(230,147,77,.45);background:rgba(230,147,77,.1)}
 /* Erst-Login: Abhol-Modus wählen */
 .pk-modes{display:flex;flex-direction:column;gap:.5rem;margin:.6rem 0 .2rem}
 .pk-mode{display:flex;gap:.6rem;align-items:flex-start;border:1px solid var(--line);border-radius:12px;

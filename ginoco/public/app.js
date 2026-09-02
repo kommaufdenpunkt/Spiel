@@ -3614,11 +3614,28 @@ window.__openInstrRoute = openInstrRoute;
 const navState = { bookings: [], selId: null, myPos: null, def: null, lastMin: 0 };
 let navWatchId = null;
 function stopNavWatch() { if (navWatchId != null) { try { navigator.geolocation.clearWatch(navWatchId); } catch {} navWatchId = null; } }
-// Ziel für eine Fahrstunde: hinterlegter Treffpunkt, sonst die Fahrschule (Standard).
+// Ziel für eine Fahrstunde: 1. fixierter Treffpunkt der Stunde  2. fester Abholort
+// des Schülers  3. die Fahrschule (Standard). Deckt sich mit der Schüler-Ansicht.
 function navDest(b) {
   if (b && b.meet_lat != null && b.meet_lng != null) return { pos: [Number(b.meet_lat), Number(b.meet_lng)], label: b.meet_label || 'Treffpunkt' };
+  if (b && b.student_home_lat != null && b.student_home_lng != null) return { pos: [Number(b.student_home_lat), Number(b.student_home_lng)], label: b.student_home_label || 'Fester Abholort', isHome: true };
   if (navState.def) return { pos: [navState.def.lat, navState.def.lng], label: navState.def.label, isDefault: true };
   return null;
+}
+// Abhol-Status eines Schülers für die Fahrlehrer-Liste: fest / flexibel / schon fixiert.
+function pickupInfo(b) {
+  const hasMeet = b.meet_label != null || (b.meet_lat != null && b.meet_lng != null);
+  const liveOn = b.student_live_active && b.student_live_at &&
+    (Date.now() - new Date(b.student_live_at).getTime() < 3 * 60 * 1000);
+  const mode = b.pickup_mode || (b.student_home_label ? 'fixed' : null);
+  if (hasMeet) return { cls: 'pu-fix', txt: '🔒 Fixiert: ' + esc(b.meet_label || 'Live-Punkt') };
+  if (liveOn) return { cls: 'pu-live', txt: '📡 Teilt gerade Live-Standort' };
+  if (mode === 'flex') {
+    const fb = b.student_home_label ? esc(b.student_home_label) : (navState.def ? esc((navState.def.label || '').replace(/^🏫\s*/, '')) : 'Fahrschule');
+    return { cls: 'pu-flex', txt: '📡 Flexibel · noch nicht fixiert', sub: 'sonst: ' + fb };
+  }
+  if (mode === 'fixed' && b.student_home_label) return { cls: 'pu-home', txt: '🏠 Fest: ' + esc(b.student_home_label) };
+  return { cls: 'pu-def', txt: '🏫 Fahrschule (Standard)' };
 }
 async function tabNavigation() {
   const box = $('#itab');
@@ -3671,10 +3688,14 @@ function renderNavList() {
   el.innerHTML = `<div class="blist">${navState.bookings.map((b) => {
     const on = String(b.id) === String(navState.selId);
     const dst = navDest(b);
-    const where = dst ? (dst.isDefault ? esc(dst.label) : '📍 ' + esc(dst.label)) : '<span class="muted">kein Ziel hinterlegt</span>';
+    const where = dst
+      ? (dst.isDefault ? '🏫 ' + esc((dst.label || '').replace(/^🏫\s*/, '')) : (dst.isHome ? '🏠 ' : '📍 ') + esc(dst.label))
+      : '<span class="muted">kein Ziel hinterlegt</span>';
+    const pu = pickupInfo(b);
+    const puLine = `<div class="pu-badge ${pu.cls}">${pu.txt}${pu.sub ? ` <span class="muted">(${pu.sub})</span>` : ''}</div>`;
     return `<div class="bitem${on ? ' warm' : ''}">
       <div><div class="when">${b.start_time} · <strong>${esc(b.student_name || 'Fahrschüler')}</strong></div>
-        <div class="meta">${where}</div></div>
+        <div class="meta">🎯 ${where}</div>${puLine}</div>
       <button class="sec sm" data-navpick="${b.id}">${on ? '✓ gewählt' : '🧭 Route'}</button>
     </div>`;
   }).join('')}</div>`;

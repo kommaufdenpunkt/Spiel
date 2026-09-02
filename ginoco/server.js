@@ -1662,7 +1662,10 @@ async function handleApi(req, res, url) {
     const from = url.searchParams.get('from') || todayStr();
     const to = url.searchParams.get('to') || addDays(from, 6);
     const rows = db.prepare(
-      `SELECT b.*, s.name AS student_name, s.phone AS student_phone
+      `SELECT b.*, s.name AS student_name, s.phone AS student_phone,
+              s.home_label AS student_home_label, s.home_lat AS student_home_lat, s.home_lng AS student_home_lng,
+              s.pickup_mode AS pickup_mode, s.live_lat AS student_live_lat, s.live_lng AS student_live_lng,
+              s.live_at AS student_live_at, s.live_active AS student_live_active
        FROM bookings b LEFT JOIN students s ON s.id = b.student_id
        WHERE b.date BETWEEN ? AND ? AND b.status != 'cancelled'
        ORDER BY b.date, b.start_time`
