@@ -1780,8 +1780,19 @@ async function handleApi(req, res, url) {
     const b = await readBody(req);
     const lat = Number(b.lat), lng = Number(b.lng);
     if (!isFinite(lat) || !isFinite(lng)) return bad(res, 'Ungueltige Koordinaten');
+    const prev = db.prepare('SELECT active, updated_at FROM live_location WHERE id=1').get();
+    const wasLive = prev && prev.active && prev.updated_at && (Date.now() - new Date(prev.updated_at).getTime() < 2 * 60 * 1000);
     db.prepare('UPDATE live_location SET lat=?, lng=?, updated_at=?, active=1 WHERE id=1')
       .run(lat, lng, new Date().toISOString());
+    // Standort-Teilen gerade gestartet -> wartende Schüler EINMAL benachrichtigen.
+    if (!wasLive) {
+      const winMin = Math.max(Number(getSettingRaw('live_lead_min')) || 0, 45);
+      const waiting = db.prepare("SELECT id, student_id, start_time FROM bookings WHERE date=? AND status='booked' AND student_id IS NOT NULL").all(todayStr())
+        .filter((bk) => { const h = hoursUntil(todayStr(), bk.start_time); return h > -0.25 && h * 60 <= winMin; });
+      for (const bk of waiting) notify(bk.student_id, 'reminder',
+        '📍 Dein Fahrlehrer teilt jetzt seinen Live-Standort – du kannst ihn auf der Karte verfolgen.',
+        todayStr(), bk.id, { pushTitle: '📍 Dein Fahrlehrer teilt Live-Standort', url: '/?live=1' });
+    }
     return ok(res);
   }
   if (p === '/api/instructor/location/stop' && method === 'POST') {
@@ -1797,6 +1808,26 @@ async function handleApi(req, res, url) {
     if (!mins) { db.prepare('UPDATE live_location SET eta_min=NULL, eta_at=NULL WHERE id=1').run(); return ok(res, { cleared: true }); }
     db.prepare('UPDATE live_location SET eta_min=?, eta_at=? WHERE id=1').run(mins, new Date().toISOString());
     return ok(res, { minutes: mins });
+  }
+  // „Ich bin unterwegs zu dir" – Standort-Teilen aktivieren + Push an genau diesen Schueler.
+  if (p === '/api/instructor/on-way' && method === 'POST') {
+    if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
+    const b = await readBody(req);
+    const bk = db.prepare('SELECT id,student_id,date,start_time FROM bookings WHERE id=?').get(Number(b.booking_id));
+    if (!bk || !bk.student_id) return bad(res, 'Fahrstunde nicht gefunden', 404);
+    const mins = Math.max(0, Math.min(180, Math.round(Number(b.minutes) || 0)));
+    const text = (typeof b.text === 'string' ? b.text : '').replace(/\s+/g, ' ').trim().slice(0, 200);
+    // Nur die Ankunftszeit aktualisieren (falls angegeben). Das Standort-Teilen
+    // steuert der Fahrlehrer separat über den „Standort teilen"-Schalter.
+    if (mins) db.prepare('UPDATE live_location SET eta_min=?, eta_at=? WHERE id=1').run(mins, new Date().toISOString());
+    const st = db.prepare('SELECT name FROM students WHERE id=?').get(bk.student_id);
+    const msg = text
+      ? text
+      : (mins
+        ? `🚗 Dein Fahrlehrer ist unterwegs zu dir – ca. ${mins} Min. Du kannst ihn live auf der Karte verfolgen.`
+        : '🚗 Dein Fahrlehrer ist unterwegs zu dir. Du kannst ihn live auf der Karte verfolgen.');
+    notify(bk.student_id, 'reminder', msg, bk.date, bk.id, { pushTitle: '🚗 Fahrlehrer unterwegs', url: '/?live=1' });
+    return ok(res, { minutes: mins, name: st?.name || null });
   }
   // Fahrlehrer sieht, ob eine Stunde ansteht (fuer den Start-Hinweis)
   if (p === '/api/instructor/live-status' && method === 'GET') {

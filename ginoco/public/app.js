@@ -1396,8 +1396,11 @@ function openTour() {
 window.__openTour = openTour;
 
 // ---------- Was ist neu? (Changelog) ----------
-const CHANGELOG_VER = '3.91';
+const CHANGELOG_VER = '3.92';
 const CHANGELOG = [
+  { v: '3.92', d: '02.09.2026', title: '🚗 Fahrlehrer live verfolgen', items: [
+    '📍 <strong>„Dein Fahrlehrer teilt Live-Standort":</strong> Sobald dein Fahrlehrer sich auf den Weg macht, bekommst du eine Push – und kannst ihn auf der Karte <strong>live kommen sehen</strong>, mit Fahrzeit.',
+    '🚦 <strong>Kurze Ansagen:</strong> Dein Fahrlehrer kann dir unterwegs schnell Bescheid geben („gleich da", „etwas Stau", „Berufsverkehr") – ganz ohne Anrufen.'] },
   { v: '3.91', d: '01.09.2026', title: '🗺️ Karte lädt zuverlässiger', items: [
     '🗺️ <strong>Live-Karte:</strong> Die Straßenkarte (Treffpunkt/Abholung) lädt jetzt stabiler – lädt ein Kartenanbieter mal nicht, wird automatisch auf einen Ersatz umgeschaltet, und die Karte bleibt nicht mehr grau.',
     '🚀 Außerdem: alles lädt spürbar schneller (die App wird jetzt komprimiert ausgeliefert – rund 70 % weniger Datenmenge).'] },
@@ -1893,7 +1896,7 @@ function wireLogout() {
 // Einträge [key, icon, label]; ['__group', Titel] ist eine Gruppen-Überschrift.
 const INSTR_NAV = [
   ['__group', 'Übersicht'],
-  ['heute', '📊', 'Heute & Ziele'], ['kalender', '📅', 'Kalender'],
+  ['heute', '📊', 'Heute & Ziele'], ['kalender', '📅', 'Kalender'], ['navigation', '🧭', 'Navigation'],
   ['__group', 'Fahrschüler'],
   ['schueler', '🧑‍🎓', 'Fahrschüler'], ['nachrichten', '✉️', 'Nachrichten'], ['codes', '🔑', 'Zugangscodes'],
   ['__group', 'Planung'],
@@ -2456,7 +2459,22 @@ async function syncStudent() {
     state.calMonth = firstOfMonth(state.date);
     renderBookingCalendar();
     maybeOpenPostfach(mine.bookings); // Push „Etwas liegt im Postfach" → direkt hin
+    maybeScrollLive(); // Push „Fahrlehrer unterwegs/teilt Standort" (/?live=1) → zur Live-Karte
   } catch (e) { toast(e.message, 'err'); }
+}
+
+// Nach Tippen auf die „Fahrlehrer unterwegs/teilt Standort"-Push (/?live=1) zur Live-Karte scrollen.
+function maybeScrollLive() {
+  try {
+    const u = new URL(location.href);
+    if (u.searchParams.get('live') !== '1') return;
+    u.searchParams.delete('live');
+    history.replaceState(null, '', u.pathname + u.search + u.hash);
+  } catch { return; }
+  if (maybeScrollLive._done) return;
+  maybeScrollLive._done = true;
+  const c = $('#live-card');
+  if (c && !c.classList.contains('hidden')) setTimeout(() => c.scrollIntoView({ behavior: 'smooth', block: 'start' }), 400);
 }
 
 // Nach Tippen auf die Push-Nachricht (/?postfach=1) direkt ins Postfach führen:
@@ -3493,6 +3511,152 @@ async function renderCarMap(id, carPos, meetPos, label, onRoute) {
   } catch {}
 }
 
+// Fahrlehrer-Navigation: Karte „du -> Fahrschüler" mit Route, Entfernung & Fahrzeit,
+// Knopf für echte Turn-by-turn-Navigation (Google/Apple Maps) und Standort-Teilen.
+async function openInstrRoute(b) {
+  const dest = (b.meet_lat != null && b.meet_lng != null) ? [Number(b.meet_lat), Number(b.meet_lng)] : null;
+  const who = b.student_name || 'Fahrschüler';
+  modal(`<h3>🧭 Zum Fahrschüler</h3>
+    <div class="hint" style="margin:0 0 .6rem"><strong>${esc(who)}</strong> · ${b.start_time} Uhr${b.meet_label ? ' · 📍 ' + esc(b.meet_label) : ''}</div>
+    ${dest ? `<div id="instr-route-map" class="live-map"><div class="lm-loading"><span class="tire">🛞</span><span>Karte lädt …</span></div></div>
+    <div class="hint" id="ir-eta" style="margin:.6rem 0 0">📍 Route wird berechnet …</div>
+    <div class="inline" style="margin-top:.7rem;flex-wrap:wrap;gap:.5rem">
+      <a class="btnlink" id="ir-nav" href="https://www.google.com/maps/dir/?api=1&destination=${dest[0]},${dest[1]}&travelmode=driving" target="_blank" rel="noopener">🧭 Navigation starten</a>
+      <button class="sec sm" id="ir-share"></button>
+      <button class="ghost sm" onclick="window.__closeModal()">Schließen</button>
+    </div>`
+    : `<div class="warnbox">Für diese Fahrstunde ist noch kein Treffpunkt mit Koordinaten hinterlegt. Trag ihn beim Bearbeiten/Abschließen unter „Treffpunkt" ein (📍 aktuellen Standort übernehmen) – dann gibt's hier Karte, Route und Fahrzeit.</div>
+    <div class="actions"><button onclick="window.__closeModal()">Schließen</button></div>`}`);
+  if (!dest) return;
+  const setShareBtn = () => { const s = $('#ir-share'); if (s) s.textContent = state.liveSharing ? '📍 Standort-Teilen beenden' : '📍 Standort teilen'; };
+  setShareBtn();
+  $('#ir-share').onclick = () => { if (state.liveSharing) stopLiveShare(); else startLiveShare(); setTimeout(setShareBtn, 120); };
+  try {
+    const c = await getPosOnce();
+    await renderCarMap('instr-route-map', [c.latitude, c.longitude], dest, esc(who), (info) => {
+      const el = $('#ir-eta'); if (!el) return;
+      el.innerHTML = info ? `🚗 <strong>${info.km.toFixed(1)} km</strong> · ca. <strong>${info.min} Min</strong> Fahrt` : '📍 Luftlinie (Route lädt gerade nicht)';
+    });
+  } catch (e) { const el = $('#ir-eta'); if (el) el.textContent = 'Standort nicht verfügbar: ' + e.message; }
+}
+window.__openInstrRoute = openInstrRoute;
+
+// ---- Cockpit-Seite: Navigation (Karte du -> Fahrschüler, Route, Live, Push) ----
+const navState = { bookings: [], selId: null, myPos: null, def: null, lastMin: 0 };
+let navWatchId = null;
+function stopNavWatch() { if (navWatchId != null) { try { navigator.geolocation.clearWatch(navWatchId); } catch {} navWatchId = null; } }
+// Ziel für eine Fahrstunde: hinterlegter Treffpunkt, sonst die Fahrschule (Standard).
+function navDest(b) {
+  if (b && b.meet_lat != null && b.meet_lng != null) return { pos: [Number(b.meet_lat), Number(b.meet_lng)], label: b.meet_label || 'Treffpunkt' };
+  if (navState.def) return { pos: [navState.def.lat, navState.def.lng], label: navState.def.label, isDefault: true };
+  return null;
+}
+async function tabNavigation() {
+  const box = $('#itab');
+  box.innerHTML = `<div class="card">
+    <h2>🧭 Navigation</h2>
+    <p class="hint">Wo dein nächster Fahrschüler steht und wie du hinfährst – mit Fahrzeit. Teile deinen Standort, dann sieht der Fahrschüler dich live kommen.</p>
+    <div class="inline" style="gap:.5rem;flex-wrap:wrap;margin-bottom:.7rem">
+      <button class="sm" id="nav-share"></button>
+      <button class="sec sm" id="nav-locate">🔄 Standort aktualisieren</button>
+    </div>
+    <div id="nav-map" class="live-map"><div class="lm-loading"><span class="tire">🛞</span><span>Karte lädt …</span></div></div>
+    <div class="hint" id="nav-eta" style="margin:.7rem 0 .5rem"></div>
+    <a class="btnlink hidden" id="nav-go" target="_blank" rel="noopener">🧭 Navigation starten</a>
+    <div class="nav-say hidden" id="nav-say" style="margin-top:.7rem">
+      <div class="hint" style="margin:0 0 .35rem">Kurze Ansage an den Fahrschüler <span class="muted">(optional – deine Position sieht er per GPS ohnehin live):</span></div>
+      <div class="inline" style="gap:.4rem;flex-wrap:wrap">
+        <button class="sec sm" data-say="eta">🔔 Unterwegs</button>
+        <button class="sec sm" data-say="🚗 Dein Fahrlehrer ist gleich da!">🚗 Gleich da</button>
+        <button class="sec sm" data-say="🚧 Hier staut es sich gerade ein bisschen – ich bin unterwegs.">🚧 Etwas Stau</button>
+        <button class="sec sm" data-say="🕗 Berufsverkehr – kann ein paar Minuten später werden.">🕗 Berufsverkehr</button>
+      </div>
+    </div>
+    <h3 style="margin-top:1.2rem">Heutige Fahrstunden</h3>
+    <div id="nav-list"></div>
+  </div>`;
+  const setShareBtn = () => { const s = $('#nav-share'); if (s) { s.textContent = state.liveSharing ? '📍 Standort-Teilen beenden' : '📍 Standort teilen'; s.className = 'sm' + (state.liveSharing ? ' danger' : ''); } };
+  setShareBtn();
+  $('#nav-share').onclick = () => { if (state.liveSharing) stopLiveShare(); else startLiveShare(); setTimeout(setShareBtn, 150); };
+  $('#nav-locate').onclick = () => navLocateAndRoute();
+  box.querySelectorAll('[data-say]').forEach((btn) => btn.onclick = () => navSay(btn.dataset.say));
+  // Standard-Treffpunkt (Fahrschule) als Ziel, falls für die Stunde keiner hinterlegt ist.
+  // Für den Fahrlehrer liefert /api/settings (in state.settings) bereits die vollen Werte.
+  let s = state.settings || {};
+  if (s.meet_default_lat == null) { try { s = (await api('/api/settings')).settings || s; state.settings = s; } catch {} }
+  navState.def = (s.meet_default_lat != null && s.meet_default_lat !== '' && s.meet_default_lng != null && s.meet_default_lng !== '')
+    ? { lat: Number(s.meet_default_lat), lng: Number(s.meet_default_lng), label: '🏫 ' + (s.meet_default_label || s.school_label || 'Fahrschule') }
+    : null;
+  try {
+    const ov = await api('/api/instructor/overview?from=' + todayStr() + '&to=' + todayStr());
+    navState.bookings = (ov.bookings || []).filter((b) => b.student_id && b.status !== 'done').sort((a, z) => a.start_time.localeCompare(z.start_time));
+  } catch { navState.bookings = []; }
+  const first = navState.bookings[0];
+  navState.selId = first ? String(first.id) : null;
+  renderNavList();
+  navLocateAndRoute();
+}
+function renderNavList() {
+  const el = $('#nav-list'); if (!el) return;
+  if (!navState.bookings.length) { el.innerHTML = '<p class="hint">Heute keine anstehenden Fahrstunden.</p>'; return; }
+  el.innerHTML = `<div class="blist">${navState.bookings.map((b) => {
+    const on = String(b.id) === String(navState.selId);
+    const dst = navDest(b);
+    const where = dst ? (dst.isDefault ? esc(dst.label) : '📍 ' + esc(dst.label)) : '<span class="muted">kein Ziel hinterlegt</span>';
+    return `<div class="bitem${on ? ' warm' : ''}">
+      <div><div class="when">${b.start_time} · <strong>${esc(b.student_name || 'Fahrschüler')}</strong></div>
+        <div class="meta">${where}</div></div>
+      <button class="sec sm" data-navpick="${b.id}">${on ? '✓ gewählt' : '🧭 Route'}</button>
+    </div>`;
+  }).join('')}</div>`;
+  el.querySelectorAll('[data-navpick]').forEach((btn) => btn.onclick = () => { navState.selId = String(btn.dataset.navpick); renderNavList(); navRenderMap(); });
+}
+async function navLocateAndRoute() {
+  try { const c = await getPosOnce(); navState.myPos = [c.latitude, c.longitude]; }
+  catch (e) { const el = $('#nav-eta'); if (el) el.textContent = 'Standort nicht verfügbar: ' + e.message; }
+  await navRenderMap();
+  // Live verfolgen: Karte bewegt sich mit, während du fährst.
+  stopNavWatch();
+  if (navigator.geolocation) navWatchId = navigator.geolocation.watchPosition(
+    (pos) => { navState.myPos = [pos.coords.latitude, pos.coords.longitude]; navRenderMap(); },
+    () => {}, { enableHighAccuracy: true, maximumAge: 8000, timeout: 20000 });
+}
+async function navRenderMap() {
+  const b = navState.bookings.find((x) => String(x.id) === String(navState.selId));
+  const dst = navDest(b);
+  const go = $('#nav-go'), nb = $('#nav-say'), etaEl = $('#nav-eta');
+  if (go) { if (dst) { go.href = `https://www.google.com/maps/dir/?api=1&destination=${dst.pos[0]},${dst.pos[1]}&travelmode=driving`; go.classList.remove('hidden'); } else go.classList.add('hidden'); }
+  if (nb) nb.classList.toggle('hidden', !b);
+  if (navState.myPos && dst) {
+    await renderCarMap('nav-map', navState.myPos, dst.pos, esc(dst.label), (info) => {
+      navState.lastMin = info ? info.min : 0;
+      if (etaEl) etaEl.innerHTML = info
+        ? `🚗 Zu <strong>${esc(b ? (b.student_name || 'Fahrschüler') : dst.label)}</strong> (${esc(dst.label)}): <strong>${info.km.toFixed(1)} km</strong> · ca. <strong>${info.min} Min</strong> Fahrt`
+        : '📍 Luftlinie (Route lädt gerade nicht)';
+    });
+  } else if (dst) {
+    await renderCarMap('nav-map', dst.pos, null, esc(dst.label), null);
+    if (etaEl) etaEl.textContent = 'Ziel angezeigt – dein Standort ist noch nicht verfügbar.';
+  } else if (navState.myPos) {
+    await renderCarMap('nav-map', navState.myPos, null, '', null);
+    if (etaEl) etaEl.textContent = b ? 'Für diese Fahrstunde ist kein Ziel hinterlegt.' : 'Dein Standort.';
+  }
+}
+// Kurze Ansage an den gewählten Fahrschüler. 'eta' = „unterwegs, ~X Min" (aus der Route).
+async function navSay(kind) {
+  const b = navState.bookings.find((x) => String(x.id) === String(navState.selId));
+  if (!b) return;
+  const useEta = kind === 'eta';
+  const mins = useEta ? (navState.lastMin || 0) : 0;
+  const msg = useEta
+    ? (mins ? `🚗 Dein Fahrlehrer ist unterwegs zu dir – ca. ${mins} Min.` : '🚗 Dein Fahrlehrer ist unterwegs zu dir.')
+    : kind;
+  try {
+    const r = await api('/api/instructor/on-way', { method: 'POST', body: { booking_id: b.id, text: msg, minutes: mins } });
+    toast(`${(r.name || 'Fahrschüler')} benachrichtigt ✓`, 'ok');
+  } catch (e) { toast(e.message, 'err'); }
+}
+
 async function refreshStudentLive() {
   const card = $('#live-card'); if (!card) return;
   let d;
@@ -4013,8 +4177,10 @@ function drawInstrTab() {
   if (_it) { _it.classList.remove('tab-in'); requestAnimationFrame(() => _it.classList.add('tab-in')); }
   const t = state.instrTab;
   if (t !== 'nachrichten') openConvo = null;
+  if (t !== 'navigation') stopNavWatch(); // GPS-Verfolgung nur auf der Navi-Seite
   if (t === 'heute') return tabHeute();
   if (t === 'kalender') return tabKalender();
+  if (t === 'navigation') return tabNavigation();
   if (t === 'codes') return tabCodes();
   if (t === 'schueler') return tabSchueler();
   if (t === 'planer') return tabPlaner();
@@ -4728,6 +4894,7 @@ function renderInstrDay(el, date, bookings, blocks) {
   el.querySelectorAll('[data-cancel]').forEach((b) => b.onclick = () => instrCancel(b.dataset.cancel));
   el.querySelectorAll('[data-delblock]').forEach((b) => b.onclick = () => delBlock(b.dataset.delblock));
   el.querySelectorAll('[data-startlesson]').forEach((b) => b.onclick = () => instrStartLesson(b.dataset.startlesson));
+  el.querySelectorAll('[data-route]').forEach((b) => b.onclick = () => { const bk = items.find((x) => x.kind === 'booking' && String(x.id) === b.dataset.route); if (bk) openInstrRoute(bk); });
 }
 // Fahrlehrer stempelt den genauen Startzeitpunkt der Fahrstunde.
 async function instrStartLesson(id) {
@@ -4753,6 +4920,8 @@ function instrBookingItem(b) {
       <div class="meta">${st} ${typeBadge(b.lesson_type)} ${gear} ${b.plate ? '· 🚘 ' + esc(b.plate) : ''} ${b.meet_label ? '· 📍 ' + esc(b.meet_label) : ''} ${b.note ? '· ' + esc(b.note) : ''}${b.started_at ? ' · 🕒 gestartet ' + new Date(b.started_at).toLocaleTimeString(LOCALE, { hour: '2-digit', minute: '2-digit' }) + ' Uhr' : ''}</div>
     </div>
     <div class="inline">
+      ${b.student_id && b.status !== 'done' && b.meet_lat != null
+        ? `<button class="ghost sm" data-route="${b.id}" title="Route & Navigation zum Fahrschüler">🧭</button>` : ''}
       ${b.student_id && b.status !== 'done' && b.confirmed !== 0 && !b.started_at
         ? `<button class="ghost sm" data-startlesson="${b.id}" title="Genauen Startzeitpunkt festhalten">▶️ Start</button>` : ''}
       ${b.student_id && b.status !== 'done'
