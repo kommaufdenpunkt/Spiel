@@ -1405,12 +1405,12 @@ window.__openTour = openTour;
 // ---------- Was ist neu? (Changelog) ----------
 const CHANGELOG_VER = '3.95';
 const CHANGELOG = [
-  { v: '3.95', d: '02.09.2026', title: '📧 Wichtige Infos jetzt auch per E-Mail', items: [
-    '📧 <strong>E-Mail-Benachrichtigungen:</strong> Terminbestätigungen, die Erinnerung am Vortag und freie Termine zum Übernehmen kommen jetzt – wenn du magst – zusätzlich per E-Mail. So verpasst du nichts, auch ohne Push.',
-    '🔕 <strong>Ganz deine Wahl:</strong> Im Profil unter „📧 E-Mail-Benachrichtigungen" kannst du das jederzeit an- oder abschalten.'] },
-  { v: '3.94', d: '02.09.2026', title: '✉️ Passwort per E-Mail & direkte Hilfe', items: [
-    '🔑 <strong>Passwort vergessen? Jetzt selbst zurücksetzen:</strong> Wenn bei dir eine E-Mail hinterlegt ist, bekommst du auf „Passwort vergessen" sofort einen Link per Mail und vergibst dir in 30 Sekunden ein neues Passwort – ganz ohne Warten.',
-    '✉️ <strong>Hilfe & Support direkt aus der App:</strong> Unten über „✉️ Hilfe" erreichst du uns mit einer kurzen Nachricht – wir melden uns zurück.'] },
+  { v: '3.95', d: '02.09.2026', title: '📧 Ginoco schreibt dir jetzt – E-Mail ist da!', items: [
+    '<strong>Ab sofort hältst du auch per E-Mail Kontakt mit deiner Fahrschule.</strong> Alles kommt von einer festen Adresse (<strong>support@ginoco.de</strong>) und in hübschem Ginoco-Look – hier die Neuerungen auf einen Blick:',
+    '🔑 <strong>Passwort vergessen? Du hilfst dir selbst.</strong> Ist bei dir eine E-Mail hinterlegt, bekommst du auf „Passwort vergessen" sofort einen sicheren Link zugeschickt und vergibst dir in 30 Sekunden ein neues Passwort – kein Warten, kein Nachfragen mehr.',
+    '📬 <strong>Wichtige Infos landen im Postfach.</strong> Terminbestätigung, die freundliche Erinnerung am Tag davor und freie Termine zum Übernehmen erreichen dich – wenn du magst – zusätzlich per E-Mail. So verpasst du nichts, auch wenn Push mal aus ist. (Die kurzfristigen Erinnerungen bleiben natürlich Push – wir fluten dein Postfach nicht.)',
+    '🔕 <strong>Ganz deine Entscheidung.</strong> Im Profil unter „📧 E-Mail-Benachrichtigungen" schaltest du das mit einem Tipp an oder aus.',
+    '✉️ <strong>Hilfe direkt aus der App.</strong> Unten über „✉️ Hilfe" schreibst du uns in Sekunden eine Nachricht – wir melden uns zurück.'] },
   { v: '3.93', d: '02.09.2026', title: '📍 Abholung: deine Wahl – mit Bewegungsfreiheit', items: [
     '📍 <strong>Beim ersten Login:</strong> Du legst einmal fest, wie du abgeholt werden möchtest – <strong>fester Abholort</strong> (immer am selben Ort, einfach & verlässlich) oder <strong>flexibel</strong> (du bist viel unterwegs und fixierst deinen Live-Standort je Fahrstunde).',
     '🕒 <strong>Bis 20 Min vorher änderbar:</strong> Spontan woanders? Kein Problem – fixiere deinen Abholort bis 20 Minuten vor Beginn. Danach steht er fest, damit dein Fahrlehrer sicher planen kann.',
