@@ -1396,8 +1396,12 @@ function openTour() {
 window.__openTour = openTour;
 
 // ---------- Was ist neu? (Changelog) ----------
-const CHANGELOG_VER = '3.92';
+const CHANGELOG_VER = '3.93';
 const CHANGELOG = [
+  { v: '3.93', d: '02.09.2026', title: '📍 Abholung: deine Wahl – mit Bewegungsfreiheit', items: [
+    '📍 <strong>Beim ersten Login:</strong> Du legst einmal fest, wie du abgeholt werden möchtest – <strong>fester Abholort</strong> (immer am selben Ort, einfach & verlässlich) oder <strong>flexibel</strong> (du bist viel unterwegs und fixierst deinen Live-Standort je Fahrstunde).',
+    '🕒 <strong>Bis 20 Min vorher änderbar:</strong> Spontan woanders? Kein Problem – fixiere deinen Abholort bis 20 Minuten vor Beginn. Danach steht er fest, damit dein Fahrlehrer sicher planen kann.',
+    '🔔 <strong>Freundliche Erinnerung:</strong> Rund 25 Minuten vorher stupsen wir dich per Push an – „Bist du woanders? Jetzt Abholort fixieren." Machst du nichts, holen wir dich einfach wie immer ab.'] },
   { v: '3.92', d: '02.09.2026', title: '🚗 Fahrlehrer live verfolgen', items: [
     '📍 <strong>„Dein Fahrlehrer teilt Live-Standort":</strong> Sobald dein Fahrlehrer sich auf den Weg macht, bekommst du eine Push – und kannst ihn auf der Karte <strong>live kommen sehen</strong>, mit Fahrzeit.',
     '🚦 <strong>Kurze Ansagen:</strong> Dein Fahrlehrer kann dir unterwegs schnell Bescheid geben („gleich da", „etwas Stau", „Berufsverkehr") – ganz ohne Anrufen.'] },
@@ -1833,7 +1837,8 @@ function modal(html, extra) {
   while (m.firstChild && m.firstChild !== actions) body.appendChild(m.firstChild);
   m.insertBefore(body, m.firstChild);
   bg.appendChild(m);
-  bg.addEventListener('click', (e) => { if (e.target === bg) closeModal(); });
+  // 'locked' = Pflicht-Dialog: kein Schließen per Klick auf den Hintergrund.
+  if (extra !== 'locked') bg.addEventListener('click', (e) => { if (e.target === bg) closeModal(); });
   document.body.appendChild(bg);
   const pwa = document.getElementById('pwa-install'); if (pwa) pwa.style.display = 'none';  // überlappt sonst das Fenster
   return bg;
@@ -2424,6 +2429,11 @@ async function renderStudent() {
   mountEdgeMenus('student');
   renderProfileCard();
   syncStudent();
+  // Erst-Login: zuerst die Abholung einrichten (Pflicht) – danach erst die Einführung.
+  if (!state.user.pickup_onboarded && !state._pickupOnbShown) {
+    state._pickupOnbShown = true; setTimeout(openPickupOnboarding, 500);
+    return;
+  }
   // Beim ersten Mal automatisch die kurze Einführung zeigen
   let tourDone = false;
   try { tourDone = localStorage.getItem('ginoco-tour-done') === '1'; } catch {}
@@ -3367,6 +3377,65 @@ async function openPickupModal(cur) {
 }
 window.__openPickup = openPickupModal;
 
+// ---------- Erst-Login: Abholung einrichten (Pflicht) ----------
+// Der Schüler wählt EINMAL, wie er abgeholt werden möchte:
+//  • Fester Abholort  – Standard: immer am hinterlegten Ort (z.B. zu Hause).
+//  • Flexibel/Live    – er bewegt sich frei und fixiert seinen Live-Standort je
+//    Fahrstunde bis 20 Min vorher; sonst gilt der feste Ort bzw. die Fahrschule.
+function openPickupOnboarding() {
+  const lead = state.settings?.live_lead_min || 20;
+  const u = state.user || {};
+  const curLabel = u.home_label || '';
+  const curMode = u.pickup_mode || 'fixed';
+  modal(`<h3>📍 Wo sollen wir dich abholen?</h3>
+    <p class="hint">Damit dein Fahrlehrer dich sicher findet, richte einmal deine Abholung ein. Du kannst das später jederzeit ändern.</p>
+    <div class="pk-modes">
+      <label class="pk-mode ${curMode === 'fixed' ? 'sel' : ''}">
+        <input type="radio" name="pkmode" value="fixed" ${curMode === 'fixed' ? 'checked' : ''}>
+        <div><strong>🏠 Fester Abholort</strong><div class="hint">Du wirst immer am selben Ort abgeholt (z.&nbsp;B. zu Hause). Einfach & verlässlich.</div></div>
+      </label>
+      <label class="pk-mode ${curMode === 'flex' ? 'sel' : ''}">
+        <input type="radio" name="pkmode" value="flex" ${curMode === 'flex' ? 'checked' : ''}>
+        <div><strong>📡 Flexibel – ich fixiere je Fahrstunde</strong><div class="hint">Du bist viel unterwegs? Fixiere deinen Live-Standort bis <strong>${lead} Min</strong> vor Beginn. Machst du nichts, gilt dein fester Ort bzw. die Fahrschule.</div></div>
+      </label>
+    </div>
+    <div class="field" style="margin-top:.6rem"><label>Fester Abholort (Adresse/Ort)</label>
+      <input id="pko-label" value="${esc(curLabel)}" placeholder="z. B. Eberswalde, Musterstr. 1"></div>
+    <button class="sec sm" id="pko-here" type="button">📍 Aktuellen Standort übernehmen</button>
+    <div class="hint" id="pko-info" style="margin:.4rem 0 0"></div>
+    <div class="hint" id="pko-flexnote" style="margin:.4rem 0 0;${curMode === 'flex' ? '' : 'display:none'}">Beim flexiblen Modus ist die Adresse optional – sie dient nur als Rückfall.</div>
+    <div class="actions"><button id="pko-save">Speichern & los 🚗</button></div>`, 'locked');
+  let lat = (u.home_lat != null ? Number(u.home_lat) : null);
+  let lng = (u.home_lng != null ? Number(u.home_lng) : null);
+  const modeEls = Array.from(document.querySelectorAll('input[name="pkmode"]'));
+  const syncMode = () => {
+    const mode = (modeEls.find((e) => e.checked) || {}).value || 'fixed';
+    document.querySelectorAll('.pk-mode').forEach((el) => el.classList.toggle('sel', el.querySelector('input').checked));
+    const fn = $('#pko-flexnote'); if (fn) fn.style.display = mode === 'flex' ? '' : 'none';
+  };
+  modeEls.forEach((e) => e.addEventListener('change', syncMode));
+  $('#pko-here').onclick = async () => {
+    try {
+      const c = await getPosOnce(); lat = c.latitude; lng = c.longitude;
+      const addr = await reverseGeocode(lat, lng);
+      if (addr && !$('#pko-label').value.trim()) $('#pko-label').value = addr;
+      $('#pko-info').innerHTML = `✅ Standort übernommen (${lat.toFixed(4)}, ${lng.toFixed(4)}).`;
+    } catch (e) { toast(e.message, 'err'); }
+  };
+  $('#pko-save').onclick = async () => {
+    const mode = (modeEls.find((e) => e.checked) || {}).value || 'fixed';
+    const label = $('#pko-label').value.trim();
+    if (mode === 'fixed' && !label) { toast('Bitte gib deinen festen Abholort an (oder wähle „Flexibel").', 'err'); return; }
+    try {
+      const r = await api('/api/my/pickup-setup', { method: 'POST', body: { mode, label, lat, lng } });
+      state.user.pickup_onboarded = true; state.user.pickup_mode = r.mode;
+      state.user.home_label = r.label; state.user.home_lat = r.lat; state.user.home_lng = r.lng;
+      closeModal(); toast('Abholung eingerichtet ✓', 'ok'); refreshStudentLive();
+    } catch (e) { toast(e.message, 'err'); }
+  };
+}
+window.__openPickupOnboarding = openPickupOnboarding;
+
 // ---------- Live-Verfolgung (Schüler) ----------
 let studentLivePoll = null;
 // ---------- Live-Karte (Leaflet + OpenStreetMap, lokal gehostet) ----------
@@ -3677,15 +3746,23 @@ async function refreshStudentLive() {
     : '';
   // Abholung: Abholort setzen + eigenen Standort teilen (damit dich der Fahrlehrer genau findet)
   const sharing = state.myShareActive;
+  // 20-Min-Regel: bis „lead" Min vor Beginn darf der Abholort geändert werden, danach fest.
+  const lockMin = d.lead || 20;
+  const locked = d.booking.minutesToStart <= lockMin;
+  const untilLock = d.booking.minutesToStart - lockMin; // Min bis zur Sperre
+  const lockLine = locked
+    ? `<div class="hint pk-locked" style="margin:.4rem 0 0">🔒 Der Abholort steht jetzt fest (ab ${lockMin} Min vor Beginn). Kurzfristig woanders? Sag deinem Fahrlehrer kurz Bescheid.</div>`
+    : (untilLock <= 15 ? `<div class="hint" style="margin:.4rem 0 0">⏳ Noch ~${untilLock} Min, dann steht der Abholort fest.</div>` : '');
   const pickupControls = `<div class="pickup-box">
     <div class="pb-line"><span class="muted">Dein Abholort:</span> <strong>${d.meet?.label ? esc(d.meet.label) : 'noch nicht gesetzt'}</strong></div>
     <div class="inline" style="margin-top:.5rem;gap:.5rem">
-      <button class="sec sm" id="pk-edit">📍 Abholort ${d.meet?.label ? 'ändern' : 'wählen'}</button>
+      ${locked ? '' : `<button class="sec sm" id="pk-edit">📍 Abholort ${d.meet?.label ? 'ändern' : 'wählen'}</button>`}
       ${sharing
         ? '<button class="danger sm" id="my-share-stop">📍 Standort-Teilen beenden</button>'
-        : '<button class="sm" id="my-share">📍 Meinen Standort teilen</button>'}
+        : (locked ? '' : '<button class="sm" id="my-share">📍 Meinen Standort teilen</button>')}
     </div>
     <div class="hint" style="margin:.4rem 0 0">${sharing ? '📍 Dein Standort wird geteilt – dein Fahrlehrer sieht jetzt genau, wo du bist.' : 'Teile deinen Standort, damit dich dein Fahrlehrer genau findet. Läuft nur jetzt und stoppt nach Beginn.'}</div>
+    ${lockLine}
   </div>`;
   // Beruhigender Status ganz oben (planmäßig / etwas später) – gilt in jeder Phase.
   // Verschobene Startzeit (delayMin) hat Vorrang; sonst der gemeldete Tagesstatus

@@ -667,9 +667,9 @@ async function handleApi(req, res, url) {
     if (sess.kind === 'instructor') {
       return ok(res, { user: { role: 'instructor', name: getSettingRaw('instructor_name') } });
     }
-    const st = db.prepare('SELECT id,name,email,phone,username,allowed_durations FROM students WHERE id = ?').get(sess.student_id);
+    const st = db.prepare('SELECT id,name,email,phone,username,allowed_durations,pickup_onboarded,pickup_mode,home_label,home_lat,home_lng FROM students WHERE id = ?').get(sess.student_id);
     if (!st) return ok(res, { user: null });
-    return ok(res, { user: { role: 'student', ...st } });
+    return ok(res, { user: { role: 'student', ...st, pickup_onboarded: !!st.pickup_onboarded } });
   }
 
   if (p === '/api/auth/logout' && method === 'POST') {
@@ -1874,12 +1874,13 @@ async function handleApi(req, res, url) {
       .sort((a, z) => a.h - z.h)[0];
     if (!upcoming) return ok(res, { window: false });
     const bk = upcoming.b;
-    // Treffpunkt: 1. an der Stunde hinterlegt  2. fester Standort des Schuelers  3. globaler Standard
+    // Treffpunkt: 1. an der Stunde hinterlegt  2. fester Standort des Schuelers
+    // 3. globaler Standard-Treffpunkt  4. die Fahrschule (letzter Rückfall).
     const home = db.prepare('SELECT home_label,home_lat,home_lng FROM students WHERE id=?').get(bk.student_id) || {};
     const meet = {
-      label: bk.meet_label || home.home_label || getSettingRaw('meet_default_label') || null,
-      lat: bk.meet_lat != null ? bk.meet_lat : (home.home_lat != null ? home.home_lat : (getSettingRaw('meet_default_lat') ? Number(getSettingRaw('meet_default_lat')) : null)),
-      lng: bk.meet_lng != null ? bk.meet_lng : (home.home_lng != null ? home.home_lng : (getSettingRaw('meet_default_lng') ? Number(getSettingRaw('meet_default_lng')) : null)),
+      label: bk.meet_label || home.home_label || getSettingRaw('meet_default_label') || getSettingRaw('school_label') || null,
+      lat: bk.meet_lat != null ? bk.meet_lat : (home.home_lat != null ? home.home_lat : (getSettingRaw('meet_default_lat') ? Number(getSettingRaw('meet_default_lat')) : (getSettingRaw('school_lat') ? Number(getSettingRaw('school_lat')) : null))),
+      lng: bk.meet_lng != null ? bk.meet_lng : (home.home_lng != null ? home.home_lng : (getSettingRaw('meet_default_lng') ? Number(getSettingRaw('meet_default_lng')) : (getSettingRaw('school_lng') ? Number(getSettingRaw('school_lng')) : null))),
     };
     const live = db.prepare('SELECT * FROM live_location WHERE id=1').get();
     const staleMs = live.updated_at ? Date.now() - new Date(live.updated_at).getTime() : Infinity;
@@ -1920,6 +1921,24 @@ async function handleApi(req, res, url) {
     });
   }
 
+  // Erst-Login: der Schueler richtet EINMAL seine Abholung ein.
+  //  mode 'fixed' = fester Abholort (home_*) – Standard; 'flex' = je Fahrstunde live fixieren.
+  // In beiden Faellen kann ein fester Abholort hinterlegt werden (Rueckfall, wenn nichts fixiert).
+  if (p === '/api/my/pickup-setup' && method === 'POST') {
+    if (!requireStudent()) return bad(res, 'Bitte anmelden', 401);
+    const b = await readBody(req);
+    const mode = b.mode === 'flex' ? 'flex' : 'fixed';
+    const label = b.label ? String(b.label).trim().slice(0, 200) : null;
+    const lat = (b.lat == null || b.lat === '') ? null : Number(b.lat);
+    const lng = (b.lng == null || b.lng === '') ? null : Number(b.lng);
+    if ((lat != null && !isFinite(lat)) || (lng != null && !isFinite(lng))) return bad(res, 'Ungueltige Koordinaten');
+    // Fester Modus braucht einen Abholort (Text reicht). Flex darf ohne festen Ort auskommen
+    // (Rueckfall ist dann die Fahrschule); ein hinterlegter Ort dient trotzdem als Rueckfall.
+    if (mode === 'fixed' && !label) return bad(res, 'Bitte gib deinen festen Abholort an.');
+    db.prepare('UPDATE students SET pickup_onboarded=1, pickup_mode=?, home_label=?, home_lat=?, home_lng=? WHERE id=?')
+      .run(mode, label, lat, lng, sess.student_id);
+    return ok(res, { mode, label, lat, lng });
+  }
   // Schüler setzt/ändert seinen Abholort für die anstehende Fahrstunde
   if (p === '/api/my/pickup' && method === 'POST') {
     if (!requireStudent()) return bad(res, 'Bitte anmelden', 401);
@@ -1927,10 +1946,15 @@ async function handleApi(req, res, url) {
     const bk = db.prepare("SELECT * FROM bookings WHERE student_id=? AND date=? AND status='booked' ORDER BY start_time")
       .all(sess.student_id, todayStr()).find((x) => hoursUntil(x.date, x.start_time) > -0.25);
     if (!bk) return bad(res, 'Gerade keine anstehende Fahrstunde');
+    // 20-Min-Regel: bis „live_lead_min" (Standard 20) Min vor Beginn darf der Abholort noch
+    // geaendert werden – danach steht er fest, damit der Fahrlehrer sicher planen kann.
+    const lead = Math.max(0, Number(getSettingRaw('live_lead_min')) || 20);
+    const minsUntil = hoursUntil(bk.date, bk.start_time) * 60;
+    if (minsUntil <= lead) return bad(res, `Zu kurzfristig – ab ${lead} Min vor Beginn steht der Abholort fest. Bitte melde dich direkt bei deinem Fahrlehrer.`);
     const label = b.label ? String(b.label).trim() : null;
     const lat = (b.lat == null || b.lat === '') ? null : Number(b.lat);
     const lng = (b.lng == null || b.lng === '') ? null : Number(b.lng);
-    db.prepare('UPDATE bookings SET meet_label=?, meet_lat=?, meet_lng=? WHERE id=?').run(label, lat, lng, bk.id);
+    db.prepare('UPDATE bookings SET meet_label=?, meet_lat=?, meet_lng=?, reminded_pickup=1 WHERE id=?').run(label, lat, lng, bk.id);
     return ok(res, { label, lat, lng });
   }
   // Schüler teilt seinen Live-Standort (nur im Abhol-Fenster, auf Tipp)
@@ -3286,6 +3310,23 @@ function sendDueReminders() {
     for (const s of due) db.prepare(`UPDATE bookings SET ${s.flag} = 1 WHERE id = ?`).run(b.id);
     notify(b.student_id, 'reminder',
       `Erinnerung (${toSend.label}): Fahrstunde am ${wdShort(b.date)} ${dmy(b.date)} um ${b.start_time} Uhr.`, b.date, b.id);
+    sent++;
+  }
+  // Abholort-Erinnerung: ~25 Min vorher EINMAL anstupsen, damit der Schueler seinen
+  // Live-Standort noch fixieren kann (bis „live_lead_min" Min vorher). Fixiert er nichts,
+  // gilt sein fester Abholort (home_*) bzw. die Fahrschule. So bleibt Bewegungsfreiheit.
+  const lead = Math.max(0, Number(getSettingRaw('live_lead_min')) || 20);
+  for (const b of rows) {
+    if (b.reminded_pickup) continue;
+    const mins = hoursUntil(b.date, b.start_time) * 60;
+    // Fenster: vom Sperr-Zeitpunkt (lead) bis lead+10 Min davor – passt auf den 5-Min-Takt.
+    if (mins <= lead || mins > lead + 10) continue;
+    db.prepare('UPDATE bookings SET reminded_pickup = 1 WHERE id = ?').run(b.id);
+    const st = db.prepare('SELECT home_label FROM students WHERE id=?').get(b.student_id) || {};
+    const where = b.meet_label || st.home_label || getSettingRaw('school_label') || 'der Fahrschule';
+    notify(b.student_id, 'reminder',
+      `📍 Bist du woanders? Fixiere jetzt deinen Abholort (nur noch bis ${lead} Min vor Beginn möglich). Sonst holen wir dich wie immer bei „${where}" ab.`,
+      b.date, b.id, { pushTitle: '📍 Abholort fixieren?', url: '/?live=1' });
     sent++;
   }
   return sent;

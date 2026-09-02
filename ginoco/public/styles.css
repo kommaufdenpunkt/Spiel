@@ -596,6 +596,16 @@ th{color:var(--muted);font-weight:600;font-size:.78rem;text-transform:uppercase;
   padding:.75rem .85rem;margin:.7rem 0}
 .pickup-box .pb-line{font-size:.95rem}
 .pickup-box .pb-line strong{color:var(--ink)}
+.pickup-box .pk-locked{color:var(--ink);opacity:.85}
+/* Erst-Login: Abhol-Modus wählen */
+.pk-modes{display:flex;flex-direction:column;gap:.5rem;margin:.6rem 0 .2rem}
+.pk-mode{display:flex;gap:.6rem;align-items:flex-start;border:1px solid var(--line);border-radius:12px;
+  padding:.65rem .75rem;cursor:pointer;background:var(--card2);transition:border-color .15s,background .15s}
+.pk-mode:hover{border-color:var(--brand,#e6934d)}
+.pk-mode.sel{border-color:var(--brand,#e6934d);background:rgba(230,147,77,.1)}
+.pk-mode input{margin-top:.2rem;flex:none}
+.pk-mode strong{color:var(--ink)}
+.pk-mode .hint{margin:.15rem 0 0}
 /* Beruhigender Status (planmäßig / etwas später) */
 .run-status{display:flex;align-items:flex-start;gap:.6rem;border-radius:12px;padding:.7rem .85rem;
   margin:0 0 .7rem;font-size:1.4rem;line-height:1.3}

@@ -158,6 +158,11 @@ ensureColumn('students', 'live_lat', 'live_lat REAL');         // Live-Standort 
 ensureColumn('students', 'live_lng', 'live_lng REAL');
 ensureColumn('students', 'live_at', 'live_at TEXT');
 ensureColumn('students', 'live_active', 'live_active INTEGER NOT NULL DEFAULT 0');
+// Abhol-Einrichtung (Erst-Login): der Schueler waehlt EINMAL, wie er abgeholt werden moechte.
+// pickup_onboarded = 1, sobald die Wahl getroffen ist. pickup_mode: 'fixed' = fester Abholort
+// (home_*), 'flex' = "ich fixiere meinen Live-Standort je Fahrstunde" (bis 20 Min vorher).
+ensureColumn('students', 'pickup_onboarded', 'pickup_onboarded INTEGER NOT NULL DEFAULT 0');
+ensureColumn('students', 'pickup_mode', 'pickup_mode TEXT');
 // Stammdaten fürs Profil (Adresse + Geburtsdatum). Nur der Fahrlehrer sieht sie (DSGVO).
 ensureColumn('students', 'birth_date', 'birth_date TEXT');    // Geburtsdatum YYYY-MM-DD (für exaktes Alter / Ausbildungsvertrag)
 ensureColumn('students', 'street', 'street TEXT');            // Straße
@@ -233,6 +238,7 @@ ensureColumn('bookings', 'reason', 'reason TEXT');
 ensureColumn('bookings', 'reminded_1d', 'reminded_1d INTEGER NOT NULL DEFAULT 0');
 ensureColumn('bookings', 'reminded_3h', 'reminded_3h INTEGER NOT NULL DEFAULT 0');
 ensureColumn('bookings', 'reminded_30m', 'reminded_30m INTEGER NOT NULL DEFAULT 0');
+ensureColumn('bookings', 'reminded_pickup', 'reminded_pickup INTEGER NOT NULL DEFAULT 0'); // "Abholort fixieren"-Erinnerung (~25 Min vorher) gesendet?
 ensureColumn('day_overrides', 'type', "type TEXT NOT NULL DEFAULT 'short'");  // short | free | vacation
 ensureColumn('bookings', 'meet_label', 'meet_label TEXT');   // Treffpunkt (Text)
 ensureColumn('bookings', 'meet_lat', 'meet_lat REAL');       // Treffpunkt-Koordinaten (optional)
