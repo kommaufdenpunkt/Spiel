@@ -346,6 +346,16 @@ const DEFAULTS = {
   rank2_min_lessons: '15',   // ab so vielen gefahrenen Stunden -> Rang 2 (Sonderfahrten frei)
   booking_horizon_days_rank2: '21', // Rang 2 darf so viele Tage im Voraus buchen
   registration_open: '0',    // '1' = neue Fahrschüler dürfen sich mit Code registrieren, '0' = geschlossen (privat)
+  // E-Mail-Versand (SMTP, eigene Domain-Mailbox). Standard: aus, bis eingerichtet.
+  mail_enabled: '0',
+  smtp_host: '',             // z.B. smtp.ionos.de
+  smtp_port: '465',
+  smtp_secure: '1',          // 1 = implizites TLS (465), 0 = STARTTLS (587)
+  smtp_user: '',             // meist die volle Mailadresse
+  smtp_pass: '',             // Postfach-Passwort – wird NIE nach aussen gegeben
+  mail_from: '',             // Absenderadresse, z.B. gino@ginoco.de
+  mail_from_name: 'Fahrschule Untern Buchen',
+  support_to: '',            // Ziel fuer Support-Mails (leer = mail_from)
   policy_text: 'Gebuchte Termine sind verbindlich. Kostenfrei stornieren nur bis '
     + '48 Std. vorher; ab 36 Std. vorher steht der Termin fest. Bei Nichterscheinen '
     + 'werden bis zu 75 % berechnet. Ab 20 Min Verspätung verkürzt sich die Fahrstunde '
@@ -391,6 +401,10 @@ export function getSettings() {
   let pkCount = 0; try { pkCount = (JSON.parse(out.instructor_passkeys || '[]') || []).length; } catch {}
   out.passkey_enabled = pkCount > 0;
   delete out.instructor_totp; delete out.instructor_totp_pending; delete out.instructor_recovery; delete out.instructor_passkeys;
+  // SMTP-Passwort niemals ausliefern – nur Status (gesetzt? vollstaendig konfiguriert?).
+  out.smtp_pass_set = !!out.smtp_pass;
+  out.mail_configured = !!(out.smtp_host && out.smtp_user && out.smtp_pass && out.mail_from);
+  delete out.smtp_pass;
   // Zahlen als Zahlen liefern
   for (const n of ['lesson_min', 'break_min', 'weekly_target_h', 'daily_target_h', 'weekly_lo_h',
     'monthly_target_h', 'monthly_max_h', 'contract_min_h', 'contract_paid_h',

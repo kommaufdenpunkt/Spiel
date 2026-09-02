@@ -7135,6 +7135,22 @@ function tabEinstellungen() {
       <div class="field" style="margin-top:.7rem"><label>🚧 Verkehrs-Schlüssel (TomTom, kostenlos) ${helpDot('Optional. Mit einem kostenlosen TomTom-Schlüssel warnt ginoco bei echtem Stau auf deinen Wegen. Leer = Verkehrs-Hinweis aus.')}</label><input id="e-traffic" value="${esc(s.traffic_key || '')}" placeholder="hier deinen TomTom-Schlüssel einfügen" autocomplete="off"></div>
       <div class="hint" style="margin:.3rem 0 0">Schlüssel gratis auf <strong>developer.tomtom.com</strong> holen (2 500 Anfragen/Tag frei). Ohne Schlüssel bleibt der Verkehrs-Hinweis einfach aus – nichts geht kaputt.</div>`)}
 
+    ${sec('📧', 'E-Mail-Versand (SMTP)', 'Eigene Domain-Mailbox für Support & Passwort-Mails', `
+      <label class="ck-line"><input type="checkbox" id="e-mail-on" ${s.mail_enabled === '1' ? 'checked' : ''}> E-Mail-Versand aktiv</label>
+      <div class="hint" style="margin:.4rem 0 .6rem">Trage die Zugangsdaten deines Postfachs (z.&nbsp;B. <strong>gino@ginoco.de</strong>) ein. Erst mit „Test-Mail“ prüfen, dann Haken setzen. Ohne Aktivierung geht nichts raus.</div>
+      <div class="row"><div class="field"><label>SMTP-Server (Host)</label><input id="e-smtp-host" value="${esc(s.smtp_host || '')}" placeholder="z.B. smtp.ionos.de" autocomplete="off"></div>
+        <div class="field"><label>Port</label><input id="e-smtp-port" type="number" value="${esc(s.smtp_port || '465')}" placeholder="465"></div></div>
+      <label class="ck-line" style="margin:.2rem 0 .5rem"><input type="checkbox" id="e-smtp-secure" ${s.smtp_secure !== '0' ? 'checked' : ''}> Verschlüsselt per SSL/TLS (Port 465). Aus = STARTTLS (Port 587)</label>
+      <div class="field"><label>Benutzername (meist die volle Mailadresse)</label><input id="e-smtp-user" value="${esc(s.smtp_user || '')}" placeholder="gino@ginoco.de" autocomplete="off"></div>
+      <div class="field"><label>Postfach-Passwort ${s.smtp_pass_set ? '<span class="muted">(gespeichert – leer lassen = unverändert)</span>' : ''}</label><input id="e-smtp-pass" type="password" autocomplete="new-password" placeholder="${s.smtp_pass_set ? '••••••••' : 'Passwort deines Postfachs'}"></div>
+      <div class="row"><div class="field"><label>Absender-Adresse</label><input id="e-mail-from" value="${esc(s.mail_from || '')}" placeholder="gino@ginoco.de" autocomplete="off"></div>
+        <div class="field"><label>Absender-Name</label><input id="e-mail-fromname" value="${esc(s.mail_from_name || '')}" placeholder="Fahrschule Untern Buchen"></div></div>
+      <div class="field"><label>Support-Adresse (wohin Support-Anfragen gehen) ${helpDot('Leer = an deine Absender-Adresse. Hier landen Nachrichten aus dem Support-Formular.')}</label><input id="e-mail-support" value="${esc(s.support_to || '')}" placeholder="leer = Absender-Adresse"></div>
+      <div class="inline" style="gap:.5rem;margin-top:.6rem;flex-wrap:wrap">
+        <input id="e-mail-testto" value="${esc(s.support_to || s.mail_from || '')}" placeholder="Test-Mail an …" style="flex:1;min-width:180px">
+        <button class="sec sm" id="e-mail-test" type="button">✉️ Test-Mail senden</button></div>
+      <div class="hint" id="e-mail-testinfo" style="margin:.4rem 0 0">Tipp: zuerst <strong>oben speichern</strong>, dann testen – der Test nutzt die gespeicherten Daten.</div>`, s.mail_enabled === '1')}
+
     ${sec('🔒', 'Privatmodus & Registrierung', 'Wer darf sich neu anmelden?', `
       <label class="ck-line"><input type="checkbox" id="e-reg-open" ${s.registration_open === '1' ? 'checked' : ''}> Neue Fahrschüler dürfen sich mit Code registrieren</label>
       <div class="hint" style="margin:.4rem 0 0">Ist der Haken <strong>weg</strong>, läuft Ginoco im <strong>Privatmodus</strong>: Auf der Startseite gibt es keinen „Neu (mit Code)“-Reiter mehr und niemand Neues kann sich anmelden. Deine bestehenden Zugänge (und du selbst) funktionieren weiter. Du kannst das jederzeit wieder öffnen, wenn du Fahrschüler einladen willst.</div>`, s.registration_open !== '1')}
@@ -7169,6 +7185,20 @@ function tabEinstellungen() {
     try { const c = await getPosOnce(); meetLat = c.latitude; meetLng = c.longitude;
       $('#e-meet-info').innerHTML = `✓ Koordinaten übernommen (${meetLat.toFixed(4)}, ${meetLng.toFixed(4)})`; toast('Treffpunkt gesetzt', 'ok'); }
     catch (e) { toast(e.message, 'err'); }
+  };
+  // Test-Mail: nutzt die GESPEICHERTEN Zugangsdaten (daher Hinweis: vorher speichern).
+  const mailTestBtn = $('#e-mail-test');
+  if (mailTestBtn) mailTestBtn.onclick = async () => {
+    const info = $('#e-mail-testinfo');
+    mailTestBtn.disabled = true; if (info) info.innerHTML = '✉️ Sende Test-Mail …';
+    try {
+      const r = await api('/api/instructor/mail-test', { method: 'POST', body: { to: $('#e-mail-testto').value.trim() } });
+      if (info) info.innerHTML = `✅ Test-Mail an <strong>${esc(r.to)}</strong> verschickt. Schau ins Postfach (auch Spam).`;
+      toast('Test-Mail verschickt ✓', 'ok');
+    } catch (e) {
+      if (info) info.innerHTML = `❌ ${esc(e.message)}`;
+      toast(e.message, 'err');
+    } finally { mailTestBtn.disabled = false; }
   };
   $('#e-save').onclick = async () => {
     const workdays = [...box.querySelectorAll('[data-day]')].filter((c) => c.checked).map((c) => c.dataset.day).join(',');
@@ -7205,6 +7235,12 @@ function tabEinstellungen() {
         school2_label: $('#e-school2label').value.trim(),
         school2_lat: $('#e-school2lat').value.trim(), school2_lng: $('#e-school2lng').value.trim(),
         travel_default_min: Number($('#e-travdef').value) || 0,
+        mail_enabled: $('#e-mail-on').checked ? '1' : '0',
+        smtp_host: $('#e-smtp-host').value.trim(), smtp_port: $('#e-smtp-port').value.trim() || '465',
+        smtp_secure: $('#e-smtp-secure').checked ? '1' : '0', smtp_user: $('#e-smtp-user').value.trim(),
+        smtp_pass: $('#e-smtp-pass').value || '',
+        mail_from: $('#e-mail-from').value.trim(), mail_from_name: $('#e-mail-fromname').value.trim(),
+        support_to: $('#e-mail-support').value.trim(),
         new_pin: $('#e-pin').value || undefined } });
       state.settings = r.settings; state.user.name = r.settings.instructor_name;
       toast('Einstellungen gespeichert ✓', 'ok'); $('#e-msg').textContent = 'Gespeichert.';

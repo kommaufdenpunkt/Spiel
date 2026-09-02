@@ -11,6 +11,7 @@ import {
   db, getSettings, getSettingRaw, setSettingRaw,
   hashPassword, verifyPassword,
 } from './db.js';
+import { sendMail } from './mail.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PUBLIC = join(__dirname, 'public');
@@ -2575,20 +2576,47 @@ async function handleApi(req, res, url) {
       'rank2_min_lessons', 'booking_horizon_days_rank2', 'registration_open',
       'flow_schedule', 'auto_fill_gaps', 'school_lat', 'school_lng', 'travel_default_min',
       'school_label', 'school2_label', 'school2_lat', 'school2_lng',
-      'instructor_home_label', 'instructor_home_lat', 'instructor_home_lng'];
+      'instructor_home_label', 'instructor_home_lat', 'instructor_home_lng',
+      'mail_enabled', 'smtp_host', 'smtp_port', 'smtp_secure', 'smtp_user',
+      'mail_from', 'mail_from_name', 'support_to'];
     const emptyOk = new Set(['instructor_phone', 'meet_default_label', 'meet_default_lat', 'meet_default_lng', 'policy_text',
-      'instructor_home_label', 'instructor_home_lat', 'instructor_home_lng', 'traffic_key']);
+      'instructor_home_label', 'instructor_home_lat', 'instructor_home_lng', 'traffic_key',
+      'smtp_host', 'smtp_user', 'mail_from', 'mail_from_name', 'support_to']);
     for (const k of allowed) {
       if (!(k in b) || b[k] == null) continue;
       if (b[k] === '' && !emptyOk.has(k)) continue;
       setSettingRaw(k, b[k]);
     }
+    // SMTP-Passwort nur ueberschreiben, wenn ausdruecklich ein neues geschickt wurde
+    // (leeres Feld = unveraendert lassen). So bleibt das Geheimnis beim Speichern erhalten.
+    if (typeof b.smtp_pass === 'string' && b.smtp_pass !== '') setSettingRaw('smtp_pass', b.smtp_pass);
     if (b.new_pin) {
       const prob = passwordProblem(b.new_pin);
       if (prob) return bad(res, 'Fahrlehrer-Passwort braucht ' + prob + '.');
       setSettingRaw('instructor_pin', hashPassword(String(b.new_pin)));
     }
     return ok(res, { settings: getSettings(), misaligned: misalignedDays() });
+  }
+
+  // Test-Mail senden – prueft die SMTP-Zugangsdaten sofort mit einer echten Mail.
+  if (p === '/api/instructor/mail-test' && method === 'POST') {
+    if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
+    const b = await readBody(req);
+    const cfg = mailConfig();
+    if (!cfg) return bad(res, 'Bitte zuerst SMTP-Host, Benutzer, Passwort und Absender speichern.');
+    const to = (String(b.to || '').trim()) || getSettingRaw('support_to') || cfg.from;
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(to)) return bad(res, 'Bitte eine gueltige Ziel-Adresse angeben.');
+    try {
+      await sendMail(cfg, {
+        to, subject: '✅ Ginoco Test-Mail',
+        text: 'Prima – dein E-Mail-Versand über Ginoco funktioniert. Diese Nachricht wurde als Test verschickt.',
+        html: mailShell('E-Mail-Versand funktioniert ✅',
+          '<p>Prima – dein E-Mail-Versand über <strong>Ginoco</strong> funktioniert. Diese Nachricht wurde als Test verschickt.</p>'),
+      });
+      return ok(res, { sent: true, to });
+    } catch (e) {
+      return bad(res, 'Versand fehlgeschlagen: ' + e.message);
+    }
   }
 
   return bad(res, 'Unbekannter Endpunkt', 404);
@@ -2755,6 +2783,39 @@ function dispatchExternal(studentId, message) {
     // Platzhalter: hier wuerde der echte Versand (SMTP / Web-Push) eingehaengt.
     console.log(`[notify:${process.env.FSP_NOTIFY}] -> ${st?.email}: ${message}`);
   } catch (e) { console.error('notify dispatch', e); }
+}
+
+// ---------- E-Mail-Versand (SMTP, eigene Domain-Mailbox) ----------
+// Liest die im Cockpit hinterlegten Zugangsdaten. Gibt null zurueck, wenn E-Mail
+// aus oder unvollstaendig konfiguriert ist – Aufrufer entscheiden dann selbst.
+function mailConfig() {
+  const host = getSettingRaw('smtp_host'), user = getSettingRaw('smtp_user');
+  const pass = getSettingRaw('smtp_pass'), from = getSettingRaw('mail_from');
+  if (!host || !user || !pass || !from) return null;
+  return {
+    host, port: Number(getSettingRaw('smtp_port')) || 465,
+    secure: getSettingRaw('smtp_secure') !== '0',
+    user, pass, from,
+    fromName: getSettingRaw('mail_from_name') || '',
+  };
+}
+function mailEnabled() { return getSettingRaw('mail_enabled') === '1' && !!mailConfig(); }
+// Sendet eine Mail, wenn E-Mail aktiv ist. Fehler werden geloggt, nie geworfen
+// (der Portal-Ablauf soll nie an einer Mail scheitern). Gibt true/false zurueck.
+async function tryMail(to, subject, { text, html, replyTo } = {}) {
+  if (!mailEnabled() || !to) return false;
+  try { await sendMail(mailConfig(), { to, subject, text, html, replyTo }); return true; }
+  catch (e) { console.error('[mail] Versand fehlgeschlagen:', e.message); return false; }
+}
+// Einheitliches HTML-Rahmenlayout fuer alle Mails (schlicht, gut lesbar).
+function mailShell(title, bodyHtml) {
+  return `<div style="font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;max-width:520px;margin:0 auto;padding:8px">
+    <div style="background:#e6934d;color:#fff;padding:14px 18px;border-radius:12px 12px 0 0;font-size:18px;font-weight:700">🚗 Ginoco</div>
+    <div style="border:1px solid #eadfd2;border-top:0;border-radius:0 0 12px 12px;padding:18px">
+      <h2 style="margin:.1rem 0 .6rem;font-size:17px;color:#2b2320">${title}</h2>
+      ${bodyHtml}
+      <p style="margin:1.4rem 0 0;color:#9a8f82;font-size:12px">Fahrschule Untern Buchen · Eisenbahnstr. 31 · 16321 Eberswalde</p>
+    </div></div>`;
 }
 
 // Alle Schueler ausser einem (fuer Angebots-Benachrichtigungen)

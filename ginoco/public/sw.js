@@ -4,7 +4,7 @@
    gerade kein Netz da ist. So sieht man Änderungen sofort – ganz ohne Hard-Refresh.
    Anmeldungen bleiben bestehen (Sitzung liegt im Cookie, nicht im Cache).
    API-Aufrufe (/api/...) laufen ohnehin immer direkt übers Netz – nie aus dem Cache. */
-const CACHE = 'ginoco-shell-v58';
+const CACHE = 'ginoco-shell-v59';
 const SHELL = ['/', '/index.html', '/app.js', '/qr.js', '/styles.css', '/manifest.webmanifest',
   '/logo.svg', '/favicon.svg', '/favicon.ico', '/icon-192.png', '/icon-512.png', '/apple-touch-icon.png',
   '/klingelton-car-lock.mp3'];
