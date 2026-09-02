@@ -604,6 +604,17 @@ th{color:var(--muted);font-weight:600;font-size:.78rem;text-transform:uppercase;
 .pu-badge.pu-fix{border-color:rgba(44,107,70,.5);background:var(--good-bg);color:var(--good)}
 .pu-badge.pu-live{border-color:rgba(230,147,77,.5);background:rgba(230,147,77,.14)}
 .pu-badge.pu-flex{border-color:rgba(230,147,77,.45);background:rgba(230,147,77,.1)}
+/* Fahrstunde verschieben (Schüler) */
+.rs-box{background:rgba(230,147,77,.14);border:1px solid rgba(230,147,77,.5);color:var(--ink);
+  border-radius:10px;padding:.5rem .7rem;font-size:.9rem;margin:.4rem 0}
+.rs-steps{margin:.3rem 0 .2rem;padding-inline-start:1.3rem;display:flex;flex-direction:column;gap:.5rem}
+.rs-steps li{color:var(--ink);line-height:1.4}
+.rs-banner{position:fixed;left:50%;transform:translateX(-50%);bottom:14px;z-index:1200;
+  max-width:min(560px,94vw);display:flex;align-items:center;gap:.7rem;
+  background:var(--brand,#e6934d);color:#fff;border-radius:14px;padding:.7rem .9rem;
+  box-shadow:0 8px 28px rgba(0,0,0,.28);font-size:.92rem;font-weight:600}
+.rs-banner .sec{background:rgba(255,255,255,.22);color:#fff;border:0;flex:none}
+.rsq-gap{display:flex;flex-direction:column;gap:.5rem;margin:.4rem 0 .2rem}
 /* Erst-Login: Abhol-Modus wählen */
 .pk-modes{display:flex;flex-direction:column;gap:.5rem;margin:.6rem 0 .2rem}
 .pk-mode{display:flex;gap:.6rem;align-items:flex-start;border:1px solid var(--line);border-radius:12px;

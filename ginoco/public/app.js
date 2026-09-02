@@ -195,6 +195,16 @@ const I18N = {
     pf_street: 'Straße', pf_houseno: 'Hausnr.', pf_zip: 'PLZ', pf_city: 'Ort',
     pf_contact: '📞 Kontakt', pf_phone: 'Handynummer', pf_email: 'E-Mail (optional)',
     pf_emailnotify: '📧 E-Mail-Benachrichtigungen', pf_emailnotify_hint: 'Termine, Erinnerungen & Angebote zusätzlich per E-Mail erhalten.',
+    rs_choose: 'Neuen Termin wählen', rs_gone: 'Diese Fahrstunde ist nicht mehr da.',
+    rs_asked: 'Dein Fahrlehrer bittet dich, diese Fahrstunde zu verschieben – such dir einfach unten einen neuen freien Termin.',
+    rs_help_title: '🔄 Fahrstunde verschieben – so einfach geht’s',
+    rs_help_1: 'Dein Fahrlehrer hat dich gebeten, diese Fahrstunde auf einen anderen Termin zu legen.',
+    rs_help_2: 'Tippe unten im Kalender auf einen Tag und wähle einen freien Termin (grün) – das ist dein neuer Wunschtermin.',
+    rs_help_3: 'Fertig! Deine Stunde wandert automatisch auf die neue Zeit, die alte fällt weg – du bekommst eine Bestätigung.',
+    rs_help_go: 'Alles klar – Termin wählen', rs_mode_cancel: 'Abbrechen',
+    rs_mode_banner: '🔄 Wähle jetzt unten einen freien Termin (grün) für deine verschobene Fahrstunde.',
+    rs_confirm_q: 'Deine Fahrstunde auf {day} um {time} Uhr verschieben?',
+    rs_confirm_go: 'Ja, hierher verschieben', rs_moved: 'Verschoben ✓ Neuer Termin: {day} um {time} Uhr.',
     pf_access: '🔑 Zugang', pf_login_fixed: 'Login-Name (fest, ändert sich nicht)', pf_reach_school: 'Fahrschule erreichen',
     pf_save: 'Speichern', pf_account: '⚠️ Konto', pf_del_account: '🗑️ Mein Konto löschen',
     pf_account_text: 'Du kannst dein Konto jederzeit selbst löschen. Dein Login und deine persönlichen Daten werden dann entfernt. Deine bereits gefahrenen Fahrstunden bleiben – anonymisiert – im gesetzlichen Ausbildungsnachweis deiner Fahrschule erhalten.',
@@ -384,6 +394,16 @@ const I18N = {
     pf_street: 'Street', pf_houseno: 'No.', pf_zip: 'Postcode', pf_city: 'City',
     pf_contact: '📞 Contact', pf_phone: 'Mobile number', pf_email: 'E-mail (optional)',
     pf_emailnotify: '📧 E-mail notifications', pf_emailnotify_hint: 'Also receive appointments, reminders & offers by e-mail.',
+    rs_choose: 'Choose new time', rs_gone: 'This lesson is no longer available.',
+    rs_asked: 'Your instructor asks you to move this lesson – just pick a new free slot below.',
+    rs_help_title: '🔄 Move your lesson – here’s how',
+    rs_help_1: 'Your instructor asked you to move this lesson to another time.',
+    rs_help_2: 'Tap a day in the calendar below and pick a free slot (green) – that’s your new time.',
+    rs_help_3: 'Done! Your lesson moves to the new time automatically and the old one is dropped – you’ll get a confirmation.',
+    rs_help_go: 'Got it – pick a time', rs_mode_cancel: 'Cancel',
+    rs_mode_banner: '🔄 Now pick a free slot (green) below for your moved lesson.',
+    rs_confirm_q: 'Move your lesson to {day} at {time}?',
+    rs_confirm_go: 'Yes, move it here', rs_moved: 'Moved ✓ New time: {day} at {time}.',
     pf_access: '🔑 Access', pf_login_fixed: 'Login name (fixed, does not change)', pf_reach_school: 'Contact the school',
     pf_save: 'Save', pf_account: '⚠️ Account', pf_del_account: '🗑️ Delete my account',
     pf_account_text: 'You can delete your account yourself at any time. Your login and personal data are then removed. Your already driven lessons remain – anonymised – in your driving school\u2019s legally required training record.',
@@ -573,6 +593,16 @@ const I18N = {
     pf_street: 'Sokak', pf_houseno: 'No.', pf_zip: 'Posta kodu', pf_city: 'Şehir',
     pf_contact: '📞 İletişim', pf_phone: 'Cep numarası', pf_email: 'E-posta (isteğe bağlı)',
     pf_emailnotify: '📧 E-posta bildirimleri', pf_emailnotify_hint: 'Randevular, hatırlatmalar ve teklifler ayrıca e-posta ile.',
+    rs_choose: 'Yeni zaman seç', rs_gone: 'Bu ders artık mevcut değil.',
+    rs_asked: 'Eğitmenin bu dersi ertelemeni istiyor – aşağıdan uygun boş bir zaman seç.',
+    rs_help_title: '🔄 Dersi erteleme – çok kolay',
+    rs_help_1: 'Eğitmenin bu dersi başka bir zamana almanı istedi.',
+    rs_help_2: 'Aşağıdaki takvimde bir güne dokun ve boş bir zaman (yeşil) seç – bu senin yeni zamanın.',
+    rs_help_3: 'Bitti! Dersin otomatik olarak yeni zamana taşınır, eskisi silinir – bir onay alırsın.',
+    rs_help_go: 'Anladım – zaman seç', rs_mode_cancel: 'İptal',
+    rs_mode_banner: '🔄 Ertelenen dersin için aşağıdan boş bir zaman (yeşil) seç.',
+    rs_confirm_q: 'Dersin {day} {time} saatine taşınsın mı?',
+    rs_confirm_go: 'Evet, buraya taşı', rs_moved: 'Taşındı ✓ Yeni zaman: {day} {time}.',
     pf_access: '🔑 Erişim', pf_login_fixed: 'Kullanıcı adı (sabit, değişmez)', pf_reach_school: 'Okula ulaş',
     pf_save: 'Kaydet', pf_account: '⚠️ Hesap', pf_del_account: '🗑️ Hesabımı sil',
     pf_account_text: 'Hesabını istediğin zaman kendin silebilirsin. Girişin ve kişisel verilerin kaldırılır. Sürdüğün dersler – anonim olarak – sürücü okulunun yasal eğitim kaydında kalır.',
@@ -762,6 +792,16 @@ const I18N = {
     pf_street: 'الشارع', pf_houseno: 'رقم', pf_zip: 'الرمز البريدي', pf_city: 'المدينة',
     pf_contact: '📞 التواصل', pf_phone: 'رقم الجوال', pf_email: 'البريد الإلكتروني (اختياري)',
     pf_emailnotify: '📧 إشعارات البريد الإلكتروني', pf_emailnotify_hint: 'استلام المواعيد والتذكيرات والعروض عبر البريد الإلكتروني أيضًا.',
+    rs_choose: 'اختر موعدًا جديدًا', rs_gone: 'هذا الدرس لم يعد متاحًا.',
+    rs_asked: 'يطلب منك مدرّبك تأجيل هذا الدرس – اختر ببساطة موعدًا متاحًا جديدًا بالأسفل.',
+    rs_help_title: '🔄 تأجيل الدرس – بهذه البساطة',
+    rs_help_1: 'طلب منك مدرّبك نقل هذا الدرس إلى موعد آخر.',
+    rs_help_2: 'اضغط على يوم في التقويم بالأسفل واختر موعدًا متاحًا (أخضر) – هذا موعدك الجديد.',
+    rs_help_3: 'تم! سيُنقل درسك تلقائيًا إلى الموعد الجديد ويُلغى القديم – وستصلك رسالة تأكيد.',
+    rs_help_go: 'حسنًا – اختر موعدًا', rs_mode_cancel: 'إلغاء',
+    rs_mode_banner: '🔄 اختر الآن موعدًا متاحًا (أخضر) بالأسفل لدرسك المؤجَّل.',
+    rs_confirm_q: 'نقل درسك إلى {day} الساعة {time}؟',
+    rs_confirm_go: 'نعم، انقله هنا', rs_moved: 'تم النقل ✓ الموعد الجديد: {day} الساعة {time}.',
     pf_access: '🔑 الدخول', pf_login_fixed: 'اسم الدخول (ثابت، لا يتغيّر)', pf_reach_school: 'التواصل مع المدرسة',
     pf_save: 'حفظ', pf_account: '⚠️ الحساب', pf_del_account: '🗑️ حذف حسابي',
     pf_account_text: 'يمكنك حذف حسابك بنفسك في أي وقت. عندها يُزال دخولك وبياناتك الشخصية. تبقى دروسك التي قدتها – مجهّلة الهوية – في سجل التدريب القانوني لمدرسة القيادة.',
@@ -1403,8 +1443,12 @@ function openTour() {
 window.__openTour = openTour;
 
 // ---------- Was ist neu? (Changelog) ----------
-const CHANGELOG_VER = '3.95';
+const CHANGELOG_VER = '3.96';
 const CHANGELOG = [
+  { v: '3.96', d: '02.09.2026', title: '🔄 Termin verschieben – kinderleicht', items: [
+    '🔄 <strong>Manchmal fragt dich dein Fahrlehrer, ob eine Fahrstunde verschoben werden kann.</strong> Dann erscheint bei dir ein Hinweis „🔄 Neuen Termin wählen".',
+    '👉 <strong>So geht’s:</strong> Antippen → eine kurze Erklärung führt dich durch → im Kalender einen freien Termin (grün) auswählen → fertig. Deine Stunde wandert automatisch auf die neue Zeit, die alte fällt weg.',
+    '🌍 Die Erklärung gibt’s in deiner Sprache (Deutsch, English, Türkçe, العربية) – oben im Anmelde-Bildschirm oder unter „🎨 Aussehen → Sprache" umschaltbar.'] },
   { v: '3.95', d: '02.09.2026', title: '📧 Ginoco schreibt dir jetzt – E-Mail ist da!', items: [
     '<strong>Ab sofort hältst du auch per E-Mail Kontakt mit deiner Fahrschule.</strong> Alles kommt von einer festen Adresse (<strong>support@ginoco.de</strong>) und in hübschem Ginoco-Look – hier die Neuerungen auf einen Blick:',
     '🔑 <strong>Passwort vergessen? Du hilfst dir selbst.</strong> Ist bei dir eine E-Mail hinterlegt, bekommst du auf „Passwort vergessen" sofort einen sicheren Link zugeschickt und vergibst dir in 30 Sekunden ein neues Passwort – kein Warten, kein Nachfragen mehr.',
@@ -2541,6 +2585,7 @@ async function syncStudent() {
     renderBookingCalendar();
     maybeOpenPostfach(mine.bookings); // Push „Etwas liegt im Postfach" → direkt hin
     maybeScrollLive(); // Push „Fahrlehrer unterwegs/teilt Standort" (/?live=1) → zur Live-Karte
+    maybeHandleRescheduleLink(); // Push „🔄 Termin verschieben" (/?reschedule=ID) → Auswahl-Modus
   } catch (e) { toast(e.message, 'err'); }
 }
 
@@ -3223,6 +3268,7 @@ function renderWeekCard(wi, bookings, progress) {
   c.querySelectorAll('[data-cancel]').forEach((b) => b.onclick = () => cancelBooking(b.dataset.cancel));
   c.querySelectorAll('[data-offer]').forEach((b) => b.onclick = () => offerBooking(b.dataset.offer));
   c.querySelectorAll('[data-withdraw]').forEach((b) => b.onclick = () => withdrawOffer(b.dataset.withdraw));
+  c.querySelectorAll('[data-reschedule]').forEach((b) => b.onclick = () => startReschedule(b.dataset.reschedule));
   const ic = $('#ical-btn');
   if (ic) ic.onclick = () => exportICS(upcoming);
   const ef = $('#eb-find');
@@ -3391,13 +3437,19 @@ function studentBookingItem(b) {
         <button class="ghost sm" data-cancel="${b.id}">${t('cancel')}</button>`;
     }
   }
+  // Verschiebe-Anfrage vom Fahrlehrer: hat Vorrang – Schüler soll neuen Termin wählen.
+  let rescheduleBox = '';
+  if (b.reschedule_req && b.status === 'booked') {
+    actions = `<button class="sm" data-reschedule="${b.id}">🔄 ${t('rs_choose')}</button>`;
+    rescheduleBox = `<div class="resv-due rs-box">🔄 <strong>${t('rs_asked')}</strong>${b.reschedule_note ? '<br>' + esc(b.reschedule_note) : ''}</div>`;
+  }
   const fb = (b.status === 'done' && b.feedback) ? `<div class="lesson-fb">📝 ${esc(b.feedback)}</div>` : '';
-  return `<div class="bitem">
+  return `<div class="bitem${rescheduleBox ? ' warm' : ''}">
     <div>
       <div class="when">${WD[isoDow(b.date) - 1]} ${fmtShort(b.date)} · ${b.start_time} <span class="muted" style="font-weight:400">(${b.duration_min} ${t('min')})</span></div>
       <div class="meta">${st} ${typeBadge(b.lesson_type)} ${gear} ${b.plate ? '· ' + esc(b.plate) : ''}
         ${b.status === 'booked' && soon ? `<span class="muted">${t('bk_in_h', { h: h < 1 ? '<1' : Math.round(h) })}</span>` : ''}</div>
-      ${reserveHint}${fb}
+      ${rescheduleBox}${reserveHint}${fb}
     </div>
     <div class="inline">${actions}</div>
   </div>`;
@@ -4261,6 +4313,8 @@ function renderSlots(slots, mine) {
 }
 
 function bookSlot(start, dur, maxDur) {
+  // Verschiebe-Modus: ein freier Slot ist der NEUE Termin für die anstehende Verschiebung.
+  if (state.rescheduling) return confirmReschedule(start);
   const cancelH = state.settings?.cancel_hours || 48;
   const lockH = state.settings?.lock_hours || 36;
   let allowed = String(state.user?.allowed_durations || '80').split(',').map(Number).filter((n) => n > 0).sort((a, b) => a - b);
@@ -4316,6 +4370,65 @@ async function rejectBooking(id) {
   if (!confirm('Diesen vom Fahrlehrer vorgeschlagenen Termin ablehnen? Der Fahrlehrer wird benachrichtigt und der Zeitpunkt wird wieder frei.')) return;
   try { await api('/api/bookings/' + id + '/reject', { method: 'POST' }); toast('Termin abgelehnt', 'ok'); syncStudent(); }
   catch (e) { toast(e.message, 'err'); }
+}
+
+// ---------- Fahrstunde verschieben (Schüler wählt neuen Termin) ----------
+// Erst freundlich erklären, wie es läuft – dann in den Auswahl-Modus wechseln.
+function startReschedule(id) {
+  const bk = (myBookingsCache || []).find((x) => String(x.id) === String(id));
+  if (!bk) { toast(t('rs_gone'), 'err'); return; }
+  modal(`<h3>${t('rs_help_title')}</h3>
+    <p class="hint">${WD[isoDow(bk.date) - 1]} ${fmtShort(bk.date)} · ${bk.start_time} ${t('oclock')}</p>
+    ${bk.reschedule_note ? `<div class="rs-box" style="margin:.2rem 0 .6rem">💬 ${esc(bk.reschedule_note)}</div>` : ''}
+    <ol class="rs-steps">
+      <li>${t('rs_help_1')}</li>
+      <li>${t('rs_help_2')}</li>
+      <li>${t('rs_help_3')}</li>
+    </ol>
+    <div class="actions"><button class="sec" onclick="window.__closeModal()">${t('abort')}</button><button id="rs-help-go">${t('rs_help_go')}</button></div>`);
+  $('#rs-help-go').onclick = () => {
+    closeModal();
+    state.rescheduling = { id: bk.id, date: bk.date, start_time: bk.start_time };
+    showRescheduleBanner();
+    const cal = document.getElementById('book-cal') || document.getElementById('slots');
+    if (cal) setTimeout(() => cal.scrollIntoView({ behavior: 'smooth', block: 'center' }), 150);
+  };
+}
+function showRescheduleBanner() {
+  cancelRescheduleBanner();
+  if (!state.rescheduling) return;
+  const el = document.createElement('div');
+  el.id = 'rs-banner'; el.className = 'rs-banner';
+  el.innerHTML = `<span>${t('rs_mode_banner')}</span> <button class="sec sm" id="rs-cancel">${t('rs_mode_cancel')}</button>`;
+  document.body.appendChild(el);
+  $('#rs-cancel').onclick = () => { state.rescheduling = null; cancelRescheduleBanner(); };
+}
+function cancelRescheduleBanner() { const e = document.getElementById('rs-banner'); if (e) e.remove(); }
+function confirmReschedule(start) {
+  const rs = state.rescheduling; if (!rs) return;
+  const dayLbl = `${WD_LONG[isoDow(state.date) - 1]}, ${fmtShort(state.date)}`;
+  modal(`<h3>🔄 ${t('rs_choose')}</h3>
+    <div class="warnbox">${t('rs_confirm_q', { day: dayLbl, time: start })}</div>
+    <div class="actions"><button class="sec" onclick="window.__closeModal()">${t('abort')}</button><button id="rs-cf-go">${t('rs_confirm_go')}</button></div>`);
+  $('#rs-cf-go').onclick = async () => {
+    try {
+      await api('/api/bookings/' + rs.id + '/reschedule', { method: 'POST', body: { date: state.date, start_time: start } });
+      state.rescheduling = null; cancelRescheduleBanner(); closeModal();
+      celebrate(t('rs_moved', { day: dayLbl, time: start })); toast(t('rs_moved', { day: dayLbl, time: start }), 'ok');
+      syncStudent();
+    } catch (e) { toast(e.message, 'err'); }
+  };
+}
+window.__startReschedule = startReschedule;
+// Deep-Link aus der Push „🔄 Termin verschieben" (/?reschedule=ID): direkt in den Modus.
+function maybeHandleRescheduleLink() {
+  let id = null;
+  try { id = new URL(location.href).searchParams.get('reschedule'); } catch { return; }
+  if (!id) return;
+  try { const u = new URL(location.href); u.searchParams.delete('reschedule'); history.replaceState(null, '', u.pathname + u.search + u.hash); } catch {}
+  if (maybeHandleRescheduleLink._done) return;
+  const bk = (myBookingsCache || []).find((x) => String(x.id) === String(id) && x.reschedule_req);
+  if (bk) { maybeHandleRescheduleLink._done = true; setTimeout(() => startReschedule(id), 400); }
 }
 
 // ====================== FAHRLEHRER ======================
@@ -5064,6 +5177,36 @@ function renderInstrDay(el, date, bookings, blocks) {
   el.querySelectorAll('[data-delblock]').forEach((b) => b.onclick = () => delBlock(b.dataset.delblock));
   el.querySelectorAll('[data-startlesson]').forEach((b) => b.onclick = () => instrStartLesson(b.dataset.startlesson));
   el.querySelectorAll('[data-route]').forEach((b) => b.onclick = () => { const bk = items.find((x) => x.kind === 'booking' && String(x.id) === b.dataset.route); if (bk) openInstrRoute(bk); });
+  el.querySelectorAll('[data-reschedule]').forEach((b) => b.onclick = () => { const bk = items.find((x) => x.kind === 'booking' && String(x.id) === b.dataset.reschedule); if (bk) openRescheduleRequest(bk); });
+  el.querySelectorAll('[data-reschedule-cancel]').forEach((b) => b.onclick = () => instrRescheduleCancel(b.dataset.rescheduleCancel));
+}
+// Fahrlehrer bittet den Schüler, die Fahrstunde zu verschieben – mit Hinweis + Lücken-Wahl.
+function openRescheduleRequest(b) {
+  const nm = (b.student_name || 'dein Fahrschüler').split(' ')[0];
+  modal(`<h3>🔄 Fahrstunde verschieben</h3>
+    <p class="hint">${esc(nm)} am ${WD[isoDow(b.date) - 1]} ${fmtShort(b.date)} um ${b.start_time} Uhr. ${esc(nm)} sucht sich dann selbst einen neuen freien Termin – du musst nichts weiter tun.</p>
+    <div class="field"><label>Kurzer Hinweis an ${esc(nm)} (optional)</label>
+      <textarea id="rsq-note" rows="2" placeholder="z. B. „Passt dir ein anderer Tag?“ oder „Geht’s auch später am selben Tag?“"></textarea></div>
+    <div class="field"><label>Was soll mit der frei werdenden Lücke passieren?</label>
+      <div class="rsq-gap">
+        <label class="pk-mode sel"><input type="radio" name="rsqgap" value="leave" checked><div><strong>🕳️ Offen lassen</strong><div class="hint">Die Zeit bleibt frei – du entscheidest später.</div></div></label>
+        <label class="pk-mode"><input type="radio" name="rsqgap" value="pack"><div><strong>⬆️ Folgende aufrücken</strong><div class="hint">Spätere Stunden des Tages rücken lückenlos nach vorne (Schüler werden informiert).</div></div></label>
+        <label class="pk-mode"><input type="radio" name="rsqgap" value="offer"><div><strong>📩 Slot anbieten</strong><div class="hint">Andere Fahrschüler bekommen „kurzfristig frei“ und können die Zeit buchen.</div></div></label>
+      </div></div>
+    <div class="actions"><button class="sec" onclick="window.__closeModal()">Abbrechen</button><button id="rsq-go">🔄 Anfrage senden</button></div>`);
+  const modes = Array.from(document.querySelectorAll('input[name="rsqgap"]'));
+  modes.forEach((e) => e.addEventListener('change', () => document.querySelectorAll('.rsq-gap .pk-mode').forEach((el) => el.classList.toggle('sel', el.querySelector('input').checked))));
+  $('#rsq-go').onclick = async () => {
+    const gap = (modes.find((e) => e.checked) || {}).value || 'leave';
+    try {
+      await api('/api/bookings/' + b.id + '/reschedule-request', { method: 'POST', body: { note: $('#rsq-note').value.trim(), gap } });
+      closeModal(); toast('Verschiebe-Anfrage an ' + nm + ' gesendet 🔄', 'ok'); drawInstrTab();
+    } catch (e) { toast(e.message, 'err'); }
+  };
+}
+async function instrRescheduleCancel(id) {
+  try { await api('/api/bookings/' + id + '/reschedule-cancel', { method: 'POST' }); toast('Anfrage zurückgenommen', 'ok'); drawInstrTab(); }
+  catch (e) { toast(e.message, 'err'); }
 }
 // Fahrlehrer stempelt den genauen Startzeitpunkt der Fahrstunde.
 async function instrStartLesson(id) {
@@ -5093,6 +5236,9 @@ function instrBookingItem(b) {
         ? `<button class="ghost sm" data-route="${b.id}" title="Route & Navigation zum Fahrschüler">🧭</button>` : ''}
       ${b.student_id && b.status !== 'done' && b.confirmed !== 0 && !b.started_at
         ? `<button class="ghost sm" data-startlesson="${b.id}" title="Genauen Startzeitpunkt festhalten">▶️ Start</button>` : ''}
+      ${b.student_id && b.status === 'booked' && (b.reschedule_req
+        ? `<button class="ghost sm" data-reschedule-cancel="${b.id}" title="Verschiebe-Anfrage zurücknehmen">🔄 angefragt ✕</button>`
+        : `<button class="ghost sm" data-reschedule="${b.id}" title="Fahrschüler bitten, den Termin zu verschieben">🔄 Verschieben</button>`)}
       ${b.student_id && b.status !== 'done'
         ? `<button class="sm" data-mark="${b.id}">✅ Abschließen &amp; abhaken</button>`
         : `<button class="sec sm" data-mark="${b.id}">Bearbeiten</button>`}

@@ -1110,7 +1110,7 @@ async function handleApi(req, res, url) {
   if (p === '/api/my/bookings' && method === 'GET') {
     if (!requireStudent()) return bad(res, 'Bitte anmelden', 401);
     const rows = db.prepare(
-      `SELECT id,date,start_time,duration_min,status,gearbox,plate,note,started_at,ended_at,confirmed,feedback,lesson_type,late_minutes,attended,needs_sign,signed_at,signature,instr_signature,instr_signed_at,curriculum,invoice_date,invoice_time,created_at
+      `SELECT id,date,start_time,duration_min,status,gearbox,plate,note,started_at,ended_at,confirmed,feedback,lesson_type,late_minutes,attended,needs_sign,signed_at,signature,instr_signature,instr_signed_at,curriculum,invoice_date,invoice_time,reschedule_req,reschedule_note,created_at
        FROM bookings WHERE student_id = ? AND status != 'cancelled' ORDER BY date, start_time`
     ).all(sess.student_id);
     return ok(res, { bookings: rows, weekInfo: weekInfoForStudent(sess.student_id),
@@ -1610,6 +1610,96 @@ async function handleApi(req, res, url) {
     logEvent('take', { actor: 'student', studentId: sess.student_id, bookingId: bk.id, date: bk.date,
       detail: `${taker?.name || '?'} übernimmt Stunde von ${from?.name || '?'} · ${wdShort(bk.date)} ${dmy(bk.date)} ${bk.start_time} Uhr` });
     return ok(res);
+  }
+
+  // ===== Verschiebe-Anfrage: Fahrlehrer bittet, der Schüler sucht sich selbst einen neuen Termin =====
+  // 1) Fahrlehrer stellt die Anfrage (mit Hinweis + Wahl, was mit der frei werdenden Lücke passiert)
+  const rrq = p.match(/^\/api\/bookings\/(\d+)\/reschedule-request$/);
+  if (rrq && method === 'POST') {
+    if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
+    const bk = db.prepare('SELECT * FROM bookings WHERE id=?').get(Number(rrq[1]));
+    if (!bk || !bk.student_id) return bad(res, 'Fahrstunde nicht gefunden', 404);
+    if (bk.status !== 'booked') return bad(res, 'Nur gebuchte Stunden können verschoben werden');
+    const b = await readBody(req);
+    const note = (typeof b.note === 'string' ? b.note : '').replace(/\s+/g, ' ').trim().slice(0, 300);
+    const gap = ['pack', 'offer', 'leave'].includes(b.gap) ? b.gap : 'leave';
+    db.prepare('UPDATE bookings SET reschedule_req=?, reschedule_note=?, reschedule_gap=? WHERE id=?')
+      .run(new Date().toISOString(), note || null, gap, bk.id);
+    const msg = `🔄 Bitte such dir einen neuen Termin für deine Fahrstunde am ${wdShort(bk.date)} ${dmy(bk.date)} um ${bk.start_time} Uhr.${note ? ' ' + note : ''}`;
+    notify(bk.student_id, 'reschedule', msg, bk.date, bk.id, { url: '/?reschedule=' + bk.id, pushTitle: '🔄 Termin verschieben' });
+    logEvent('shift', { actor: 'instructor', studentId: bk.student_id, bookingId: bk.id, date: bk.date,
+      detail: `Verschiebung angefragt: ${wdShort(bk.date)} ${dmy(bk.date)} ${bk.start_time} Uhr${note ? ' – ' + note : ''}` });
+    return ok(res, { requested: true });
+  }
+  // 2) Fahrlehrer nimmt die Anfrage zurück
+  const rrc = p.match(/^\/api\/bookings\/(\d+)\/reschedule-cancel$/);
+  if (rrc && method === 'POST') {
+    if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
+    const bk = db.prepare('SELECT * FROM bookings WHERE id=?').get(Number(rrc[1]));
+    if (!bk) return bad(res, 'Fahrstunde nicht gefunden', 404);
+    const hadReq = !!bk.reschedule_req;
+    db.prepare('UPDATE bookings SET reschedule_req=NULL, reschedule_note=NULL, reschedule_gap=NULL WHERE id=?').run(bk.id);
+    if (bk.student_id && hadReq) notify(bk.student_id, 'info',
+      `Alles gut – deine Fahrstunde am ${wdShort(bk.date)} ${dmy(bk.date)} um ${bk.start_time} Uhr bleibt wie gehabt. Du musst nichts verschieben.`, bk.date, bk.id);
+    return ok(res, { cancelled: true });
+  }
+  // 3) Schüler wählt selbst einen neuen freien Termin (nur bei offener Anfrage)
+  const rsm = p.match(/^\/api\/bookings\/(\d+)\/reschedule$/);
+  if (rsm && method === 'POST') {
+    if (!requireStudent()) return bad(res, 'Bitte anmelden', 401);
+    const bk = db.prepare('SELECT * FROM bookings WHERE id=?').get(Number(rsm[1]));
+    if (!bk || bk.student_id !== sess.student_id) return bad(res, 'Keine Berechtigung', 403);
+    if (!bk.reschedule_req) return bad(res, 'Für diese Fahrstunde liegt keine Verschiebe-Anfrage vor.');
+    const b = await readBody(req);
+    const newDate = String(b.date || '').trim();
+    const newStart = String(b.start_time || '').trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(newDate) || !/^([01]?\d|2[0-3]):[0-5]\d$/.test(newStart)) return bad(res, 'Bitte einen gültigen Termin wählen.');
+    if (hoursUntil(newDate, newStart) <= 0) return bad(res, 'Bitte einen Termin in der Zukunft wählen.');
+    const dur = bk.duration_min;
+    const s = getSettings();
+    // ALLE Buchungsregeln wie beim normalen Buchen – so lässt sich per Verschieben nichts umgehen:
+    // Arbeitstag, Horizont/Rang, gültiger freier Start, Dauer passt in den Tag, Kollision, Wochenlimit.
+    const workdays = getSettingRaw('workdays').split(',').map(Number);
+    const ov = getOverride(newDate);
+    if ((ov && ov.closed) || !workdays.includes(isoDow(newDate)))
+      return bad(res, 'An diesem Tag werden keine Fahrstunden angeboten.');
+    if (!dateOpenForStudents(newDate, sess.student_id)) {
+      const { horizon, rank } = studentRank(sess.student_id);
+      return bad(res, `Dieser Tag ist für dich (Rang ${rank}) noch nicht buchbar – bis ${horizon} Tage im Voraus.`);
+    }
+    const free = freeStarts(newDate, sess.student_id);
+    const win = free.find((w) => toHHMM(w.start) === newStart);
+    if (!win) return bad(res, 'Diese Startzeit ist gerade nicht frei. Bitte nimm einen angebotenen freien Start.');
+    const ns = toMin(newStart), ne = ns + dur;
+    if (ne > win.cap) return bad(res, `Diese Länge passt an diesem Start nicht mehr in den Tag (Ende spätestens ${toHHMM(win.cap)} Uhr). Wähle einen früheren Start oder anderen Tag.`);
+    for (const o of db.prepare("SELECT * FROM bookings WHERE date=? AND id!=? AND status!='cancelled'").all(newDate, bk.id)) {
+      const os = toMin(o.start_time), oe = os + o.duration_min;
+      if (overlaps(ns, ne + s.break_min, os, oe + s.break_min)) return bad(res, 'Dieser Termin ist leider schon belegt – bitte einen anderen wählen.');
+    }
+    for (const bl of db.prepare('SELECT * FROM blocks WHERE date=?').all(newDate))
+      if (overlaps(ns, ne, toMin(bl.start_time), toMin(bl.end_time))) return bad(res, 'Zu dieser Zeit ist etwas anderes geplant – bitte einen anderen Termin wählen.');
+    // Wochenlimit – die zu verschiebende Stunde nicht doppelt zählen (gleiche Woche = schon enthalten).
+    const wi = weekInfoForStudent(sess.student_id, newDate);
+    const sameWeek = weekStartEnd(bk.date).from === weekStartEnd(newDate).from;
+    if ((sameWeek ? wi.count - 1 : wi.count) >= wi.max)
+      return bad(res, `Pro Woche sind nur ${wi.max} Fahrstunden möglich – die Zielwoche ist voll. Bitte wähle eine andere Woche.`);
+    const oldDate = bk.date, oldStart = bk.start_time, gap = bk.reschedule_gap || 'leave';
+    // Verschieben + Anfrage schließen; Erinnerungs-/Abhol-Marker zurücksetzen (neuer Termin)
+    db.prepare(`UPDATE bookings SET date=?, start_time=?, reschedule_req=NULL, reschedule_note=NULL, reschedule_gap=NULL,
+      reminded_1d=0, reminded_3h=0, reminded_30m=0, reminded_pickup=0 WHERE id=?`).run(newDate, newStart, bk.id);
+    let moved = 0;
+    if (gap === 'pack') moved = applyPack(oldDate, 'Lücke nach Verschiebung geschlossen');
+    else if (gap === 'offer') {
+      const ids = db.prepare("SELECT id FROM students WHERE id!=? AND archived_at IS NULL AND deleted_at IS NULL").all(sess.student_id).map((r) => r.id);
+      for (const sid of ids) notify(sid, 'reminder',
+        `🚗 Kurzfristig frei geworden: ${wdShort(oldDate)} ${dmy(oldDate)} um ${oldStart} Uhr. Schnell buchen lohnt sich!`,
+        oldDate, null, { email: false, url: '/', pushTitle: '🚗 Kurzfristig frei' });
+    }
+    const stu = db.prepare('SELECT name FROM students WHERE id=?').get(sess.student_id);
+    logEvent('shift', { actor: 'student', studentId: sess.student_id, bookingId: bk.id, date: newDate,
+      detail: `${stu?.name || 'Schüler'} hat verschoben: ${wdShort(oldDate)} ${dmy(oldDate)} ${oldStart} → ${wdShort(newDate)} ${dmy(newDate)} ${newStart} Uhr`
+        + (gap === 'pack' ? ` · ${moved} Std. aufgerückt` : gap === 'offer' ? ' · Lücke zur Übernahme angeboten' : ' · Lücke offen gelassen') });
+    return ok(res, { moved: true, date: newDate, start_time: newStart, gap, packed: moved });
   }
 
   // Schueler bestaetigt einen reservierten Termin (den der Fahrlehrer eingetragen hat)
@@ -2846,7 +2936,7 @@ function notify(studentId, kind, message, date = null, refBookingId = null, opts
 // Nachrichten-Arten, die standardmaessig auch als E-Mail gehen (wichtige Ereignisse).
 // Erinnerungen sind bewusst NICHT dabei – die schickt sendDueReminders gezielt (opts.email)
 // nur einmal (1 Tag vorher), damit keine Mail-Flut entsteht.
-const EMAIL_KINDS = new Set(['booking', 'cancel', 'shift', 'offer', 'sign']);
+const EMAIL_KINDS = new Set(['booking', 'cancel', 'shift', 'offer', 'sign', 'reschedule']);
 function maybeEmailNotify(studentId, kind, message, title, opts = {}) {
   if (!mailEnabled()) return;
   const wants = opts.email === true || (opts.email !== false && EMAIL_KINDS.has(kind));
@@ -2870,6 +2960,7 @@ const PUSH_TITLES = {
   reminder: '⏰ Erinnerung',
   daystatus: '🚦 Tagesstatus',
   weather: '🌨️ Wetterhinweis',
+  reschedule: '🔄 Termin verschieben',
 };
 
 // Haken fuer E-Mail / Push. Standardmaessig aus – aktivierbar ueber Umgebungs-

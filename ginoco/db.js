@@ -241,6 +241,10 @@ ensureColumn('bookings', 'reminded_1d', 'reminded_1d INTEGER NOT NULL DEFAULT 0'
 ensureColumn('bookings', 'reminded_3h', 'reminded_3h INTEGER NOT NULL DEFAULT 0');
 ensureColumn('bookings', 'reminded_30m', 'reminded_30m INTEGER NOT NULL DEFAULT 0');
 ensureColumn('bookings', 'reminded_pickup', 'reminded_pickup INTEGER NOT NULL DEFAULT 0'); // "Abholort fixieren"-Erinnerung (~25 Min vorher) gesendet?
+// Verschiebe-Anfrage: der Fahrlehrer bittet den Schueler, sich einen neuen Termin zu suchen.
+ensureColumn('bookings', 'reschedule_req', 'reschedule_req TEXT');   // ISO-Zeitpunkt der Anfrage (NULL = keine)
+ensureColumn('bookings', 'reschedule_note', 'reschedule_note TEXT'); // optionaler Hinweis des Fahrlehrers
+ensureColumn('bookings', 'reschedule_gap', 'reschedule_gap TEXT');   // was mit der Luecke passiert: 'pack' | 'offer' | 'leave'
 ensureColumn('day_overrides', 'type', "type TEXT NOT NULL DEFAULT 'short'");  // short | free | vacation
 ensureColumn('bookings', 'meet_label', 'meet_label TEXT');   // Treffpunkt (Text)
 ensureColumn('bookings', 'meet_lat', 'meet_lat REAL');       // Treffpunkt-Koordinaten (optional)
