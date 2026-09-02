@@ -2058,7 +2058,7 @@ async function handleApi(req, res, url) {
   // Eigenes Profil ansehen (nur der Schüler selbst)
   if (p === '/api/my/profile' && method === 'GET') {
     if (!requireStudent()) return bad(res, 'Bitte anmelden', 401);
-    const st = db.prepare('SELECT name,email,phone,birth_year,birth_date,street,house_no,zip,city,username,(photo IS NOT NULL) AS has_photo FROM students WHERE id=?').get(sess.student_id);
+    const st = db.prepare('SELECT name,email,phone,birth_year,birth_date,street,house_no,zip,city,username,email_notify,(photo IS NOT NULL) AS has_photo FROM students WHERE id=?').get(sess.student_id);
     return ok(res, { profile: st || {} });
   }
   // Eigenes Profilfoto ausliefern (nur der Schueler selbst)
@@ -2098,6 +2098,7 @@ async function handleApi(req, res, url) {
     for (const k of ['street', 'house_no', 'zip', 'city']) {
       if (k in b) { fields.push(`${k}=?`); vals.push(b[k] ? String(b[k]).trim() : null); }
     }
+    if ('email_notify' in b) { fields.push('email_notify=?'); vals.push(b.email_notify ? 1 : 0); }
     if ('photo' in b) {
       if (b.photo === null || b.photo === '') { fields.push('photo=?'); vals.push(null); }
       else if (validPhoto(b.photo)) { fields.push('photo=?'); vals.push(b.photo); }
@@ -2655,7 +2656,7 @@ async function handleApi(req, res, url) {
       'school_label', 'school2_label', 'school2_lat', 'school2_lng',
       'instructor_home_label', 'instructor_home_lat', 'instructor_home_lng',
       'mail_enabled', 'smtp_host', 'smtp_port', 'smtp_secure', 'smtp_user',
-      'mail_from', 'mail_from_name', 'support_to'];
+      'mail_from', 'mail_from_name', 'support_to', 'public_url'];
     const emptyOk = new Set(['instructor_phone', 'meet_default_label', 'meet_default_lat', 'meet_default_lng', 'policy_text',
       'instructor_home_label', 'instructor_home_lat', 'instructor_home_lng', 'traffic_key',
       'smtp_host', 'smtp_user', 'mail_from', 'mail_from_name', 'support_to']);
@@ -2839,6 +2840,26 @@ function notify(studentId, kind, message, date = null, refBookingId = null, opts
   // damit z. B. eine Unterschriften-Anfrage wie eine echte Postfach-Nachricht wirkt.
   const pushTitle = opts.pushTitle || PUSH_TITLES[kind] || 'Ginoco';
   pushToStudent(studentId, message, opts.url || '/', pushTitle);
+  // Wichtige Ereignisse zusaetzlich per E-Mail (falls aktiviert). Fire-and-forget.
+  maybeEmailNotify(studentId, kind, message, pushTitle, opts);
+}
+// Nachrichten-Arten, die standardmaessig auch als E-Mail gehen (wichtige Ereignisse).
+// Erinnerungen sind bewusst NICHT dabei – die schickt sendDueReminders gezielt (opts.email)
+// nur einmal (1 Tag vorher), damit keine Mail-Flut entsteht.
+const EMAIL_KINDS = new Set(['booking', 'cancel', 'shift', 'offer', 'sign']);
+function maybeEmailNotify(studentId, kind, message, title, opts = {}) {
+  if (!mailEnabled()) return;
+  const wants = opts.email === true || (opts.email !== false && EMAIL_KINDS.has(kind));
+  if (!wants) return;
+  const st = db.prepare('SELECT name,email,email_notify FROM students WHERE id=?').get(studentId);
+  if (!st || !st.email || st.email_notify === 0) return;
+  const base = (getSettingRaw('public_url') || 'https://ginoco.de').replace(/\/+$/, '');
+  const link = base + (opts.url || '/');
+  const html = mailShell(escHtml(title || 'Ginoco'),
+    `<p>Hallo ${escHtml(st.name)},</p><p style="font-size:15px">${escHtml(message)}</p>`
+    + `<p style="margin:1.2rem 0"><a href="${escHtml(link)}" style="background:#e6934d;color:#fff;padding:11px 20px;border-radius:10px;text-decoration:none;font-weight:700;display:inline-block">In Ginoco öffnen</a></p>`
+    + `<p style="color:#9a8f82;font-size:12px">Diese Hinweise kannst du in deinem Profil unter „E-Mail-Benachrichtigungen" abschalten.</p>`);
+  tryMail(st.email, title || 'Ginoco', { text: `Hallo ${st.name},\n\n${message}\n\nÖffnen: ${link}\n\n(E-Mail-Hinweise kannst du in deinem Profil abschalten.)`, html });
 }
 // Kurze, sprechende Push-Überschriften je Nachrichten-Art.
 const PUSH_TITLES = {
@@ -3454,8 +3475,11 @@ function sendDueReminders() {
     if (!due.length) continue;
     const toSend = due[due.length - 1]; // die naheste (kleinste) Stufe
     for (const s of due) db.prepare(`UPDATE bookings SET ${s.flag} = 1 WHERE id = ?`).run(b.id);
+    // Nur die Tages-Erinnerung (1 Tag vorher) geht zusaetzlich per E-Mail – die
+    // kurzfristigen Stufen (3 h / 30 min) bleiben Push/Postfach, damit es keine Mail-Flut gibt.
     notify(b.student_id, 'reminder',
-      `Erinnerung (${toSend.label}): Fahrstunde am ${wdShort(b.date)} ${dmy(b.date)} um ${b.start_time} Uhr.`, b.date, b.id);
+      `Erinnerung (${toSend.label}): Fahrstunde am ${wdShort(b.date)} ${dmy(b.date)} um ${b.start_time} Uhr.`,
+      b.date, b.id, { email: toSend.flag === 'reminded_1d', url: '/' });
     sent++;
   }
   // Abholort-Erinnerung: ~25 Min vorher EINMAL anstupsen, damit der Schueler seinen

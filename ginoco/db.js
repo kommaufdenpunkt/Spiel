@@ -163,6 +163,8 @@ ensureColumn('students', 'live_active', 'live_active INTEGER NOT NULL DEFAULT 0'
 // (home_*), 'flex' = "ich fixiere meinen Live-Standort je Fahrstunde" (bis 20 Min vorher).
 ensureColumn('students', 'pickup_onboarded', 'pickup_onboarded INTEGER NOT NULL DEFAULT 0');
 ensureColumn('students', 'pickup_mode', 'pickup_mode TEXT');
+// E-Mail-Benachrichtigungen (Buchung/Erinnerung/Angebot) je Schueler an/aus. Standard: an.
+ensureColumn('students', 'email_notify', 'email_notify INTEGER NOT NULL DEFAULT 1');
 // Stammdaten fürs Profil (Adresse + Geburtsdatum). Nur der Fahrlehrer sieht sie (DSGVO).
 ensureColumn('students', 'birth_date', 'birth_date TEXT');    // Geburtsdatum YYYY-MM-DD (für exaktes Alter / Ausbildungsvertrag)
 ensureColumn('students', 'street', 'street TEXT');            // Straße
@@ -366,6 +368,7 @@ const DEFAULTS = {
   mail_from: '',             // Absenderadresse, z.B. gino@ginoco.de
   mail_from_name: 'Fahrschule Untern Buchen',
   support_to: '',            // Ziel fuer Support-Mails (leer = mail_from)
+  public_url: 'https://ginoco.de',  // oeffentliche Adresse des Portals (fuer Links in E-Mails)
   policy_text: 'Gebuchte Termine sind verbindlich. Kostenfrei stornieren nur bis '
     + '48 Std. vorher; ab 36 Std. vorher steht der Termin fest. Bei Nichterscheinen '
     + 'werden bis zu 75 % berechnet. Ab 20 Min Verspätung verkürzt sich die Fahrstunde '

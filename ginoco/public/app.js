@@ -194,6 +194,7 @@ const I18N = {
     pf_geo_hint: 'Faul zuhause? Ein Tipp füllt Straße, PLZ und Ort automatisch – du ergänzt nur die Hausnummer.',
     pf_street: 'Straße', pf_houseno: 'Hausnr.', pf_zip: 'PLZ', pf_city: 'Ort',
     pf_contact: '📞 Kontakt', pf_phone: 'Handynummer', pf_email: 'E-Mail (optional)',
+    pf_emailnotify: '📧 E-Mail-Benachrichtigungen', pf_emailnotify_hint: 'Termine, Erinnerungen & Angebote zusätzlich per E-Mail erhalten.',
     pf_access: '🔑 Zugang', pf_login_fixed: 'Login-Name (fest, ändert sich nicht)', pf_reach_school: 'Fahrschule erreichen',
     pf_save: 'Speichern', pf_account: '⚠️ Konto', pf_del_account: '🗑️ Mein Konto löschen',
     pf_account_text: 'Du kannst dein Konto jederzeit selbst löschen. Dein Login und deine persönlichen Daten werden dann entfernt. Deine bereits gefahrenen Fahrstunden bleiben – anonymisiert – im gesetzlichen Ausbildungsnachweis deiner Fahrschule erhalten.',
@@ -382,6 +383,7 @@ const I18N = {
     pf_geo_hint: 'Feeling lazy at home? One tap fills in street, postcode and city – you only add the house number.',
     pf_street: 'Street', pf_houseno: 'No.', pf_zip: 'Postcode', pf_city: 'City',
     pf_contact: '📞 Contact', pf_phone: 'Mobile number', pf_email: 'E-mail (optional)',
+    pf_emailnotify: '📧 E-mail notifications', pf_emailnotify_hint: 'Also receive appointments, reminders & offers by e-mail.',
     pf_access: '🔑 Access', pf_login_fixed: 'Login name (fixed, does not change)', pf_reach_school: 'Contact the school',
     pf_save: 'Save', pf_account: '⚠️ Account', pf_del_account: '🗑️ Delete my account',
     pf_account_text: 'You can delete your account yourself at any time. Your login and personal data are then removed. Your already driven lessons remain – anonymised – in your driving school\u2019s legally required training record.',
@@ -570,6 +572,7 @@ const I18N = {
     pf_geo_hint: 'Evde üşengeç mi? Bir dokunuş sokak, posta kodu ve şehri otomatik doldurur – sadece kapı numarasını eklersin.',
     pf_street: 'Sokak', pf_houseno: 'No.', pf_zip: 'Posta kodu', pf_city: 'Şehir',
     pf_contact: '📞 İletişim', pf_phone: 'Cep numarası', pf_email: 'E-posta (isteğe bağlı)',
+    pf_emailnotify: '📧 E-posta bildirimleri', pf_emailnotify_hint: 'Randevular, hatırlatmalar ve teklifler ayrıca e-posta ile.',
     pf_access: '🔑 Erişim', pf_login_fixed: 'Kullanıcı adı (sabit, değişmez)', pf_reach_school: 'Okula ulaş',
     pf_save: 'Kaydet', pf_account: '⚠️ Hesap', pf_del_account: '🗑️ Hesabımı sil',
     pf_account_text: 'Hesabını istediğin zaman kendin silebilirsin. Girişin ve kişisel verilerin kaldırılır. Sürdüğün dersler – anonim olarak – sürücü okulunun yasal eğitim kaydında kalır.',
@@ -758,6 +761,7 @@ const I18N = {
     pf_geo_hint: 'كسول في البيت؟ نقرة واحدة تملأ الشارع والرمز البريدي والمدينة – تضيف رقم المنزل فقط.',
     pf_street: 'الشارع', pf_houseno: 'رقم', pf_zip: 'الرمز البريدي', pf_city: 'المدينة',
     pf_contact: '📞 التواصل', pf_phone: 'رقم الجوال', pf_email: 'البريد الإلكتروني (اختياري)',
+    pf_emailnotify: '📧 إشعارات البريد الإلكتروني', pf_emailnotify_hint: 'استلام المواعيد والتذكيرات والعروض عبر البريد الإلكتروني أيضًا.',
     pf_access: '🔑 الدخول', pf_login_fixed: 'اسم الدخول (ثابت، لا يتغيّر)', pf_reach_school: 'التواصل مع المدرسة',
     pf_save: 'حفظ', pf_account: '⚠️ الحساب', pf_del_account: '🗑️ حذف حسابي',
     pf_account_text: 'يمكنك حذف حسابك بنفسك في أي وقت. عندها يُزال دخولك وبياناتك الشخصية. تبقى دروسك التي قدتها – مجهّلة الهوية – في سجل التدريب القانوني لمدرسة القيادة.',
@@ -1251,6 +1255,8 @@ async function renderProfileCard() {
         <div class="pf-sec-h">${t('pf_contact')}</div>
         <div class="field"><label>${t('pf_phone')}</label><input id="pf-phone" inputmode="tel" value="${esc(pr.phone || '')}" placeholder="${t('pf_ph_phone')}"></div>
         <div class="field"><label>${t('pf_email')}</label><input id="pf-email" type="email" value="${esc(pr.email || '')}" placeholder="${t('pf_ph_email')}"></div>
+        <label class="ck-line" style="margin-top:.2rem"><input type="checkbox" id="pf-emailnotify" ${pr.email_notify === 0 ? '' : 'checked'}> ${t('pf_emailnotify')}</label>
+        <div class="hint" style="margin:.2rem 0 0">${t('pf_emailnotify_hint')}</div>
       </div>
       <div class="pf-sec">
         <div class="pf-sec-h">${t('pf_access')}</div>
@@ -1317,6 +1323,7 @@ async function renderProfileCard() {
       await api('/api/my/profile', { method: 'PATCH', body: {
         name: $('#pf-name').value, phone: $('#pf-phone').value,
         email: $('#pf-email').value || null,
+        email_notify: $('#pf-emailnotify') ? $('#pf-emailnotify').checked : undefined,
         birth_date: $('#pf-bdate').value || null,
         street: $('#pf-street').value || null, house_no: $('#pf-houseno').value || null,
         zip: $('#pf-zip').value || null, city: $('#pf-city').value || null } });
@@ -1396,8 +1403,11 @@ function openTour() {
 window.__openTour = openTour;
 
 // ---------- Was ist neu? (Changelog) ----------
-const CHANGELOG_VER = '3.94';
+const CHANGELOG_VER = '3.95';
 const CHANGELOG = [
+  { v: '3.95', d: '02.09.2026', title: '📧 Wichtige Infos jetzt auch per E-Mail', items: [
+    '📧 <strong>E-Mail-Benachrichtigungen:</strong> Terminbestätigungen, die Erinnerung am Vortag und freie Termine zum Übernehmen kommen jetzt – wenn du magst – zusätzlich per E-Mail. So verpasst du nichts, auch ohne Push.',
+    '🔕 <strong>Ganz deine Wahl:</strong> Im Profil unter „📧 E-Mail-Benachrichtigungen" kannst du das jederzeit an- oder abschalten.'] },
   { v: '3.94', d: '02.09.2026', title: '✉️ Passwort per E-Mail & direkte Hilfe', items: [
     '🔑 <strong>Passwort vergessen? Jetzt selbst zurücksetzen:</strong> Wenn bei dir eine E-Mail hinterlegt ist, bekommst du auf „Passwort vergessen" sofort einen Link per Mail und vergibst dir in 30 Sekunden ein neues Passwort – ganz ohne Warten.',
     '✉️ <strong>Hilfe & Support direkt aus der App:</strong> Unten über „✉️ Hilfe" erreichst du uns mit einer kurzen Nachricht – wir melden uns zurück.'] },
@@ -7207,6 +7217,7 @@ function tabEinstellungen() {
       <div class="row"><div class="field"><label>Absender-Adresse</label><input id="e-mail-from" value="${esc(s.mail_from || '')}" placeholder="gino@ginoco.de" autocomplete="off"></div>
         <div class="field"><label>Absender-Name</label><input id="e-mail-fromname" value="${esc(s.mail_from_name || '')}" placeholder="Fahrschule Untern Buchen"></div></div>
       <div class="field"><label>Support-Adresse (wohin Support-Anfragen gehen) ${helpDot('Leer = an deine Absender-Adresse. Hier landen Nachrichten aus dem Support-Formular.')}</label><input id="e-mail-support" value="${esc(s.support_to || '')}" placeholder="leer = Absender-Adresse"></div>
+      <div class="field"><label>Portal-Adresse (für Links in E-Mails) ${helpDot('Die öffentliche Adresse, die in E-Mail-Knöpfen verlinkt wird – normalerweise https://ginoco.de.')}</label><input id="e-mail-url" value="${esc(s.public_url || '')}" placeholder="https://ginoco.de"></div>
       <div class="inline" style="gap:.5rem;margin-top:.6rem;flex-wrap:wrap">
         <input id="e-mail-testto" value="${esc(s.support_to || s.mail_from || '')}" placeholder="Test-Mail an …" style="flex:1;min-width:180px">
         <button class="sec sm" id="e-mail-test" type="button">✉️ Test-Mail senden</button></div>
@@ -7301,7 +7312,7 @@ function tabEinstellungen() {
         smtp_secure: $('#e-smtp-secure').checked ? '1' : '0', smtp_user: $('#e-smtp-user').value.trim(),
         smtp_pass: $('#e-smtp-pass').value || '',
         mail_from: $('#e-mail-from').value.trim(), mail_from_name: $('#e-mail-fromname').value.trim(),
-        support_to: $('#e-mail-support').value.trim(),
+        support_to: $('#e-mail-support').value.trim(), public_url: $('#e-mail-url').value.trim(),
         new_pin: $('#e-pin').value || undefined } });
       state.settings = r.settings; state.user.name = r.settings.instructor_name;
       toast('Einstellungen gespeichert ✓', 'ok'); $('#e-msg').textContent = 'Gespeichert.';
