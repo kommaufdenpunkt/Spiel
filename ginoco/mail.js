@@ -98,13 +98,23 @@ export async function sendMail(cfg, mail) {
       try { sock && sock.destroy(); } catch {}
       err ? reject(err) : resolve(val);
     };
-    const timer = setTimeout(() => done(new Error('Zeitueberschreitung beim Mailversand (20 s).')), 20000);
+    const timer = setTimeout(() => done(new Error('Zeitüberschreitung (20 s) – keine Antwort vom Mailserver. Oft ist der ausgehende Mail-Port beim Server-Anbieter gesperrt (z.B. Hetzner Cloud) und muss freigeschaltet werden.')), 20000);
 
     const bind = (s) => {
       sock = s;
       s.on('data', (d) => reader.feed(d));
-      s.on('error', (e) => { reader.fail(e); done(new Error('SMTP-Verbindungsfehler: ' + e.message)); });
-      s.on('close', () => { if (!settled) done(new Error('SMTP-Verbindung unerwartet geschlossen.')); });
+      s.on('error', (e) => {
+        reader.fail(e);
+        // Klartext-Hinweise fuer die haeufigsten Faelle (z.B. gesperrter Mail-Port).
+        const code = e.code || '';
+        let hint = e.message || String(e) || 'unbekannt';
+        if (code === 'ETIMEDOUT' || code === 'ECONNREFUSED' || code === 'ECONNRESET' || code === 'EHOSTUNREACH')
+          hint = `${code} – der Mailserver ist nicht erreichbar. Oft blockiert der Anbieter (z.B. Hetzner Cloud) ausgehende Mail-Ports (25/465/587); dann muss der Versand freigeschaltet werden. Alternativ Port 587 (SSL-Haken aus) probieren.`;
+        else if (/certificate|self.signed|altnames|CERT_/i.test(hint))
+          hint = `TLS-Zertifikat passt nicht (${hint}). Stimmt der SMTP-Server exakt? Bei Port 587 den SSL-Haken ausschalten (STARTTLS).`;
+        done(new Error('SMTP-Verbindungsfehler: ' + hint));
+      });
+      s.on('close', () => { if (!settled) done(new Error('SMTP-Verbindung unerwartet geschlossen (evtl. Port blockiert oder falscher Verschlüsselungs-Modus).')); });
     };
 
     const expect = async (want, ctx) => {
