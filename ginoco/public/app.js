@@ -1396,8 +1396,11 @@ function openTour() {
 window.__openTour = openTour;
 
 // ---------- Was ist neu? (Changelog) ----------
-const CHANGELOG_VER = '3.93';
+const CHANGELOG_VER = '3.94';
 const CHANGELOG = [
+  { v: '3.94', d: '02.09.2026', title: '✉️ Passwort per E-Mail & direkte Hilfe', items: [
+    '🔑 <strong>Passwort vergessen? Jetzt selbst zurücksetzen:</strong> Wenn bei dir eine E-Mail hinterlegt ist, bekommst du auf „Passwort vergessen" sofort einen Link per Mail und vergibst dir in 30 Sekunden ein neues Passwort – ganz ohne Warten.',
+    '✉️ <strong>Hilfe & Support direkt aus der App:</strong> Unten über „✉️ Hilfe" erreichst du uns mit einer kurzen Nachricht – wir melden uns zurück.'] },
   { v: '3.93', d: '02.09.2026', title: '📍 Abholung: deine Wahl – mit Bewegungsfreiheit', items: [
     '📍 <strong>Beim ersten Login:</strong> Du legst einmal fest, wie du abgeholt werden möchtest – <strong>fester Abholort</strong> (immer am selben Ort, einfach & verlässlich) oder <strong>flexibel</strong> (du bist viel unterwegs und fixierst deinen Live-Standort je Fahrstunde).',
     '🕒 <strong>Bis 20 Min vorher änderbar:</strong> Spontan woanders? Kein Problem – fixiere deinen Abholort bis 20 Minuten vor Beginn. Danach steht er fest, damit dein Fahrlehrer sicher planen kann.',
@@ -1856,6 +1859,8 @@ function closeModal() {
   } catch (e) { /* settings evtl. ohne login */ }
   applyLangDir();
   render();
+  // Passwort-Reset-Link aus der E-Mail (/?reset=TOKEN) direkt abfangen.
+  maybeHandleResetLink();
 })();
 
 function render() {
@@ -2057,7 +2062,7 @@ function renderAuth() {
         <button class="ghost sm" onclick="window.__openThemePicker()">${t('appearance')}</button>
         <button class="ghost sm" onclick="window.__openLangPicker()">${lg.flag} ${esc(lg.label)}</button>
       </div>
-      <div class="center legal-links"><a href="/nutzungsbedingungen.html">${t('terms')}</a> · <a href="/datenschutz.html">${t('privacy')}</a> · <a href="/impressum.html">${t('imprint')}</a></div>
+      <div class="center legal-links"><a href="/nutzungsbedingungen.html">${t('terms')}</a> · <a href="/datenschutz.html">${t('privacy')}</a> · <a href="/impressum.html">${t('imprint')}</a> · <a href="#" onclick="window.__openSupport();return false">✉️ Hilfe</a></div>
       ${mode !== 'admin' ? '<div class="rev-marquee" id="rev-marquee" hidden></div>' : ''}
     </div></div>`;
     app.querySelectorAll('.tabs button').forEach((b) => b.onclick = () => { tab = b.dataset.t; draw(); });
@@ -2154,6 +2159,62 @@ function openForgotModal() {
     } catch (e) { showErr(e.message); }
   };
 }
+
+// Reset-Link aus der E-Mail (/?reset=TOKEN): neues Passwort setzen.
+async function maybeHandleResetLink() {
+  let token = null;
+  try { token = new URL(location.href).searchParams.get('reset'); } catch { return false; }
+  if (!token) return false;
+  // Token aus der Adresszeile entfernen (nicht im Verlauf/History stehen lassen)
+  try { const u = new URL(location.href); u.searchParams.delete('reset'); history.replaceState(null, '', u.pathname + u.search + u.hash); } catch {}
+  let valid = false;
+  try { valid = (await api('/api/auth/reset-check', { method: 'POST', body: { token } })).valid; } catch {}
+  if (!valid) { toast('Der Passwort-Link ist ungültig oder abgelaufen. Bitte fordere einen neuen an.', 'err'); return false; }
+  openPwResetModal(token);
+  return true;
+}
+function openPwResetModal(token) {
+  modal(`<h3>🔑 Neues Passwort setzen</h3>
+    <p class="hint">Wähle ein neues Passwort für dein Ginoco-Konto.</p>
+    ${errBox()}
+    <div class="field"><label>Neues Passwort</label><input id="rs-pw" type="password" autocomplete="new-password" placeholder="mind. 8 Zeichen, mit Zahl & Sonderzeichen"></div>
+    <div class="field"><label>Nochmal zur Kontrolle</label><input id="rs-pw2" type="password" autocomplete="new-password"></div>
+    <div class="actions"><button id="rs-go">Passwort speichern</button></div>`, 'locked');
+  $('#rs-go').onclick = async () => {
+    const pw = $('#rs-pw').value, pw2 = $('#rs-pw2').value;
+    if (pw !== pw2) { showErr('Die Passwörter stimmen nicht überein.'); return; }
+    try {
+      await api('/api/auth/reset', { method: 'POST', body: { token, new_password: pw } });
+      closeModal();
+      toast('Passwort geändert ✓ Du kannst dich jetzt anmelden.', 'ok');
+    } catch (e) { showErr(e.message); }
+  };
+}
+
+// Support-/Hilfe-Formular: Nachricht an den Fahrlehrer.
+function openSupportModal() {
+  const u = state.user;
+  const known = u && u.role === 'student';
+  modal(`<h3>✉️ Hilfe & Support</h3>
+    <p class="hint">Schreib uns dein Anliegen – wir melden uns${known ? '' : ' (gib deine E-Mail an, damit wir antworten können)'}.</p>
+    ${errBox()}
+    ${known ? '' : `<div class="field"><label>Deine E-Mail (für die Antwort)</label><input id="sp-email" type="email" placeholder="name@beispiel.de"></div>`}
+    <div class="field"><label>Betreff</label><input id="sp-subject" placeholder="Worum geht’s?"></div>
+    <div class="field"><label>Nachricht</label><textarea id="sp-msg" rows="5" placeholder="Beschreibe dein Anliegen kurz …"></textarea></div>
+    <div class="actions"><button class="sec" onclick="window.__closeModal()">Abbrechen</button><button id="sp-go">Absenden</button></div>`);
+  $('#sp-go').onclick = async () => {
+    const message = $('#sp-msg').value.trim();
+    if (message.length < 5) { showErr('Bitte schreib kurz, worum es geht.'); return; }
+    const body = { message, subject: $('#sp-subject').value.trim() };
+    const em = $('#sp-email'); if (em) body.email = em.value.trim();
+    try {
+      await api('/api/support', { method: 'POST', body });
+      closeModal();
+      toast('Danke! Deine Nachricht ist raus. 🚗', 'ok');
+    } catch (e) { showErr(e.message); }
+  };
+}
+window.__openSupport = openSupportModal;
 function registerForm() {
   return `${errBox()}
     <p class="hint">${t('reg_intro')}</p>

@@ -264,6 +264,16 @@ ensureColumn('students', 'home_base', 'home_base TEXT');
 ensureColumn('students', 'availability', 'availability TEXT');
 ensureColumn('students', 'deleted_at', 'deleted_at TEXT');      // gesetzt = vom Schueler selbst geloescht (Login gesperrt, Daten anonymisiert; Fahrstunden bleiben fuer den Nachweis)
 
+// Passwort-Zuruecksetzen per E-Mail: kurzlebige Einmal-Token (Self-Service).
+db.exec(`CREATE TABLE IF NOT EXISTS password_resets (
+  token      TEXT PRIMARY KEY,
+  student_id INTEGER NOT NULL,
+  expires    INTEGER NOT NULL,
+  used       INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL
+);`);
+db.exec('CREATE INDEX IF NOT EXISTS idx_pwreset_student ON password_resets(student_id)');
+
 // Live-Standort des Fahrlehrers (genau eine Zeile)
 db.exec(`CREATE TABLE IF NOT EXISTS live_location (
   id INTEGER PRIMARY KEY CHECK(id = 1),

@@ -39,6 +39,7 @@ function passwordProblem(pw) {
 
 // ---------- Einfacher Login-Ratenbegrenzer (im Speicher, gegen Brute-Force) ----------
 const loginAttempts = new Map(); // ip -> { count, until }
+const supportHits = new Map();   // ip -> { count, until } – Rate-Limit fuers Support-Formular
 const LOGIN_MAX = 8;             // erlaubte Fehlversuche
 const LOGIN_WINDOW_MS = 15 * 60 * 1000;
 function clientIp(req) {
@@ -903,16 +904,92 @@ async function handleApi(req, res, url) {
     const b = await readBody(req);
     const handle = String(b.login || b.email || '').trim();
     if (handle) {
-      const st = db.prepare('SELECT id,name,username FROM students WHERE username = ? COLLATE NOCASE OR email = ?').get(handle, handle.toLowerCase());
+      const st = db.prepare('SELECT id,name,username,email FROM students WHERE username = ? COLLATE NOCASE OR email = ?').get(handle, handle.toLowerCase());
       if (st) {
-        // Doppelte Anfragen innerhalb von 30 Min nicht mehrfach protokollieren
+        // Doppelte Anfragen innerhalb von 30 Min nicht mehrfach protokollieren/verschicken
         const recent = db.prepare("SELECT 1 FROM events WHERE type='reset' AND student_id=? AND at > ?")
           .get(st.id, new Date(Date.now() - 30 * 60000).toISOString());
+        // Self-Service per E-Mail: hat der Schueler eine Adresse und ist der Versand
+        // aktiv, schicken wir einen Reset-Link (1 Std gueltig). Sonst Rueckfall: Fahrlehrer.
+        let mailed = false;
+        if (!recent && st.email && mailEnabled()) {
+          const token = b64url(randomBytes(24));
+          db.prepare('INSERT INTO password_resets(token,student_id,expires,created_at) VALUES(?,?,?,?)')
+            .run(token, st.id, Date.now() + 60 * 60 * 1000, new Date().toISOString());
+          const link = `${isHttps(req) ? 'https' : 'http'}://${req.headers.host}/?reset=${token}`;
+          mailed = await tryMail(st.email, '🔑 Neues Passwort für Ginoco', {
+            text: `Hallo ${st.name},\n\ndu (oder jemand) hat ein neues Passwort für dein Ginoco-Konto angefragt.\nÖffne diesen Link, um ein neues Passwort zu setzen (gültig 1 Stunde):\n\n${link}\n\nWar das nicht du? Dann ignoriere diese Mail – dein Passwort bleibt unverändert.`,
+            html: mailShell('Neues Passwort setzen',
+              `<p>Hallo ${escHtml(st.name)},</p><p>du (oder jemand) hat ein neues Passwort für dein Ginoco-Konto angefragt. Klick auf den Knopf, um ein neues Passwort zu setzen – der Link ist <strong>1&nbsp;Stunde</strong> gültig:</p>`
+              + `<p style="margin:1.2rem 0"><a href="${escHtml(link)}" style="background:#e6934d;color:#fff;padding:11px 20px;border-radius:10px;text-decoration:none;font-weight:700;display:inline-block">🔑 Neues Passwort setzen</a></p>`
+              + `<p style="color:#9a8f82;font-size:13px">War das nicht du? Dann ignoriere diese Mail – dein Passwort bleibt unverändert.</p>`),
+          });
+        }
         if (!recent) logEvent('reset', { actor: 'student', studentId: st.id,
-          detail: `${st.name} hat „Passwort vergessen" angefragt (Login ${st.username || '?'}). Bitte ein neues Passwort setzen und mitteilen.` });
+          detail: `${st.name} hat „Passwort vergessen" angefragt (Login ${st.username || '?'})${mailed ? ' – Reset-Mail wurde verschickt.' : '. Bitte ein neues Passwort setzen und mitteilen.'}` });
       }
     }
     return ok(res, { requested: true });
+  }
+  // Support-/Hilfe-Anfrage: Nachricht an den Fahrlehrer (Mail + Portal-Protokoll).
+  if (p === '/api/support' && method === 'POST') {
+    const b = await readBody(req);
+    const msg = String(b.message || '').replace(/\r\n/g, '\n').trim();
+    if (msg.length < 5) return bad(res, 'Bitte schreib kurz, worum es geht (mind. 5 Zeichen).');
+    if (msg.length > 4000) return bad(res, 'Bitte fasse dich etwas kürzer (max. 4000 Zeichen).');
+    const ip = clientIp(req), now = Date.now();
+    const e = supportHits.get(ip);
+    if (e && e.until > now && e.count >= 5) return bad(res, 'Zu viele Anfragen. Bitte in ein paar Minuten erneut.', 429);
+    if (!e || e.until < now) supportHits.set(ip, { count: 1, until: now + 15 * 60000 }); else e.count++;
+    let who = 'Gast', fromEmail = String(b.email || '').trim();
+    if (sess && sess.kind === 'student') {
+      const st = db.prepare('SELECT name,email,username FROM students WHERE id=?').get(sess.student_id);
+      if (st) { who = `${st.name} (${st.username || 'Schüler'})`; if (st.email) fromEmail = st.email; }
+    }
+    const subject = (String(b.subject || '').trim().slice(0, 120)) || 'Support-Anfrage';
+    const validEmail = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(fromEmail) ? fromEmail : null;
+    logEvent('info', {
+      actor: sess && sess.kind === 'student' ? 'student' : 'system',
+      studentId: sess && sess.kind === 'student' ? sess.student_id : null,
+      detail: `📮 Support: „${subject}" von ${who}${validEmail ? ' <' + validEmail + '>' : ''}: ${msg.slice(0, 500)}`,
+    });
+    const to = getSettingRaw('support_to') || getSettingRaw('mail_from');
+    let mailed = false;
+    if (mailEnabled() && to) {
+      mailed = await tryMail(to, '📮 Support: ' + subject, {
+        replyTo: validEmail || undefined,
+        text: `Neue Support-Anfrage über Ginoco\n\nVon: ${who}${validEmail ? ' <' + validEmail + '>' : ''}\nBetreff: ${subject}\n\n${msg}`,
+        html: mailShell('📮 Support-Anfrage',
+          `<p><strong>Von:</strong> ${escHtml(who)}${validEmail ? ' &lt;' + escHtml(validEmail) + '&gt;' : ''}<br><strong>Betreff:</strong> ${escHtml(subject)}</p>`
+          + `<p style="white-space:pre-wrap;border-left:3px solid #e6934d;padding-left:12px;color:#2b2320">${escHtml(msg)}</p>`),
+      });
+    }
+    return ok(res, { received: true, mailed });
+  }
+  // Reset-Token pruefen (zeigt der Client, um das Formular anzuzeigen).
+  if (p === '/api/auth/reset-check' && method === 'POST') {
+    const b = await readBody(req);
+    const row = db.prepare('SELECT student_id,expires,used FROM password_resets WHERE token=?').get(String(b.token || ''));
+    const okTok = !!(row && !row.used && row.expires > Date.now());
+    return ok(res, { valid: okTok });
+  }
+  // Neues Passwort per Token setzen (Self-Service).
+  if (p === '/api/auth/reset' && method === 'POST') {
+    if (loginBlocked(req)) return bad(res, 'Zu viele Versuche. Bitte in ein paar Minuten erneut.', 429);
+    const b = await readBody(req);
+    const row = db.prepare('SELECT token,student_id,expires,used FROM password_resets WHERE token=?').get(String(b.token || ''));
+    if (!row || row.used || row.expires <= Date.now()) { noteLoginFail(req); return bad(res, 'Der Link ist ungültig oder abgelaufen. Bitte fordere einen neuen an.', 400); }
+    const prob = passwordProblem(String(b.new_password || ''));
+    if (prob) return bad(res, 'Neues Passwort braucht ' + prob + '.');
+    db.prepare('UPDATE students SET pass=? WHERE id=?').run(hashPassword(String(b.new_password)), row.student_id);
+    db.prepare('UPDATE password_resets SET used=1 WHERE token=?').run(row.token);
+    // alle weiteren offenen Token dieses Schuelers entwerten + Sitzungen beenden (Sicherheit)
+    db.prepare('UPDATE password_resets SET used=1 WHERE student_id=? AND used=0').run(row.student_id);
+    db.prepare("DELETE FROM sessions WHERE kind='student' AND student_id=?").run(row.student_id);
+    const stu = db.prepare('SELECT name FROM students WHERE id=?').get(row.student_id);
+    logEvent('info', { actor: 'student', studentId: row.student_id, detail: `${stu?.name || 'Fahrschüler'} hat sein Passwort per E-Mail-Link neu gesetzt.` });
+    noteLoginOk(req);
+    return ok(res, { reset: true });
   }
 
   // ===== Einstellungen: Fahrlehrer sieht alles, andere nur eine unbedenkliche Teilmenge =====
@@ -2806,6 +2883,11 @@ async function tryMail(to, subject, { text, html, replyTo } = {}) {
   if (!mailEnabled() || !to) return false;
   try { await sendMail(mailConfig(), { to, subject, text, html, replyTo }); return true; }
   catch (e) { console.error('[mail] Versand fehlgeschlagen:', e.message); return false; }
+}
+// HTML-Escaping fuer Nutzer-Eingaben in Mail-Texten (Name, Freitext).
+function escHtml(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, (c) =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 // Einheitliches HTML-Rahmenlayout fuer alle Mails (schlicht, gut lesbar).
 function mailShell(title, bodyHtml) {
