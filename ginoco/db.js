@@ -360,6 +360,7 @@ const DEFAULTS = {
   sonder_min_autobahn: '180', // Dauer je Autobahn-Sonderfahrt (Minuten) – 4 UE
   sonder_min_nacht: '135',    // Dauer je Nachtfahrt (Minuten) – 3 UE
   rank2_min_lessons: '15',   // ab so vielen gefahrenen Stunden -> Rang 2 (Sonderfahrten frei)
+  rank2_min_manual: '6',     // zusaetzlich noetig fuer Rang 2: so viele Schalt-Einheiten (à 80 Min)
   booking_horizon_days_rank2: '21', // Rang 2 darf so viele Tage im Voraus buchen
   registration_open: '0',    // '1' = neue Fahrschüler dürfen sich mit Code registrieren, '0' = geschlossen (privat)
   // E-Mail-Versand (SMTP, eigene Domain-Mailbox). Standard: aus, bis eingerichtet.
@@ -427,7 +428,7 @@ export function getSettings() {
     'monthly_target_h', 'monthly_max_h', 'contract_min_h', 'contract_paid_h',
     'max_per_week', 'student_max_per_day', 'reserve_expire_min', 'booking_horizon_days', 'cancel_hours', 'lock_hours',
     'vacation_credit_min', 'vacation_days_left', 'late_grace_min', 'avg_speed_kmh', 'live_lead_min',
-    'req_ueberland', 'req_autobahn', 'req_nacht', 'rank2_min_lessons', 'booking_horizon_days_rank2',
+    'req_ueberland', 'req_autobahn', 'req_nacht', 'rank2_min_lessons', 'rank2_min_manual', 'booking_horizon_days_rank2',
     'sonder_min_ueberland', 'sonder_min_autobahn', 'sonder_min_nacht']) {
     out[n] = Number(out[n]);
   }

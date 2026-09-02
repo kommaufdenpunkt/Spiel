@@ -154,6 +154,7 @@ const I18N = {
     pc_sonder_help: 'Pflichtfahrten für die Führerscheinprüfung: Überlandfahrten, Autobahn und Nachtfahrt. Die Zahlen zeigen, wie viele du schon hast.',
     pc_book_min: '+ {dur} Min buchen',
     pc_sonder_hint: 'Sonderfahrten kannst du ab <strong>Rang 2</strong> ({n} Fahrstunden) selbst buchen.',
+    pc_manual_info: 'ℹ️ Davon idealerweise {need} Schalter-Einheiten (à 80 Min) – du hast {have}.',
     pc_adk: '📋 Ausbildungskarte', pc_exam: '🎓 Prüfungsreife',
     msg_you: 'Du', msg_title: '✉️ Nachrichten', msg_to: 'an {who}', msg_placeholder: 'Nachricht schreiben …', send: 'Senden',
     msg_none: 'Noch keine Nachrichten. Schreib deinem Fahrlehrer – z. B. eine Frage oder Bescheid, wenn du dich verspätest.',
@@ -353,6 +354,7 @@ const I18N = {
     pc_sonder_help: 'Mandatory drives for the driving test: cross-country, motorway and night drive. The numbers show how many you already have.',
     pc_book_min: '+ book {dur} min',
     pc_sonder_hint: 'You can book special drives yourself from <strong>rank 2</strong> ({n} lessons).',
+    pc_manual_info: 'ℹ️ Ideally {need} of them are manual units (80 min each) – you have {have}.',
     pc_adk: '📋 Training card', pc_exam: '🎓 Test readiness',
     msg_you: 'You', msg_title: '✉️ Messages', msg_to: 'to {who}', msg_placeholder: 'Write a message …', send: 'Send',
     msg_none: 'No messages yet. Write to your instructor – e.g. a question or to let them know if you’re running late.',
@@ -552,6 +554,7 @@ const I18N = {
     pc_sonder_help: 'Sürücü sınavı için zorunlu sürüşler: şehirlerarası, otoyol ve gece sürüşü. Sayılar kaç tane olduğunu gösterir.',
     pc_book_min: '+ {dur} dk al',
     pc_sonder_hint: 'Özel sürüşleri <strong>Sınıf 2</strong>’den ({n} ders) itibaren kendin alabilirsin.',
+    pc_manual_info: 'ℹ️ Bunların ideal olarak {need} tanesi manuel birim (80 dk) – sende {have} var.',
     pc_adk: '📋 Eğitim kartı', pc_exam: '🎓 Sınav hazırlığı',
     msg_you: 'Sen', msg_title: '✉️ Mesajlar', msg_to: '{who} kişisine', msg_placeholder: 'Mesaj yaz …', send: 'Gönder',
     msg_none: 'Henüz mesaj yok. Eğitmenine yaz – örn. bir soru ya da geç kalacaksan haber ver.',
@@ -751,6 +754,7 @@ const I18N = {
     pc_sonder_help: 'رحلات إلزامية لاختبار القيادة: خارج المدينة، الطريق السريع، والقيادة الليلية. الأرقام تُظهر كم أنجزت.',
     pc_book_min: '+ احجز {dur} دقيقة',
     pc_sonder_hint: 'يمكنك حجز الرحلات الخاصة بنفسك من <strong>المستوى 2</strong> ({n} درساً).',
+    pc_manual_info: 'ℹ️ يُفضّل أن يكون {need} منها وحدات قير يدوي (80 د) – لديك {have}.',
     pc_adk: '📋 بطاقة التدريب', pc_exam: '🎓 جاهزية الاختبار',
     msg_you: 'أنت', msg_title: '✉️ الرسائل', msg_to: 'إلى {who}', msg_placeholder: 'اكتب رسالة …', send: 'إرسال',
     msg_none: 'لا رسائل بعد. راسِل مدرّبك – مثلاً سؤال أو أخبره إن كنت ستتأخر.',
@@ -3293,6 +3297,7 @@ function studentProgress(p) {
           <div class="pc-line"><span>${t('pc_to_rank2')}</span><span class="muted">${p.doneCount}/${p.rank2Min}</span></div>
           ${pbar(p.doneCount, p.rank2Min, 'var(--brand)')}
           <div class="hint" style="margin:.3rem 0 0">${t('pc_to_rank2_hint', { n: toRank2, d: state.settings?.booking_horizon_days_rank2 || 21 })}</div>
+          ${p.rank2Manual ? `<div class="hint" style="margin:.2rem 0 0">${t('pc_manual_info', { have: p.manualUnits, need: p.rank2Manual })}</div>` : ''}
         </div>`
       : `<div class="pc-block"><span class="pill" style="background:var(--good-bg);color:var(--good)">${t('pc_rank2_ok', { d: p.horizon })}</span></div>`}
     <div class="pc-sonder">

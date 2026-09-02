@@ -555,15 +555,24 @@ function freeStarts(date, studentId) {
 function doneCount(studentId) {
   return db.prepare("SELECT COUNT(*) AS n FROM bookings WHERE student_id=? AND status='done' AND (attended IS NULL OR attended=1)").get(studentId).n;
 }
-// Rang & Buchungshorizont eines Schuelers (ab X Stunden -> Rang 2 -> weiter im Voraus)
+// Gefahrene Schalt-Einheiten (à 80 Min) eines Schuelers – für die Rang-2-Bedingung.
+function manualUnits(studentId) {
+  if (!studentId) return 0;
+  const m = db.prepare("SELECT COALESCE(SUM(duration_min),0) AS m FROM bookings WHERE student_id=? AND status='done' AND gearbox='schalt' AND (attended IS NULL OR attended=1)").get(studentId).m;
+  return Math.round(((m || 0) / 80) * 10) / 10;
+}
+// Rang & Buchungshorizont eines Schuelers: ab „rank2_min_lessons" gefahrenen
+// Fahrstunden -> Rang 2 (3 Wochen Vorausschau + Sonderfahrten buchbar). Die
+// Schalt-Einheiten werden nur als Info mitgeliefert (keine Bedingung).
 function studentRank(studentId) {
   const rank2Min = Number(getSettingRaw('rank2_min_lessons'));
+  const rank2Manual = Number(getSettingRaw('rank2_min_manual'));
   const dc = studentId ? doneCount(studentId) : 0;
   const rank = dc >= rank2Min ? 2 : 1;
   const horizon = rank >= 2
     ? Number(getSettingRaw('booking_horizon_days_rank2'))
     : Number(getSettingRaw('booking_horizon_days'));
-  return { rank, horizon, doneCount: dc, rank2Min };
+  return { rank, horizon, doneCount: dc, rank2Min, manualUnits: manualUnits(studentId), rank2Manual };
 }
 // Gefahrene Sonderfahrten je Art – in UNTERRICHTSEINHEITEN (UE, 45 Min).
 // So zaehlt eine 225-Min-Ueberlandfahrt korrekt als 5 UE (= 5/5), nicht als 1 Termin.
@@ -2741,7 +2750,7 @@ async function handleApi(req, res, url) {
       'meet_default_label', 'meet_default_lat', 'meet_default_lng',
       'anonymous_swaps', 'req_ueberland', 'req_autobahn', 'req_nacht',
       'sonder_min_ueberland', 'sonder_min_autobahn', 'sonder_min_nacht',
-      'rank2_min_lessons', 'booking_horizon_days_rank2', 'registration_open',
+      'rank2_min_lessons', 'rank2_min_manual', 'booking_horizon_days_rank2', 'registration_open',
       'flow_schedule', 'auto_fill_gaps', 'school_lat', 'school_lng', 'travel_default_min',
       'school_label', 'school2_label', 'school2_lat', 'school2_lng',
       'instructor_home_label', 'instructor_home_lat', 'instructor_home_lng',
@@ -3412,9 +3421,9 @@ function createBooking(res, sess, body) {
 
     if (sonderType) {
       // Sonderfahrten erst ab Rang 2 – feste Dauer, keine allowed_durations-Pruefung.
-      const { rank } = studentRank(sess.student_id);
-      if (rank < 2)
-        return bad(res, `Sonderfahrten kannst du erst ab Rang 2 buchen (ab ${Number(getSettingRaw('rank2_min_lessons'))} gefahrenen Fahrstunden).`);
+      const rk = studentRank(sess.student_id);
+      if (rk.rank < 2)
+        return bad(res, `Sonderfahrten gibt es ab Rang 2 – dafür brauchst du ${rk.rank2Min} gefahrene Fahrstunden (du hast ${rk.doneCount}).`);
     } else {
       // Erlaubte Dauer fuer diesen Schueler?
       const stu = db.prepare('SELECT allowed_durations FROM students WHERE id = ?').get(sess.student_id);
