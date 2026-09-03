@@ -5689,20 +5689,38 @@ function openLearnpointEditor(point, studentName) {
   modal(`<h3>📍 Fehler festhalten</h3>
     <p class="hint"><strong>${esc(studentName || 'Fahrschüler')}</strong> · <span id="lp-geo">${point.lat != null ? '📍 Standort gesetzt ✓' : '📍 Standort …'}</span></p>
     <div class="lp-chips">${LP_CHIPS.map((c) => `<button type="button" class="lp-chip" data-chip="${esc(c)}">${esc(c)}</button>`).join('')}</div>
-    <div class="field" style="margin-top:.4rem"><textarea id="lp-text" rows="3" placeholder="Was ist passiert? Worauf beim nächsten Mal achten?">${esc(point.text || '')}</textarea></div>
+    <div class="field" style="margin-top:.4rem"><textarea id="lp-text" rows="3" placeholder="Tipp einfach oben auf einen Fehler – wird sofort gespeichert. (Freitext optional.)">${esc(point.text || '')}</textarea></div>
+    <div id="lp-saved" class="lp-saved" aria-live="polite"></div>
     <div class="lp-photos" id="lp-photos">${photoGrid()}</div>
     <input type="file" id="lp-file" accept="image/*" capture="environment" multiple style="display:none">
     <button class="sec sm" id="lp-add" type="button">📷 Foto hinzufügen</button>
     <div class="actions" style="flex-wrap:wrap;gap:.5rem;margin-top:.7rem">
       <button class="ghost sm" id="lp-del-point">🗑️ Verwerfen</button>
-      <button class="sec" id="lp-save">💾 Später weiter</button>
+      <button class="sec" id="lp-save">Schließen</button>
       <button id="lp-done">✅ Fertig – dem Schüler zeigen</button>
     </div>`, 'wide');
   const ta = $('#lp-text');
+  // Auto-Speichern: jeder Chip-Tipp und jedes Tippen sichert den Text sofort (nur Text,
+  // damit „Fertig"/„done" unberührt bleibt). Man muss nichts mehr extra speichern.
+  const setSaved = (txt) => { const el = $('#lp-saved'); if (el) el.textContent = txt; };
+  let saveTimer, saving = false, dirty = false, lastSaved = point.text || '';
+  const doSave = async () => {
+    if (saving) { dirty = true; return; }
+    if (ta.value === lastSaved) return;
+    saving = true; setSaved('💾 speichere …');
+    try {
+      const r = await api('/api/instructor/learnpoints/' + point.id, { method: 'PATCH', body: { text: ta.value } });
+      point.text = r.point.text; lastSaved = ta.value; setSaved('✓ gespeichert');
+    } catch { setSaved('⚠️ nicht gespeichert – nochmal antippen'); }
+    saving = false;
+    if (dirty) { dirty = false; doSave(); }
+  };
+  const queueSave = () => { clearTimeout(saveTimer); saveTimer = setTimeout(doSave, 500); };
   document.querySelectorAll('[data-chip]').forEach((ch) => ch.onclick = () => {
     const v = ch.dataset.chip; ta.value = ta.value.trim() ? ta.value.replace(/\s*$/, '') + '\n• ' + v : '• ' + v;
-    ta.focus();
+    doSave();   // sofort sichern – kein „Fertig" nötig, damit nichts verloren geht
   });
+  ta.oninput = queueSave;
   const redrawPhotos = () => { const el = $('#lp-photos'); if (el) { el.innerHTML = photoGrid(); wireDel(); } };
   const wireDel = () => document.querySelectorAll('[data-delph]').forEach((db2) => db2.onclick = async () => {
     try { await api(`/api/instructor/learnpoints/${point.id}/photo/${db2.dataset.delph}`, { method: 'DELETE' });
@@ -5727,8 +5745,8 @@ function openLearnpointEditor(point, studentName) {
       closeModal(); toast(done ? '📖 Im Fehlerbuch – der Schüler kann es ansehen.' : '💾 Als Entwurf gespeichert.', 'ok');
     } catch (e) { toast(e.message, 'err'); }
   };
-  $('#lp-save').onclick = () => saveText(false);
-  $('#lp-done').onclick = () => saveText(true);
+  $('#lp-save').onclick = async () => { clearTimeout(saveTimer); await doSave(); closeModal(); toast('💾 Gespeichert – findest du unter 📖 Fehlerbuch.', 'ok'); };
+  $('#lp-done').onclick = () => { clearTimeout(saveTimer); saveText(true); };
   $('#lp-del-point').onclick = async () => {
     if (!confirm('Diesen Eintrag verwerfen?')) return;
     try { await api('/api/instructor/learnpoints/' + point.id, { method: 'DELETE' }); closeModal(); toast('Verworfen', 'ok'); } catch (e) { toast(e.message, 'err'); }

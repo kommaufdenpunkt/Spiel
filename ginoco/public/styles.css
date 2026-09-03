@@ -1718,3 +1718,6 @@ header .brand .brandname{
   background:color-mix(in srgb,var(--brand) 12%,transparent)}
 .lp-step.done{color:var(--good);border-color:color-mix(in srgb,var(--good) 45%,var(--line))}
 @media(max-width:430px){.lp-step{font-size:.72rem;padding:.24rem .45rem}.lh-num{font-size:2rem}}
+
+/* Fehlerbuch-Editor: dezenter Auto-Speichern-Status */
+.lp-saved{min-height:1.1em;font-size:.8rem;font-weight:700;color:var(--good);margin:.15rem 0 .2rem;transition:opacity .2s}
