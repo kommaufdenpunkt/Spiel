@@ -1374,15 +1374,19 @@ async function handleApi(req, res, url) {
         if (h < lockH) {
           return bad(res, `Ab ${lockH} Std. vorher ist der Termin fest gebucht und kann nicht mehr abgesagt werden.`);
         }
-        if (h < cancelH) {
-          return bad(res, `Kostenfreies Stornieren nur bis ${cancelH} Std. vorher. `
-            + `Du kannst die Stunde aber zur Uebernahme anbieten – uebernimmt sie jemand, bist du frei.`);
+        // Zwischen Storno- und Sperrfrist ist die Absage kostenpflichtig (bis 75 %).
+        // Sie geht nur mit ausdruecklicher Bestaetigung (?charge=1); sonst Hinweis + Alternative.
+        const late = h < cancelH;
+        if (late && url.searchParams.get('charge') !== '1') {
+          return bad(res, `Kostenfrei stornieren nur bis ${cancelH} Std. vorher. Jetzt wäre die Absage kostenpflichtig (bis 75 %). `
+            + `Besser: gib die Stunde zur Übernahme frei – übernimmt sie jemand, bist du kostenlos raus.`);
         }
-        db.prepare("UPDATE bookings SET status='cancelled' WHERE id = ?").run(id);
+        db.prepare("UPDATE bookings SET status='cancelled', reason=? WHERE id = ?")
+          .run(late ? 'Kurzfristige Absage – bis 75 % berechenbar' : null, id);
         logEvent('cancel_student', { actor: 'student', studentId: bk.student_id, bookingId: id, date: bk.date,
-          detail: `${wdShort(bk.date)} ${dmy(bk.date)} ${bk.start_time} Uhr storniert (rechtzeitig)` });
+          detail: `${wdShort(bk.date)} ${dmy(bk.date)} ${bk.start_time} Uhr ${late ? '⚠️ KURZFRISTIG abgesagt – bis 75 % berechenbar' : 'storniert (rechtzeitig)'}` });
         const filled = autoFillGapsOnCancel(bk.date);  // Tag lueckenlos halten
-        return ok(res, { autofilled: filled });
+        return ok(res, { autofilled: filled, late });
       }
       return bad(res, 'Keine Berechtigung', 403);
     }

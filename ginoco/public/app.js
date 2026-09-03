@@ -85,6 +85,11 @@ const I18N = {
     book_go: 'Ja, verbindlich buchen',
     toast_booked: 'Termin gebucht ✓', celebrate_booked: 'Termin gebucht',
     cancel_confirm: 'Diesen Termin wirklich stornieren?', toast_cancelled: 'Storniert',
+    cx_title_free: 'Fahrstunde absagen?', cx_free_text: 'Kostenlos – du sagst mehr als {h} Std. vorher ab.',
+    cx_title_late: '⚠️ Kurzfristige Absage', cx_keep: 'Behalten',
+    cx_late_text: 'So kurzfristig ist die Absage <strong>kostenpflichtig – bis zu 75 %</strong> werden berechnet. Fairer für dich: gib die Stunde zur <strong>Übernahme</strong> frei – übernimmt sie ein anderer, bist du kostenlos raus.',
+    cx_offer_btn: '🎁 Lieber anbieten (kostenlos)', cx_cancel_free: 'Ja, absagen', cx_cancel_late: 'Trotzdem absagen (75 %)',
+    cx_done_free: 'Fahrstunde abgesagt.', cx_done_late: 'Kurzfristig abgesagt – dein Fahrlehrer wurde informiert.',
     toast_accepted: 'Termin angenommen ✓', toast_taken: 'Fahrstunde übernommen ✓',
     celebrate_taken: 'Übernommen', toast_declined: 'Abgelehnt',
     ds_rush: 'Berufsverkehr', ds_jam: 'Stau', ds_snow: 'Schnee', ds_ice: 'Glatteis', ds_weather: 'Witterung', ds_other: 'Sonstiges',
@@ -288,6 +293,11 @@ const I18N = {
     book_go: 'Yes, book it',
     toast_booked: 'Lesson booked ✓', celebrate_booked: 'Lesson booked',
     cancel_confirm: 'Really cancel this lesson?', toast_cancelled: 'Cancelled',
+    cx_title_free: 'Cancel lesson?', cx_free_text: 'Free of charge – you’re cancelling more than {h} hrs ahead.',
+    cx_title_late: '⚠️ Short-notice cancellation', cx_keep: 'Keep it',
+    cx_late_text: 'At such short notice cancelling is <strong>chargeable – up to 75%</strong> will be billed. Fairer for you: offer the lesson for <strong>someone to take over</strong> – if they do, you’re off the hook for free.',
+    cx_offer_btn: '🎁 Rather offer it (free)', cx_cancel_free: 'Yes, cancel', cx_cancel_late: 'Cancel anyway (75%)',
+    cx_done_free: 'Lesson cancelled.', cx_done_late: 'Cancelled at short notice – your instructor was informed.',
     toast_accepted: 'Lesson accepted ✓', toast_taken: 'Lesson taken over ✓',
     celebrate_taken: 'Taken over', toast_declined: 'Declined',
     ds_rush: 'Rush hour', ds_jam: 'Traffic jam', ds_snow: 'Snow', ds_ice: 'Black ice', ds_weather: 'Weather', ds_other: 'Other',
@@ -491,6 +501,11 @@ const I18N = {
     book_go: 'Evet, kesin al',
     toast_booked: 'Randevu alındı ✓', celebrate_booked: 'Randevu alındı',
     cancel_confirm: 'Bu randevu gerçekten iptal edilsin mi?', toast_cancelled: 'İptal edildi',
+    cx_title_free: 'Ders iptal edilsin mi?', cx_free_text: 'Ücretsiz – {h} saatten fazla önce iptal ediyorsun.',
+    cx_title_late: '⚠️ Son dakika iptali', cx_keep: 'Kalsın',
+    cx_late_text: 'Bu kadar kısa sürede iptal <strong>ücretlidir – %75’e kadar</strong> tahsil edilir. Senin için daha adil: dersi <strong>devralınması</strong> için teklife koy – biri alırsa ücretsiz kurtulursun.',
+    cx_offer_btn: '🎁 Teklife koy (ücretsiz)', cx_cancel_free: 'Evet, iptal et', cx_cancel_late: 'Yine de iptal et (%75)',
+    cx_done_free: 'Ders iptal edildi.', cx_done_late: 'Son dakika iptal edildi – eğitmenin bilgilendirildi.',
     toast_accepted: 'Randevu kabul edildi ✓', toast_taken: 'Ders devralındı ✓',
     celebrate_taken: 'Devralındı', toast_declined: 'Reddedildi',
     ds_rush: 'Yoğun trafik', ds_jam: 'Trafik sıkışıklığı', ds_snow: 'Kar', ds_ice: 'Buzlanma', ds_weather: 'Hava koşulları', ds_other: 'Diğer',
@@ -694,6 +709,11 @@ const I18N = {
     book_go: 'نعم، احجز',
     toast_booked: 'تم الحجز ✓', celebrate_booked: 'تم الحجز',
     cancel_confirm: 'هل تريد إلغاء هذا الموعد فعلاً؟', toast_cancelled: 'تم الإلغاء',
+    cx_title_free: 'إلغاء الدرس؟', cx_free_text: 'مجاناً – أنت تلغي قبل أكثر من {h} ساعة.',
+    cx_title_late: '⚠️ إلغاء في وقت متأخر', cx_keep: 'الإبقاء عليه',
+    cx_late_text: 'الإلغاء في هذا الوقت القصير <strong>مدفوع – حتى 75%</strong> ستُحتسب. الأفضل لك: اعرض الدرس <strong>ليأخذه غيرك</strong> – إن أخذه أحد، تتحرر مجاناً.',
+    cx_offer_btn: '🎁 الأفضل اعرضه (مجاناً)', cx_cancel_free: 'نعم، ألغِ', cx_cancel_late: 'ألغِ رغم ذلك (75%)',
+    cx_done_free: 'تم إلغاء الدرس.', cx_done_late: 'أُلغي في وقت متأخر – تم إبلاغ مدرّبك.',
     toast_accepted: 'تم قبول الموعد ✓', toast_taken: 'تم استلام الدرس ✓',
     celebrate_taken: 'تم الاستلام', toast_declined: 'تم الرفض',
     ds_rush: 'ازدحام ساعة الذروة', ds_jam: 'ازدحام مروري', ds_snow: 'ثلوج', ds_ice: 'جليد', ds_weather: 'الأحوال الجوية', ds_other: 'أخرى',
@@ -1459,8 +1479,11 @@ function openTour() {
 window.__openTour = openTour;
 
 // ---------- Was ist neu? (Changelog) ----------
-const CHANGELOG_VER = '3.98';
+const CHANGELOG_VER = '3.99';
 const CHANGELOG = [
+  { v: '3.99', d: '03.09.2026', title: '🧯 Absagen – fair und glasklar', items: [
+    '💶 <strong>Klare Ansage beim Absagen:</strong> Du siehst jetzt sofort, was eine Absage kostet – <strong>mehr als 48 Std. vorher: kostenlos</strong>, kurzfristiger: bis zu 75 %.',
+    '🎁 <strong>Die faire Alternative zuerst:</strong> Statt kurzfristig zu zahlen, kannst du die Stunde mit einem Tipp <strong>zur Übernahme anbieten</strong> – übernimmt sie jemand, bist du kostenlos raus.'] },
   { v: '3.98', d: '03.09.2026', title: '🔄 Deine Fahrstunde selbst verschieben', items: [
     '🔄 <strong>Selbst verschieben:</strong> Passt dir ein Termin nicht mehr? Bis <strong>48 Std. vorher</strong> tippst du bei der Fahrstunde auf „🔄 Verschieben", wählst einen anderen freien Termin – fertig, deine Stunde wandert dorthin.',
     '⏳ <strong>Kurzfristig?</strong> Ab 48 Std. vorher geht Verschieben nicht mehr – dann kannst du die Stunde noch <strong>zur Übernahme anbieten</strong> (ein anderer übernimmt) oder absagen (bei Nichterscheinen werden bis zu 75 % berechnet).',
@@ -3466,8 +3489,9 @@ function studentBookingItem(b) {
       // gesperrt: Termin steht fest
       actions = `<span class="pill">${t('bk_locked')}</span>`;
     } else if (soon) {
-      // zwischen Sperr- und Storno-Frist: nur noch ins Angebot geben
-      actions = `<button class="sm" data-offer="${b.id}" title="${t('bk_offer_title', { h: cancelH })}">${t('bk_offer_btn')}</button>`;
+      // zwischen Sperr- und Storno-Frist: anbieten (kostenlos) oder kostenpflichtig absagen (75 %)
+      actions = `<button class="sm" data-offer="${b.id}" title="${t('bk_offer_title', { h: cancelH })}">${t('bk_offer_btn')}</button>
+        <button class="ghost sm" data-cancel="${b.id}">${t('cancel')}</button>`;
     } else {
       // Vor der Storno-Frist: selbst verschieben, ins Angebot geben oder absagen.
       actions = `<button class="sm" data-reschedule="${b.id}">${t('bk_move_btn')}</button>
@@ -4395,10 +4419,38 @@ function bookSlot(start, dur, maxDur) {
     } catch (e) { toast(e.message, 'err'); }
   };
 }
-async function cancelBooking(id) {
-  if (!confirm(t('cancel_confirm'))) return;
-  try { await api('/api/bookings/' + id, { method: 'DELETE' }); toast(t('toast_cancelled'), 'ok'); syncStudent(); }
-  catch (e) { toast(e.message, 'err'); }
+function cancelBooking(id) {
+  const bk = (myBookingsCache || []).find((x) => String(x.id) === String(id));
+  if (!bk) return;
+  const h = hoursUntil(bk.date, bk.start_time);
+  const cancelH = state.settings?.cancel_hours || 48;
+  const when = `${WD[isoDow(bk.date) - 1]} ${fmtShort(bk.date)} · ${bk.start_time} ${t('oclock')}`;
+  const doCancel = async (late) => {
+    try {
+      await api('/api/bookings/' + id + (late ? '?charge=1' : ''), { method: 'DELETE' });
+      closeModal(); toast(late ? t('cx_done_late') : t('cx_done_free'), 'ok'); syncStudent();
+    } catch (e) { toast(e.message, 'err'); }
+  };
+  if (h >= cancelH) {
+    // Rechtzeitig: kostenlos.
+    modal(`<h3>${t('cx_title_free')}</h3>
+      <p class="hint">${when}</p>
+      <div class="warnbox">${t('cx_free_text', { h: cancelH })}</div>
+      <div class="actions"><button class="sec" onclick="window.__closeModal()">${t('cx_keep')}</button><button class="danger" id="cx-go">${t('cx_cancel_free')}</button></div>`);
+    $('#cx-go').onclick = () => doCancel(false);
+  } else {
+    // Kurzfristig: kostenpflichtig (bis 75 %) – faire Alternative „anbieten" hervorheben.
+    modal(`<h3>${t('cx_title_late')}</h3>
+      <p class="hint">${when}</p>
+      <div class="cx-late">${t('cx_late_text')}</div>
+      <div class="actions" style="flex-wrap:wrap;gap:.5rem">
+        <button class="sec" onclick="window.__closeModal()">${t('cx_keep')}</button>
+        <button id="cx-offer">${t('cx_offer_btn')}</button>
+        <button class="danger" id="cx-go">${t('cx_cancel_late')}</button>
+      </div>`);
+    $('#cx-offer').onclick = () => { closeModal(); offerBooking(id); };
+    $('#cx-go').onclick = () => doCancel(true);
+  }
 }
 async function confirmBooking(id) {
   try { await api('/api/bookings/' + id + '/confirm', { method: 'POST' }); toast(t('toast_accepted'), 'ok'); syncStudent(); }
