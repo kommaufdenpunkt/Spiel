@@ -1658,7 +1658,16 @@ async function handleApi(req, res, url) {
     if (!requireStudent()) return bad(res, 'Bitte anmelden', 401);
     const bk = db.prepare('SELECT * FROM bookings WHERE id=?').get(Number(rsm[1]));
     if (!bk || bk.student_id !== sess.student_id) return bad(res, 'Keine Berechtigung', 403);
-    if (!bk.reschedule_req) return bad(res, 'Für diese Fahrstunde liegt keine Verschiebe-Anfrage vor.');
+    const requested = !!bk.reschedule_req;
+    if (!requested) {
+      // Selbst-Verschieben (ohne Fahrlehrer-Anfrage): nur bestätigte Stunden und
+      // nur bis zur Storno-Frist. Danach nur noch anbieten/absagen/Fahrlehrer fragen.
+      if (bk.status !== 'booked' || bk.confirmed === 0)
+        return bad(res, 'Diese Fahrstunde kann gerade nicht verschoben werden.');
+      const cancelH = Number(getSettingRaw('cancel_hours'));
+      if (hoursUntil(bk.date, bk.start_time) < cancelH)
+        return bad(res, `Selbst verschieben geht nur bis ${cancelH} Std. vorher. Danach kannst du die Stunde zur Übernahme anbieten oder deinen Fahrlehrer fragen.`);
+    }
     const b = await readBody(req);
     const newDate = String(b.date || '').trim();
     const newStart = String(b.start_time || '').trim();
@@ -1692,22 +1701,25 @@ async function handleApi(req, res, url) {
     const sameWeek = weekStartEnd(bk.date).from === weekStartEnd(newDate).from;
     if ((sameWeek ? wi.count - 1 : wi.count) >= wi.max)
       return bad(res, `Pro Woche sind nur ${wi.max} Fahrstunden möglich – die Zielwoche ist voll. Bitte wähle eine andere Woche.`);
-    const oldDate = bk.date, oldStart = bk.start_time, gap = bk.reschedule_gap || 'leave';
-    // Verschieben + Anfrage schließen; Erinnerungs-/Abhol-Marker zurücksetzen (neuer Termin)
+    const oldDate = bk.date, oldStart = bk.start_time, gap = requested ? (bk.reschedule_gap || 'leave') : 'self';
+    // Verschieben + evtl. Anfrage schließen; Erinnerungs-/Abhol-Marker zurücksetzen (neuer Termin)
     db.prepare(`UPDATE bookings SET date=?, start_time=?, reschedule_req=NULL, reschedule_note=NULL, reschedule_gap=NULL,
       reminded_1d=0, reminded_3h=0, reminded_30m=0, reminded_pickup=0 WHERE id=?`).run(newDate, newStart, bk.id);
-    let moved = 0;
-    if (gap === 'pack') moved = applyPack(oldDate, 'Lücke nach Verschiebung geschlossen');
-    else if (gap === 'offer') {
+    let moved = 0, gapNote = '';
+    if (requested && gap === 'pack') { moved = applyPack(oldDate, 'Lücke nach Verschiebung geschlossen'); gapNote = ` · ${moved} Std. aufgerückt`; }
+    else if (requested && gap === 'offer') {
       const ids = db.prepare("SELECT id FROM students WHERE id!=? AND archived_at IS NULL AND deleted_at IS NULL").all(sess.student_id).map((r) => r.id);
       for (const sid of ids) notify(sid, 'reminder',
         `🚗 Kurzfristig frei geworden: ${wdShort(oldDate)} ${dmy(oldDate)} um ${oldStart} Uhr. Schnell buchen lohnt sich!`,
         oldDate, null, { email: false, url: '/', pushTitle: '🚗 Kurzfristig frei' });
+      gapNote = ' · Lücke zur Übernahme angeboten';
+    } else if (!requested) {
+      // Selbst-Verschieben: alten Tag lückenlos halten (falls in den Einstellungen aktiviert).
+      moved = autoFillGapsOnCancel(oldDate); gapNote = moved ? ` · ${moved} Std. aufgerückt` : '';
     }
     const stu = db.prepare('SELECT name FROM students WHERE id=?').get(sess.student_id);
     logEvent('shift', { actor: 'student', studentId: sess.student_id, bookingId: bk.id, date: newDate,
-      detail: `${stu?.name || 'Schüler'} hat verschoben: ${wdShort(oldDate)} ${dmy(oldDate)} ${oldStart} → ${wdShort(newDate)} ${dmy(newDate)} ${newStart} Uhr`
-        + (gap === 'pack' ? ` · ${moved} Std. aufgerückt` : gap === 'offer' ? ' · Lücke zur Übernahme angeboten' : ' · Lücke offen gelassen') });
+      detail: `${stu?.name || 'Schüler'} hat ${requested ? '' : 'selbst '}verschoben: ${wdShort(oldDate)} ${dmy(oldDate)} ${oldStart} → ${wdShort(newDate)} ${dmy(newDate)} ${newStart} Uhr${gapNote}` });
     return ok(res, { moved: true, date: newDate, start_time: newStart, gap, packed: moved });
   }
 

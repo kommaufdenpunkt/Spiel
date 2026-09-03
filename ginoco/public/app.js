@@ -146,7 +146,8 @@ const I18N = {
     bk_done: 'gefahren', bk_offered: '🎁 im Angebot', bk_withdraw: 'Zurücknehmen',
     bk_reserved: '🔶 reserviert', bk_accept: '✅ Annehmen', bk_reject: '✕ Ablehnen',
     bk_due: '⏳ Bitte bis <strong>{when}</strong> antworten – sonst wird der Termin wieder frei.',
-    bk_confirmed: '✅ bestätigt', bk_locked: '🔒 fest gebucht', bk_offer_btn: '🎁 Ins Angebot geben',
+    bk_confirmed: '✅ bestätigt', bk_locked: '🔒 fest gebucht', bk_offer_btn: '🎁 Ins Angebot geben', bk_move_btn: '🔄 Verschieben',
+    rs_help_self1: 'Du möchtest diese Fahrstunde auf einen anderen freien Termin legen – kein Problem.',
     bk_offer_title: 'Kostenfreies Storno nur bis {h} h vorher – gib die Stunde stattdessen ins Angebot',
     bk_in_h: '· in {h} h',
     pc_rank: '🏅 Rang {r}', pc_drives: '<strong>{n}</strong> Fahrstunden gefahren',
@@ -348,7 +349,8 @@ const I18N = {
     bk_done: 'driven', bk_offered: '🎁 offered', bk_withdraw: 'Withdraw',
     bk_reserved: '🔶 reserved', bk_accept: '✅ Accept', bk_reject: '✕ Decline',
     bk_due: '⏳ Please reply by <strong>{when}</strong> – otherwise the slot is released again.',
-    bk_confirmed: '✅ confirmed', bk_locked: '🔒 fixed', bk_offer_btn: '🎁 Offer this lesson',
+    bk_confirmed: '✅ confirmed', bk_locked: '🔒 fixed', bk_offer_btn: '🎁 Offer this lesson', bk_move_btn: '🔄 Move',
+    rs_help_self1: 'You’d like to move this lesson to another free slot – no problem.',
     bk_offer_title: 'Free cancellation only up to {h} h before – offer the lesson instead',
     bk_in_h: '· in {h} h',
     pc_rank: '🏅 Rank {r}', pc_drives: '<strong>{n}</strong> lessons driven',
@@ -550,7 +552,8 @@ const I18N = {
     bk_done: 'sürüldü', bk_offered: '🎁 teklifte', bk_withdraw: 'Geri al',
     bk_reserved: '🔶 ayrıldı', bk_accept: '✅ Kabul et', bk_reject: '✕ Reddet',
     bk_due: '⏳ Lütfen <strong>{when}</strong> kadar yanıtla – yoksa randevu tekrar boşa çıkar.',
-    bk_confirmed: '✅ onaylandı', bk_locked: '🔒 kesin', bk_offer_btn: '🎁 Teklife koy',
+    bk_confirmed: '✅ onaylandı', bk_locked: '🔒 kesin', bk_offer_btn: '🎁 Teklife koy', bk_move_btn: '🔄 Ertele',
+    rs_help_self1: 'Bu dersi başka bir uygun zamana almak istiyorsun – sorun değil.',
     bk_offer_title: 'Ücretsiz iptal yalnızca {h} saat öncesine kadar – bunun yerine dersi teklife koy',
     bk_in_h: '· {h} saat içinde',
     pc_rank: '🏅 Sınıf {r}', pc_drives: '<strong>{n}</strong> ders sürüldü',
@@ -752,7 +755,8 @@ const I18N = {
     bk_done: 'تمّ', bk_offered: '🎁 معروض', bk_withdraw: 'سحب',
     bk_reserved: '🔶 محجوز مبدئياً', bk_accept: '✅ قبول', bk_reject: '✕ رفض',
     bk_due: '⏳ يرجى الرد قبل <strong>{when}</strong> – وإلا يعود الموعد متاحاً.',
-    bk_confirmed: '✅ مؤكّد', bk_locked: '🔒 مثبّت', bk_offer_btn: '🎁 اعرض هذا الدرس',
+    bk_confirmed: '✅ مؤكّد', bk_locked: '🔒 مثبّت', bk_offer_btn: '🎁 اعرض هذا الدرس', bk_move_btn: '🔄 تأجيل',
+    rs_help_self1: 'تريد نقل هذا الدرس إلى موعد متاح آخر – لا مشكلة.',
     bk_offer_title: 'الإلغاء المجاني حتى {h} ساعة قبل الموعد فقط – اعرض الدرس بدلاً من ذلك',
     bk_in_h: '· خلال {h} ساعة',
     pc_rank: '🏅 المستوى {r}', pc_drives: '<strong>{n}</strong> درساً مُنجَزاً',
@@ -1455,8 +1459,12 @@ function openTour() {
 window.__openTour = openTour;
 
 // ---------- Was ist neu? (Changelog) ----------
-const CHANGELOG_VER = '3.97';
+const CHANGELOG_VER = '3.98';
 const CHANGELOG = [
+  { v: '3.98', d: '03.09.2026', title: '🔄 Deine Fahrstunde selbst verschieben', items: [
+    '🔄 <strong>Selbst verschieben:</strong> Passt dir ein Termin nicht mehr? Bis <strong>48 Std. vorher</strong> tippst du bei der Fahrstunde auf „🔄 Verschieben", wählst einen anderen freien Termin – fertig, deine Stunde wandert dorthin.',
+    '⏳ <strong>Kurzfristig?</strong> Ab 48 Std. vorher geht Verschieben nicht mehr – dann kannst du die Stunde noch <strong>zur Übernahme anbieten</strong> (ein anderer übernimmt) oder absagen (bei Nichterscheinen werden bis zu 75 % berechnet).',
+    '🌍 Alles mit kurzer Erklärung und in deiner Sprache (Deutsch, English, Türkçe, العربية).'] },
   { v: '3.97', d: '03.09.2026', title: '🧾 Nachweise nach Zeitraum – mit einem Klick', items: [
     '🧾 <strong>Nachweise filtern:</strong> Unter „Meine Fahrstunden" wählst du jetzt einen <strong>Zeitraum (von–bis)</strong> – die Liste und der ausgedruckte Nachweis zeigen genau diese Fahrstunden.',
     '📊 <strong>Auswertung inklusive:</strong> Über „📋 Ausbildungs-Übersicht" siehst du, <strong>wie oft</strong> ihr jede Aufgabe geübt habt (z. B. „rückwärts einparken · 5×") und an welchen Tagen – alles auch im PDF-Nachweis mit Fahrschul-Logo.'] },
@@ -3461,7 +3469,9 @@ function studentBookingItem(b) {
       // zwischen Sperr- und Storno-Frist: nur noch ins Angebot geben
       actions = `<button class="sm" data-offer="${b.id}" title="${t('bk_offer_title', { h: cancelH })}">${t('bk_offer_btn')}</button>`;
     } else {
-      actions = `<button class="sm" data-offer="${b.id}">${t('bk_offer_btn')}</button>
+      // Vor der Storno-Frist: selbst verschieben, ins Angebot geben oder absagen.
+      actions = `<button class="sm" data-reschedule="${b.id}">${t('bk_move_btn')}</button>
+        <button class="ghost sm" data-offer="${b.id}">${t('bk_offer_btn')}</button>
         <button class="ghost sm" data-cancel="${b.id}">${t('cancel')}</button>`;
     }
   }
@@ -4409,7 +4419,7 @@ function startReschedule(id) {
     <p class="hint">${WD[isoDow(bk.date) - 1]} ${fmtShort(bk.date)} · ${bk.start_time} ${t('oclock')}</p>
     ${bk.reschedule_note ? `<div class="rs-box" style="margin:.2rem 0 .6rem">💬 ${esc(bk.reschedule_note)}</div>` : ''}
     <ol class="rs-steps">
-      <li>${t('rs_help_1')}</li>
+      <li>${bk.reschedule_req ? t('rs_help_1') : t('rs_help_self1')}</li>
       <li>${t('rs_help_2')}</li>
       <li>${t('rs_help_3')}</li>
     </ol>
