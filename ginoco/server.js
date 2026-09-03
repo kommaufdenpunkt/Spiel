@@ -23,7 +23,7 @@ const APP_VERSION = "3.72.0";
 const PUBLIC_SETTINGS = ['instructor_name', 'instructor_phone', 'policy_text',
   'cancel_hours', 'lock_hours', 'reserve_expire_min', 'booking_horizon_days', 'booking_horizon_days_rank2',
   'live_lead_min', 'lesson_min', 'break_min', 'start_time', 'last_start', 'max_per_week', 'release_time',
-  'registration_open', 'sonder_min_ueberland', 'sonder_min_autobahn', 'sonder_min_nacht',
+  'registration_open', 'self_registration', 'sonder_min_ueberland', 'sonder_min_autobahn', 'sonder_min_nacht',
   'req_ueberland', 'req_autobahn', 'req_nacht', 'rank2_min_lessons', 'passkey_enabled'];
 
 // ---------- Passwort-Richtlinie (stark, mit Sonderzeichen) ----------
@@ -40,6 +40,8 @@ function passwordProblem(pw) {
 // ---------- Einfacher Login-Ratenbegrenzer (im Speicher, gegen Brute-Force) ----------
 const loginAttempts = new Map(); // ip -> { count, until }
 const supportHits = new Map();   // ip -> { count, until } – Rate-Limit fuers Support-Formular
+const signupHits = new Map();    // ip -> { count, until } – Rate-Limit fuer die Selbst-Anmeldung (Anti-Spam)
+const geoCache = new Map();      // url -> { at, data } – kleiner Cache fuer die Adress-Suche (OpenPLZ)
 const LOGIN_MAX = 8;             // erlaubte Fehlversuche
 const LOGIN_WINDOW_MS = 15 * 60 * 1000;
 function clientIp(req) {
@@ -678,9 +680,10 @@ async function handleApi(req, res, url) {
     if (sess.kind === 'instructor') {
       return ok(res, { user: { role: 'instructor', name: getSettingRaw('instructor_name') } });
     }
-    const st = db.prepare('SELECT id,name,email,phone,username,allowed_durations,pickup_onboarded,pickup_mode,home_label,home_lat,home_lng FROM students WHERE id = ?').get(sess.student_id);
+    const st = db.prepare('SELECT id,name,email,phone,username,allowed_durations,pickup_onboarded,pickup_mode,home_label,home_lat,home_lng,approved,email_verified,registered_self FROM students WHERE id = ?').get(sess.student_id);
     if (!st) return ok(res, { user: null });
-    return ok(res, { user: { role: 'student', ...st, pickup_onboarded: !!st.pickup_onboarded } });
+    return ok(res, { user: { role: 'student', ...st, pickup_onboarded: !!st.pickup_onboarded,
+      approved: !!st.approved, email_verified: !!st.email_verified, registered_self: !!st.registered_self } });
   }
 
   if (p === '/api/auth/logout' && method === 'POST') {
@@ -999,6 +1002,121 @@ async function handleApi(req, res, url) {
     logEvent('info', { actor: 'student', studentId: row.student_id, detail: `${stu?.name || 'Fahrschüler'} hat sein Passwort per E-Mail-Link neu gesetzt.` });
     noteLoginOk(req);
     return ok(res, { reset: true });
+  }
+
+  // ===== Selbst-Anmeldung (Schritt fuer Schritt) – E-Mail bestaetigen + Freischaltung =====
+  // Der Schueler legt sein Konto selbst an. Danach muss er (a) seine E-Mail per Link
+  // bestaetigen und (b) vom Fahrlehrer freigeschaltet werden. Erst dann darf er buchen.
+  if (p === '/api/auth/signup' && method === 'POST') {
+    if (getSettingRaw('self_registration') !== '1')
+      return bad(res, 'Die Online-Anmeldung ist gerade geschlossen. Bitte wende dich direkt an die Fahrschule.', 403);
+    const b = await readBody(req);
+    // Honeypot: ein fuer Menschen unsichtbares Feld. Ist es ausgefuellt, ist es ein Bot –
+    // wir tun so, als haette es geklappt (kein Konto, kein Hinweis fuers Skript).
+    if (b.website || b.hp_field) return ok(res, { registered: true });
+    // Rate-Limit je IP (Anti-Spam): hoechstens 4 Anmeldungen pro Stunde.
+    const ip = clientIp(req), now = Date.now();
+    const e = signupHits.get(ip);
+    if (e && e.until > now && e.count >= 4) return bad(res, 'Zu viele Anmeldeversuche. Bitte in einer Stunde erneut oder ruf einfach kurz an.', 429);
+    const first = String(b.first_name || '').trim(), last = String(b.last_name || '').trim();
+    const name = combineName(first, last) || String(b.name || '').trim();
+    if (!name || !first || !last) return bad(res, 'Bitte Vor- und Nachnamen angeben.');
+    const bd = String(b.birth_date || '').trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(bd)) return bad(res, 'Bitte gib dein Geburtsdatum an.');
+    const by = Number(bd.slice(0, 4));
+    if (by < 1930 || by > new Date().getFullYear() - 14) return bad(res, 'Bitte ein gültiges Geburtsdatum angeben.');
+    const email = String(b.email || '').trim().toLowerCase();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return bad(res, 'Bitte gib eine gültige E-Mail-Adresse an – dorthin schicken wir den Bestätigungslink.');
+    if (db.prepare('SELECT 1 FROM students WHERE email = ?').get(email)) return bad(res, 'Für diese E-Mail gibt es schon ein Konto. Du kannst dich anmelden oder das Passwort zurücksetzen.');
+    const prob = passwordProblem(String(b.password || ''));
+    if (prob) return bad(res, 'Dein Passwort braucht ' + prob + '.');
+    if (!(b.agb === true || b.agb === 1 || b.agb === '1')) return bad(res, 'Bitte bestätige die Nutzungs- und Datenschutzhinweise.');
+    const phone = b.phone ? String(b.phone).trim() : null;
+    const street = b.street ? String(b.street).trim() : null;
+    const houseNo = b.house_no ? String(b.house_no).trim() : null;
+    const zip = b.zip ? String(b.zip).trim().replace(/\s/g, '') : null;
+    if (zip && !/^\d{4,5}$/.test(zip)) return bad(res, 'Die Postleitzahl sieht nicht richtig aus.');
+    const city = b.city ? String(b.city).trim() : null;
+    const availability = cleanAvailability(b.availability);
+    // Rate-Limit erst jetzt hochzaehlen (gueltige Anmeldung)
+    if (!e || e.until < now) signupHits.set(ip, { count: 1, until: now + 60 * 60000 }); else e.count++;
+    const username = genUsername(name, by);
+    const stamp = new Date().toISOString();
+    // Ist der Mailversand aktiv, muss der Schueler die E-Mail bestaetigen (email_verified=0).
+    // Ohne Mailversand koennen wir nicht bestaetigen -> gilt als bestaetigt, Freischaltung reicht.
+    const canMail = mailEnabled();
+    const info = db.prepare(
+      `INSERT INTO students(name,first_name,last_name,email,phone,pass,username,birth_year,birth_date,street,house_no,zip,city,availability,
+        approved,email_verified,registered_self,terms_at,created_at)
+       VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?, 0, ?, 1, ?, ?)`
+    ).run(name, first || null, last || null, email, phone, hashPassword(String(b.password)), username, by, bd,
+      street, houseNo, zip, city, availability, canMail ? 0 : 1, stamp, stamp);
+    const sid = Number(info.lastInsertRowid);
+    let mailed = false;
+    if (canMail) {
+      const token = b64url(randomBytes(24));
+      db.prepare('INSERT INTO email_verifications(token,student_id,expires,created_at) VALUES(?,?,?,?)')
+        .run(token, sid, Date.now() + 24 * 60 * 60 * 1000, stamp);
+      const link = `${isHttps(req) ? 'https' : 'http'}://${req.headers.host}/?verify=${token}`;
+      mailed = await tryMail(email, '✅ Bestätige deine Anmeldung bei Ginoco', {
+        text: `Hallo ${name},\n\nschön, dass du dich für Fahrstunden anmeldest!\nBitte bestätige deine E-Mail-Adresse über diesen Link (24 Std. gültig):\n\n${link}\n\nDanach schaltet dich dein Fahrlehrer frei – du bekommst Bescheid, sobald du Fahrstunden buchen kannst.\n\nDu warst das nicht? Dann ignoriere diese Mail einfach.`,
+        html: mailShell('Nur noch ein Schritt',
+          `<p>Hallo ${escHtml(name)},</p><p>schön, dass du dich für Fahrstunden anmeldest! Bitte bestätige deine E-Mail-Adresse – der Link ist <strong>24&nbsp;Stunden</strong> gültig:</p>`
+          + `<p style="margin:1.2rem 0"><a href="${escHtml(link)}" style="background:#e6934d;color:#fff;padding:11px 20px;border-radius:10px;text-decoration:none;font-weight:700;display:inline-block">✅ E-Mail bestätigen</a></p>`
+          + `<p>Danach schaltet dich dein Fahrlehrer frei – du bekommst Bescheid, sobald du Fahrstunden buchen kannst.</p>`
+          + `<p style="color:#9a8f82;font-size:13px">Du warst das nicht? Dann ignoriere diese Mail einfach.</p>`),
+      });
+    } else {
+      // Ohne Mailversand direkt dem Fahrlehrer melden.
+      pushToInstructor(`🆕 Neue Anmeldung: ${name} wartet auf Freischaltung.`, '/');
+      logEvent('info', { actor: 'student', studentId: sid, detail: `🆕 Selbst-Anmeldung: ${name} (${username}) – wartet auf Freischaltung.` });
+    }
+    return ok(res, { registered: true, mailed, needs_verify: canMail, email });
+  }
+
+  // E-Mail-Bestaetigung: der Link aus der Anmelde-Mail. Danach loggen wir den Schueler
+  // ein (er hat den Zugriff auf sein Postfach bewiesen) – er landet im Warte-Screen.
+  if (p === '/api/auth/verify' && method === 'POST') {
+    const b = await readBody(req);
+    const row = db.prepare('SELECT token,student_id,expires,used FROM email_verifications WHERE token=?').get(String(b.token || ''));
+    if (!row || row.used || row.expires <= Date.now())
+      return bad(res, 'Der Bestätigungslink ist ungültig oder abgelaufen. Bitte melde dich einfach noch einmal an.', 400);
+    db.prepare('UPDATE email_verifications SET used=1 WHERE token=?').run(row.token);
+    db.prepare('UPDATE students SET email_verified=1 WHERE id=?').run(row.student_id);
+    const st = db.prepare('SELECT id,name,username,approved FROM students WHERE id=?').get(row.student_id);
+    if (!st) return bad(res, 'Konto nicht gefunden.', 404);
+    // Fahrlehrer benachrichtigen: jetzt taucht die Anmeldung in der Freischalt-Liste auf.
+    if (!st.approved) {
+      pushToInstructor(`🆕 Neue Anmeldung: ${st.name} hat die E-Mail bestätigt und wartet auf Freischaltung.`, '/');
+      logEvent('info', { actor: 'student', studentId: st.id, detail: `🆕 Selbst-Anmeldung bestätigt: ${st.name} (${st.username}) – wartet auf Freischaltung.` });
+    }
+    const token = createSession(res, 'student', st.id, isHttps(req));
+    return ok(res, { verified: true, role: 'student', id: st.id, name: st.name, approved: !!st.approved, token });
+  }
+
+  // Adress-Autofill (kostenlose OpenPLZ-API, kein Schluessel). Faellt bei Nichterreichbarkeit
+  // still auf eine leere Liste zurueck – dann bleibt es eine normale Texteingabe.
+  if (p === '/api/geo/plz' && method === 'GET') {
+    const zip = String(url.searchParams.get('zip') || '').replace(/\s/g, '');
+    if (!/^\d{5}$/.test(zip)) return ok(res, { localities: [] });
+    const rows = await openplz(`/de/Localities?postalCode=${zip}`);
+    const localities = [...new Set((rows || []).map((r) => r && r.name).filter(Boolean))];
+    return ok(res, { localities });
+  }
+  if (p === '/api/geo/streets' && method === 'GET') {
+    const zip = String(url.searchParams.get('zip') || '').replace(/\s/g, '');
+    const q = String(url.searchParams.get('q') || '').trim();
+    if (!/^\d{5}$/.test(zip) || q.length < 2) return ok(res, { streets: [] });
+    const rows = await openplz(`/de/Streets?postalCode=${zip}&name=${encodeURIComponent(q)}`);
+    // Entdoppeln nach Strassennamen (keine dreifach gleiche Strasse) und begrenzen.
+    const seen = new Set(), streets = [];
+    for (const r of (rows || [])) {
+      const nm = r && r.name;
+      if (!nm || seen.has(nm)) continue;
+      seen.add(nm); streets.push(nm);
+      if (streets.length >= 8) break;
+    }
+    return ok(res, { streets });
   }
 
   // ===== Einstellungen: Fahrlehrer sieht alles, andere nur eine unbedenkliche Teilmenge =====
@@ -2422,6 +2540,49 @@ async function handleApi(req, res, url) {
   }
 
   // -- Schueler --
+  // Offene Selbst-Anmeldungen (warten auf Freischaltung): Liste fuer den Fahrlehrer.
+  if (p === '/api/instructor/signups' && method === 'GET') {
+    if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
+    const rows = db.prepare(
+      `SELECT id,name,first_name,last_name,email,phone,birth_date,birth_year,street,house_no,zip,city,
+        availability,email_verified,created_at
+       FROM students WHERE registered_self=1 AND approved=0 AND deleted_at IS NULL ORDER BY created_at DESC`
+    ).all().map((s) => ({ ...s, email_verified: !!s.email_verified }));
+    return ok(res, { signups: rows });
+  }
+  // Selbst-Anmeldung freischalten (approved=1) -> Schueler darf buchen.
+  const apm = p.match(/^\/api\/instructor\/signups\/(\d+)\/approve$/);
+  if (apm && method === 'POST') {
+    if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
+    const sid = Number(apm[1]);
+    const st = db.prepare('SELECT id,name,email FROM students WHERE id=? AND registered_self=1 AND approved=0').get(sid);
+    if (!st) return bad(res, 'Diese Anmeldung gibt es nicht (mehr).', 404);
+    db.prepare('UPDATE students SET approved=1, email_verified=1 WHERE id=?').run(sid);
+    logEvent('info', { actor: 'instructor', studentId: sid, detail: `✅ ${st.name} freigeschaltet – kann jetzt Fahrstunden buchen.` });
+    notify(sid, 'info', '🎉 Du bist freigeschaltet! Du kannst jetzt deine Fahrstunden buchen. Viel Erfolg!');
+    if (st.email && mailEnabled()) {
+      const base = getSettingRaw('public_url') || `${isHttps(req) ? 'https' : 'http'}://${req.headers.host}`;
+      await tryMail(st.email, '🎉 Du bist freigeschaltet – jetzt Fahrstunden buchen', {
+        text: `Hallo ${st.name},\n\ngute Nachrichten: dein Fahrlehrer hat dich freigeschaltet!\nDu kannst dich jetzt anmelden und deine Fahrstunden buchen:\n\n${base}\n\nViel Erfolg!`,
+        html: mailShell('Du bist freigeschaltet!',
+          `<p>Hallo ${escHtml(st.name)},</p><p>gute Nachrichten: dein Fahrlehrer hat dich <strong>freigeschaltet</strong>! Du kannst jetzt deine Fahrstunden buchen.</p>`
+          + `<p style="margin:1.2rem 0"><a href="${escHtml(base)}" style="background:#e6934d;color:#fff;padding:11px 20px;border-radius:10px;text-decoration:none;font-weight:700;display:inline-block">🚗 Zu meinen Fahrstunden</a></p><p>Viel Erfolg!</p>`),
+      });
+    }
+    return ok(res, { approved: true });
+  }
+  // Selbst-Anmeldung ablehnen -> Konto samt Daten entfernen (Spam/Fehler).
+  const rjm = p.match(/^\/api\/instructor\/signups\/(\d+)\/reject$/);
+  if (rjm && method === 'POST') {
+    if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
+    const sid = Number(rjm[1]);
+    const st = db.prepare('SELECT id,name FROM students WHERE id=? AND registered_self=1 AND approved=0').get(sid);
+    if (!st) return bad(res, 'Diese Anmeldung gibt es nicht (mehr).', 404);
+    deleteStudentCascade(sid);
+    logEvent('info', { actor: 'instructor', detail: `🗑️ Anmeldung von ${st.name} abgelehnt und entfernt.` });
+    return ok(res, { rejected: true });
+  }
+
   if (p === '/api/students' && method === 'GET') {
     if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
     const archived = url.searchParams.get('scope') === 'archived';
@@ -2431,15 +2592,16 @@ async function handleApi(req, res, url) {
         s.home_label,s.home_lat,s.home_lng,s.travel_min,s.home_base,s.availability,s.archived_at,s.notes,
         (s.photo IS NOT NULL) AS has_photo,
         (SELECT COUNT(*) FROM bookings b WHERE b.student_id=s.id AND b.status='done') AS done_count
-       FROM students s WHERE s.archived_at IS ${archived ? 'NOT NULL' : 'NULL'} AND s.deleted_at IS NULL ORDER BY s.name`
+       FROM students s WHERE s.archived_at IS ${archived ? 'NOT NULL' : 'NULL'} AND s.approved=1 AND s.deleted_at IS NULL ORDER BY s.name`
     ).all().map((s) => {
       const adk = adkSummary(s.id); const st = lessonStats(s.id);
       return { ...s, ...studentRank(s.id), sonder: sonderCounts(s.id), travel_est: travelMin(s.id),
         redCount: adk.needWork.length, adkDistinct: adk.distinct, units: st.units, schaltUnits: st.schalt.units };
     });
-    const activeCount = db.prepare('SELECT COUNT(*) AS c FROM students WHERE archived_at IS NULL').get().c;
+    const activeCount = db.prepare('SELECT COUNT(*) AS c FROM students WHERE archived_at IS NULL AND approved=1').get().c;
     const archivedCount = db.prepare('SELECT COUNT(*) AS c FROM students WHERE archived_at IS NOT NULL').get().c;
-    return ok(res, { students: rows, req: sonderReq(), activeCount, archivedCount, scope: archived ? 'archived' : 'active' });
+    const pendingCount = db.prepare('SELECT COUNT(*) AS c FROM students WHERE registered_self=1 AND approved=0 AND deleted_at IS NULL').get().c;
+    return ok(res, { students: rows, req: sonderReq(), activeCount, archivedCount, pendingCount, scope: archived ? 'archived' : 'active' });
   }
   // Erlaubte Slot-Laengen eines Schuelers setzen (z.B. 40-Min-Ausnahme)
   const stm = p.match(/^\/api\/students\/(\d+)$/);
@@ -2870,7 +3032,7 @@ async function handleApi(req, res, url) {
       'meet_default_label', 'meet_default_lat', 'meet_default_lng',
       'anonymous_swaps', 'req_ueberland', 'req_autobahn', 'req_nacht',
       'sonder_min_ueberland', 'sonder_min_autobahn', 'sonder_min_nacht',
-      'rank2_min_lessons', 'rank2_min_manual', 'booking_horizon_days_rank2', 'registration_open',
+      'rank2_min_lessons', 'rank2_min_manual', 'booking_horizon_days_rank2', 'registration_open', 'self_registration',
       'flow_schedule', 'auto_fill_gaps', 'school_lat', 'school_lng', 'travel_default_min',
       'school_label', 'school2_label', 'school2_lat', 'school2_lng',
       'instructor_home_label', 'instructor_home_lat', 'instructor_home_lng',
@@ -2975,6 +3137,50 @@ function genUsername(name, year) {
   let handle = base, n = 1;
   while (db.prepare('SELECT 1 FROM students WHERE username = ?').get(handle)) { n++; handle = `${base}${year ? '-' : ''}${n}`; }
   return handle;
+}
+
+// Verfuegbarkeit (Mo-Sa von-bis) aus dem Anmelde-/Bearbeiten-Formular saeubern.
+// Ergebnis: JSON-String {"mo":[{"v":"08:00","b":"12:00"}],...} oder null.
+function cleanAvailability(src) {
+  if (!src || typeof src !== 'object' || Array.isArray(src)) return null;
+  const re = /^([01]?\d|2[0-3]):[0-5]\d$/;
+  const clean = {};
+  for (const d of ['mo', 'di', 'mi', 'do', 'fr', 'sa', 'so']) {
+    const arr = Array.isArray(src[d]) ? src[d] : [];
+    const wins = [];
+    for (const w of arr) {
+      let v, bb, m = 'school', pp = '';
+      if (Array.isArray(w) && w.length >= 2) { v = w[0]; bb = w[1]; }
+      else if (w && typeof w === 'object') { v = w.v; bb = w.b; m = w.m === 'pickup' ? 'pickup' : 'school'; pp = w.p ? String(w.p).slice(0, 80).trim() : ''; }
+      else continue;
+      if (re.test(v) && re.test(bb) && v < bb) wins.push(m === 'pickup' ? { v, b: bb, m, p: pp } : { v, b: bb });
+    }
+    if (wins.length) clean[d] = wins;
+  }
+  return Object.keys(clean).length ? JSON.stringify(clean) : null;
+}
+
+// Adress-Suche ueber die kostenlose OpenPLZ-API (kein Schluessel). Kleiner Tages-Cache,
+// kurzes Timeout. Faellt bei jedem Fehler still auf [] zurueck (dann kein Autofill).
+async function openplz(pathAndQuery) {
+  const key = pathAndQuery;
+  const hit = geoCache.get(key);
+  if (hit && Date.now() - hit.at < 24 * 60 * 60 * 1000) return hit.data;
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 8000);
+  try {
+    const r = await fetch('https://openplzapi.org' + pathAndQuery, {
+      signal: ctrl.signal,
+      headers: { Accept: 'application/json', 'User-Agent': 'Ginoco Fahrschulportal (support@ginoco.de)' },
+    });
+    if (!r.ok) { geoCache.set(key, { at: Date.now(), data: [] }); return []; }
+    const data = await r.json();
+    const arr = Array.isArray(data) ? data : [];
+    if (geoCache.size > 500) geoCache.clear();   // simpler Deckel
+    geoCache.set(key, { at: Date.now(), data: arr });
+    return arr;
+  } catch { return []; }
+  finally { clearTimeout(timer); }
 }
 
 // Slots eines Tages inkl. Status (frei / gebucht / geblockt) – FLIESSENDER Tagesplan:
@@ -3157,6 +3363,7 @@ function deleteStudentCascade(sid) {
   db.prepare('DELETE FROM push_subscriptions WHERE student_id=?').run(sid);
   try { db.prepare('DELETE FROM offer_declines WHERE student_id=?').run(sid); } catch {}
   try { db.prepare('DELETE FROM password_resets WHERE student_id=?').run(sid); } catch {}
+  try { db.prepare('DELETE FROM email_verifications WHERE student_id=?').run(sid); } catch {}
   db.prepare('DELETE FROM sessions WHERE student_id=?').run(sid);
   db.prepare('UPDATE reviews SET student_id = NULL, show_photo = 0 WHERE student_id = ?').run(sid);
   db.prepare('DELETE FROM students WHERE id = ?').run(sid);
@@ -3536,6 +3743,11 @@ function createBooking(res, sess, body) {
   const ov = getOverride(date);
 
   if (!isInstructor) {
+    // Freischaltung: eine Selbst-Anmeldung darf erst buchen, wenn der Fahrlehrer
+    // sie freigeschaltet hat (approved=1). Bestehende/angelegte Schueler sind frei.
+    const acct = db.prepare('SELECT approved FROM students WHERE id=?').get(sess.student_id);
+    if (acct && acct.approved === 0)
+      return bad(res, 'Dein Konto ist noch nicht freigeschaltet. Sobald dein Fahrlehrer dich bestätigt, kannst du Fahrstunden buchen.', 403);
     // Arbeitstag / Tages-Ausnahme?
     const workdays = getSettingRaw('workdays').split(',').map(Number);
     if ((ov && ov.closed) || !workdays.includes(isoDow(date)))

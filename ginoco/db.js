@@ -269,6 +269,24 @@ ensureColumn('students', 'home_base', 'home_base TEXT');
 // Leer/NULL = keine Angabe. Basis fuer die automatischen Terminvorschlaege.
 ensureColumn('students', 'availability', 'availability TEXT');
 ensureColumn('students', 'deleted_at', 'deleted_at TEXT');      // gesetzt = vom Schueler selbst geloescht (Login gesperrt, Daten anonymisiert; Fahrstunden bleiben fuer den Nachweis)
+// Selbst-Anmeldung (Schritt-fuer-Schritt): der Schueler legt sein Konto selbst an,
+// bestaetigt die E-Mail und wartet dann auf die Freischaltung durch den Fahrlehrer.
+// approved = 1 (Standard) heisst freigeschaltet – bestehende & vom Fahrlehrer angelegte
+// Schueler sind sofort frei. Selbst-Anmeldungen starten mit approved = 0 (gesperrt fuers Buchen).
+ensureColumn('students', 'approved', 'approved INTEGER NOT NULL DEFAULT 1');
+ensureColumn('students', 'email_verified', 'email_verified INTEGER NOT NULL DEFAULT 1'); // E-Mail per Link bestaetigt?
+ensureColumn('students', 'registered_self', 'registered_self INTEGER NOT NULL DEFAULT 0'); // 1 = Selbst-Anmeldung (fuer die Freischalt-Liste)
+ensureColumn('students', 'terms_at', 'terms_at TEXT');         // Zeitpunkt der AGB-/Datenschutz-Zustimmung
+
+// E-Mail-Bestaetigung fuer Selbst-Anmeldungen: kurzlebige Einmal-Token (Anti-Spam).
+db.exec(`CREATE TABLE IF NOT EXISTS email_verifications (
+  token      TEXT PRIMARY KEY,
+  student_id INTEGER NOT NULL,
+  expires    INTEGER NOT NULL,
+  used       INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL
+);`);
+db.exec('CREATE INDEX IF NOT EXISTS idx_emailverif_student ON email_verifications(student_id)');
 
 // Passwort-Zuruecksetzen per E-Mail: kurzlebige Einmal-Token (Self-Service).
 db.exec(`CREATE TABLE IF NOT EXISTS password_resets (
@@ -385,6 +403,7 @@ const DEFAULTS = {
   rank2_min_manual: '6',     // zusaetzlich noetig fuer Rang 2: so viele Schalt-Einheiten (à 80 Min)
   booking_horizon_days_rank2: '21', // Rang 2 darf so viele Tage im Voraus buchen
   registration_open: '0',    // '1' = neue Fahrschüler dürfen sich mit Code registrieren, '0' = geschlossen (privat)
+  self_registration: '1',    // '1' = Schüler dürfen sich selbst anmelden (E-Mail bestätigen + Freischaltung), '0' = aus
   // E-Mail-Versand (SMTP, eigene Domain-Mailbox). Standard: aus, bis eingerichtet.
   mail_enabled: '0',
   smtp_host: '',             // z.B. smtp.ionos.de

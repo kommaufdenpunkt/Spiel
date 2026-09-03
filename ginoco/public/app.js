@@ -45,7 +45,7 @@ const I18N = {
     tagline_student: 'Fahrstunden einfach online buchen', tagline_admin: 'Fahrlehrer-Bereich',
     feat_book: '📅 Selbst buchen', feat_swap: '🎁 Tauschen', feat_pickup: '📍 Live-Abholung',
     feat_day: '📅 Tagesplan', feat_students: '🧑‍🎓 Fahrschüler', feat_reviews: '⭐ Bewertungen', feat_push: '🔔 Push',
-    tab_login: 'Anmelden', tab_register: 'Neu (mit Code)', tab_instr: 'Fahrlehrer',
+    tab_login: 'Anmelden', tab_register: 'Neu (mit Code)', tab_signup: 'Neu hier?', tab_instr: 'Fahrlehrer',
     appearance: '🎨 Aussehen', lang_section: '🌍 Sprache', terms: 'Nutzungsbedingungen', privacy: 'Datenschutz', imprint: 'Impressum', or: 'oder',
     login_id: 'Login-Name oder E-Mail', login_pw: 'Passwort', login_go: 'Anmelden',
     login_forgot_q: 'Passwort vergessen?', login_forgot_link: 'Neues anfordern', login_forgot_tail: '– dein Fahrlehrer setzt dir dann eins.',
@@ -254,7 +254,7 @@ const I18N = {
     tagline_student: 'Book driving lessons easily online', tagline_admin: 'Instructor area',
     feat_book: '📅 Book yourself', feat_swap: '🎁 Swap', feat_pickup: '📍 Live pick-up',
     feat_day: '📅 Day plan', feat_students: '🧑‍🎓 Students', feat_reviews: '⭐ Reviews', feat_push: '🔔 Push',
-    tab_login: 'Sign in', tab_register: 'New (with code)', tab_instr: 'Instructor',
+    tab_login: 'Sign in', tab_register: 'New (with code)', tab_signup: 'New here?', tab_instr: 'Instructor',
     appearance: '🎨 Appearance', lang_section: '🌍 Language', terms: 'Terms of Use', privacy: 'Privacy', imprint: 'Legal notice', or: 'or',
     login_id: 'Login name or e-mail', login_pw: 'Password', login_go: 'Sign in',
     login_forgot_q: 'Forgot your password?', login_forgot_link: 'Request a new one', login_forgot_tail: '– your instructor will set one for you.',
@@ -463,7 +463,7 @@ const I18N = {
     tagline_student: 'Direksiyon derslerini kolayca online al', tagline_admin: 'Eğitmen alanı',
     feat_book: '📅 Kendin rezerve et', feat_swap: '🎁 Takas', feat_pickup: '📍 Canlı buluşma',
     feat_day: '📅 Günlük plan', feat_students: '🧑‍🎓 Öğrenciler', feat_reviews: '⭐ Değerlendirmeler', feat_push: '🔔 Bildirim',
-    tab_login: 'Giriş yap', tab_register: 'Yeni (kodla)', tab_instr: 'Eğitmen',
+    tab_login: 'Giriş yap', tab_register: 'Yeni (kodla)', tab_signup: 'Yeni misin?', tab_instr: 'Eğitmen',
     appearance: '🎨 Görünüm', lang_section: '🌍 Dil', terms: 'Kullanım Koşulları', privacy: 'Gizlilik', imprint: 'Künye', or: 'veya',
     login_id: 'Kullanıcı adı veya e-posta', login_pw: 'Şifre', login_go: 'Giriş yap',
     login_forgot_q: 'Şifreni mi unuttun?', login_forgot_link: 'Yeni iste', login_forgot_tail: '– eğitmenin sana yeni bir şifre belirler.',
@@ -672,7 +672,7 @@ const I18N = {
     tagline_student: 'احجز دروس القيادة بسهولة عبر الإنترنت', tagline_admin: 'منطقة المدرّب',
     feat_book: '📅 احجز بنفسك', feat_swap: '🎁 تبادل', feat_pickup: '📍 لقاء مباشر',
     feat_day: '📅 خطة اليوم', feat_students: '🧑‍🎓 الطلاب', feat_reviews: '⭐ التقييمات', feat_push: '🔔 إشعارات',
-    tab_login: 'تسجيل الدخول', tab_register: 'جديد (برمز)', tab_instr: 'المدرّب',
+    tab_login: 'تسجيل الدخول', tab_register: 'جديد (برمز)', tab_signup: 'جديد هنا؟', tab_instr: 'المدرّب',
     appearance: '🎨 المظهر', lang_section: '🌍 اللغة', terms: 'شروط الاستخدام', privacy: 'الخصوصية', imprint: 'بيانات النشر', or: 'أو',
     login_id: 'اسم الدخول أو البريد الإلكتروني', login_pw: 'كلمة المرور', login_go: 'تسجيل الدخول',
     login_forgot_q: 'هل نسيت كلمة المرور؟', login_forgot_link: 'اطلب واحدة جديدة', login_forgot_tail: '– سيقوم مدرّبك بتعيين كلمة مرور لك.',
@@ -1483,8 +1483,13 @@ function openTour() {
 window.__openTour = openTour;
 
 // ---------- Was ist neu? (Changelog) ----------
-const CHANGELOG_VER = '4.0';
+const CHANGELOG_VER = '4.1';
 const CHANGELOG = [
+  { v: '4.1', d: '03.09.2026', title: '🚗 Selbst anmelden & klarer buchen', items: [
+    '✅ <strong>Neu: Du kannst dich selbst anmelden.</strong> Auf der Startseite gibt’s jetzt „Neu hier?" – eine kurze Schritt-für-Schritt-Anmeldung (Name, Geburtsdatum, Adresse mit Vorschlägen, wann du Zeit hast). Danach bestätigst du deine <strong>E-Mail</strong>, dein Fahrlehrer schaltet dich frei – und los geht’s.',
+    '🏠 <strong>Adresse leicht gemacht:</strong> Tippe deine PLZ ein – Ort und passende Straßen werden vorgeschlagen (keine doppelten Einträge mehr).',
+    '⏱️ <strong>Klarer buchen:</strong> Wähle zuerst die <strong>Dauer (40/80/120 Min)</strong> – danach zeigt dir der Kalender nur noch die Startzeiten, die dazu passen. Du weißt sofort, was du buchst.',
+    '🔔 <strong>Aufgeräumte Mitteilungen:</strong> Es werden erst die neuesten 3 gezeigt – den Rest blendest du mit einem Tipp ein.'] },
   { v: '4.0', d: '03.09.2026', title: '📖 Dein Fehlerbuch', items: [
     '📖 <strong>Neu: dein Fehlerbuch.</strong> Wenn deinem Fahrlehrer unterwegs etwas auffällt, hält er den Moment fest – mit <strong>Ort auf der Karte, Fotos und einer kurzen Notiz</strong>, worauf du beim nächsten Mal achtest.',
     '👀 <strong>In Ruhe nachschauen:</strong> Sobald dein Fahrlehrer auf „Fertig" tippt, erscheint der Eintrag bei dir unter „📖 Dein Fehlerbuch" – perfekt zum Wiederholen vor der nächsten Stunde.'] },
@@ -1965,6 +1970,8 @@ function closeModal() {
     state.user = me.user; state.settings = s.settings;
   } catch (e) { /* settings evtl. ohne login */ }
   applyLangDir();
+  // E-Mail-Bestätigung aus der Anmelde-Mail (/?verify=TOKEN) hat Vorrang – bestätigt & rendert selbst.
+  if (await maybeHandleVerifyLink()) return;
   render();
   // Passwort-Reset-Link aus der E-Mail (/?reset=TOKEN) direkt abfangen.
   maybeHandleResetLink();
@@ -2138,7 +2145,10 @@ function portalMode() {
 function renderAuth() {
   const mode = portalMode();
   const regOpen = state.settings?.registration_open === '1'; // privat, wenn geschlossen
-  const reg = regOpen ? [['register', 'tab_register']] : [];
+  const selfReg = state.settings?.self_registration === '1';  // Selbst-Anmeldung (E-Mail + Freischaltung)
+  const reg = [];
+  if (selfReg) reg.push(['signup', 'tab_signup']);
+  if (regOpen) reg.push(['register', 'tab_register']);
   const TABS = mode === 'admin'
     ? [['instr', 'tab_instr']]
     : mode === 'student'
@@ -2176,6 +2186,7 @@ function renderAuth() {
     const body = $('#authbody');
     if (tab === 'login') body.innerHTML = loginForm();
     else if (tab === 'register') body.innerHTML = registerForm();
+    else if (tab === 'signup') body.innerHTML = signupIntro();
     else body.innerHTML = instrForm();
     wireAuth(tab);
     if (mode !== 'admin') loadReviewMarquee();
@@ -2337,6 +2348,206 @@ function registerForm() {
     <div class="field"><label>${t('reg_pw')}</label><input id="r-pw" type="password"><div class="hint" style="margin:.3rem 0 0">${t('reg_pw_hint')}</div></div>
     <div class="form-actions"><button id="r-go">${t('reg_go')}</button></div>`;
 }
+// ---- Selbst-Anmeldung (Schritt für Schritt) ----
+function signupIntro() {
+  return `<div class="sw-intro">
+    <p class="hint" style="margin:.2rem 0 .8rem">Melde dich in wenigen Schritten selbst an. Danach bestätigst du deine E-Mail und dein Fahrlehrer schaltet dich frei – dann kannst du Fahrstunden buchen.</p>
+    <ul class="sw-bullets">
+      <li>📝 Name &amp; Geburtsdatum</li>
+      <li>🏠 Adresse (mit Vorschlägen)</li>
+      <li>🕒 Wann du Zeit hast</li>
+      <li>✅ E-Mail bestätigen &amp; freischalten lassen</li>
+    </ul>
+    <div class="form-actions"><button id="sw-start">Anmeldung starten →</button></div>
+  </div>`;
+}
+
+const SW = { step: 1, data: null };
+const SW_DAYS = [['mo', 'Mo'], ['di', 'Di'], ['mi', 'Mi'], ['do', 'Do'], ['fr', 'Fr'], ['sa', 'Sa']];
+function openSignupWizard() {
+  SW.step = 1;
+  SW.data = { first_name: '', last_name: '', birth_date: '', zip: '', city: '', street: '', house_no: '', phone: '', email: '', password: '', availability: {} };
+  modal(`<div class="sw">
+    <h3 style="margin:.1rem 0 .2rem">🚗 Anmeldung</h3>
+    <div class="sw-prog" id="sw-prog"></div>
+    ${errBox()}
+    <div id="sw-body"></div>
+    <div class="sw-nav">
+      <button class="sec" id="sw-back">Zurück</button>
+      <button id="sw-next">Weiter →</button>
+    </div>
+    <!-- Bot-Falle: bleibt für Menschen unsichtbar. -->
+    <input id="sw-hp" name="website" tabindex="-1" autocomplete="off" style="position:absolute;left:-9999px;opacity:0;height:0;width:0" aria-hidden="true">
+  </div>`, 'wide');
+  swRenderStep();
+  $('#sw-back').onclick = () => { if (SW.step > 1) { swSave(); SW.step--; swRenderStep(); } else closeModal(); };
+  $('#sw-next').onclick = swNext;
+}
+function swProg() {
+  const labels = ['Name', 'Adresse', 'Login', 'Zeiten', 'Fertig'];
+  return labels.map((l, i) => `<span class="sw-dot ${i + 1 === SW.step ? 'now' : (i + 1 < SW.step ? 'ok' : '')}">${i + 1 < SW.step ? '✓' : (i + 1)}</span>`).join('<i></i>');
+}
+function swAge(bd) { if (!/^\d{4}-\d{2}-\d{2}$/.test(bd)) return null; const d = new Date(bd); if (isNaN(d)) return null; const n = new Date(); let a = n.getFullYear() - d.getFullYear(); const m = n.getMonth() - d.getMonth(); if (m < 0 || (m === 0 && n.getDate() < d.getDate())) a--; return a; }
+function swRenderStep() {
+  const d = SW.data;
+  $('#sw-prog').innerHTML = swProg();
+  const back = $('#sw-back'), next = $('#sw-next');
+  back.textContent = SW.step === 1 ? 'Abbrechen' : '← Zurück';
+  next.textContent = SW.step === 5 ? 'Anmeldung absenden ✓' : 'Weiter →';
+  const body = $('#sw-body');
+  if (SW.step === 1) {
+    body.innerHTML = `<div class="row">
+        <div class="field"><label>Vorname</label><input id="sw-first" autocomplete="given-name" value="${esc(d.first_name)}"></div>
+        <div class="field"><label>Nachname</label><input id="sw-last" autocomplete="family-name" value="${esc(d.last_name)}"></div>
+      </div>
+      <div class="field"><label>Geburtsdatum</label><input id="sw-bd" type="date" value="${esc(d.birth_date)}" max="${todayStr()}"><div class="hint" id="sw-age" style="margin:.3rem 0 0"></div></div>`;
+    const showAge = () => { const a = swAge($('#sw-bd').value); $('#sw-age').textContent = a != null ? `Alter: ${a} Jahre` : ''; };
+    $('#sw-bd').oninput = showAge; showAge();
+  } else if (SW.step === 2) {
+    body.innerHTML = `<div class="row">
+        <div class="field" style="max-width:140px"><label>PLZ</label><input id="sw-zip" inputmode="numeric" maxlength="5" autocomplete="postal-code" value="${esc(d.zip)}" placeholder="16321"></div>
+        <div class="field"><label>Ort</label><input id="sw-city" list="sw-cities" autocomplete="address-level2" value="${esc(d.city)}" placeholder="Eberswalde"><datalist id="sw-cities"></datalist></div>
+      </div>
+      <div class="row">
+        <div class="field"><label>Straße</label><input id="sw-street" list="sw-streets" autocomplete="address-line1" value="${esc(d.street)}" placeholder="Eisenbahnstraße"><datalist id="sw-streets"></datalist></div>
+        <div class="field" style="max-width:110px"><label>Nr.</label><input id="sw-no" autocomplete="address-line2" value="${esc(d.house_no)}" placeholder="31"></div>
+      </div>
+      <div class="field"><label>Telefon <span class="hint" style="font-weight:400">(für Rückfragen)</span></label><input id="sw-phone" type="tel" autocomplete="tel" value="${esc(d.phone)}" placeholder="0170 …"></div>
+      <div class="hint" id="sw-geo-note" style="margin-top:.2rem">💡 Tippe deine PLZ ein – Ort und Straßen werden vorgeschlagen.</div>`;
+    swWireGeo();
+  } else if (SW.step === 3) {
+    body.innerHTML = `<div class="field"><label>E-Mail</label><input id="sw-email" type="email" autocomplete="email" value="${esc(d.email)}" placeholder="name@beispiel.de"><div class="hint" style="margin:.3rem 0 0">Hierhin schicken wir den Bestätigungslink.</div></div>
+      <div class="field"><label>Passwort</label><input id="sw-pw" type="password" autocomplete="new-password" value="${esc(d.password)}"><div class="hint" id="sw-pw-hint" style="margin:.3rem 0 0">mind. 8 Zeichen, mit Zahl &amp; Sonderzeichen</div></div>
+      <div class="field"><label>Passwort wiederholen</label><input id="sw-pw2" type="password" autocomplete="new-password" value="${esc(d.password)}"></div>`;
+    const chk = () => { const p = $('#sw-pw').value; const prob = pwProblem(p); const h = $('#sw-pw-hint'); if (h) { h.textContent = prob ? 'Es fehlt noch: ' + prob : '✓ sicheres Passwort'; h.style.color = prob ? '' : 'var(--good)'; } };
+    $('#sw-pw').oninput = chk; chk();
+  } else if (SW.step === 4) {
+    body.innerHTML = `<p class="hint" style="margin:.1rem 0 .6rem">Wann hast du in der Regel Zeit für Fahrstunden? (Optional – hilft bei der Planung. Du kannst mehrere Zeiträume je Tag angeben.)</p>
+      <div class="sw-avail">${SW_DAYS.map((dd) => swDayRow(dd[0], dd[1])).join('')}</div>`;
+    body.querySelectorAll('[data-add]').forEach((b) => b.onclick = () => { const day = b.dataset.add; (SW.data.availability[day] = SW.data.availability[day] || []).push(['', '']); swSaveAvail(); swRenderStep(); });
+    body.querySelectorAll('[data-del]').forEach((b) => b.onclick = () => { const [day, idx] = b.dataset.del.split(':'); SW.data.availability[day].splice(Number(idx), 1); swSaveAvail(); swRenderStep(); });
+  } else {
+    const av = SW.data.availability;
+    const avTxt = SW_DAYS.filter((dd) => (av[dd[0]] || []).some((w) => w[0] && w[1]))
+      .map((dd) => `${dd[1]}: ${(av[dd[0]] || []).filter((w) => w[0] && w[1]).map((w) => w[0] + '–' + w[1]).join(', ')}`).join(' · ') || 'keine Angabe';
+    body.innerHTML = `<div class="sw-summary">
+        <div><b>${esc(d.first_name)} ${esc(d.last_name)}</b>${d.birth_date ? ` · geb. ${esc(d.birth_date.split('-').reverse().join('.'))}` : ''}</div>
+        <div>${esc([d.street, d.house_no].filter(Boolean).join(' '))}${(d.zip || d.city) ? ', ' + esc([d.zip, d.city].filter(Boolean).join(' ')) : ''}</div>
+        <div>📧 ${esc(d.email)}${d.phone ? ' · 📞 ' + esc(d.phone) : ''}</div>
+        <div>🕒 ${esc(avTxt)}</div>
+      </div>
+      <label class="ck-line" style="justify-content:flex-start;margin:.7rem 0"><input type="checkbox" id="sw-agb"> Ich habe die <a href="/nutzungsbedingungen.html" target="_blank">Nutzungsbedingungen</a> und den <a href="/datenschutz.html" target="_blank">Datenschutz</a> gelesen und bin einverstanden.</label>`;
+  }
+  const errEl = $('#autherr'); if (errEl) errEl.classList.add('hidden');
+}
+function swDayRow(day, label) {
+  const wins = SW.data.availability[day] || [];
+  const rows = wins.map((w, i) => `<div class="sw-win">
+      <input type="time" data-day="${day}" data-i="${i}" data-k="v" value="${esc(w[0] || '')}">
+      <span>–</span>
+      <input type="time" data-day="${day}" data-i="${i}" data-k="b" value="${esc(w[1] || '')}">
+      <button class="lp-del" data-del="${day}:${i}" title="entfernen">✕</button>
+    </div>`).join('');
+  return `<div class="sw-day"><div class="sw-day-h">${label}</div>${rows}<button class="ghost sm" data-add="${day}">+ Zeitraum</button></div>`;
+}
+function swSaveAvail() {
+  const body = $('#sw-body'); if (!body) return;
+  body.querySelectorAll('input[type=time][data-day]').forEach((inp) => {
+    const day = inp.dataset.day, i = Number(inp.dataset.i), k = inp.dataset.k;
+    if (!SW.data.availability[day] || !SW.data.availability[day][i]) return;
+    SW.data.availability[day][i][k === 'v' ? 0 : 1] = inp.value;
+  });
+}
+function swSave() {
+  const d = SW.data, g = (id) => { const el = $(id); return el ? el.value.trim() : undefined; };
+  if (SW.step === 1) { d.first_name = g('#sw-first') ?? d.first_name; d.last_name = g('#sw-last') ?? d.last_name; d.birth_date = ($('#sw-bd') || {}).value || d.birth_date; }
+  else if (SW.step === 2) { d.zip = g('#sw-zip') ?? d.zip; d.city = g('#sw-city') ?? d.city; d.street = g('#sw-street') ?? d.street; d.house_no = g('#sw-no') ?? d.house_no; d.phone = g('#sw-phone') ?? d.phone; }
+  else if (SW.step === 3) { d.email = (g('#sw-email') || '').toLowerCase() || d.email; d.password = ($('#sw-pw') || {}).value || d.password; }
+  else if (SW.step === 4) { swSaveAvail(); }
+}
+async function swNext() {
+  swSave();
+  const d = SW.data;
+  if (SW.step === 1) {
+    if (!d.first_name || !d.last_name) return showErr('Bitte Vor- und Nachnamen angeben.');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(d.birth_date)) return showErr('Bitte dein Geburtsdatum angeben.');
+    const a = swAge(d.birth_date); if (a == null || a < 14 || a > 95) return showErr('Bitte ein gültiges Geburtsdatum angeben.');
+  } else if (SW.step === 2) {
+    if (d.zip && !/^\d{5}$/.test(d.zip)) return showErr('Die PLZ sollte 5 Ziffern haben.');
+  } else if (SW.step === 3) {
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(d.email)) return showErr('Bitte eine gültige E-Mail angeben.');
+    const pw2 = ($('#sw-pw2') || {}).value;
+    const prob = pwProblem(d.password); if (prob) return showErr('Passwort braucht ' + prob + '.');
+    if (d.password !== pw2) return showErr('Die Passwörter stimmen nicht überein.');
+  }
+  if (SW.step < 5) { SW.step++; swRenderStep(); return; }
+  // Schritt 5: absenden
+  if (!$('#sw-agb') || !$('#sw-agb').checked) return showErr('Bitte bestätige Nutzungsbedingungen & Datenschutz.');
+  const availability = {};
+  for (const [day] of SW_DAYS) { const wins = (d.availability[day] || []).filter((w) => w[0] && w[1]).map((w) => [w[0], w[1]]); if (wins.length) availability[day] = wins; }
+  const payload = { first_name: d.first_name, last_name: d.last_name, birth_date: d.birth_date,
+    zip: d.zip || null, city: d.city || null, street: d.street || null, house_no: d.house_no || null,
+    phone: d.phone || null, email: d.email, password: d.password, availability, agb: true,
+    website: ($('#sw-hp') || {}).value || '' };
+  const btn = $('#sw-next'); if (btn) { btn.disabled = true; btn.textContent = 'Sende …'; }
+  try {
+    const r = await api('/api/auth/signup', { method: 'POST', body: payload });
+    closeModal();
+    swDoneScreen(r);
+  } catch (e) { showErr(e.message); if (btn) { btn.disabled = false; btn.textContent = 'Anmeldung absenden ✓'; } }
+}
+// Adress-Vorschläge (OpenPLZ über unseren Server). Debounced, Fehler werden ignoriert.
+function swWireGeo() {
+  const zip = $('#sw-zip'), city = $('#sw-city'), street = $('#sw-street');
+  let tGeoZip, tGeoStreet;
+  const loadCities = async () => {
+    if (!/^\d{5}$/.test(zip.value.trim())) return;
+    try {
+      const r = await api('/api/geo/plz?zip=' + encodeURIComponent(zip.value.trim()));
+      const dl = $('#sw-cities'); if (dl) dl.innerHTML = (r.localities || []).map((n) => `<option value="${esc(n)}">`).join('');
+      if ((r.localities || []).length && !city.value.trim()) city.value = r.localities[0];   // Ort automatisch füllen
+    } catch {}
+  };
+  const loadStreets = async () => {
+    const q = street.value.trim();
+    if (!/^\d{5}$/.test(zip.value.trim()) || q.length < 2) return;
+    try {
+      const r = await api(`/api/geo/streets?zip=${encodeURIComponent(zip.value.trim())}&q=${encodeURIComponent(q)}`);
+      const dl = $('#sw-streets'); if (dl) dl.innerHTML = (r.streets || []).map((n) => `<option value="${esc(n)}">`).join('');
+    } catch {}
+  };
+  if (zip) zip.oninput = () => { clearTimeout(tGeoZip); tGeoZip = setTimeout(loadCities, 400); };
+  if (street) street.oninput = () => { clearTimeout(tGeoStreet); tGeoStreet = setTimeout(loadStreets, 350); };
+  if (zip && /^\d{5}$/.test(zip.value.trim())) loadCities();
+}
+function swDoneScreen(r) {
+  modal(`<div class="sw-done">
+    <div class="pending-emoji">📧</div>
+    <h3 style="text-align:center;margin:.2rem 0 .5rem">Fast geschafft!</h3>
+    ${r && r.needs_verify !== false
+      ? `<p class="hint" style="text-align:center">Wir haben dir eine E-Mail${r && r.email ? ' an <strong>' + esc(r.email) + '</strong>' : ''} geschickt. Öffne den Bestätigungslink darin.<br><span style="color:var(--muted)">Danach schaltet dich dein Fahrlehrer frei – du bekommst Bescheid.</span></p>`
+      : `<p class="hint" style="text-align:center">Deine Anmeldung ist da! Dein Fahrlehrer schaltet dich in Kürze frei – dann kannst du dich anmelden und buchen.</p>`}
+    <div class="actions" style="justify-content:center"><button id="sw-ok">Alles klar</button></div>
+  </div>`, 'locked');
+  $('#sw-ok').onclick = () => closeModal();
+}
+
+// E-Mail-Bestätigungslink (/?verify=TOKEN): Konto bestätigen und einloggen.
+async function maybeHandleVerifyLink() {
+  let token = null;
+  try { token = new URL(location.href).searchParams.get('verify'); } catch { return false; }
+  if (!token) return false;
+  try { const u = new URL(location.href); u.searchParams.delete('verify'); history.replaceState(null, '', u.pathname + u.search + u.hash); } catch {}
+  try {
+    await api('/api/auth/verify', { method: 'POST', body: { token } });
+    const [me, s] = await Promise.all([api('/api/auth/me'), api('/api/settings')]);
+    state.user = me.user; state.settings = s.settings;
+    toast('E-Mail bestätigt ✓', 'ok');
+    render();
+    return true;
+  } catch (e) { toast(e.message || 'Bestätigungslink ungültig oder abgelaufen.', 'err'); return false; }
+}
+
 function instrForm() {
   return `${errBox()}
     <p class="hint">${t('instr_intro')}</p>
@@ -2519,6 +2730,8 @@ function wireAuth(tab) {
       } catch (e) { showErr(e.message); }
     };
     const fg = $('#l-forgot'); if (fg) fg.onclick = (ev) => { ev.preventDefault(); openForgotModal(); };
+  } else if (tab === 'signup') {
+    const go = $('#sw-start'); if (go) go.onclick = () => openSignupWizard();
   } else if (tab === 'register') {
     $('#r-go').onclick = async () => {
       const prob = pwProblem($('#r-pw').value);
@@ -2556,6 +2769,8 @@ function wireAuth(tab) {
 
 // ====================== FAHRSCHÜLER ======================
 async function renderStudent() {
+  // Selbst-Anmeldung: solange nicht freigeschaltet, den Warte-Screen zeigen (kein Buchen).
+  if (state.user && state.user.approved === false) { renderPendingApproval(); return; }
   app.innerHTML = header() + `<main>
     <div class="card hidden" id="lesson-card"></div>
     <div class="card hidden" id="live-card"></div>
@@ -2582,6 +2797,7 @@ async function renderStudent() {
         <button class="ghost sm" id="go-today">${t('today')}</button>
       </div>
       <div id="book-cal"></div>
+      <div id="dur-choose" class="dur-choose"></div>
       <div class="slots" id="slots"></div>
     </div>
   </main>`;
@@ -2607,6 +2823,45 @@ async function renderStudent() {
   let tourDone = false;
   try { tourDone = localStorage.getItem('ginoco-tour-done') === '1'; } catch {}
   if (!tourDone && !state._tourShown) { state._tourShown = true; setTimeout(openTour, 500); }
+}
+
+// Warte-Screen nach der Selbst-Anmeldung: E-Mail bestätigen + Freischaltung abwarten.
+function renderPendingApproval() {
+  const u = state.user || {};
+  const verified = u.email_verified !== false;
+  app.innerHTML = `<div class="auth-wrap"><div class="auth">
+    <div class="auth-hero">
+      <div class="auth-logo"><img src="/logo.svg?v=3630" alt="Ginoco" width="70" height="70" onerror="this.replaceWith(Object.assign(document.createElement('span'),{textContent:'🚗'}))"></div>
+      <h1 class="auth-name">ginoco</h1>
+      <div class="tag">Willkommen${u.name ? ', ' + esc(u.name.split(' ')[0]) : ''}!</div>
+    </div>
+    <div class="card pending-card">
+      <div class="pending-emoji">${verified ? '⏳' : '📧'}</div>
+      <h2 style="text-align:center;margin:.2rem 0 .6rem">${verified ? 'Fast geschafft!' : 'Bitte bestätige deine E-Mail'}</h2>
+      ${verified
+        ? `<p class="hint" style="text-align:center">Deine E-Mail ist bestätigt ✓<br>Jetzt schaut dein Fahrlehrer noch kurz drüber und schaltet dich frei. <strong>Du bekommst eine Nachricht (Push &amp; E-Mail)</strong>, sobald du deine Fahrstunden buchen kannst.</p>`
+        : `<p class="hint" style="text-align:center">Wir haben dir eine E-Mail geschickt${u.email ? ' an <strong>' + esc(u.email) + '</strong>' : ''}. Öffne den Link darin, um deine Anmeldung zu bestätigen.<br><span style="color:var(--muted)">Nichts erhalten? Schau bitte im Spam-Ordner nach.</span></p>`}
+      <div class="pending-steps">
+        <div class="pstep ${verified ? 'ok' : 'now'}"><span>1</span> E-Mail bestätigen ${verified ? '✓' : ''}</div>
+        <div class="pstep ${verified ? 'now' : ''}"><span>2</span> Freischaltung durch den Fahrlehrer</div>
+        <div class="pstep"><span>3</span> Fahrstunden buchen 🚗</div>
+      </div>
+      <div class="actions" style="justify-content:center;margin-top:1rem">
+        <button class="sec" id="pa-refresh">🔄 Aktualisieren</button>
+        <button class="ghost" id="pa-logout">Abmelden</button>
+      </div>
+      <p class="hint" style="text-align:center;margin-top:.8rem">Fragen? <a href="#" onclick="window.__openSupport();return false">✉️ Hilfe &amp; Support</a></p>
+    </div>
+  </div></div>`;
+  $('#pa-refresh').onclick = async () => {
+    try {
+      const me = await api('/api/auth/me');
+      state.user = me.user;
+      if (me.user && me.user.approved) { toast('🎉 Du bist freigeschaltet!', 'ok'); render(); }
+      else { renderPendingApproval(); toast('Noch nicht freigeschaltet – wir sagen dir Bescheid.', ''); }
+    } catch {}
+  };
+  $('#pa-logout').onclick = async () => { await api('/api/auth/logout', { method: 'POST' }); state.user = null; render(); };
 }
 
 let myBookingsCache = [];
@@ -4275,21 +4530,36 @@ function renderNotifications(notifs, unread) {
   card.classList.remove('hidden'); // immer sichtbar – wegen Push-Schalter
   chimeOnIncrease('notif', unread || 0); // Ton, wenn neue Mitteilungen dazugekommen sind
   const icon = (k) => k === 'offer' ? '🎁' : k === 'shift' ? '🕐' : k === 'reminder' ? '⏰' : k === 'sign' ? '✍️' : 'ℹ️';
-  const list = (notifs && notifs.length)
-    ? `<div class="notif-list">${notifs.map((n) => {
-        const needsSign = n.kind === 'sign' && n.ref_booking_id && (myBookingsCache || []).some((b) => b.id === n.ref_booking_id && b.needs_sign);
-        return `<div class="notif ${n.read ? '' : 'unread'}">
+  const SHOW = 3; // erst 3 zeigen, den Rest per „mehr“ – spart Platz
+  const item = (n) => {
+    const needsSign = n.kind === 'sign' && n.ref_booking_id && (myBookingsCache || []).some((b) => b.id === n.ref_booking_id && b.needs_sign);
+    return `<div class="notif ${n.read ? '' : 'unread'}">
         <span class="notif-ic">${icon(n.kind)}</span>
         <div class="notif-body"><div class="notif-msg">${esc(n.message)}</div>
           <div class="notif-time">${new Date(n.created_at).toLocaleString(LOCALE, { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</div>
           ${needsSign ? `<button class="sm notif-sign" data-sign="${n.ref_booking_id}" style="margin-top:.5rem">${t('notif_sign_btn')}</button>` : ''}</div>
         ${n.read ? '' : '<span class="notif-dot"></span>'}
-      </div>`; }).join('')}</div>
+      </div>`;
+  };
+  const expanded = !!state._notifExpanded;
+  const list = (notifs && notifs.length)
+    ? `<div class="notif-list">
+        ${notifs.slice(0, SHOW).map(item).join('')}
+        ${notifs.length > SHOW ? `<div id="notif-rest" ${expanded ? '' : 'hidden'}>${notifs.slice(SHOW).map(item).join('')}</div>` : ''}
+      </div>
+      ${notifs.length > SHOW ? `<div style="margin-top:.6rem"><button class="ghost sm" id="notif-more">${expanded ? '▲ Weniger anzeigen' : `▼ ${notifs.length - SHOW} weitere anzeigen`}</button></div>` : ''}
       ${unread ? `<div style="margin-top:.8rem"><button class="sec sm" id="notif-read">${t('notif_mark_read')}</button></div>` : ''}`
     : `<p class="hint">${t('notif_none')}</p>`;
   card.innerHTML = `<h2>${t('notif_title')} ${unread ? `<span class="badge offer">${t('notif_new', { n: unread })}</span>` : ''}</h2>
     <div class="push-ctl" id="push-ctl"></div>
     ${list}`;
+  const more = $('#notif-more');
+  if (more) more.onclick = () => {
+    const rest = $('#notif-rest'); if (!rest) return;
+    state._notifExpanded = rest.hidden;   // umschalten
+    rest.hidden = !rest.hidden;
+    more.textContent = rest.hidden ? `▼ ${(notifs.length - SHOW)} weitere anzeigen` : '▲ Weniger anzeigen';
+  };
   const b = $('#notif-read');
   if (b) b.onclick = async () => { try { await api('/api/my/notifications/read', { method: 'POST' }); syncStudent(); } catch (e) { toast(e.message, 'err'); } };
   card.querySelectorAll('[data-sign]').forEach((btn) => btn.onclick = () => {
@@ -4347,7 +4617,25 @@ async function declineOffer(id) {
   catch (e) { toast(e.message, 'err'); }
 }
 
+// Erlaubte Fahrstunden-Längen des Schülers (40/80/120), aufsteigend.
+function studentDurs() { return String(state.user?.allowed_durations || '80').split(',').map(Number).filter((n) => n > 0).sort((a, b) => a - b); }
+// Gewählte Dauer merken (Standard: 80, sonst die längste erlaubte).
+function initBookDur() { const d = studentDurs(); if (!d.length) return; if (!state.bookDur || !d.includes(state.bookDur)) state.bookDur = d.includes(80) ? 80 : d[d.length - 1]; }
+// „Erst Dauer wählen" – Chips über den Startzeiten. Nur bei mehr als einer erlaubten Länge.
+function renderDurChoose() {
+  const box = $('#dur-choose'); if (!box) return;
+  const durs = studentDurs();
+  if (durs.length <= 1) { box.innerHTML = ''; return; }
+  box.innerHTML = `<div class="dc-label">${t('choose_duration')}</div>
+    <div class="dc-chips">${durs.map((d) => `<button class="dc-chip ${d === state.bookDur ? 'on' : ''}" data-dc="${d}">${d} ${t('min')}</button>`).join('')}</div>`;
+  box.querySelectorAll('[data-dc]').forEach((b) => b.onclick = () => { state.bookDur = Number(b.dataset.dc); renderSlots(state._lastSlots || [], state._lastMine || []); });
+}
+
 function renderSlots(slots, mine) {
+  state._lastSlots = slots; state._lastMine = mine;   // für die Dauer-Umschaltung ohne Neuladen
+  initBookDur();
+  renderDurChoose();
+  const wantDur = state.bookDur || 0;
   const mineToday = new Set(mine.filter((b) => b.date === state.date && b.status !== 'cancelled').map((b) => b.start_time));
   const el = $('#slots');
   const dayName = WD_LONG[isoDow(state.date) - 1];
@@ -4363,13 +4651,15 @@ function renderSlots(slots, mine) {
   }
   el.innerHTML = slots.map((s) => {
     const mineHere = mineToday.has(s.start);
+    const md = Number(s.maxDur || s.duration);
+    // „Erst Dauer, dann passende Zeiten": freie Starts, die für die gewählte Dauer nicht
+    // reichen, gar nicht anzeigen (so verschwinden auch Mini-Zwischen-Slots).
+    if (s.state === 'free' && !mineHere && wantDur && md < wantDur) return '';
     let cls = s.state, inner = '';
     let sub = t('slot_dur', { start: s.start, end: s.end, dur: s.duration });
-    // Freier (fliessender) Start: Dauer waehlt der Schüler selbst -> passende Beschriftung.
+    // Freier (fliessender) Start: mit der oben gewählten Dauer beschriften.
     if (s.state === 'free' && !mineHere) {
-      const md = Number(s.maxDur || s.duration);
-      const my = String(state.user?.allowed_durations || '80').split(',').map(Number).filter((n) => n > 0 && n <= md).sort((a, b) => a - b);
-      sub = my.length > 1 ? t('slot_free_from_multi', { start: s.start, durs: my.join('/') }) : t('slot_free_from', { start: s.start, dur: my[0] || s.duration });
+      sub = t('slot_free_from', { start: s.start, dur: wantDur || md });
     }
     if (mineHere) {
       // Nur frei stornierbar, solange die Storno-Frist nicht erreicht ist –
@@ -4381,7 +4671,7 @@ function renderSlots(slots, mine) {
                       : `<span class="pill">${t('slot_locked')}</span>`);
       cls = 'booked';
     } else if (s.state === 'free') {
-      inner = `<span class="tag g">${t('free')}</span><button class="sm" data-book="${s.start}" data-dur="${s.duration}" data-maxdur="${s.maxDur || s.duration}">${t('book')}</button>`;
+      inner = `<span class="tag g">${t('free')}</span><button class="sm" data-book="${s.start}" data-dur="${wantDur || s.duration}" data-maxdur="${s.maxDur || s.duration}">${t('book')}</button>`;
     } else if (s.state === 'booked') {
       inner = `<span class="tag x">${t('taken')}</span>`;
     } else if (s.state === 'offered') {
@@ -4403,7 +4693,7 @@ function renderSlots(slots, mine) {
   }).join('');
   // Tag hat Slots, aber nichts Freies (alles belegt/vorbei) und keiner gehört mir:
   // sanfter Hinweis + Sprung zum nächsten freien Termin.
-  const anyFree = slots.some((s) => s.state === 'free');
+  const anyFree = slots.some((s) => s.state === 'free' && !mineToday.has(s.start) && (!wantDur || Number(s.maxDur || s.duration) >= wantDur));
   const anyMine = slots.some((s) => mineToday.has(s.start));
   if (!anyFree && !anyMine) {
     el.insertAdjacentHTML('beforeend', `<div class="slots-hint">
@@ -4436,6 +4726,9 @@ function bookSlot(start, dur, maxDur) {
     return;
   }
   allowed = fits;
+  // Dauer wurde oben schon gewählt (data-dur) → hier festnageln, kein zweites Auswählen.
+  const preferred = Number(dur) > 0 && fits.includes(Number(dur)) ? Number(dur) : null;
+  if (preferred) allowed = [preferred];
   const defDur = allowed.includes(80) ? 80 : allowed[allowed.length - 1];
   const durSelect = allowed.length > 1
     ? `<div class="field"><label>${t('choose_duration')}</label><select id="bk-dur">${allowed.map((d) => `<option value="${d}" ${d === defDur ? 'selected' : ''}>${t('minutes_opt', { d })}</option>`).join('')}</select></div>`
@@ -6274,6 +6567,60 @@ async function loadCodes() {
 }
 
 // ---- Tab: Schüler ----
+// Offene Selbst-Anmeldungen im Cockpit: freischalten oder ablehnen.
+const SU_DAYNAMES = { mo: 'Mo', di: 'Di', mi: 'Mi', do: 'Do', fr: 'Fr', sa: 'Sa', so: 'So' };
+function fmtAvailability(json) {
+  let av; try { av = JSON.parse(json || '{}'); } catch { return ''; }
+  const parts = [];
+  for (const d of ['mo', 'di', 'mi', 'do', 'fr', 'sa', 'so']) {
+    const wins = av[d]; if (!Array.isArray(wins) || !wins.length) continue;
+    parts.push(`${SU_DAYNAMES[d]} ${wins.map((w) => `${w.v || w[0]}–${w.b || w[1]}`).join(', ')}`);
+  }
+  return parts.join(' · ');
+}
+async function renderSignups() {
+  const box = $('#s-signups'); if (!box) return;
+  let signups = [];
+  try { signups = (await api('/api/instructor/signups')).signups || []; } catch { return; }
+  if (!signups.length) { box.innerHTML = ''; return; }
+  box.innerHTML = `<div class="signup-panel">
+    <div class="signup-h">🆕 Neue Anmeldungen <span class="pill">${signups.length}</span></div>
+    <p class="hint" style="margin:.1rem 0 .6rem">Diese Fahrschüler haben sich selbst angemeldet und warten auf deine Freischaltung. Prüfe kurz und schalte frei – oder lehne ab (entfernt die Anmeldung).</p>
+    ${signups.map((s) => {
+      const age = s.birth_date ? (() => { const a = swAge(s.birth_date); return a != null ? `${a} J.` : ''; })() : '';
+      const addr = [ [s.street, s.house_no].filter(Boolean).join(' '), [s.zip, s.city].filter(Boolean).join(' ') ].filter(Boolean).join(', ');
+      const avail = fmtAvailability(s.availability);
+      return `<div class="signup-card">
+        <div class="signup-top">
+          <div class="signup-name">${esc(s.name)}${age ? ` <span class="muted">(${age})</span>` : ''}
+            ${s.email_verified ? '<span class="pill" style="background:var(--good-bg);color:var(--good)">✓ E-Mail bestätigt</span>' : '<span class="pill" style="background:rgba(255,180,0,.16);color:#d99500">⏳ E-Mail offen</span>'}</div>
+          <div class="signup-when muted">${s.created_at ? esc(new Date(s.created_at).toLocaleDateString(LOCALE, { day: '2-digit', month: '2-digit' })) : ''}</div>
+        </div>
+        <div class="signup-body">
+          <div>📧 ${esc(s.email || '–')}${s.phone ? ` · 📞 ${esc(s.phone)}` : ''}</div>
+          ${addr ? `<div>🏠 ${esc(addr)}</div>` : ''}
+          ${s.birth_date ? `<div>🎂 ${esc(s.birth_date.split('-').reverse().join('.'))}</div>` : ''}
+          ${avail ? `<div>🕒 ${esc(avail)}</div>` : ''}
+        </div>
+        <div class="signup-actions">
+          <button class="sm" data-approve="${s.id}">✅ Freischalten</button>
+          <button class="ghost sm" data-reject="${s.id}" data-rname="${esc(s.name)}" style="color:var(--bad)">Ablehnen</button>
+        </div>
+      </div>`;
+    }).join('')}
+  </div>`;
+  box.querySelectorAll('[data-approve]').forEach((b) => b.onclick = async () => {
+    b.disabled = true;
+    try { await api(`/api/instructor/signups/${b.dataset.approve}/approve`, { method: 'POST' }); toast('Freigeschaltet ✅ – der Schüler wurde benachrichtigt.', 'ok'); renderSignups(); tabSchueler('active'); }
+    catch (e) { toast(e.message, 'err'); b.disabled = false; }
+  });
+  box.querySelectorAll('[data-reject]').forEach((b) => b.onclick = async () => {
+    if (!confirm(`Anmeldung von „${b.dataset.rname}" ablehnen und entfernen?`)) return;
+    try { await api(`/api/instructor/signups/${b.dataset.reject}/reject`, { method: 'POST' }); toast('Anmeldung abgelehnt.', ''); renderSignups(); }
+    catch (e) { toast(e.message, 'err'); }
+  });
+}
+
 async function tabSchueler(scope) {
   scope = scope || state._schuelerScope || 'active';
   state._schuelerScope = scope;
@@ -6293,11 +6640,13 @@ async function tabSchueler(scope) {
     <p class="hint">${scope === 'archived'
       ? 'Bestandene / archivierte Fahrschüler. Ihre Daten und Fahrstunden bleiben einsehbar; sie tauchen nicht in der aktiven Liste auf. Über „Reaktivieren“ kommen sie zurück.'
       : 'Lege Fahrschüler an – jeder bekommt automatisch Login + Startpasswort. Über die Zeilen: bearbeiten, Notiz, Stundenlängen (40/80/120), Treffpunkt, Zugangsdaten, archivieren (bestanden) oder löschen.'}</p>
+    <div id="s-signups"></div>
     <div id="s-list"></div></div>`;
   $('#s-add').onclick = () => openCreateStudentModal();
   $('#s-bulk').onclick = () => openBulkStudentModal();
   $('#sc-active').onclick = () => tabSchueler('active');
   $('#sc-arch').onclick = () => tabSchueler('archived');
+  if (scope !== 'archived') renderSignups();
   try {
     const { students, req, activeCount, archivedCount } = await api('/api/students' + (scope === 'archived' ? '?scope=archived' : ''));
     if ($('#sc-ac')) $('#sc-ac').textContent = activeCount != null ? `(${activeCount})` : '';
@@ -7604,8 +7953,10 @@ function tabEinstellungen() {
       <div class="hint" id="e-mail-testinfo" style="margin:.4rem 0 0">Tipp: zuerst <strong>oben speichern</strong>, dann testen – der Test nutzt die gespeicherten Daten.</div>`, s.mail_enabled === '1')}
 
     ${sec('🔒', 'Privatmodus & Registrierung', 'Wer darf sich neu anmelden?', `
-      <label class="ck-line"><input type="checkbox" id="e-reg-open" ${s.registration_open === '1' ? 'checked' : ''}> Neue Fahrschüler dürfen sich mit Code registrieren</label>
-      <div class="hint" style="margin:.4rem 0 0">Ist der Haken <strong>weg</strong>, läuft Ginoco im <strong>Privatmodus</strong>: Auf der Startseite gibt es keinen „Neu (mit Code)“-Reiter mehr und niemand Neues kann sich anmelden. Deine bestehenden Zugänge (und du selbst) funktionieren weiter. Du kannst das jederzeit wieder öffnen, wenn du Fahrschüler einladen willst.</div>`, s.registration_open !== '1')}
+      <label class="ck-line"><input type="checkbox" id="e-self-reg" ${s.self_registration === '1' ? 'checked' : ''}> Fahrschüler dürfen sich selbst anmelden (E-Mail bestätigen + deine Freischaltung)</label>
+      <div class="hint" style="margin:.4rem 0 .8rem">Empfohlen. Neue Fahrschüler füllen eine Schritt-für-Schritt-Anmeldung aus (Name, Geburtsdatum, Adresse, Verfügbarkeit). Gegen Spam bestätigen sie zuerst ihre <strong>E-Mail</strong> – danach erscheinen sie bei dir unter „🆕 Neue Anmeldungen“ und du <strong>schaltest sie frei</strong>. Erst dann können sie buchen. ${s.mail_configured ? '' : '<strong style="color:var(--bad)">Achtung:</strong> Der E-Mail-Versand ist noch nicht eingerichtet – ohne ihn können neue Anmeldungen ihre E-Mail nicht bestätigen. Richte oben zuerst „E-Mail/SMTP“ ein.'}</div>
+      <label class="ck-line"><input type="checkbox" id="e-reg-open" ${s.registration_open === '1' ? 'checked' : ''}> Zusätzlich: Anmeldung mit Einladungs-Code erlauben</label>
+      <div class="hint" style="margin:.4rem 0 0">Ist <strong>beides weg</strong>, läuft Ginoco im <strong>Privatmodus</strong>: keine Anmelde-Reiter auf der Startseite, niemand Neues kann sich anmelden. Deine bestehenden Zugänge (und du selbst) funktionieren weiter.</div>`, s.self_registration !== '1' && s.registration_open !== '1')}
 
     ${sec('👤', 'Zugang & Kontakt', 'Name, Handynummer, Passwort', `
       <div class="field"><label>Angezeigter Name</label><input id="e-name" value="${esc(s.instructor_name)}"></div>
@@ -7677,6 +8028,7 @@ function tabEinstellungen() {
         req_ueberland: Number($('#e-req-u').value), req_autobahn: Number($('#e-req-a').value), req_nacht: Number($('#e-req-n').value),
         rank2_min_lessons: Number($('#e-rank2').value), booking_horizon_days_rank2: Number($('#e-horizon2').value),
         registration_open: $('#e-reg-open').checked ? '1' : '0',
+        self_registration: $('#e-self-reg').checked ? '1' : '0',
         weather_enabled: $('#e-weather').checked ? '1' : '0',
         weather_autostatus: $('#e-weather-auto').checked ? '1' : '0',
         traffic_key: $('#e-traffic').value.trim(),
