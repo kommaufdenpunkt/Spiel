@@ -280,6 +280,28 @@ db.exec(`CREATE TABLE IF NOT EXISTS password_resets (
 );`);
 db.exec('CREATE INDEX IF NOT EXISTS idx_pwreset_student ON password_resets(student_id)');
 
+// Lernpunkte: der Fahrlehrer markiert unterwegs einen Ort (GPS) + Notiz + Fotos zu
+// einem Fehler/Lernmoment. Erst nach „Fertig" (done=1) sieht der Fahrschüler ihn.
+db.exec(`CREATE TABLE IF NOT EXISTS learnpoints (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  student_id INTEGER NOT NULL,
+  booking_id INTEGER,
+  lat        REAL,
+  lng        REAL,
+  text       TEXT,
+  done       INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL,
+  updated_at TEXT
+);`);
+db.exec('CREATE INDEX IF NOT EXISTS idx_learnpoints_student ON learnpoints(student_id, done)');
+db.exec(`CREATE TABLE IF NOT EXISTS learnpoint_photos (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  point_id   INTEGER NOT NULL,
+  data       TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);`);
+db.exec('CREATE INDEX IF NOT EXISTS idx_learnpoint_photos_pt ON learnpoint_photos(point_id)');
+
 // Live-Standort des Fahrlehrers (genau eine Zeile)
 db.exec(`CREATE TABLE IF NOT EXISTS live_location (
   id INTEGER PRIMARY KEY CHECK(id = 1),

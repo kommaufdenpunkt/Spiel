@@ -1727,6 +1727,104 @@ async function handleApi(req, res, url) {
     return ok(res, { moved: true, date: newDate, start_time: newStart, gap, packed: moved });
   }
 
+  // ===== Fehlerbuch / Lernpunkte: Fahrlehrer markiert unterwegs Ort + Notiz + Fotos =====
+  const lpPhotos = (id) => db.prepare('SELECT id FROM learnpoint_photos WHERE point_id=? ORDER BY id').all(id).map((r) => r.id);
+  const lpRow = (r) => ({ id: r.id, student_id: r.student_id, booking_id: r.booking_id, lat: r.lat, lng: r.lng,
+    text: r.text || '', done: !!r.done, created_at: r.created_at, updated_at: r.updated_at, photos: lpPhotos(r.id) });
+  // 1) Anlegen (sofort beim Antippen – Standort wird gleich mitgeschickt). Entwurf (done=0).
+  if (p === '/api/instructor/learnpoints' && method === 'POST') {
+    if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
+    const b = await readBody(req);
+    const sid = Number(b.student_id);
+    if (!db.prepare('SELECT 1 FROM students WHERE id=?').get(sid)) return bad(res, 'Fahrschüler nicht gefunden', 404);
+    const lat = (b.lat == null || b.lat === '') ? null : Number(b.lat);
+    const lng = (b.lng == null || b.lng === '') ? null : Number(b.lng);
+    const text = (typeof b.text === 'string' ? b.text : '').trim().slice(0, 2000);
+    const now = new Date().toISOString();
+    const info = db.prepare('INSERT INTO learnpoints(student_id,booking_id,lat,lng,text,done,created_at,updated_at) VALUES(?,?,?,?,?,0,?,?)')
+      .run(sid, b.booking_id ? Number(b.booking_id) : null, isFinite(lat) ? lat : null, isFinite(lng) ? lng : null, text || null, now, now);
+    const row = db.prepare('SELECT * FROM learnpoints WHERE id=?').get(Number(info.lastInsertRowid));
+    return ok(res, { point: lpRow(row) });
+  }
+  // 2) Text/Standort/Fertig aktualisieren
+  const lpm = p.match(/^\/api\/instructor\/learnpoints\/(\d+)$/);
+  if (lpm && method === 'PATCH') {
+    if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
+    const lp = db.prepare('SELECT * FROM learnpoints WHERE id=?').get(Number(lpm[1]));
+    if (!lp) return bad(res, 'Nicht gefunden', 404);
+    const b = await readBody(req);
+    const fields = [], vals = [];
+    if ('text' in b) { fields.push('text=?'); vals.push((String(b.text || '').trim().slice(0, 2000)) || null); }
+    if ('lat' in b) { fields.push('lat=?'); vals.push((b.lat == null || b.lat === '') ? null : Number(b.lat)); }
+    if ('lng' in b) { fields.push('lng=?'); vals.push((b.lng == null || b.lng === '') ? null : Number(b.lng)); }
+    const wasDone = !!lp.done;
+    if ('done' in b) { fields.push('done=?'); vals.push(b.done ? 1 : 0); }
+    fields.push('updated_at=?'); vals.push(new Date().toISOString());
+    vals.push(lp.id);
+    db.prepare(`UPDATE learnpoints SET ${fields.join(',')} WHERE id=?`).run(...vals);
+    // „Fertig" gerade erst gesetzt -> Fahrschüler benachrichtigen (er darf jetzt reinschauen)
+    if ('done' in b && b.done && !wasDone) {
+      notify(lp.student_id, 'info', '📖 Neuer Eintrag in deinem Fehlerbuch – schau mal rein, worauf du beim nächsten Mal achtest.',
+        null, lp.booking_id, { url: '/?fehlerbuch=1', pushTitle: '📖 Neuer Eintrag im Fehlerbuch' });
+    }
+    const row = db.prepare('SELECT * FROM learnpoints WHERE id=?').get(lp.id);
+    return ok(res, { point: lpRow(row) });
+  }
+  if (lpm && method === 'DELETE') {
+    if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
+    db.prepare('DELETE FROM learnpoint_photos WHERE point_id=?').run(Number(lpm[1]));
+    db.prepare('DELETE FROM learnpoints WHERE id=?').run(Number(lpm[1]));
+    return ok(res);
+  }
+  // 3) Foto anhängen (ein Bild pro Anfrage)
+  const lpph = p.match(/^\/api\/instructor\/learnpoints\/(\d+)\/photo$/);
+  if (lpph && method === 'POST') {
+    if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
+    const lp = db.prepare('SELECT id FROM learnpoints WHERE id=?').get(Number(lpph[1]));
+    if (!lp) return bad(res, 'Nicht gefunden', 404);
+    const b = await readBody(req);
+    if (!validPhoto(b.photo)) return bad(res, 'Foto ungültig oder zu groß (bitte ein normales Foto).');
+    if (db.prepare('SELECT COUNT(*) c FROM learnpoint_photos WHERE point_id=?').get(lp.id).c >= 12)
+      return bad(res, 'Maximal 12 Fotos pro Lernpunkt.');
+    const info = db.prepare('INSERT INTO learnpoint_photos(point_id,data,created_at) VALUES(?,?,?)').run(lp.id, b.photo, new Date().toISOString());
+    db.prepare('UPDATE learnpoints SET updated_at=? WHERE id=?').run(new Date().toISOString(), lp.id);
+    return ok(res, { photo_id: Number(info.lastInsertRowid) });
+  }
+  // 4) Foto löschen
+  const lpphd = p.match(/^\/api\/instructor\/learnpoints\/(\d+)\/photo\/(\d+)$/);
+  if (lpphd && method === 'DELETE') {
+    if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
+    db.prepare('DELETE FROM learnpoint_photos WHERE id=? AND point_id=?').run(Number(lpphd[2]), Number(lpphd[1]));
+    return ok(res);
+  }
+  // 5) Liste für den Fahrlehrer (zu einem Schüler / einer Fahrstunde)
+  if (p === '/api/instructor/learnpoints' && method === 'GET') {
+    if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
+    const sid = url.searchParams.get('student_id');
+    const bid = url.searchParams.get('booking_id');
+    const cond = [], args = [];
+    if (sid) { cond.push('student_id=?'); args.push(Number(sid)); }
+    if (bid) { cond.push('booking_id=?'); args.push(Number(bid)); }
+    const rows = db.prepare(`SELECT * FROM learnpoints ${cond.length ? 'WHERE ' + cond.join(' AND ') : ''} ORDER BY created_at DESC`).all(...args);
+    return ok(res, { points: rows.map(lpRow) });
+  }
+  // 6) Fahrschüler sieht seine fertigen Fehlerbuch-Einträge
+  if (p === '/api/my/learnpoints' && method === 'GET') {
+    if (!requireStudent()) return bad(res, 'Bitte anmelden', 401);
+    const rows = db.prepare("SELECT * FROM learnpoints WHERE student_id=? AND done=1 ORDER BY created_at DESC").all(sess.student_id);
+    return ok(res, { points: rows.map(lpRow) });
+  }
+  // 7) Foto ausliefern – Fahrlehrer immer; Fahrschüler nur eigene + nur wenn „Fertig".
+  const lpphg = p.match(/^\/api\/learnpoints\/photo\/(\d+)$/);
+  if (lpphg && method === 'GET') {
+    const ph = db.prepare('SELECT p.data AS data, lp.student_id AS sid, lp.done AS done FROM learnpoint_photos p JOIN learnpoints lp ON lp.id=p.point_id WHERE p.id=?').get(Number(lpphg[1]));
+    if (!ph) { res.writeHead(404); return res.end(); }
+    const mayInstr = requireInstructor();
+    const mayStud = requireStudent() && ph.sid === sess.student_id && ph.done;
+    if (!mayInstr && !mayStud) return bad(res, 'Keine Berechtigung', 403);
+    return sendDataUrl(res, ph.data);
+  }
+
   // Schueler bestaetigt einen reservierten Termin (den der Fahrlehrer eingetragen hat)
   const confm = p.match(/^\/api\/bookings\/(\d+)\/confirm$/);
   if (confm && method === 'POST') {

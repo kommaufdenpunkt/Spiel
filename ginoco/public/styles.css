@@ -622,6 +622,32 @@ th{color:var(--muted);font-weight:600;font-size:.78rem;text-transform:uppercase;
   .ml-filter input[type=date]{flex:1;min-width:0}
   .ml-filter-n{margin-left:0;width:100%}
 }
+/* 📍 Fehlerbuch / Lernpunkte – Erfassung (Fahrlehrer) */
+.lp-chips{display:flex;flex-wrap:wrap;gap:.35rem;margin:.2rem 0}
+.lp-chip{background:var(--card2);border:1px solid var(--line);color:var(--ink);border-radius:999px;
+  padding:.3rem .6rem;font-size:.82rem;cursor:pointer}
+.lp-chip:active{background:rgba(230,147,77,.18);border-color:var(--brand,#e6934d)}
+.lp-photos{display:flex;flex-wrap:wrap;gap:.5rem;margin:.5rem 0}
+.lp-thumb{position:relative;width:84px;height:84px;border-radius:10px;overflow:hidden;border:1px solid var(--line)}
+.lp-thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.lp-del{position:absolute;top:2px;right:2px;width:22px;height:22px;border-radius:50%;border:0;
+  background:rgba(0,0,0,.6);color:#fff;font-size:.8rem;line-height:1;cursor:pointer}
+.lp-list{display:flex;flex-direction:column;gap:.4rem;margin:.3rem 0}
+.lp-row{display:flex;align-items:center;gap:.6rem;width:100%;text-align:left;background:var(--card2);
+  border:1px solid var(--line);border-radius:12px;padding:.55rem .7rem;cursor:pointer;color:var(--ink)}
+.lp-row-ic{font-size:1.1rem;flex:none}
+.lp-row-tx{display:flex;flex-direction:column;min-width:0;flex:1}
+.lp-row-tx .muted{font-size:.78rem}
+.lp-row-go{color:var(--muted);flex:none}
+.lp-btn{background:rgba(214,64,64,.16);border:1px solid rgba(214,64,64,.5);color:var(--ink)}
+/* 📖 Fehlerbuch (Schüler) */
+.fb-list{display:flex;flex-direction:column;gap:.6rem;margin-top:.4rem}
+.fb-item{background:var(--card2);border:1px solid var(--line);border-radius:14px;padding:.7rem .8rem}
+.fb-when{font-size:.8rem;color:var(--muted);font-weight:600;margin-bottom:.25rem}
+.fb-text{color:var(--ink);line-height:1.45;white-space:normal}
+.fb-photos{display:flex;flex-wrap:wrap;gap:.45rem;margin-top:.5rem}
+.fb-ph{width:88px;height:88px;object-fit:cover;border-radius:10px;border:1px solid var(--line);cursor:pointer}
+.fb-map{margin-top:.55rem}
 /* Kurzfristige Absage (75 %) – klarer Warnhinweis */
 .cx-late{background:rgba(214,64,64,.13);border:1px solid rgba(214,64,64,.5);color:var(--ink);
   border-radius:12px;padding:.7rem .85rem;margin:.5rem 0;font-size:.95rem;line-height:1.45}

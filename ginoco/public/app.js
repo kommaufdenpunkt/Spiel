@@ -118,6 +118,7 @@ const I18N = {
     nav_messages: 'Nachrichten', nav_notif: 'Mitteilungen', nav_offers: 'Angebote', nav_review: 'Bewertung',
     menu: 'Menü', actions: 'Aktionen', menu_open: 'Menü öffnen', menu_close: 'Menü schließen',
     ml_title: '📖 Meine Fahrstunden',
+    fb_title: '📖 Dein Fehlerbuch', fb_hint: 'Worauf du beim nächsten Mal achtest – von deinem Fahrlehrer festgehalten (mit Ort & Fotos).', fb_map: 'Auf der Karte',
     ml_hint: 'Alle deine gefahrenen Stunden – mit Datum &amp; Uhrzeit, Dauer, Art und Vermerk. Bei jeder Stunde kannst du die Ausbildungskarte öffnen: <em>was</em> ihr geübt habt und wie es sitzt.',
     ml_overview_btn: '📋 Ausbildungs-Übersicht', ml_print_btn: '📄 Nachweis drucken',
     ml_filter_from: 'von', ml_filter_to: 'bis', ml_filter_reset: 'ganzer Zeitraum', ml_filter_title: '🧾 Nachweise · Zeitraum wählen',
@@ -326,6 +327,7 @@ const I18N = {
     nav_messages: 'Messages', nav_notif: 'Notifications', nav_offers: 'Offers', nav_review: 'Review',
     menu: 'Menu', actions: 'Actions', menu_open: 'Open menu', menu_close: 'Close menu',
     ml_title: '📖 My lessons',
+    fb_title: '📖 Your mistake log', fb_hint: 'What to watch out for next time – noted by your instructor (with place & photos).', fb_map: 'On the map',
     ml_hint: 'All your driven lessons – with date &amp; time, duration, type and note. For each lesson you can open the training card: <em>what</em> you practised and how well it fits.',
     ml_overview_btn: '📋 Training overview', ml_print_btn: '📄 Print record',
     ml_filter_from: 'from', ml_filter_to: 'to', ml_filter_reset: 'whole period', ml_filter_title: '🧾 Records · pick a period',
@@ -534,6 +536,7 @@ const I18N = {
     nav_messages: 'Mesajlar', nav_notif: 'Bildirimler', nav_offers: 'Teklifler', nav_review: 'Değerlendirme',
     menu: 'Menü', actions: 'İşlemler', menu_open: 'Menüyü aç', menu_close: 'Menüyü kapat',
     ml_title: '📖 Derslerim',
+    fb_title: '📖 Hata defterin', fb_hint: 'Bir dahaki sefere nelere dikkat edeceğin – eğitmenin not etti (yer & fotoğraflarla).', fb_map: 'Haritada',
     ml_hint: 'Sürdüğün tüm dersler – tarih &amp; saat, süre, tür ve not ile. Her ders için eğitim kartını açabilirsin: <em>ne</em> çalıştığınız ve ne kadar oturduğu.',
     ml_overview_btn: '📋 Eğitim özeti', ml_print_btn: '📄 Belgeyi yazdır',
     ml_filter_from: 'başlangıç', ml_filter_to: 'bitiş', ml_filter_reset: 'tüm dönem', ml_filter_title: '🧾 Belgeler · dönem seç',
@@ -742,6 +745,7 @@ const I18N = {
     nav_messages: 'الرسائل', nav_notif: 'الإشعارات', nav_offers: 'العروض', nav_review: 'التقييم',
     menu: 'القائمة', actions: 'الإجراءات', menu_open: 'فتح القائمة', menu_close: 'إغلاق القائمة',
     ml_title: '📖 دروسي',
+    fb_title: '📖 دفتر أخطائك', fb_hint: 'ما ينبغي الانتباه له في المرة القادمة – دوّنه مدرّبك (مع المكان والصور).', fb_map: 'على الخريطة',
     ml_hint: 'كل دروسك التي قدتها – مع التاريخ والوقت والمدة والنوع والملاحظة. لكل درس يمكنك فتح بطاقة التدريب: <em>ماذا</em> تدربتم وكيف رسخ.',
     ml_overview_btn: '📋 ملخص التدريب', ml_print_btn: '📄 طباعة السجل',
     ml_filter_from: 'من', ml_filter_to: 'إلى', ml_filter_reset: 'كامل المدة', ml_filter_title: '🧾 السجلات · اختر المدة',
@@ -1479,8 +1483,11 @@ function openTour() {
 window.__openTour = openTour;
 
 // ---------- Was ist neu? (Changelog) ----------
-const CHANGELOG_VER = '3.99';
+const CHANGELOG_VER = '4.0';
 const CHANGELOG = [
+  { v: '4.0', d: '03.09.2026', title: '📖 Dein Fehlerbuch', items: [
+    '📖 <strong>Neu: dein Fehlerbuch.</strong> Wenn deinem Fahrlehrer unterwegs etwas auffällt, hält er den Moment fest – mit <strong>Ort auf der Karte, Fotos und einer kurzen Notiz</strong>, worauf du beim nächsten Mal achtest.',
+    '👀 <strong>In Ruhe nachschauen:</strong> Sobald dein Fahrlehrer auf „Fertig" tippt, erscheint der Eintrag bei dir unter „📖 Dein Fehlerbuch" – perfekt zum Wiederholen vor der nächsten Stunde.'] },
   { v: '3.99', d: '03.09.2026', title: '🧯 Absagen – fair und glasklar', items: [
     '💶 <strong>Klare Ansage beim Absagen:</strong> Du siehst jetzt sofort, was eine Absage kostet – <strong>mehr als 48 Std. vorher: kostenlos</strong>, kurzfristiger: bis zu 75 %.',
     '🎁 <strong>Die faire Alternative zuerst:</strong> Statt kurzfristig zu zahlen, kannst du die Stunde mit einem Tipp <strong>zur Übernahme anbieten</strong> – übernimmt sie jemand, bist du kostenlos raus.'] },
@@ -2557,6 +2564,7 @@ async function renderStudent() {
     <div id="daystatus-banner"></div>
     <div class="card" id="week-card"></div>
     <div class="card hidden" id="lessons-card"></div>
+    <div class="card hidden" id="fehlerbuch-card"></div>
     <div class="card" id="messages-card"></div>
     <div class="card hidden" id="review-card"></div>
     <div class="card hidden" id="offers-card"></div>
@@ -2620,6 +2628,7 @@ async function syncStudent() {
     refreshStudentLive();
     renderWeekCard(mine.weekInfo, mine.bookings, mine.progress);
     renderMyLessons(mine.bookings);
+    renderFehlerbuch();
     renderReviewCard(mine.progress);
     renderStudentMessages();
     { const hn = $('#horizon-note'); if (hn && mine.progress) hn.textContent = t('horizon_note_rank', { d: mine.progress.horizon, r: mine.progress.rank }); }
@@ -3515,6 +3524,42 @@ function studentBookingItem(b) {
     </div>
     <div class="inline">${actions}</div>
   </div>`;
+}
+
+// ---------- Fehlerbuch (Schüler sieht seine Lernpunkte) ----------
+async function renderFehlerbuch() {
+  const card = $('#fehlerbuch-card'); if (!card) return;
+  let points = [];
+  try { points = (await api('/api/my/learnpoints')).points || []; } catch { return; }
+  if (!points.length) { card.classList.add('hidden'); return; }
+  card.classList.remove('hidden');
+  card.innerHTML = `<h2>${t('fb_title')}</h2><p class="hint">${t('fb_hint')}</p>
+    <div class="fb-list">${points.map((p) => {
+      const photos = (p.photos || []).map((id) => `<img class="fb-ph" data-photo="/api/learnpoints/photo/${id}" src="/api/learnpoints/photo/${id}" alt="">`).join('');
+      const text = esc(p.text || '').replace(/\n/g, '<br>');
+      return `<div class="fb-item">
+        <div class="fb-when">📌 ${esc(fmtEntry(p.created_at))}</div>
+        ${text ? `<div class="fb-text">${text}</div>` : ''}
+        ${photos ? `<div class="fb-photos">${photos}</div>` : ''}
+        ${p.lat != null ? `<button class="sec sm fb-map" data-lat="${p.lat}" data-lng="${p.lng}">📍 ${t('fb_map')}</button>` : ''}
+      </div>`;
+    }).join('')}</div>`;
+  card.querySelectorAll('[data-photo]').forEach((im) => im.onclick = () => openPhotoLightbox(im.dataset.photo));
+  card.querySelectorAll('.fb-map').forEach((b) => b.onclick = () => openPointMap(Number(b.dataset.lat), Number(b.dataset.lng)));
+}
+function openPhotoLightbox(src) {
+  modal(`<div style="text-align:center"><img src="${src}" style="max-width:100%;max-height:74vh;border-radius:12px" alt=""></div>
+    <div class="actions"><button onclick="window.__closeModal()">${t('close')}</button></div>`, 'wide');
+}
+async function openPointMap(lat, lng) {
+  modal(`<h3>📍 ${t('fb_map')}</h3><div id="fb-map" class="live-map"><div class="lm-loading"><span class="tire">🛞</span></div></div>
+    <div class="actions"><button onclick="window.__closeModal()">${t('close')}</button></div>`, 'wide');
+  try { await ensureLeaflet(); } catch { return; }
+  const el = document.getElementById('fb-map'); if (!el || !window.L) return;
+  const map = L.map(el, { zoomControl: true, attributionControl: true, scrollWheelZoom: false }).setView([lat, lng], 16);
+  L.tileLayer(TILE_SOURCES[0].url, TILE_SOURCES[0].opt).addTo(map);
+  L.marker([lat, lng], { icon: _meetIcon() }).addTo(map);
+  setTimeout(() => { try { map.invalidateSize(); } catch {} }, 200);
 }
 
 // ---------- Abholung: Schüler teilt Standort / setzt Abholort ----------
@@ -5269,6 +5314,98 @@ function renderInstrDay(el, date, bookings, blocks) {
   el.querySelectorAll('[data-route]').forEach((b) => b.onclick = () => { const bk = items.find((x) => x.kind === 'booking' && String(x.id) === b.dataset.route); if (bk) openInstrRoute(bk); });
   el.querySelectorAll('[data-reschedule]').forEach((b) => b.onclick = () => { const bk = items.find((x) => x.kind === 'booking' && String(x.id) === b.dataset.reschedule); if (bk) openRescheduleRequest(bk); });
   el.querySelectorAll('[data-reschedule-cancel]').forEach((b) => b.onclick = () => instrRescheduleCancel(b.dataset.rescheduleCancel));
+  el.querySelectorAll('[data-learnpoint]').forEach((b) => b.onclick = () => { const bk = items.find((x) => x.kind === 'booking' && String(x.id) === b.dataset.learnpoint); if (bk) openLearnpoint(bk); });
+}
+
+// ---------- Fehlerbuch / Lernpunkte (Fahrlehrer erfasst unterwegs) ----------
+const LP_CHIPS = ['Vorfahrt missachtet', 'Schulterblick vergessen', 'Blinker vergessen', 'Zu schnell',
+  'Zu langsam', 'Abstand zu gering', 'Spur nicht gehalten', 'Zu dicht aufgefahren', 'Zu spät gebremst',
+  'Kupplung/Schalten', 'Blick zu kurz', 'Vorfahrt beachten üben', 'Einordnen üben', 'Rechts vor links'];
+// Antippen: vorhandene Einträge dieser Fahrstunde zeigen (oder gleich neuen anlegen).
+async function openLearnpoint(b) {
+  let points = [];
+  try { points = (await api(`/api/instructor/learnpoints?booking_id=${b.id}&student_id=${b.student_id}`)).points || []; } catch {}
+  if (!points.length) return newLearnpoint(b);
+  modal(`<h3>📍 Fehlerbuch · ${esc(b.student_name || 'Fahrschüler')}</h3>
+    <p class="hint">${points.length} Eintrag${points.length === 1 ? '' : 'e'} zu dieser Fahrstunde.</p>
+    <div class="lp-list">${points.map((p) => lpListItem(p)).join('')}</div>
+    <div class="actions"><button class="sec" onclick="window.__closeModal()">Schließen</button><button id="lp-new">＋ Neuer Eintrag</button></div>`, 'wide');
+  $('#lp-new').onclick = () => newLearnpoint(b);
+  document.querySelectorAll('[data-lpopen]').forEach((el) => el.onclick = () => {
+    const pt = points.find((x) => String(x.id) === el.dataset.lpopen); if (pt) openLearnpointEditor(pt, b.student_name);
+  });
+}
+function lpListItem(p) {
+  const when = fmtEntry(p.created_at);
+  const first = (p.text || '').split('\n')[0].slice(0, 60) || '(ohne Text)';
+  return `<button class="lp-row" data-lpopen="${p.id}">
+    <span class="lp-row-ic">${p.done ? '✅' : '✏️'}</span>
+    <span class="lp-row-tx"><strong>${esc(first)}</strong><span class="muted">${when}${p.photos.length ? ' · 📷 ' + p.photos.length : ''}${p.lat != null ? ' · 📍' : ''}${p.done ? '' : ' · Entwurf'}</span></span>
+    <span class="lp-row-go">›</span></button>`;
+}
+// Neuer Eintrag: sofort anlegen, Editor gleich öffnen, Standort im Hintergrund nachtragen.
+async function newLearnpoint(b) {
+  let point;
+  try { point = (await api('/api/instructor/learnpoints', { method: 'POST', body: { student_id: b.student_id, booking_id: b.id } })).point; }
+  catch (e) { toast(e.message, 'err'); return; }
+  openLearnpointEditor(point, b.student_name);
+  const setGeo = (html) => { const el = $('#lp-geo'); if (el) el.innerHTML = html; };
+  const grab = () => { setGeo('📍 Standort …'); getPosOnce().then(async (c) => {
+    try { await api('/api/instructor/learnpoints/' + point.id, { method: 'PATCH', body: { lat: c.latitude, lng: c.longitude } }); point.lat = c.latitude; point.lng = c.longitude; setGeo('📍 Standort gesetzt ✓'); } catch { setGeo('📍 Standort konnte nicht gespeichert werden'); }
+  }).catch(() => { setGeo('📍 Kein GPS – <a href="#" class="linklike" id="lp-geo-retry">nochmal</a>'); const r = $('#lp-geo-retry'); if (r) r.onclick = (e) => { e.preventDefault(); grab(); }; }); };
+  grab();
+}
+// Editor: Standort-Status, Schnell-Chips, Text, Fotos, Fertig.
+function openLearnpointEditor(point, studentName) {
+  const photoGrid = () => (point.photos || []).map((id) =>
+    `<div class="lp-thumb"><img src="/api/learnpoints/photo/${id}" alt=""><button class="lp-del" data-delph="${id}" title="Foto entfernen">✕</button></div>`).join('');
+  modal(`<h3>📍 Fehler festhalten</h3>
+    <p class="hint"><strong>${esc(studentName || 'Fahrschüler')}</strong> · <span id="lp-geo">${point.lat != null ? '📍 Standort gesetzt ✓' : '📍 Standort …'}</span></p>
+    <div class="lp-chips">${LP_CHIPS.map((c) => `<button type="button" class="lp-chip" data-chip="${esc(c)}">${esc(c)}</button>`).join('')}</div>
+    <div class="field" style="margin-top:.4rem"><textarea id="lp-text" rows="3" placeholder="Was ist passiert? Worauf beim nächsten Mal achten?">${esc(point.text || '')}</textarea></div>
+    <div class="lp-photos" id="lp-photos">${photoGrid()}</div>
+    <input type="file" id="lp-file" accept="image/*" capture="environment" multiple style="display:none">
+    <button class="sec sm" id="lp-add" type="button">📷 Foto hinzufügen</button>
+    <div class="actions" style="flex-wrap:wrap;gap:.5rem;margin-top:.7rem">
+      <button class="ghost sm" id="lp-del-point">🗑️ Verwerfen</button>
+      <button class="sec" id="lp-save">💾 Später weiter</button>
+      <button id="lp-done">✅ Fertig – dem Schüler zeigen</button>
+    </div>`, 'wide');
+  const ta = $('#lp-text');
+  document.querySelectorAll('[data-chip]').forEach((ch) => ch.onclick = () => {
+    const v = ch.dataset.chip; ta.value = ta.value.trim() ? ta.value.replace(/\s*$/, '') + '\n• ' + v : '• ' + v;
+    ta.focus();
+  });
+  const redrawPhotos = () => { const el = $('#lp-photos'); if (el) { el.innerHTML = photoGrid(); wireDel(); } };
+  const wireDel = () => document.querySelectorAll('[data-delph]').forEach((db2) => db2.onclick = async () => {
+    try { await api(`/api/instructor/learnpoints/${point.id}/photo/${db2.dataset.delph}`, { method: 'DELETE' });
+      point.photos = point.photos.filter((x) => String(x) !== db2.dataset.delph); redrawPhotos(); } catch (e) { toast(e.message, 'err'); }
+  });
+  wireDel();
+  $('#lp-add').onclick = () => $('#lp-file').click();
+  $('#lp-file').onchange = async (e) => {
+    const files = Array.from(e.target.files || []); e.target.value = '';
+    for (const f of files) {
+      try {
+        const dataUrl = await fileToResizedDataUrl(f);
+        const r = await api('/api/instructor/learnpoints/' + point.id + '/photo', { method: 'POST', body: { photo: dataUrl } });
+        point.photos.push(r.photo_id); redrawPhotos();
+      } catch (err) { toast(err.message || 'Foto zu groß', 'err'); }
+    }
+  };
+  const saveText = async (done) => {
+    try {
+      const r = await api('/api/instructor/learnpoints/' + point.id, { method: 'PATCH', body: { text: ta.value, done } });
+      point.text = r.point.text; point.done = r.point.done;
+      closeModal(); toast(done ? '📖 Im Fehlerbuch – der Schüler kann es ansehen.' : '💾 Als Entwurf gespeichert.', 'ok');
+    } catch (e) { toast(e.message, 'err'); }
+  };
+  $('#lp-save').onclick = () => saveText(false);
+  $('#lp-done').onclick = () => saveText(true);
+  $('#lp-del-point').onclick = async () => {
+    if (!confirm('Diesen Eintrag verwerfen?')) return;
+    try { await api('/api/instructor/learnpoints/' + point.id, { method: 'DELETE' }); closeModal(); toast('Verworfen', 'ok'); } catch (e) { toast(e.message, 'err'); }
+  };
 }
 // Fahrlehrer bittet den Schüler, die Fahrstunde zu verschieben – mit Hinweis + Lücken-Wahl.
 function openRescheduleRequest(b) {
@@ -5326,6 +5463,7 @@ function instrBookingItem(b) {
         ? `<button class="ghost sm" data-route="${b.id}" title="Route & Navigation zum Fahrschüler">🧭</button>` : ''}
       ${b.student_id && b.status !== 'done' && b.confirmed !== 0 && !b.started_at
         ? `<button class="ghost sm" data-startlesson="${b.id}" title="Genauen Startzeitpunkt festhalten">▶️ Start</button>` : ''}
+      ${b.student_id ? `<button class="sm lp-btn" data-learnpoint="${b.id}" title="Fehler/Lernmoment mit Standort & Fotos festhalten">📍 Fehler</button>` : ''}
       ${b.student_id && b.status === 'booked' && (b.reschedule_req
         ? `<button class="ghost sm" data-reschedule-cancel="${b.id}" title="Verschiebe-Anfrage zurücknehmen">🔄 angefragt ✕</button>`
         : `<button class="ghost sm" data-reschedule="${b.id}" title="Fahrschüler bitten, den Termin zu verschieben">🔄 Verschieben</button>`)}
