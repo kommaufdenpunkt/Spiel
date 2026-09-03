@@ -1852,7 +1852,7 @@ async function handleApi(req, res, url) {
   // ===== Fehlerbuch / Lernpunkte: Fahrlehrer markiert unterwegs Ort + Notiz + Fotos =====
   const lpPhotos = (id) => db.prepare('SELECT id FROM learnpoint_photos WHERE point_id=? ORDER BY id').all(id).map((r) => r.id);
   const lpRow = (r) => ({ id: r.id, student_id: r.student_id, booking_id: r.booking_id, lat: r.lat, lng: r.lng,
-    text: r.text || '', done: !!r.done, created_at: r.created_at, updated_at: r.updated_at, photos: lpPhotos(r.id) });
+    text: r.text || '', done: !!r.done, resolved: !!r.resolved, created_at: r.created_at, updated_at: r.updated_at, photos: lpPhotos(r.id) });
   // 1) Anlegen (sofort beim Antippen – Standort wird gleich mitgeschickt). Entwurf (done=0).
   if (p === '/api/instructor/learnpoints' && method === 'POST') {
     if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
@@ -1881,6 +1881,8 @@ async function handleApi(req, res, url) {
     if ('lng' in b) { fields.push('lng=?'); vals.push((b.lng == null || b.lng === '') ? null : Number(b.lng)); }
     const wasDone = !!lp.done;
     if ('done' in b) { fields.push('done=?'); vals.push(b.done ? 1 : 0); }
+    // „Sitzt jetzt!": gemeistert markieren (grüne Nadel) bzw. wieder öffnen.
+    if ('resolved' in b) { fields.push('resolved=?', 'resolved_at=?'); vals.push(b.resolved ? 1 : 0, b.resolved ? new Date().toISOString() : null); }
     fields.push('updated_at=?'); vals.push(new Date().toISOString());
     vals.push(lp.id);
     db.prepare(`UPDATE learnpoints SET ${fields.join(',')} WHERE id=?`).run(...vals);

@@ -1495,7 +1495,8 @@ window.__openTour = openTour;
 const CHANGELOG_VER = '4.2';
 const CHANGELOG = [
   { v: '4.2', d: '03.09.2026', title: '🗺️ Fehlerbuch mit Karte', items: [
-    '🗺️ <strong>Dein Fehlerbuch hat jetzt eine Karte.</strong> Oben siehst du alle Stellen als <strong>nummerierte Nadeln (1, 2, 3 …)</strong>, darunter die passende Liste mit Foto und Tipp – so hast du genau vor Augen, <strong>wo</strong> was war und worauf du beim nächsten Mal achtest.'] },
+    '🗺️ <strong>Dein Fehlerbuch hat jetzt eine Karte.</strong> Oben siehst du alle Stellen als <strong>nummerierte Nadeln (1, 2, 3 …)</strong>, darunter die passende Liste mit Foto und Tipp – so hast du genau vor Augen, <strong>wo</strong> was war und worauf du beim nächsten Mal achtest.',
+    '🟢 <strong>„Sitzt jetzt!":</strong> Hast du eine Sache gemeistert, markiert dein Fahrlehrer sie als geübt – die <strong>Nadel wird grün</strong>. So siehst du deinen Fortschritt und was noch offen ist.'] },
   { v: '4.1', d: '03.09.2026', title: '🚗 Selbst anmelden & klarer buchen', items: [
     '✅ <strong>Neu: Du kannst dich selbst anmelden.</strong> Auf der Startseite gibt’s jetzt „Neu hier?" – eine kurze Schritt-für-Schritt-Anmeldung (Name, Geburtsdatum, Adresse mit Vorschlägen, wann du Zeit hast). Danach bestätigst du deine <strong>E-Mail</strong>, dein Fahrlehrer schaltet dich frei – und los geht’s.',
     '🏠 <strong>Adresse leicht gemacht:</strong> Tippe deine PLZ ein – Ort und passende Straßen werden vorgeschlagen (keine doppelten Einträge mehr).',
@@ -3809,8 +3810,8 @@ async function renderFehlerbuch() {
     <div class="fb-list">${points.map((p) => {
       const photos = (p.photos || []).map((id) => `<img class="fb-ph" data-photo="/api/learnpoints/photo/${id}" src="/api/learnpoints/photo/${id}" alt="">`).join('');
       const text = esc(p.text || '').replace(/\n/g, '<br>');
-      return `<div class="fb-item">
-        <div class="fb-when"><span class="fb-num">${p._n}</span> ${esc(fmtEntry(p.created_at))}</div>
+      return `<div class="fb-item${p.resolved ? ' fb-done' : ''}">
+        <div class="fb-when"><span class="fb-num${p.resolved ? ' ok' : ''}">${p.resolved ? '✓' : p._n}</span> ${esc(fmtEntry(p.created_at))}${p.resolved ? ' <span class="fb-sit">sitzt jetzt ✓</span>' : ''}</div>
         ${text ? `<div class="fb-text">${text}</div>` : ''}
         ${photos ? `<div class="fb-photos">${photos}</div>` : ''}
         ${p.lat != null ? `<button class="sec sm fb-map" data-lat="${p.lat}" data-lng="${p.lng}">📍 ${t('fb_map')}</button>` : ''}
@@ -3818,7 +3819,7 @@ async function renderFehlerbuch() {
     }).join('')}</div>`;
   card.querySelectorAll('[data-photo]').forEach((im) => im.onclick = () => openPhotoLightbox(im.dataset.photo));
   card.querySelectorAll('.fb-map').forEach((b) => b.onclick = () => openPointMap(Number(b.dataset.lat), Number(b.dataset.lng)));
-  if (withGeo.length) fillPinsMap('fb-overview-map', withGeo.map((p) => ({ lat: p.lat, lng: p.lng, n: p._n, label: (p.text || '').split('\n')[0].slice(0, 60) || ('Eintrag ' + p._n) })));
+  if (withGeo.length) fillPinsMap('fb-overview-map', withGeo.map((p) => ({ lat: p.lat, lng: p.lng, n: p._n, resolved: p.resolved, label: (p.text || '').split('\n')[0].slice(0, 60) || ('Eintrag ' + p._n) })));
 }
 function openPhotoLightbox(src) {
   modal(`<div style="text-align:center"><img src="${src}" style="max-width:100%;max-height:74vh;border-radius:12px" alt=""></div>
@@ -3963,7 +3964,7 @@ function _carIcon() { return L.divIcon({ className: 'lm-car', html: '🚗', icon
 function _meetIcon() { return L.divIcon({ className: 'lm-pin', html: '📍', iconSize: [30, 34], iconAnchor: [15, 30] }); }
 function _youIcon() { return L.divIcon({ className: 'lm-you', html: '🧍', iconSize: [30, 34], iconAnchor: [15, 30] }); }
 // Nummerierte Nadel (1, 2, 3 …) für die Fehler-Übersichtskarte.
-function _numIcon(n) { return L.divIcon({ className: 'lm-num', html: `<span class="pin-num">${n}</span>`, iconSize: [30, 40], iconAnchor: [15, 38], popupAnchor: [0, -34] }); }
+function _numIcon(n, resolved) { return L.divIcon({ className: 'lm-num', html: `<span class="pin-num${resolved ? ' ok' : ''}">${resolved ? '✓' : n}</span>`, iconSize: [30, 40], iconAnchor: [15, 38], popupAnchor: [0, -34] }); }
 // Übersichtskarte mit nummerierten Nadeln; zoomt automatisch auf alle Punkte.
 async function fillPinsMap(elId, pins) {
   try { await ensureLeaflet(); } catch { return; }
@@ -3973,8 +3974,8 @@ async function fillPinsMap(elId, pins) {
   const pts = [];
   for (const p of pins) {
     if (p.lat == null || p.lng == null) continue;
-    const m = L.marker([p.lat, p.lng], { icon: _numIcon(p.n) }).addTo(map);
-    if (p.label) m.bindPopup(`<strong>${p.n}.</strong> ${p.label}`);
+    const m = L.marker([p.lat, p.lng], { icon: _numIcon(p.n, p.resolved) }).addTo(map);
+    if (p.label) m.bindPopup(`<strong>${p.n}.</strong> ${p.label}${p.resolved ? ' <span style="color:#2aa568">· sitzt ✓</span>' : ''}`);
     pts.push([p.lat, p.lng]);
   }
   if (pts.length === 1) map.setView(pts[0], 16);
@@ -5681,15 +5682,15 @@ async function openLearnpoint(b) {
   document.querySelectorAll('[data-lpopen]').forEach((el) => el.onclick = () => {
     const pt = points.find((x) => String(x.id) === el.dataset.lpopen); if (pt) openLearnpointEditor(pt, b.student_name);
   });
-  if (withGeo.length) fillPinsMap('lp-overview-map', withGeo.map((p) => ({ lat: p.lat, lng: p.lng, n: p._n, label: (p.text || '').split('\n')[0].slice(0, 60) || ('Eintrag ' + p._n) })));
+  if (withGeo.length) fillPinsMap('lp-overview-map', withGeo.map((p) => ({ lat: p.lat, lng: p.lng, n: p._n, resolved: p.resolved, label: (p.text || '').split('\n')[0].slice(0, 60) || ('Eintrag ' + p._n) })));
 }
 function lpListItem(p) {
   const when = fmtEntry(p.created_at);
   const first = (p.text || '').split('\n')[0].slice(0, 60) || '(ohne Text)';
-  return `<button class="lp-row" data-lpopen="${p.id}">
-    ${p._n ? `<span class="lp-num">${p._n}</span>` : ''}
-    <span class="lp-row-ic">${p.done ? '✅' : '✏️'}</span>
-    <span class="lp-row-tx"><strong>${esc(first)}</strong><span class="muted">${when}${p.photos.length ? ' · 📷 ' + p.photos.length : ''}${p.lat != null ? ' · 📍' : ''}${p.done ? '' : ' · Entwurf'}</span></span>
+  return `<button class="lp-row${p.resolved ? ' resolved' : ''}" data-lpopen="${p.id}">
+    ${p._n ? `<span class="lp-num${p.resolved ? ' ok' : ''}">${p.resolved ? '✓' : p._n}</span>` : ''}
+    <span class="lp-row-ic">${p.resolved ? '🟢' : (p.done ? '✅' : '✏️')}</span>
+    <span class="lp-row-tx"><strong>${esc(first)}</strong><span class="muted">${when}${p.photos.length ? ' · 📷 ' + p.photos.length : ''}${p.lat != null ? ' · 📍' : ''}${p.resolved ? ' · 🟢 sitzt jetzt' : (p.done ? '' : ' · Entwurf')}</span></span>
     <span class="lp-row-go">›</span></button>`;
 }
 // Ein-Tipp-Merker fürs FAHREN: legt sofort einen Entwurf an (Standort + Zeit),
@@ -5730,6 +5731,7 @@ function openLearnpointEditor(point, studentName) {
     <button class="sec sm" id="lp-add" type="button">📷 Foto hinzufügen</button>
     <div class="actions" style="flex-wrap:wrap;gap:.5rem;margin-top:.7rem">
       <button class="ghost sm" id="lp-del-point">🗑️ Verwerfen</button>
+      <button class="sec sm" id="lp-resolve">${point.resolved ? '↩︎ Wieder offen' : '🟢 Sitzt jetzt'}</button>
       <button class="sec" id="lp-save">Schließen</button>
       <button id="lp-done">✅ Fertig – dem Schüler zeigen</button>
     </div>`, 'wide');
@@ -5781,6 +5783,13 @@ function openLearnpointEditor(point, studentName) {
   };
   $('#lp-save').onclick = async () => { clearTimeout(saveTimer); await doSave(); closeModal(); toast('💾 Gespeichert – findest du unter 📖 Fehlerbuch.', 'ok'); };
   $('#lp-done').onclick = () => { clearTimeout(saveTimer); saveText(true); };
+  $('#lp-resolve').onclick = async () => {
+    clearTimeout(saveTimer); await doSave();
+    const nv = !point.resolved;
+    try { const r = await api('/api/instructor/learnpoints/' + point.id, { method: 'PATCH', body: { resolved: nv } }); point.resolved = r.point.resolved;
+      closeModal(); toast(nv ? '🟢 „Sitzt jetzt!" – die Nadel wird grün.' : 'Wieder als offen markiert.', 'ok'); }
+    catch (e) { toast(e.message, 'err'); }
+  };
   $('#lp-del-point').onclick = async () => {
     if (!confirm('Diesen Eintrag verwerfen?')) return;
     try { await api('/api/instructor/learnpoints/' + point.id, { method: 'DELETE' }); closeModal(); toast('Verworfen', 'ok'); } catch (e) { toast(e.message, 'err'); }

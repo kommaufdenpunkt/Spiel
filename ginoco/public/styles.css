@@ -1733,3 +1733,12 @@ header .brand .brandname{
 .fb-num,.lp-num{flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;min-width:22px;height:22px;
   padding:0 .32rem;border-radius:999px;background:var(--brand);color:#fff;font-weight:800;font-size:.78rem}
 .fb-when{display:flex;align-items:center;gap:.4rem}
+
+/* „Sitzt jetzt!" – gemeisterte Fehler werden grün */
+.pin-num.ok{background:var(--good)}
+.pin-num.ok::after{border-top-color:#fff}
+.fb-num.ok,.lp-num.ok{background:var(--good)}
+.fb-sit{color:var(--good);font-weight:800;font-size:.78rem}
+.fb-item.fb-done{opacity:.85}
+.fb-item.fb-done .fb-text{text-decoration:none}
+.lp-row.resolved{border-color:color-mix(in srgb,var(--good) 45%,var(--line))}

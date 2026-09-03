@@ -312,6 +312,9 @@ db.exec(`CREATE TABLE IF NOT EXISTS learnpoints (
   updated_at TEXT
 );`);
 db.exec('CREATE INDEX IF NOT EXISTS idx_learnpoints_student ON learnpoints(student_id, done)');
+// „Sitzt jetzt!": ein Fehler/Lernpunkt ist geübt und gemeistert -> Nadel wird grün.
+ensureColumn('learnpoints', 'resolved', 'resolved INTEGER NOT NULL DEFAULT 0');
+ensureColumn('learnpoints', 'resolved_at', 'resolved_at TEXT');
 db.exec(`CREATE TABLE IF NOT EXISTS learnpoint_photos (
   id         INTEGER PRIMARY KEY AUTOINCREMENT,
   point_id   INTEGER NOT NULL,
