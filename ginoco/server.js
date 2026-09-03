@@ -1503,6 +1503,8 @@ async function handleApi(req, res, url) {
           .run(late ? 'Kurzfristige Absage – bis 75 % berechenbar' : null, id);
         logEvent('cancel_student', { actor: 'student', studentId: bk.student_id, bookingId: id, date: bk.date,
           detail: `${wdShort(bk.date)} ${dmy(bk.date)} ${bk.start_time} Uhr ${late ? '⚠️ KURZFRISTIG abgesagt – bis 75 % berechenbar' : 'storniert (rechtzeitig)'}` });
+        const stX = db.prepare('SELECT name FROM students WHERE id=?').get(bk.student_id);
+        pushToInstructor(`❌ Absage${late ? ' (kurzfristig, bis 75 %)' : ''}: ${stX?.name || 'Ein Fahrschüler'} – ${wdShort(bk.date)} ${dmy(bk.date)} um ${bk.start_time} Uhr.`, '/');
         const filled = autoFillGapsOnCancel(bk.date);  // Tag lueckenlos halten
         return ok(res, { autofilled: filled, late });
       }
@@ -1740,6 +1742,7 @@ async function handleApi(req, res, url) {
     const from = db.prepare('SELECT name FROM students WHERE id = ?').get(bk.student_id);
     logEvent('take', { actor: 'student', studentId: sess.student_id, bookingId: bk.id, date: bk.date,
       detail: `${taker?.name || '?'} übernimmt Stunde von ${from?.name || '?'} · ${wdShort(bk.date)} ${dmy(bk.date)} ${bk.start_time} Uhr` });
+    pushToInstructor(`🎁 Übernahme: ${taker?.name || 'Ein Fahrschüler'} übernimmt ${wdShort(bk.date)} ${dmy(bk.date)} um ${bk.start_time} Uhr (von ${from?.name || '?'}).`, '/');
     return ok(res);
   }
 
@@ -1842,6 +1845,7 @@ async function handleApi(req, res, url) {
     const stu = db.prepare('SELECT name FROM students WHERE id=?').get(sess.student_id);
     logEvent('shift', { actor: 'student', studentId: sess.student_id, bookingId: bk.id, date: newDate,
       detail: `${stu?.name || 'Schüler'} hat ${requested ? '' : 'selbst '}verschoben: ${wdShort(oldDate)} ${dmy(oldDate)} ${oldStart} → ${wdShort(newDate)} ${dmy(newDate)} ${newStart} Uhr${gapNote}` });
+    pushToInstructor(`🔄 Verschoben: ${stu?.name || 'Ein Fahrschüler'} – ${wdShort(oldDate)} ${dmy(oldDate)} ${oldStart} → ${wdShort(newDate)} ${dmy(newDate)} ${newStart} Uhr.`, '/');
     return ok(res, { moved: true, date: newDate, start_time: newStart, gap, packed: moved });
   }
 
@@ -3844,6 +3848,11 @@ function createBooking(res, sess, body) {
     detail: `${sonderLbl}${wdShort(date)} ${dmy(date)} ${start} Uhr (${duration} Min)${isInstructor ? ' – vom Fahrlehrer eingetragen' + (studentId ? ' (reserviert)' : '') : ''}` });
   if (isInstructor && studentId) notify(studentId, 'info',
     `Neuer Termin für dich reserviert: ${wdShort(date)} ${dmy(date)} um ${start} Uhr (${duration} Min). Bitte in der App bestätigen.`, date, bid);
+  // Bucht ein Schüler selbst, direkt beim Fahrlehrer aufploppen (Push + Protokoll).
+  if (!isInstructor) {
+    const stB = db.prepare('SELECT name FROM students WHERE id=?').get(studentId);
+    pushToInstructor(`📅 Neue Buchung: ${stB?.name || 'Ein Fahrschüler'} – ${wdShort(date)} ${dmy(date)} um ${start} Uhr (${duration} Min)${sonderLbl ? ' · ' + sonderLbl.replace(/ · $/, '') : ''}.`, '/');
+  }
   return ok(res, { id: bid });
 }
 
