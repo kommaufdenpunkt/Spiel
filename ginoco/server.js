@@ -1069,7 +1069,7 @@ async function handleApi(req, res, url) {
     } else {
       // Ohne Mailversand direkt dem Fahrlehrer melden.
       pushToInstructor(`🆕 Neue Anmeldung: ${name} wartet auf Freischaltung.`, '/');
-      logEvent('info', { actor: 'student', studentId: sid, detail: `🆕 Selbst-Anmeldung: ${name} (${username}) – wartet auf Freischaltung.` });
+      logEvent('signup', { actor: 'student', studentId: sid, detail: `🆕 Selbst-Anmeldung: ${name} (${username}) – wartet auf Freischaltung.` });
     }
     return ok(res, { registered: true, mailed, needs_verify: canMail, email });
   }
@@ -1088,7 +1088,7 @@ async function handleApi(req, res, url) {
     // Fahrlehrer benachrichtigen: jetzt taucht die Anmeldung in der Freischalt-Liste auf.
     if (!st.approved) {
       pushToInstructor(`🆕 Neue Anmeldung: ${st.name} hat die E-Mail bestätigt und wartet auf Freischaltung.`, '/');
-      logEvent('info', { actor: 'student', studentId: st.id, detail: `🆕 Selbst-Anmeldung bestätigt: ${st.name} (${st.username}) – wartet auf Freischaltung.` });
+      logEvent('signup', { actor: 'student', studentId: st.id, detail: `🆕 Selbst-Anmeldung bestätigt: ${st.name} (${st.username}) – wartet auf Freischaltung.` });
     }
     const token = createSession(res, 'student', st.id, isHttps(req));
     return ok(res, { verified: true, role: 'student', id: st.id, name: st.name, approved: !!st.approved, token });
@@ -2562,7 +2562,7 @@ async function handleApi(req, res, url) {
     const st = db.prepare('SELECT id,name,email FROM students WHERE id=? AND registered_self=1 AND approved=0').get(sid);
     if (!st) return bad(res, 'Diese Anmeldung gibt es nicht (mehr).', 404);
     db.prepare('UPDATE students SET approved=1, email_verified=1 WHERE id=?').run(sid);
-    logEvent('info', { actor: 'instructor', studentId: sid, detail: `✅ ${st.name} freigeschaltet – kann jetzt Fahrstunden buchen.` });
+    logEvent('approve', { actor: 'instructor', studentId: sid, detail: `✅ ${st.name} freigeschaltet – kann jetzt Fahrstunden buchen.` });
     notify(sid, 'info', '🎉 Du bist freigeschaltet! Du kannst jetzt deine Fahrstunden buchen. Viel Erfolg!');
     if (st.email && mailEnabled()) {
       const base = getSettingRaw('public_url') || `${isHttps(req) ? 'https' : 'http'}://${req.headers.host}`;
@@ -2583,7 +2583,7 @@ async function handleApi(req, res, url) {
     const st = db.prepare('SELECT id,name FROM students WHERE id=? AND registered_self=1 AND approved=0').get(sid);
     if (!st) return bad(res, 'Diese Anmeldung gibt es nicht (mehr).', 404);
     deleteStudentCascade(sid);
-    logEvent('info', { actor: 'instructor', detail: `🗑️ Anmeldung von ${st.name} abgelehnt und entfernt.` });
+    logEvent('reject', { actor: 'instructor', detail: `🗑️ Anmeldung von ${st.name} abgelehnt und entfernt.` });
     return ok(res, { rejected: true });
   }
 

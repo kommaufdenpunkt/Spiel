@@ -946,6 +946,15 @@ const THEMES = {
   mitternacht: { label: 'Mitternacht', dot: '#5aa0ff', vars: {
     '--bg': '#08090c', '--bg2': '#050609', '--bg-glow': '#141821', '--card': '#111319', '--card2': '#161922',
     '--line': '#262a34', '--brand': '#5aa0ff', '--brand-dark': '#3f7fd6', '--ink': '#e9edf3', '--muted': '#8b93a2' } },
+  espresso: { label: 'Espresso', dot: 'linear-gradient(135deg,#e0a44a,#7a4a22)', vars: {
+    '--bg': '#14100c', '--bg2': '#0f0b08', '--bg-glow': '#2e2110', '--card': '#1f1810', '--card2': '#271e14',
+    '--line': '#392c1d', '--brand': '#f2a01a', '--brand-dark': '#d8850f', '--ink': '#f2e9da', '--muted': '#b0a08a' } },
+  terrakotta: { label: 'Terrakotta', dot: '#e2794a', vars: {
+    '--bg': '#17100e', '--bg2': '#120b09', '--bg-glow': '#341c14', '--card': '#221713', '--card2': '#2b1d17',
+    '--line': '#3f2a22', '--brand': '#e2794a', '--brand-dark': '#cc6238', '--ink': '#f3e7df', '--muted': '#bd9e91' } },
+  schiefer: { label: 'Schiefer (weicher)', dot: '#e6934d', vars: {
+    '--bg': '#16181d', '--bg2': '#101216', '--bg-glow': '#262a33', '--card': '#1f232a', '--card2': '#262b34',
+    '--line': '#353c47', '--brand': '#e6934d', '--brand-dark': '#cf7d38', '--ink': '#eaeef4', '--muted': '#9aa3b1' } },
 };
 // Schriftarten (nur systemeigene Stacks – nichts wird nachgeladen, funktioniert offline)
 const FONTS = {
@@ -1489,7 +1498,8 @@ const CHANGELOG = [
     '✅ <strong>Neu: Du kannst dich selbst anmelden.</strong> Auf der Startseite gibt’s jetzt „Neu hier?" – eine kurze Schritt-für-Schritt-Anmeldung (Name, Geburtsdatum, Adresse mit Vorschlägen, wann du Zeit hast). Danach bestätigst du deine <strong>E-Mail</strong>, dein Fahrlehrer schaltet dich frei – und los geht’s.',
     '🏠 <strong>Adresse leicht gemacht:</strong> Tippe deine PLZ ein – Ort und passende Straßen werden vorgeschlagen (keine doppelten Einträge mehr).',
     '⏱️ <strong>Klarer buchen:</strong> Wähle zuerst die <strong>Dauer (40/80/120 Min)</strong> – danach zeigt dir der Kalender nur noch die Startzeiten, die dazu passen. Du weißt sofort, was du buchst.',
-    '🔔 <strong>Aufgeräumte Mitteilungen:</strong> Es werden erst die neuesten 3 gezeigt – den Rest blendest du mit einem Tipp ein.'] },
+    '🔔 <strong>Aufgeräumte Mitteilungen:</strong> Es werden erst die neuesten 3 gezeigt – den Rest blendest du mit einem Tipp ein.',
+    '🎨 <strong>Neue Hintergründe:</strong> Unter „🎨 Aussehen" gibt’s jetzt zusätzlich <strong>Espresso, Terrakotta und Schiefer</strong> – warme, augenschonende Töne.'] },
   { v: '4.0', d: '03.09.2026', title: '📖 Dein Fehlerbuch', items: [
     '📖 <strong>Neu: dein Fehlerbuch.</strong> Wenn deinem Fahrlehrer unterwegs etwas auffällt, hält er den Moment fest – mit <strong>Ort auf der Karte, Fotos und einer kurzen Notiz</strong>, worauf du beim nächsten Mal achtest.',
     '👀 <strong>In Ruhe nachschauen:</strong> Sobald dein Fahrlehrer auf „Fertig" tippt, erscheint der Eintrag bei dir unter „📖 Dein Fehlerbuch" – perfekt zum Wiederholen vor der nächsten Stunde.'] },
@@ -7759,6 +7769,7 @@ const EV_META = {
   delay: ['⏱️', 'Verspätung'], done: ['🚗', 'Gefahren'], noshow: ['🚫', 'Nicht erschienen'],
   vacation: ['🌴', 'Urlaub'], reminder: ['🔔', 'Erinnerung'], info: ['ℹ️', 'Info'],
   reset: ['🔑', 'Passwort vergessen'], message: ['✉️', 'Nachricht'],
+  signup: ['🆕', 'Anmeldung'], approve: ['✅', 'Freigeschaltet'], reject: ['🗑️', 'Abgelehnt'],
 };
 async function tabProtokoll() {
   const box = $('#itab');
