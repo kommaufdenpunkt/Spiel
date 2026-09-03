@@ -6321,9 +6321,10 @@ async function tabSchueler(scope) {
     </div>`;
     $('#s-list').innerHTML = `
       ${ovBar}
-      <div class="inline" style="margin-bottom:.7rem;gap:.5rem">
-        <input id="s-search" placeholder="🔍 Suchen: Name, Login-Name, Telefon oder E-Mail …" style="flex:1" autocomplete="off">
+      <div class="inline" style="margin-bottom:.7rem;gap:.5rem;flex-wrap:wrap">
+        <input id="s-search" placeholder="🔍 Suchen: Name, Login-Name, Telefon oder E-Mail …" style="flex:1;min-width:180px" autocomplete="off">
         <span class="pill" id="s-count">${students.length}</span>
+        ${scope !== 'archived' && students.some((s) => /^Testschüler/.test(s.name || '')) ? '<button class="ghost sm" id="s-purge-tests">🧪 Testschüler entfernen</button>' : ''}
       </div>
       <p class="muted hidden" id="s-noresult">Keine Treffer.</p>
       <div class="stu-grid">
@@ -6409,6 +6410,11 @@ async function tabSchueler(scope) {
     });
     $('#s-list').querySelectorAll('[data-del]').forEach((btn) => btn.onclick = () =>
       deleteStudent(btn.dataset.del, btn.dataset.dname));
+    { const pt = $('#s-purge-tests'); if (pt) pt.onclick = async () => {
+      if (!confirm('Alle automatisch angelegten „Testschüler …" endgültig entfernen? Der Apple-Prüfer-Zugang (appletest) und echte Fahrschüler bleiben unberührt.')) return;
+      try { const r = await api('/api/instructor/students/purge-tests', { method: 'POST' }); toast(`${r.removed} Testschüler entfernt`, 'ok'); tabSchueler(); }
+      catch (e) { toast(e.message, 'err'); }
+    } }
     $('#s-list').querySelectorAll('[data-arch]').forEach((btn) => btn.onclick = async () => {
       if (!confirm(`„${btn.dataset.aname}" als bestanden markieren und ins Archiv verschieben? Daten & Fahrstunden bleiben einsehbar, du kannst jederzeit reaktivieren.`)) return;
       try { await api('/api/students/' + btn.dataset.arch + '/archive', { method: 'POST' }); toast('Ins Archiv verschoben ✅', 'ok'); tabSchueler(); }

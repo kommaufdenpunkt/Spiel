@@ -2744,12 +2744,18 @@ async function handleApi(req, res, url) {
     const sid = Number(delm[1]);
     const st = db.prepare('SELECT id,name,username FROM students WHERE id = ?').get(sid);
     if (!st) return bad(res, 'Schüler nicht gefunden', 404);
-    db.prepare('DELETE FROM bookings WHERE student_id = ?').run(sid);
-    // Bewertung bleibt dauerhaft erhalten – nur die Verknuepfung wird geloest (Foto entfaellt dann).
-    db.prepare('UPDATE reviews SET student_id = NULL, show_photo = 0 WHERE student_id = ?').run(sid);
-    db.prepare('DELETE FROM students WHERE id = ?').run(sid);
+    deleteStudentCascade(sid);
     logEvent('info', { actor: 'instructor', detail: `Fahrschüler gelöscht (${st.username || st.name})` });
     return ok(res, { deleted: true });
+  }
+  // Alle automatisch angelegten Testschüler auf einen Schlag entfernen. Schützt den
+  // Apple-Prüfer-Zugang (appletest) und lässt echte Fahrschüler unangetastet.
+  if (p === '/api/instructor/students/purge-tests' && method === 'POST') {
+    if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
+    const tests = db.prepare("SELECT id,name,username FROM students WHERE name LIKE 'Testschüler%' AND (username IS NULL OR username <> 'appletest')").all();
+    for (const s of tests) deleteStudentCascade(s.id);
+    if (tests.length) logEvent('info', { actor: 'instructor', detail: `${tests.length} Testschüler entfernt` });
+    return ok(res, { removed: tests.length, names: tests.map((s) => s.name) });
   }
 
   if (p === '/api/instructor/test-student' && method === 'POST') {
@@ -3138,6 +3144,22 @@ function mailShell(title, bodyHtml) {
 // Alle Schueler ausser einem (fuer Angebots-Benachrichtigungen)
 function otherStudentIds(exceptId) {
   return db.prepare('SELECT id FROM students WHERE id != ?').all(exceptId).map((r) => r.id);
+}
+// Einen Fahrschüler restlos entfernen – inkl. aller Verknüpfungen (keine Datenreste).
+// Bewertungen bleiben anonym erhalten (nur Verknüpfung/Foto gelöst).
+function deleteStudentCascade(sid) {
+  const photoIds = db.prepare('SELECT p.id FROM learnpoint_photos p JOIN learnpoints l ON l.id=p.point_id WHERE l.student_id=?').all(sid).map((r) => r.id);
+  if (photoIds.length) db.prepare(`DELETE FROM learnpoint_photos WHERE id IN (${photoIds.map(() => '?').join(',')})`).run(...photoIds);
+  db.prepare('DELETE FROM learnpoints WHERE student_id=?').run(sid);
+  db.prepare('DELETE FROM bookings WHERE student_id=?').run(sid);
+  db.prepare('DELETE FROM messages WHERE student_id=?').run(sid);
+  db.prepare('DELETE FROM notifications WHERE student_id=?').run(sid);
+  db.prepare('DELETE FROM push_subscriptions WHERE student_id=?').run(sid);
+  try { db.prepare('DELETE FROM offer_declines WHERE student_id=?').run(sid); } catch {}
+  try { db.prepare('DELETE FROM password_resets WHERE student_id=?').run(sid); } catch {}
+  db.prepare('DELETE FROM sessions WHERE student_id=?').run(sid);
+  db.prepare('UPDATE reviews SET student_id = NULL, show_photo = 0 WHERE student_id = ?').run(sid);
+  db.prepare('DELETE FROM students WHERE id = ?').run(sid);
 }
 
 // Protokoll-Eintrag schreiben (dient zugleich als Fahrlehrer-Benachrichtigung)
