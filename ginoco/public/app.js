@@ -5942,7 +5942,9 @@ function openMarkModal(id) {
     ${b.student_id ? `<div class="mk-step glass" style="--i:1">
       <div class="mk-step-h"><span class="mk-step-n">2</span> Was habt ihr gemacht?</div>
       <div class="field"><label>📝 Rückmeldung an den Schüler <span class="muted">(sieht der Schüler)</span></label>
-        <textarea id="m-feedback" rows="2" placeholder="z.B. Kreisverkehr &amp; Vorfahrt geübt – nächstes Mal Einparken." style="resize:vertical">${esc(b.feedback || '')}</textarea></div>
+        <textarea id="m-feedback" rows="2" placeholder="z.B. Kreisverkehr &amp; Vorfahrt geübt – nächstes Mal Einparken." style="resize:vertical">${esc(b.feedback || '')}</textarea>
+        <button class="sec sm" id="m-fb-suggest" type="button" style="margin-top:.4rem">✨ Vorschlag aus heute</button>
+        <span class="hint" style="margin-inline-start:.5rem">aus abgehakten Punkten + Fehlerbuch</span></div>
       <details class="mk-curr" id="m-curr-wrap" ${b.status !== 'done' ? 'open' : ''}><summary>📋 Ausbildungskarte Klasse B – jeden Punkt abhaken</summary>
         <input id="m-curr-search" placeholder="🔎 suchen (z. B. Kreisverkehr)" autocomplete="off" style="margin:.5rem 0">
         <div id="m-curr-list" class="mk-curr-list">${gLoad('Lädt…')}</div>
@@ -6050,6 +6052,33 @@ function openMarkModal(id) {
     const cs = $('#m-curr-search');
     if (cs) cs.oninput = () => { const q = cs.value.trim().toLowerCase(); document.querySelectorAll('#m-curr-list .mk-item2').forEach((l) => { l.style.display = (!q || l.dataset.txt.includes(q)) ? '' : 'none'; }); };
   }
+  // ✨ Vorschlag: baut die Rückmeldung aus heute abgehakten Punkten (🟡/🟢),
+  // offenen Fehlerbuch-Einträgen und der Fahrt-Art. Nur ein Vorschlag – frei änderbar.
+  const fbs = $('#m-fb-suggest');
+  if (fbs) fbs.onclick = async () => {
+    const geuebt = [...document.querySelectorAll('#m-curr-list .mk-seg')].map((seg) => {
+      const on = seg.querySelector('button.on');
+      if (!on || on.dataset.s === 'mehr') return null;   // 🔴 = noch üben, nicht „geübt"
+      return currLabel(seg.dataset.cc);
+    }).filter(Boolean);
+    let fehler = [];
+    try {
+      const pts = (await api(`/api/instructor/learnpoints?booking_id=${b.id}&student_id=${b.student_id}`)).points || [];
+      fehler = pts.filter((p) => !p.resolved && (p.text || '').trim())
+        .map((p) => (p.text || '').split('\n')[0].replace(/^[•\-\s]+/, '').slice(0, 50));
+    } catch {}
+    const parts = [];
+    if (geuebt.length) parts.push('Heute geübt: ' + [...new Set(geuebt)].slice(0, 6).join(', ') + '.');
+    const typeLbl = { ueberland: 'Überlandfahrt', autobahn: 'Autobahnfahrt', nacht: 'Nachtfahrt' }[$('#m-type').value];
+    if (typeLbl) parts.push(typeLbl + ' gemacht.');
+    if (fehler.length) parts.push('Nächstes Mal achten auf: ' + [...new Set(fehler)].slice(0, 4).join('; ') + '.');
+    const text = parts.join(' ');
+    if (!text) { toast('Erst Punkte abhaken (🟡/🟢) oder Fehler markieren – dann gibt’s einen Vorschlag.', ''); return; }
+    const ta = $('#m-feedback');
+    ta.value = ta.value.trim() ? ta.value.trim() + ' ' + text : text;
+    ta.focus();
+    toast('✨ Vorschlag eingefügt – gern noch anpassen.', 'ok');
+  };
   $('#m-meet-here').onclick = async () => {
     try { const c = await getPosOnce(); meetLat = c.latitude; meetLng = c.longitude;
       $('#m-meet-info').innerHTML = `✓ Koordinaten übernommen (${meetLat.toFixed(4)}, ${meetLng.toFixed(4)})`; toast('Treffpunkt gesetzt', 'ok'); }
