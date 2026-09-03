@@ -115,6 +115,8 @@ const I18N = {
     ml_title: '📖 Meine Fahrstunden',
     ml_hint: 'Alle deine gefahrenen Stunden – mit Datum &amp; Uhrzeit, Dauer, Art und Vermerk. Bei jeder Stunde kannst du die Ausbildungskarte öffnen: <em>was</em> ihr geübt habt und wie es sitzt.',
     ml_overview_btn: '📋 Ausbildungs-Übersicht', ml_print_btn: '📄 Nachweis drucken',
+    ml_filter_from: 'von', ml_filter_to: 'bis', ml_filter_reset: 'ganzer Zeitraum', ml_filter_title: '🧾 Nachweise · Zeitraum wählen',
+    ml_filter_count: '{n} von {all} Fahrstunden im Zeitraum', ml_filter_none: 'Keine Fahrstunden in diesem Zeitraum.',
     ml_th_when: 'Datum &amp; Uhrzeit', ml_th_end: 'Ende', ml_th_dur: 'Dauer', ml_th_type: 'Art', ml_th_late: 'Verspät.', ml_th_note: 'Vermerk / Ausbildungskarte',
     ml_dl_when: 'Wann', ml_dl_late: 'Verspätung', ml_dl_note: 'Vermerk',
     ml_driven_on: 'gefahren am', ml_entered_on: 'vom Fahrlehrer eingetragen am {date}',
@@ -315,6 +317,8 @@ const I18N = {
     ml_title: '📖 My lessons',
     ml_hint: 'All your driven lessons – with date &amp; time, duration, type and note. For each lesson you can open the training card: <em>what</em> you practised and how well it fits.',
     ml_overview_btn: '📋 Training overview', ml_print_btn: '📄 Print record',
+    ml_filter_from: 'from', ml_filter_to: 'to', ml_filter_reset: 'whole period', ml_filter_title: '🧾 Records · pick a period',
+    ml_filter_count: '{n} of {all} lessons in period', ml_filter_none: 'No lessons in this period.',
     ml_th_when: 'Date &amp; time', ml_th_end: 'End', ml_th_dur: 'Duration', ml_th_type: 'Type', ml_th_late: 'Late', ml_th_note: 'Note / training card',
     ml_dl_when: 'When', ml_dl_late: 'Late', ml_dl_note: 'Note',
     ml_driven_on: 'driven on', ml_entered_on: 'entered by your instructor on {date}',
@@ -515,6 +519,8 @@ const I18N = {
     ml_title: '📖 Derslerim',
     ml_hint: 'Sürdüğün tüm dersler – tarih &amp; saat, süre, tür ve not ile. Her ders için eğitim kartını açabilirsin: <em>ne</em> çalıştığınız ve ne kadar oturduğu.',
     ml_overview_btn: '📋 Eğitim özeti', ml_print_btn: '📄 Belgeyi yazdır',
+    ml_filter_from: 'başlangıç', ml_filter_to: 'bitiş', ml_filter_reset: 'tüm dönem', ml_filter_title: '🧾 Belgeler · dönem seç',
+    ml_filter_count: 'Dönemde {all} dersten {n} tanesi', ml_filter_none: 'Bu dönemde ders yok.',
     ml_th_when: 'Tarih &amp; saat', ml_th_end: 'Bitiş', ml_th_dur: 'Süre', ml_th_type: 'Tür', ml_th_late: 'Gecikme', ml_th_note: 'Not / eğitim kartı',
     ml_dl_when: 'Ne zaman', ml_dl_late: 'Gecikme', ml_dl_note: 'Not',
     ml_driven_on: 'sürüldüğü gün', ml_entered_on: 'eğitmen tarafından {date} tarihinde girildi',
@@ -715,6 +721,8 @@ const I18N = {
     ml_title: '📖 دروسي',
     ml_hint: 'كل دروسك التي قدتها – مع التاريخ والوقت والمدة والنوع والملاحظة. لكل درس يمكنك فتح بطاقة التدريب: <em>ماذا</em> تدربتم وكيف رسخ.',
     ml_overview_btn: '📋 ملخص التدريب', ml_print_btn: '📄 طباعة السجل',
+    ml_filter_from: 'من', ml_filter_to: 'إلى', ml_filter_reset: 'كامل المدة', ml_filter_title: '🧾 السجلات · اختر المدة',
+    ml_filter_count: '{n} من {all} درساً في المدة', ml_filter_none: 'لا دروس في هذه المدة.',
     ml_th_when: 'التاريخ والوقت', ml_th_end: 'الانتهاء', ml_th_dur: 'المدة', ml_th_type: 'النوع', ml_th_late: 'التأخير', ml_th_note: 'ملاحظة / بطاقة التدريب',
     ml_dl_when: 'متى', ml_dl_late: 'التأخير', ml_dl_note: 'ملاحظة',
     ml_driven_on: 'قُدت في', ml_entered_on: 'أدخله مدرّبك في {date}',
@@ -1447,8 +1455,11 @@ function openTour() {
 window.__openTour = openTour;
 
 // ---------- Was ist neu? (Changelog) ----------
-const CHANGELOG_VER = '3.96';
+const CHANGELOG_VER = '3.97';
 const CHANGELOG = [
+  { v: '3.97', d: '03.09.2026', title: '🧾 Nachweise nach Zeitraum – mit einem Klick', items: [
+    '🧾 <strong>Nachweise filtern:</strong> Unter „Meine Fahrstunden" wählst du jetzt einen <strong>Zeitraum (von–bis)</strong> – die Liste und der ausgedruckte Nachweis zeigen genau diese Fahrstunden.',
+    '📊 <strong>Auswertung inklusive:</strong> Über „📋 Ausbildungs-Übersicht" siehst du, <strong>wie oft</strong> ihr jede Aufgabe geübt habt (z. B. „rückwärts einparken · 5×") und an welchen Tagen – alles auch im PDF-Nachweis mit Fahrschul-Logo.'] },
   { v: '3.96', d: '02.09.2026', title: '🔄 Termin verschieben – kinderleicht', items: [
     '🔄 <strong>Manchmal fragt dich dein Fahrlehrer, ob eine Fahrstunde verschoben werden kann.</strong> Dann erscheint bei dir ein Hinweis „🔄 Neuen Termin wählen".',
     '👉 <strong>So geht’s:</strong> Antippen → eine kurze Erklärung führt dich durch → im Kalender einen freien Termin (grün) auswählen → fertig. Deine Stunde wandert automatisch auf die neue Zeit, die alte fällt weg.',
@@ -2664,10 +2675,11 @@ function renderMyLessons(bookings) {
     .sort((a, z) => (z.date + z.start_time).localeCompare(a.date + a.start_time));
   if (!done.length) { card.classList.add('hidden'); return; }
   card.classList.remove('hidden');
-  const driven = done.filter((b) => b.attended !== 0);
-  const totalMin = driven.reduce((s, b) => s + (b.duration_min || 0), 0);
   const toSign = done.filter((b) => b.needs_sign);
-  const rows = done.map((b) => {
+  // 🧾 Nachweise: nach Zeitraum filtern (leer = alles). Filter gilt für Liste UND Ausdruck.
+  const fFrom = state.mlFrom || '', fTo = state.mlTo || '';
+  const shown = (fFrom || fTo) ? done.filter((b) => (!fFrom || b.date >= fFrom) && (!fTo || b.date <= fTo)) : done;
+  const rows = shown.map((b) => {
     const noshow = b.attended === 0;
     const late = b.late_minutes || 0;
     const entryDate = b.created_at ? String(b.created_at).slice(0, 10) : null;
@@ -2693,16 +2705,27 @@ function renderMyLessons(bookings) {
     ${banner}
     ${statStripHtml(myStats)}
     ${adkNeedWorkHtml(myAdk)}
-    <div class="inline" style="margin:.4rem 0 .6rem;flex-wrap:wrap">
+    <div class="ml-filter">
+      <span class="ml-filter-t">${t('ml_filter_title')}</span>
+      <label>${t('ml_filter_from')} <input type="date" id="ml-from" value="${esc(fFrom)}"></label>
+      <label>${t('ml_filter_to')} <input type="date" id="ml-to" value="${esc(fTo)}"></label>
+      ${(fFrom || fTo) ? `<button class="ghost sm" id="ml-reset">✕ ${t('ml_filter_reset')}</button>` : ''}
+      <span class="muted ml-filter-n">${t('ml_filter_count', { n: shown.length, all: done.length })}</span>
+    </div>
+    <div class="inline" style="margin:.2rem 0 .6rem;flex-wrap:wrap">
       <button class="sec sm" id="ml-adk-all">${t('ml_overview_btn')}</button>
-      <button class="sec sm" id="ml-print" style="margin-left:auto">${t('ml_print_btn')}</button>
+      <button class="sm" id="ml-print" style="margin-left:auto" ${shown.length ? '' : 'disabled'}>${t('ml_print_btn')}</button>
     </div>
     <div class="ml-wrap"><table class="ml-table">
       <thead><tr><th>${t('ml_th_when')}</th><th>${t('ml_th_end')}</th><th>${t('ml_th_dur')}</th><th>${t('ml_th_type')}</th><th>${t('ml_th_late')}</th><th>${t('ml_th_note')}</th></tr></thead>
-      <tbody>${rows}</tbody>
+      <tbody>${rows || `<tr><td colspan="6" class="muted" style="text-align:center;padding:1rem">${t('ml_filter_none')}</td></tr>`}</tbody>
     </table></div>`;
-  const pb = $('#ml-print'); if (pb) pb.onclick = () => printLessonProof(state.user?.name || 'Fahrschüler', done, myAdk, myStats);
+  const pb = $('#ml-print'); if (pb) pb.onclick = () => printLessonProof(state.user?.name || 'Fahrschüler', shown, myAdk, myStats);
   const ab = $('#ml-adk-all'); if (ab) ab.onclick = () => openMyTraining();
+  const applyF = () => { state.mlFrom = $('#ml-from').value || ''; state.mlTo = $('#ml-to').value || ''; renderMyLessons(myBookingsCache); };
+  const ff = $('#ml-from'); if (ff) ff.onchange = applyF;
+  const ft = $('#ml-to'); if (ft) ft.onchange = applyF;
+  const fr = $('#ml-reset'); if (fr) fr.onclick = () => { state.mlFrom = ''; state.mlTo = ''; renderMyLessons(myBookingsCache); };
   card.querySelectorAll('[data-sign]').forEach((btn) => btn.onclick = () => {
     const bk = done.find((x) => x.id === Number(btn.dataset.sign)); if (bk) openSignModal(bk);
   });
@@ -3161,7 +3184,7 @@ function printLessonProof(name, done, adk, stats) {
     </style></head><body>
     <div class="head">
       <div class="brand">${LOGO}<div><div class="school">${school}</div>${addr ? `<div class="addr">${addr}</div>` : ''}</div></div>
-      <div class="titleblock"><h1>Fahrstunden-Nachweis</h1><div class="stud">${esc(name)}</div><div class="meta">Stand: ${today}</div></div>
+      <div class="titleblock"><h1>Fahrstunden-Nachweis</h1><div class="stud">${esc(name)}</div><div class="meta">${(state.mlFrom || state.mlTo) ? `Zeitraum: ${state.mlFrom ? fmtDT(state.mlFrom) : '…'} – ${state.mlTo ? fmtDT(state.mlTo) : '…'} · ` : ''}Stand: ${today}</div></div>
     </div>
     <div class="sum"><b>${driven.length} gefahrene Fahrstunden · ${hLabel(totalMin)} gesamt</b></div>
     <table><thead><tr><th>#</th><th>Datum &amp; Uhrzeit (gefahren)</th><th>Auf der Rechnung</th><th>Ende</th><th>Dauer</th><th>Art</th><th>Verspätung</th><th>Vermerk</th><th>Unterschrift</th></tr></thead>
