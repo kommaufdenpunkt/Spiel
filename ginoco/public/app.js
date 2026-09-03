@@ -5618,6 +5618,7 @@ function renderInstrDay(el, date, bookings, blocks) {
   el.querySelectorAll('[data-reschedule]').forEach((b) => b.onclick = () => { const bk = items.find((x) => x.kind === 'booking' && String(x.id) === b.dataset.reschedule); if (bk) openRescheduleRequest(bk); });
   el.querySelectorAll('[data-reschedule-cancel]').forEach((b) => b.onclick = () => instrRescheduleCancel(b.dataset.rescheduleCancel));
   el.querySelectorAll('[data-learnpoint]').forEach((b) => b.onclick = () => { const bk = items.find((x) => x.kind === 'booking' && String(x.id) === b.dataset.learnpoint); if (bk) openLearnpoint(bk); });
+  el.querySelectorAll('[data-lpquick]').forEach((b) => b.onclick = () => { const bk = items.find((x) => x.kind === 'booking' && String(x.id) === b.dataset.lpquick); if (bk) quickLearnpoint(bk); });
 }
 
 // ---------- Fehlerbuch / Lernpunkte (Fahrlehrer erfasst unterwegs) ----------
@@ -5645,6 +5646,18 @@ function lpListItem(p) {
     <span class="lp-row-ic">${p.done ? '✅' : '✏️'}</span>
     <span class="lp-row-tx"><strong>${esc(first)}</strong><span class="muted">${when}${p.photos.length ? ' · 📷 ' + p.photos.length : ''}${p.lat != null ? ' · 📍' : ''}${p.done ? '' : ' · Entwurf'}</span></span>
     <span class="lp-row-go">›</span></button>`;
+}
+// Ein-Tipp-Merker fürs FAHREN: legt sofort einen Entwurf an (Standort + Zeit),
+// KEIN Formular. Notiz & Fotos trägt der Fahrlehrer nach der Fahrt in Ruhe nach
+// (📖 Fehlerbuch) und tippt dann „Fertig", damit der Schüler es sieht.
+async function quickLearnpoint(b) {
+  let point;
+  try { point = (await api('/api/instructor/learnpoints', { method: 'POST', body: { student_id: b.student_id, booking_id: b.id } })).point; }
+  catch (e) { toast(e.message, 'err'); return; }
+  toast('📍 Stelle gemerkt – Notiz & Fotos später (📖 Fehlerbuch).', 'ok');
+  // Standort im Hintergrund nachtragen – ohne Interaktion, damit nichts vom Fahren ablenkt.
+  try { const c = await getPosOnce(); await api('/api/instructor/learnpoints/' + point.id, { method: 'PATCH', body: { lat: c.latitude, lng: c.longitude } }); }
+  catch {}
 }
 // Neuer Eintrag: sofort anlegen, Editor gleich öffnen, Standort im Hintergrund nachtragen.
 async function newLearnpoint(b) {
@@ -5766,7 +5779,8 @@ function instrBookingItem(b) {
         ? `<button class="ghost sm" data-route="${b.id}" title="Route & Navigation zum Fahrschüler">🧭</button>` : ''}
       ${b.student_id && b.status !== 'done' && b.confirmed !== 0 && !b.started_at
         ? `<button class="ghost sm" data-startlesson="${b.id}" title="Genauen Startzeitpunkt festhalten">▶️ Start</button>` : ''}
-      ${b.student_id ? `<button class="sm lp-btn" data-learnpoint="${b.id}" title="Fehler/Lernmoment mit Standort & Fotos festhalten">📍 Fehler</button>` : ''}
+      ${b.student_id ? `<button class="sm lp-btn" data-lpquick="${b.id}" title="Ein Tipp: Stelle merken (Standort + Zeit). Notiz & Fotos später – fürs Fahren gedacht.">📍 Fehler merken</button>
+      <button class="ghost sm lp-book" data-learnpoint="${b.id}" title="Fehlerbuch öffnen – Notiz & Fotos ergänzen, dem Schüler zeigen">📖</button>` : ''}
       ${b.student_id && b.status === 'booked' && (b.reschedule_req
         ? `<button class="ghost sm" data-reschedule-cancel="${b.id}" title="Verschiebe-Anfrage zurücknehmen">🔄 angefragt ✕</button>`
         : `<button class="ghost sm" data-reschedule="${b.id}" title="Fahrschüler bitten, den Termin zu verschieben">🔄 Verschieben</button>`)}
