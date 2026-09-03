@@ -4330,14 +4330,24 @@ async function refreshStudentLive() {
       const km = info ? info.km : d.distanceKm;
       const arrived = (km != null && km < 0.12) || (etaMin != null && etaMin <= 0);
       const goNow = !arrived && etaMin != null && etaMin <= 2;
+      const phase = arrived ? 'da' : (goNow ? 'gleich' : 'unterwegs');
+      const live = '<span class="lh-live"><span class="lh-dot"></span>live</span>';
       const hero = arrived
-        ? `<div class="live-hero go"><span class="lh-ic">🎉</span><div><div class="lh-big">Dein Fahrlehrer ist da!</div><div class="lh-sub">Geh zum Treffpunkt – er wartet auf dich.</div></div></div>`
+        ? `<div class="live-hero go"><span class="lh-ic">🎉</span><div class="lh-txt"><div class="lh-big">Dein Fahrlehrer ist da!</div><div class="lh-sub">Geh zum Treffpunkt – er wartet auf dich.</div></div>${live}</div>`
         : goNow
-          ? `<div class="live-hero go"><span class="lh-ic">🚶</span><div><div class="lh-big">Jetzt rausgehen!</div><div class="lh-sub">Dein Fahrlehrer ist gleich da.</div></div></div>`
-          : `<div class="live-hero"><span class="lh-ic">🚗</span><div><div class="lh-big">${etaMin != null ? `Fahrlehrer in ~${etaMin} Min da` : 'Fahrlehrer unterwegs'}</div><div class="lh-sub">${info ? 'Echte Fahrzeit über die Straße.' : 'Er ist auf dem Weg zu dir – wir sagen Bescheid, wann du raus musst.'}</div></div></div>`;
+          ? `<div class="live-hero go"><span class="lh-ic pulse">🚶</span><div class="lh-txt"><div class="lh-big">Jetzt rausgehen!</div><div class="lh-sub">Dein Fahrlehrer ist gleich da.</div></div>${live}</div>`
+          : `<div class="live-hero"><span class="lh-ic pulse">🚗</span>${etaMin != null ? `<div class="lh-eta"><span class="lh-num">${etaMin}</span><span class="lh-unit">Min</span></div>` : ''}<div class="lh-txt"><div class="lh-big">${etaMin != null ? 'Dein Fahrlehrer ist gleich unterwegs zu dir' : 'Fahrlehrer unterwegs'}</div><div class="lh-sub">${info ? 'Echte Fahrzeit über die Straße.' : 'Er ist auf dem Weg – wir sagen Bescheid, wann du raus musst.'}</div></div>${live}</div>`;
       const distStr = km != null ? (km < 1 ? Math.round(km * 1000) + ' m' : km.toFixed(1) + ' km') : null;
       const distPill = distStr ? `<span class="pill">🚗 ${distStr}${info ? ' Fahrweg' : ' Luftlinie'}</span>` : '';
+      // Fortschritt: Unterwegs → Gleich da → Da
+      const step = (key, ic, lbl) => {
+        const order = { unterwegs: 0, gleich: 1, da: 2 };
+        const cls = order[phase] > order[key] ? 'done' : (phase === key ? 'now' : '');
+        return `<div class="lp-step ${cls}"><span>${ic}</span>${lbl}</div>`;
+      };
+      const prog = `<div class="live-prog">${step('unterwegs', '🚗', 'Unterwegs')}<i></i>${step('gleich', '🚶', 'Gleich da')}<i></i>${step('da', '📍', 'Da')}</div>`;
       setEl('live-hero', hero);
+      setEl('live-prog', prog);
       setEl('live-pills', `${distPill}<span class="pill">aktualisiert ${upd}</span>`);
     };
     // Karte NUR EINMAL aufbauen und danach live aktualisieren (sonst würde der Punkt „springen")
@@ -4345,6 +4355,7 @@ async function refreshStudentLive() {
       card.dataset.mode = 'live';
       card.innerHTML = `<h2>🛰️ Dein Fahrlehrer ist unterwegs</h2>
         <div id="live-hero"></div>
+        <div id="live-prog"></div>
         <div class="inline" id="live-pills" style="margin-bottom:.6rem"></div>
         <div id="live-map" class="live-map"><div class="lm-loading"><span class="tire">🛞</span><span>${t('live_map_loading')}</span></div></div>
         <div id="live-meet"></div>
