@@ -1492,8 +1492,10 @@ function openTour() {
 window.__openTour = openTour;
 
 // ---------- Was ist neu? (Changelog) ----------
-const CHANGELOG_VER = '4.1';
+const CHANGELOG_VER = '4.2';
 const CHANGELOG = [
+  { v: '4.2', d: '03.09.2026', title: '🗺️ Fehlerbuch mit Karte', items: [
+    '🗺️ <strong>Dein Fehlerbuch hat jetzt eine Karte.</strong> Oben siehst du alle Stellen als <strong>nummerierte Nadeln (1, 2, 3 …)</strong>, darunter die passende Liste mit Foto und Tipp – so hast du genau vor Augen, <strong>wo</strong> was war und worauf du beim nächsten Mal achtest.'] },
   { v: '4.1', d: '03.09.2026', title: '🚗 Selbst anmelden & klarer buchen', items: [
     '✅ <strong>Neu: Du kannst dich selbst anmelden.</strong> Auf der Startseite gibt’s jetzt „Neu hier?" – eine kurze Schritt-für-Schritt-Anmeldung (Name, Geburtsdatum, Adresse mit Vorschlägen, wann du Zeit hast). Danach bestätigst du deine <strong>E-Mail</strong>, dein Fahrlehrer schaltet dich frei – und los geht’s.',
     '🏠 <strong>Adresse leicht gemacht:</strong> Tippe deine PLZ ein – Ort und passende Straßen werden vorgeschlagen (keine doppelten Einträge mehr).',
@@ -3798,12 +3800,17 @@ async function renderFehlerbuch() {
   try { points = (await api('/api/my/learnpoints')).points || []; } catch { return; }
   if (!points.length) { card.classList.add('hidden'); return; }
   card.classList.remove('hidden');
+  points.forEach((p, i) => p._n = i + 1);
+  const withGeo = points.filter((p) => p.lat != null);
+  const overview = withGeo.length
+    ? `<div id="fb-overview-map" class="live-map fb-overview"><div class="lm-loading"><span class="tire">🛞</span></div></div>` : '';
   card.innerHTML = `<h2>${t('fb_title')}</h2><p class="hint">${t('fb_hint')}</p>
+    ${overview}
     <div class="fb-list">${points.map((p) => {
       const photos = (p.photos || []).map((id) => `<img class="fb-ph" data-photo="/api/learnpoints/photo/${id}" src="/api/learnpoints/photo/${id}" alt="">`).join('');
       const text = esc(p.text || '').replace(/\n/g, '<br>');
       return `<div class="fb-item">
-        <div class="fb-when">📌 ${esc(fmtEntry(p.created_at))}</div>
+        <div class="fb-when"><span class="fb-num">${p._n}</span> ${esc(fmtEntry(p.created_at))}</div>
         ${text ? `<div class="fb-text">${text}</div>` : ''}
         ${photos ? `<div class="fb-photos">${photos}</div>` : ''}
         ${p.lat != null ? `<button class="sec sm fb-map" data-lat="${p.lat}" data-lng="${p.lng}">📍 ${t('fb_map')}</button>` : ''}
@@ -3811,6 +3818,7 @@ async function renderFehlerbuch() {
     }).join('')}</div>`;
   card.querySelectorAll('[data-photo]').forEach((im) => im.onclick = () => openPhotoLightbox(im.dataset.photo));
   card.querySelectorAll('.fb-map').forEach((b) => b.onclick = () => openPointMap(Number(b.dataset.lat), Number(b.dataset.lng)));
+  if (withGeo.length) fillPinsMap('fb-overview-map', withGeo.map((p) => ({ lat: p.lat, lng: p.lng, n: p._n, label: (p.text || '').split('\n')[0].slice(0, 60) || ('Eintrag ' + p._n) })));
 }
 function openPhotoLightbox(src) {
   modal(`<div style="text-align:center"><img src="${src}" style="max-width:100%;max-height:74vh;border-radius:12px" alt=""></div>
@@ -3954,6 +3962,25 @@ const _liveMaps = {}; // id -> Karten-Objekt (map, marker, route, zustand)
 function _carIcon() { return L.divIcon({ className: 'lm-car', html: '🚗', iconSize: [36, 36], iconAnchor: [18, 18] }); }
 function _meetIcon() { return L.divIcon({ className: 'lm-pin', html: '📍', iconSize: [30, 34], iconAnchor: [15, 30] }); }
 function _youIcon() { return L.divIcon({ className: 'lm-you', html: '🧍', iconSize: [30, 34], iconAnchor: [15, 30] }); }
+// Nummerierte Nadel (1, 2, 3 …) für die Fehler-Übersichtskarte.
+function _numIcon(n) { return L.divIcon({ className: 'lm-num', html: `<span class="pin-num">${n}</span>`, iconSize: [30, 40], iconAnchor: [15, 38], popupAnchor: [0, -34] }); }
+// Übersichtskarte mit nummerierten Nadeln; zoomt automatisch auf alle Punkte.
+async function fillPinsMap(elId, pins) {
+  try { await ensureLeaflet(); } catch { return; }
+  const el = document.getElementById(elId); if (!el || !window.L) return;
+  const map = L.map(el, { zoomControl: true, attributionControl: true, scrollWheelZoom: false });
+  L.tileLayer(TILE_SOURCES[0].url, TILE_SOURCES[0].opt).addTo(map);
+  const pts = [];
+  for (const p of pins) {
+    if (p.lat == null || p.lng == null) continue;
+    const m = L.marker([p.lat, p.lng], { icon: _numIcon(p.n) }).addTo(map);
+    if (p.label) m.bindPopup(`<strong>${p.n}.</strong> ${p.label}`);
+    pts.push([p.lat, p.lng]);
+  }
+  if (pts.length === 1) map.setView(pts[0], 16);
+  else if (pts.length > 1) map.fitBounds(pts, { padding: [34, 34], maxZoom: 16 });
+  setTimeout(() => { try { map.invalidateSize(); } catch {} }, 200);
+}
 // Ansicht so einstellen, dass beide Punkte sichtbar sind (programmatisch, ohne „userMoved" zu setzen)
 function _fitLive(m) {
   if (!m || !m.pts) return;
@@ -5641,19 +5668,26 @@ async function openLearnpoint(b) {
   let points = [];
   try { points = (await api(`/api/instructor/learnpoints?booking_id=${b.id}&student_id=${b.student_id}`)).points || []; } catch {}
   if (!points.length) return newLearnpoint(b);
+  points.forEach((p, i) => p._n = i + 1);
+  const withGeo = points.filter((p) => p.lat != null);
+  const overview = withGeo.length
+    ? `<div id="lp-overview-map" class="live-map" style="margin:.3rem 0 .7rem"><div class="lm-loading"><span class="tire">🛞</span></div></div>` : '';
   modal(`<h3>📍 Fehlerbuch · ${esc(b.student_name || 'Fahrschüler')}</h3>
-    <p class="hint">${points.length} Eintrag${points.length === 1 ? '' : 'e'} zu dieser Fahrstunde.</p>
+    <p class="hint">${points.length} Eintrag${points.length === 1 ? '' : 'e'} zu dieser Fahrstunde${withGeo.length ? ' · Nadeln = Orte' : ''}.</p>
+    ${overview}
     <div class="lp-list">${points.map((p) => lpListItem(p)).join('')}</div>
     <div class="actions"><button class="sec" onclick="window.__closeModal()">Schließen</button><button id="lp-new">＋ Neuer Eintrag</button></div>`, 'wide');
   $('#lp-new').onclick = () => newLearnpoint(b);
   document.querySelectorAll('[data-lpopen]').forEach((el) => el.onclick = () => {
     const pt = points.find((x) => String(x.id) === el.dataset.lpopen); if (pt) openLearnpointEditor(pt, b.student_name);
   });
+  if (withGeo.length) fillPinsMap('lp-overview-map', withGeo.map((p) => ({ lat: p.lat, lng: p.lng, n: p._n, label: (p.text || '').split('\n')[0].slice(0, 60) || ('Eintrag ' + p._n) })));
 }
 function lpListItem(p) {
   const when = fmtEntry(p.created_at);
   const first = (p.text || '').split('\n')[0].slice(0, 60) || '(ohne Text)';
   return `<button class="lp-row" data-lpopen="${p.id}">
+    ${p._n ? `<span class="lp-num">${p._n}</span>` : ''}
     <span class="lp-row-ic">${p.done ? '✅' : '✏️'}</span>
     <span class="lp-row-tx"><strong>${esc(first)}</strong><span class="muted">${when}${p.photos.length ? ' · 📷 ' + p.photos.length : ''}${p.lat != null ? ' · 📍' : ''}${p.done ? '' : ' · Entwurf'}</span></span>
     <span class="lp-row-go">›</span></button>`;
