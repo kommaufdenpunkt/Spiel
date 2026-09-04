@@ -451,6 +451,13 @@ if (!getSetting.get('mig_flow_v1')) {
   setSetting.run('mig_flow_v1', '1');
 }
 
+// Einmalige Korrektur: frueher gesetzter TWA-Paketname auf den echten
+// Play-Store-Paketnamen umstellen (die Android-App laeuft unter de.ginoco.twa).
+{
+  const cur = getSetting.get('android_package');
+  if (cur && cur.value === 'de.ginoco.app') setSetting.run('android_package', 'de.ginoco.twa');
+}
+
 // Standard-PIN nur beim allerersten Start setzen (1234). Aenderbar in den Einstellungen.
 if (!getSetting.get('instructor_pin')) {
   setSetting.run('instructor_pin', hashPassword('1234'));
