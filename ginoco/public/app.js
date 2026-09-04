@@ -8059,6 +8059,36 @@ function promptRealign(mis) {
   };
 }
 
+// Rundmail an alle aktiven Fahrschüler (mit Vorschau der Empfänger-Anzahl + Bestätigung).
+async function openAnnounceModal() {
+  let count = null;
+  try { count = (await api('/api/instructor/announce', { method: 'POST', body: { commit: false } })).recipients; } catch {}
+  const defMsg = 'Hallo! Wir haben die App aufpoliert – das ist neu:\n\n'
+    + '✅ Selbst anmelden – Schritt für Schritt direkt in der App.\n'
+    + '⏱️ Klarer buchen – erst die Dauer (80/120/160 Min), dann die passenden Zeiten.\n'
+    + '📖 Fehlerbuch mit Karte – deine Lernpunkte als nummerierte Nadeln; Gemeistertes wird grün.\n'
+    + '🛰️ Live sehen, wann dein Fahrlehrer kommt (mit Ankunftszeit).\n'
+    + '🎓 Prüfungs-Countdown – „Noch X Tage" plus kurzer Reifecheck.\n\n'
+    + 'Einfach die App öffnen: ginoco.de. Viel Erfolg beim Üben! 🚗';
+  modal(`<h3>📣 Neuigkeiten an alle</h3>
+    <p class="hint">Geht an ${count == null ? '…' : `<strong>${count}</strong>`} aktive Fahrschüler (mit E-Mail &amp; aktivierten Benachrichtigungen). Erscheint zusätzlich als Mitteilung in der App.</p>
+    ${errBox()}
+    <div class="field"><label>Betreff</label><input id="an-subject" value="🚗 Neuigkeiten in der Ginoco-App"></div>
+    <div class="field"><label>Nachricht</label><textarea id="an-msg" rows="11" style="resize:vertical">${esc(defMsg)}</textarea></div>
+    <div class="actions"><button class="sec" onclick="window.__closeModal()">Abbrechen</button><button id="an-send">✉️ An alle senden</button></div>`, 'wide');
+  $('#an-send').onclick = async () => {
+    const subject = $('#an-subject').value.trim();
+    const message = $('#an-msg').value.trim();
+    if (message.length < 5) { showErr('Bitte schreib kurz, worum es geht.'); return; }
+    if (!confirm(`Wirklich an ${count != null ? count : 'alle'} Fahrschüler senden?`)) return;
+    const btn = $('#an-send'); btn.disabled = true; btn.textContent = 'Sende …';
+    try {
+      const r = await api('/api/instructor/announce', { method: 'POST', body: { commit: true, subject, message } });
+      closeModal(); toast(`📣 An ${r.sent} Fahrschüler gesendet${r.failed ? ` · ${r.failed} fehlgeschlagen` : ''}.`, 'ok');
+    } catch (e) { showErr(e.message); btn.disabled = false; btn.textContent = '✉️ An alle senden'; }
+  };
+}
+
 // ---- Tab: Einstellungen ----
 function tabEinstellungen() {
   const s = state.settings;
@@ -8169,6 +8199,11 @@ function tabEinstellungen() {
       <label class="ck-line"><input type="checkbox" id="e-reg-open" ${s.registration_open === '1' ? 'checked' : ''}> Zusätzlich: Anmeldung mit Einladungs-Code erlauben</label>
       <div class="hint" style="margin:.4rem 0 0">Ist <strong>beides weg</strong>, läuft Ginoco im <strong>Privatmodus</strong>: keine Anmelde-Reiter auf der Startseite, niemand Neues kann sich anmelden. Deine bestehenden Zugänge (und du selbst) funktionieren weiter.</div>`, s.self_registration !== '1' && s.registration_open !== '1')}
 
+    ${sec('📣', 'Neuigkeiten an alle', 'Rundmail an deine Fahrschüler', `
+      <p class="hint" style="margin:.1rem 0 .6rem">Schick allen aktiven Fahrschülern (mit E-Mail &amp; aktivierten Benachrichtigungen) eine kurze Nachricht – z.&nbsp;B. Neuigkeiten in der App. Mit Vorschau und Bestätigung, bevor etwas rausgeht.</p>
+      <button class="sec sm" id="e-announce" type="button">📣 Neuigkeiten schreiben &amp; senden …</button>
+      ${s.mail_configured ? '' : '<div class="hint" style="margin:.5rem 0 0;color:var(--bad)">Zum Senden zuerst „E-Mail/SMTP“ oben einrichten.</div>'}`, false)}
+
     ${sec('👤', 'Zugang & Kontakt', 'Name, Handynummer, Passwort', `
       <div class="field"><label>Angezeigter Name</label><input id="e-name" value="${esc(s.instructor_name)}"></div>
       <div class="field"><label>Deine Handynummer (Schüler können anrufen/schreiben)</label><input id="e-phone" value="${esc(s.instructor_phone || '')}" placeholder="z.B. 0151 23456789"></div>
@@ -8214,6 +8249,7 @@ function tabEinstellungen() {
       toast(e.message, 'err');
     } finally { mailTestBtn.disabled = false; }
   };
+  const annBtn = $('#e-announce'); if (annBtn) annBtn.onclick = () => openAnnounceModal();
   $('#e-save').onclick = async () => {
     const workdays = [...box.querySelectorAll('[data-day]')].filter((c) => c.checked).map((c) => c.dataset.day).join(',');
     try {

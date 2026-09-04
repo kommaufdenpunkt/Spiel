@@ -2738,6 +2738,36 @@ async function handleApi(req, res, url) {
     return ok(res, { requests: rows });
   }
 
+  // ===== Neuigkeiten an alle aktiven Fahrschüler (Rundmail + Portal-Nachricht) =====
+  // Empfaenger: aktive (nicht archiviert/geloescht), freigeschaltete Schueler mit E-Mail
+  // und aktivierter E-Mail-Benachrichtigung. Preview (commit != true) -> nur Anzahl.
+  if (p === '/api/instructor/announce' && method === 'POST') {
+    if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
+    const b = await readBody(req);
+    const recips = db.prepare(
+      `SELECT id, name, email FROM students
+       WHERE archived_at IS NULL AND deleted_at IS NULL AND approved=1
+         AND email IS NOT NULL AND email <> '' AND email_notify=1`).all();
+    if (b.commit !== true) return ok(res, { recipients: recips.length });
+    if (!mailEnabled()) return bad(res, 'E-Mail-Versand ist nicht eingerichtet (Einstellungen → E-Mail/SMTP).', 400);
+    const subject = String(b.subject || '').trim().slice(0, 120) || '🚗 Neuigkeiten von deiner Fahrschule';
+    const msg = String(b.message || '').replace(/\r\n/g, '\n').trim();
+    if (msg.length < 5) return bad(res, 'Bitte schreib kurz, worum es geht.');
+    if (msg.length > 8000) return bad(res, 'Bitte etwas kürzer (max. 8000 Zeichen).');
+    const bodyHtml = msg.split(/\n{2,}/).map((para) =>
+      `<p>${escHtml(para).replace(/\n/g, '<br>')}</p>`).join('');
+    let sent = 0, failed = 0;
+    for (const r of recips) {
+      const html = mailShell(subject.replace(/^[^\p{L}\p{N}]+/u, '') || 'Neuigkeiten',
+        `<p>Hallo ${escHtml((r.name || '').split(' ')[0] || 'zusammen')},</p>${bodyHtml}`
+        + `<p style="color:#9a8f82;font-size:13px;margin-top:1rem">Fahrschule Untern Buchen · <a href="https://ginoco.de">ginoco.de</a></p>`);
+      const okSent = await tryMail(r.email, subject, { text: `Hallo ${(r.name || '').split(' ')[0] || 'zusammen'},\n\n${msg}\n\nFahrschule Untern Buchen · ginoco.de` });
+      if (okSent) { sent++; try { notify(r.id, 'info', '📣 ' + msg.split('\n')[0].slice(0, 140)); } catch {} } else failed++;
+    }
+    logEvent('info', { actor: 'instructor', detail: `📣 Neuigkeiten an ${sent} Fahrschüler gesendet („${subject}")${failed ? ` – ${failed} fehlgeschlagen` : ''}.` });
+    return ok(res, { sent, failed, recipients: recips.length });
+  }
+
   // ===== Nachrichten (Fahrlehrer-Seite) =====
   // Gesprächsliste: je Schüler letzte Nachricht + ungelesen-Anzahl
   if (p === '/api/instructor/messages' && method === 'GET') {
