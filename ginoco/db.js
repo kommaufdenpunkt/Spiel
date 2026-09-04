@@ -406,6 +406,10 @@ const DEFAULTS = {
   rank2_min_lessons: '15',   // ab so vielen gefahrenen Stunden -> Rang 2 (Sonderfahrten frei)
   rank2_min_manual: '6',     // zusaetzlich noetig fuer Rang 2: so viele Schalt-Einheiten (à 80 Min)
   booking_horizon_days_rank2: '21', // Rang 2 darf so viele Tage im Voraus buchen
+  // Android-App (TWA/Play Store): SHA-256-Signatur-Fingerabdruck(e) für Digital Asset Links.
+  // Leer = /.well-known/assetlinks.json liefert eine leere Liste. Mehrere per Komma/Zeile.
+  android_fingerprint: '',
+  android_package: 'de.ginoco.app',
   registration_open: '0',    // '1' = neue Fahrschüler dürfen sich mit Code registrieren, '0' = geschlossen (privat)
   self_registration: '1',    // '1' = Schüler dürfen sich selbst anmelden (E-Mail bestätigen + Freischaltung), '0' = aus
   // E-Mail-Versand (SMTP, eigene Domain-Mailbox). Standard: aus, bis eingerichtet.

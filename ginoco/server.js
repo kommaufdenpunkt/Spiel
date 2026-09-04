@@ -3084,10 +3084,10 @@ async function handleApi(req, res, url) {
       'school_label', 'school2_label', 'school2_lat', 'school2_lng',
       'instructor_home_label', 'instructor_home_lat', 'instructor_home_lng',
       'mail_enabled', 'smtp_host', 'smtp_port', 'smtp_secure', 'smtp_user',
-      'mail_from', 'mail_from_name', 'support_to', 'public_url'];
+      'mail_from', 'mail_from_name', 'support_to', 'public_url', 'android_fingerprint', 'android_package'];
     const emptyOk = new Set(['instructor_phone', 'meet_default_label', 'meet_default_lat', 'meet_default_lng', 'policy_text',
       'instructor_home_label', 'instructor_home_lat', 'instructor_home_lng', 'traffic_key',
-      'smtp_host', 'smtp_user', 'mail_from', 'mail_from_name', 'support_to']);
+      'smtp_host', 'smtp_user', 'mail_from', 'mail_from_name', 'support_to', 'android_fingerprint']);
     for (const k of allowed) {
       if (!(k in b) || b[k] == null) continue;
       if (b[k] === '' && !emptyOk.has(k)) continue;
@@ -4223,6 +4223,22 @@ async function loadStatic(full) {
   _staticCache.set(full, ent);
   return ent;
 }
+// Digital Asset Links: bestaetigt, dass die Android-App (TWA) zu ginoco.de gehoert.
+// Der/die SHA-256-Fingerabdruck(e) kommen aus der Einstellung android_fingerprint
+// (Komma/Zeilen-getrennt). Leer -> leere Liste (App laeuft dann noch mit Adressleiste).
+function serveAssetLinks(res) {
+  const fps = (getSettingRaw('android_fingerprint') || '').split(/[\s,]+/)
+    .map((x) => x.trim().toUpperCase()).filter((f) => /^([0-9A-F]{2}:){31}[0-9A-F]{2}$/.test(f));
+  const pkg = getSettingRaw('android_package') || 'de.ginoco.app';
+  const body = fps.length ? [{
+    relation: ['delegate_permission/common.handle_all_urls'],
+    target: { namespace: 'android_app', package_name: pkg, sha256_cert_fingerprints: fps },
+  }] : [];
+  const json = JSON.stringify(body, null, 2);
+  res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'public, max-age=3600' });
+  res.end(json);
+}
+
 async function serveStatic(req, res, url) {
   let path = decodeURIComponent(url.pathname);
   if (path === '/') path = '/index.html';
@@ -4268,6 +4284,8 @@ const server = createServer(async (req, res) => {
     setSecurityHeaders(req, res);
     const url = new URL(req.url, `http://${req.headers.host}`);
     if (url.pathname.startsWith('/api/')) return await handleApi(req, res, url);
+    // Digital Asset Links für die Android-App (TWA) – verknüpft ginoco.de mit der Play-Store-App.
+    if (url.pathname === '/.well-known/assetlinks.json') return serveAssetLinks(res);
     return await serveStatic(req, res, url);
   } catch (err) {
     console.error(err);

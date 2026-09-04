@@ -8204,6 +8204,12 @@ function tabEinstellungen() {
       <button class="sec sm" id="e-announce" type="button">📣 Neuigkeiten schreiben &amp; senden …</button>
       ${s.mail_configured ? '' : '<div class="hint" style="margin:.5rem 0 0;color:var(--bad)">Zum Senden zuerst „E-Mail/SMTP“ oben einrichten.</div>'}`, false)}
 
+    ${sec('📱', 'Android-App (Play Store)', 'Verknüpfung für die TWA-App', `
+      <p class="hint" style="margin:.1rem 0 .6rem">Für die Android-App (Trusted Web Activity) muss ginoco.de mit der App verknüpft sein. Trag hier den <strong>SHA-256-Fingerabdruck</strong> deines App-Signatur-Schlüssels ein (aus Bubblewrap bzw. Google Play → „App-Signatur"). Mehrere durch Komma trennen.</p>
+      <div class="field"><label>SHA-256-Fingerabdruck</label>
+        <input id="e-android-fp" value="${esc(s.android_fingerprint || '')}" placeholder="AB:CD:12:…:EF" autocomplete="off"></div>
+      <div class="hint" style="margin:.2rem 0 0">Prüfen: <a href="/.well-known/assetlinks.json" target="_blank">/.well-known/assetlinks.json</a> muss den Fingerabdruck zeigen. Anleitung: <code>ginoco/android/README-BUILD-ANDROID.md</code>.</div>`, true)}
+
     ${sec('👤', 'Zugang & Kontakt', 'Name, Handynummer, Passwort', `
       <div class="field"><label>Angezeigter Name</label><input id="e-name" value="${esc(s.instructor_name)}"></div>
       <div class="field"><label>Deine Handynummer (Schüler können anrufen/schreiben)</label><input id="e-phone" value="${esc(s.instructor_phone || '')}" placeholder="z.B. 0151 23456789"></div>
@@ -8276,6 +8282,7 @@ function tabEinstellungen() {
         rank2_min_lessons: Number($('#e-rank2').value), booking_horizon_days_rank2: Number($('#e-horizon2').value),
         registration_open: $('#e-reg-open').checked ? '1' : '0',
         self_registration: $('#e-self-reg').checked ? '1' : '0',
+        android_fingerprint: ($('#e-android-fp')?.value || '').trim(),
         weather_enabled: $('#e-weather').checked ? '1' : '0',
         weather_autostatus: $('#e-weather-auto').checked ? '1' : '0',
         traffic_key: $('#e-traffic').value.trim(),
