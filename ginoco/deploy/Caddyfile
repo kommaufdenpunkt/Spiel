@@ -2,7 +2,10 @@
 # Caddy holt und erneuert das SSL-Zertifikat vollautomatisch.
 # Diese Datei nach /etc/caddy/Caddyfile kopieren.
 
-ginoco.de, www.ginoco.de {
+# Alle Adressen zeigen auf denselben Node-Server – die Unterseite entscheidet,
+# welches Portal erscheint (ginoco.de = Fahrschüler, mcp. = Fahrlehrer,
+# buero./abrechnung./steuer./team. = Team-Portal).
+ginoco.de, www.ginoco.de, mcp.ginoco.de, buero.ginoco.de, abrechnung.ginoco.de, steuer.ginoco.de, team.ginoco.de {
 	# Node-Server läuft lokal auf Port 3000 (nur über den Proxy erreichbar)
 	reverse_proxy 127.0.0.1:3000
 

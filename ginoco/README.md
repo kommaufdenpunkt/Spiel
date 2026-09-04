@@ -44,11 +44,78 @@ Die App zeigt je nach aufgerufener Domain automatisch den passenden Zugang:
 |---|---|
 | `ginoco.de` / `www.ginoco.de` | nur **Fahrschüler** (Anmelden + Registrieren) |
 | `mcp.ginoco.de` | nur **Fahrlehrer** (privater PIN-Zugang) |
+| `buero.` / `abrechnung.` / `steuer.` / `team.ginoco.de` | das **Team-Portal** (siehe unten) – überall auch unter `/portal` |
 | `localhost`, `neu.…`, IP | **alles** (zum Testen) |
 
-Gesteuert über `location.hostname` (Funktion `portalMode()` in `app.js`).
-Ein und derselbe Server bedient beide Domains – die Trennung ist die
-Login-Ansicht, nicht der Datenbestand.
+Gesteuert über `location.hostname` (Funktion `portalMode()` in `app.js`; die
+Team-Subdomains stehen in der Einstellung `portal_hosts`).
+Ein und derselbe Server bedient alle Domains – die Trennung ist die
+Login-Ansicht, nicht der Datenbestand. **Ein Topf, mehrere Zugänge.**
+
+## Das Portal-System (Team, Büro, Abrechnung, Steuerbüro)
+
+Neben Fahrschülern und dem Fahrlehrer gibt es das **Team-Portal**
+(`public/portal.html`, API in `portal.js`). Jede Rolle sieht nur, was sie braucht:
+
+| Rolle | Login | Sieht / darf |
+|---|---|---|
+| 👑 **Inhaber (Admin)** | Fahrlehrer-PIN | alles: Team-Zugänge, Preise, Fahrzeuge anlegen, Urlaub genehmigen |
+| 🚗 **Fahrlehrer** | Team-Konto | Fahrzeuge buchen, eigene Fahrschüler & Akten, Theorie-QR, Urlaub/Krankmeldung – plus die Fahrlehrer-App |
+| 🏢 **Büro** | Team-Konto | neue Anmeldungen (📞 Anrufen / 💬 WhatsApp), freischalten, Klasse & Fahrlehrer zuweisen, Fahrzeuge, Theorie |
+| 🧾 **Abrechnung** (fsmanager / DataPart) | Team-Konto | gefahrene Stunden mit Datum, Uhrzeit, Minuten, Auto, Preis – „abgerechnet" abhaken, CSV |
+| 📊 **Steuerbüro** | Team-Konto | nur Monatssummen (Umsatz, Stunden, offen/abgerechnet), CSV – keine Schülerdaten |
+
+Team-Konten legt der Inhaber im Portal unter **Team & Zugänge** an
+(Benutzername + Passwort). Der Login ist `POST /api/auth/staff`.
+
+**Was das Portal kann**
+- 🚘 **Fahrzeuge mit Uhr:** Jeder Fahrlehrer hat sein Automatik-Auto, die
+  Schaltwagen (Startbestand: Audi A4 Avant `EW-AZ 11`, `EW-AZ 29`, `EW-AZ 27`)
+  werden geteilt. „Jetzt nehmen" oder vorab buchen – alle sehen um das Auto herum
+  die ablaufende Uhr (🔴 gerade erst los → 🟠 → 🟡 bald frei → 🟢 frei), das Team
+  bekommt eine Push-Nachricht. „Zurück – frei" gibt das Auto früher zurück,
+  „+40 Min" verlängert. Die Fahrzeuge erscheinen auch als Kennzeichen-Vorschlag
+  beim Abschließen einer Fahrstunde. (Fahrlehrer-App: Tab „🚘 Fahrzeuge".)
+- 🧾 **Abrechnung:** Jede abgeschlossene Fahrstunde bekommt automatisch ihren Preis
+  (Einheiten à 40 Min × Satz der Führerscheinklasse; Sonderfahrten eigener Satz;
+  Nichterscheinen anteilig). Weicht das Rechnungsdatum vom Fahrdatum ab
+  (Fahrlehrer-App → 🧾 Rechnung), steht das Rechnungsdatum in der Liste. Beim
+  Abhaken wird der Preis eingefroren.
+- 💶 **Preise je Klasse:** AM, A1, A2, A, Aufstieg A1→A2 / A2→A, B, B197, B96,
+  BE, C1, C1E, C, CE, L, T – Grundbetrag, Fahrstunde, Sonderfahrt, Vorstellung
+  Theorie/Praxis. Einheit (Minuten) und Nichterscheinen-Prozentsatz einstellbar.
+- 🆕 **Neue Anmeldungen (Büro):** Selbst-Anmeldungen landen hier mit Telefon,
+  Adresse, Anruf- und WhatsApp-Knopf; Klasse und Fahrlehrer wählen, freischalten.
+- 🧑‍🎓 **Akten:** Klasse, Fahrlehrer, Fahrstunden (mit Preis/abgerechnet),
+  Theorie-Lektionen 1–14, Prüfungstermin.
+- 📚 **Theorie mit QR-Anwesenheit:** Theoriestunde starten (Lektion 1–14), QR-Code
+  groß anzeigen – er **wechselt alle 5 Minuten** (HMAC-Token, nur der aktuelle
+  zählt). Fahrschüler scannen mit der Handykamera → `ginoco.de/?theorie=…` →
+  Anwesenheit steht sofort in der Akte und in der Schüler-Karte „📚 Theorie".
+- 🌴 **Urlaub & Krankmeldung:** Fahrlehrer reichen ein, der Inhaber genehmigt
+  (Push in beide Richtungen); Krankmeldungen sind sofort gemeldet. Resturlaub
+  pro Person.
+- 💶 **Schüler-Karte „Kosten & Rechnung":** jede gefahrene Stunde mit Preis und
+  Status „abgerechnet" – genau so, wie es auf der Rechnung erscheint.
+
+**Wichtigste Endpunkte** (alle unter `/api`):
+
+| Zweck | Methode & Pfad |
+|---|---|
+| Team-Login / Ich | `POST /auth/staff` · `GET /portal/me` |
+| Team-Konten (Admin) | `GET·POST /portal/staff` · `PATCH·DELETE /portal/staff/:id` |
+| Fahrzeuge & Uhr | `GET /portal/vehicles` · `POST /portal/vehicles/:id/book` · `POST /portal/vehicle-bookings/:id/return·extend` |
+| Preise | `GET·PUT /portal/prices` |
+| Abrechnung | `GET /portal/billing[.csv]?from&to&status` · `POST /portal/billing/mark` |
+| Steuerbüro | `GET /portal/tax[.csv]?year` |
+| Fahrschüler / Akte | `GET /portal/students` · `PATCH /portal/students/:id` · `GET /portal/students/:id/akte` |
+| Urlaub / Krank | `GET·POST /portal/absences` · `POST /portal/absences/:id/genehmigt·abgelehnt·delete` |
+| Theorie-QR | `GET·POST /portal/theory` · `GET /portal/theory/:id/code` · `POST /portal/theory/:id/end` |
+| Schüler | `POST /my/theory/checkin` · `GET /my/theory` · `GET /my/costs` |
+
+> **Hinweis zum Kalender:** Der Fahrstunden-Kalender ist weiterhin *ein* Kalender
+> (der des Inhabers). Team-Fahrlehrer arbeiten in derselben Fahrlehrer-App mit;
+> getrennte Kalender je Fahrlehrer sind der nächste Ausbauschritt.
 
 ## Online stellen (ginoco.de)
 
@@ -241,12 +308,15 @@ mal einen Slot mehr oder weniger willst.
 ```
 ginoco/
 ├── server.js        # Server + komplette API
+├── portal.js        # Portal-System: Team-Rollen, Fahrzeuge, Abrechnung, Theorie-QR
 ├── db.js            # Datenbank-Schema, Einstellungen, Passwort-Hashing
 ├── package.json
 └── public/
     ├── index.html
     ├── styles.css
-    └── app.js
+    ├── app.js
+    ├── portal.html / portal.js / portal.css   # Team-Portal
+    └── vehicles.css                            # Fahrzeug-Uhr (App + Portal)
 ```
 
 ### Hinweis zum Betrieb

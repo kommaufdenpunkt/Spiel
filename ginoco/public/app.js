@@ -1524,8 +1524,13 @@ function openHelpMenu() {
 window.__openHelp = openHelpMenu;
 
 // ---------- Was ist neu? (Changelog) ----------
-const CHANGELOG_VER = '4.4';
+const CHANGELOG_VER = '4.5';
 const CHANGELOG = [
+  { v: '4.5', d: '04.09.2026', title: '🏢 Ein Portal für alle – Team, Büro, Abrechnung', items: [
+    '📚 <strong>Theorie per QR:</strong> Im Unterricht hängt ein QR-Code, der alle 5 Minuten wechselt. Handykamera drauf halten – deine Anwesenheit landet sofort in deiner Akte. Neue Karte „Theorie" zeigt, welche der 14 Lektionen du schon hast.',
+    '💶 <strong>Kosten &amp; Rechnung:</strong> Neue Karte mit allen gefahrenen Stunden, Preis je Stunde und ob sie schon abgerechnet ist – genau so, wie es auf der Rechnung steht.',
+    '🚘 <strong>Fahrzeuge (Fahrlehrer):</strong> Die Schaltwagen werden geteilt – „Jetzt nehmen", und alle sehen die Uhr (rot → orange → gelb → grün), das Team bekommt eine Push-Nachricht.',
+    '🏢 <strong>Team-Portal:</strong> Büro (Anmeldungen freischalten, Fahrlehrer zuweisen), Abrechnung (abgerechnet abhaken, CSV), Steuerbüro (Monatssummen), Preise je Führerscheinklasse, Urlaub &amp; Krankmeldung, Team-Zugänge – jeder sieht nur, was er braucht.'] },
   { v: '4.4', d: '04.09.2026', title: '🚗 Großes Update – das ist neu!', items: [
     '<strong>Hallo zusammen! Wir haben eure App ordentlich aufpoliert – das erwartet euch:</strong>',
     '✅ <strong>Selbst anmelden:</strong> Neu dabei? Meld dich direkt in der App an – Name, Geburtsdatum, Adresse (mit Vorschlägen) und wann du Zeit hast. E-Mail bestätigen, freischalten lassen, fertig.',
@@ -2025,6 +2030,11 @@ function closeModal() {
     state.user = me.user; state.settings = s.settings;
   } catch (e) { /* settings evtl. ohne login */ }
   applyLangDir();
+  // QR-Code aus dem Theorieunterricht (/?theorie=TOKEN): merken, nach dem Login einlösen.
+  try {
+    const th = new URLSearchParams(location.search).get('theorie');
+    if (th) { sessionStorage.setItem('ginoco-theorie', th); history.replaceState(null, '', location.pathname); }
+  } catch {}
   // E-Mail-Bestätigung aus der Anmelde-Mail (/?verify=TOKEN) hat Vorrang – bestätigt & rendert selbst.
   if (await maybeHandleVerifyLink()) return;
   render();
@@ -2080,15 +2090,16 @@ const INSTR_NAV = [
   ['schueler', '🧑‍🎓', 'Fahrschüler'], ['nachrichten', '✉️', 'Nachrichten'], ['codes', '🔑', 'Zugangscodes'],
   ['__group', 'Planung'],
   ['planer', '🧠', 'KI-Planer'],
-  ['arbeitszeiten', '🕒', 'Arbeitszeiten'], ['theorie', '📚', 'Theorie'],
+  ['arbeitszeiten', '🕒', 'Arbeitszeiten'], ['theorie', '📚', 'Theorie'], ['fahrzeuge', '🚘', 'Fahrzeuge'],
   ['__group', 'System'],
+  ['portal', '🏢', 'Team-Portal'],
   ['bewertungen', '⭐', 'Bewertungen'],
   ['protokoll', '📋', 'Protokoll'], ['einstellungen', '⚙️', 'Einstellungen'],
 ];
 const STUDENT_NAV = [
   ['__group', 'nav_grp_overview'],
   ['week-card', '📅', 'nav_week'], ['slots', '🚗', 'nav_book'],
-  ['lessons-card', '📖', 'nav_lessons'],
+  ['lessons-card', '📖', 'nav_lessons'], ['theorie-card', '📚', 'Theorie'], ['costs-card', '💶', 'Kosten'],
   ['__group', 'nav_grp_more'],
   ['messages-card', '✉️', 'nav_messages'],
   ['notif-card', '🔔', 'nav_notif'], ['offers-card', '🎁', 'nav_offers'],
@@ -2835,6 +2846,8 @@ async function renderStudent() {
     <div id="daystatus-banner"></div>
     <div class="card" id="week-card"></div>
     <div class="card hidden" id="lessons-card"></div>
+    <div class="card hidden" id="theorie-card"></div>
+    <div class="card hidden" id="costs-card"></div>
     <div class="card hidden" id="fehlerbuch-card"></div>
     <div class="card" id="messages-card"></div>
     <div class="card hidden" id="review-card"></div>
@@ -2870,6 +2883,7 @@ async function renderStudent() {
   mountEdgeMenus('student');
   renderProfileCard();
   syncStudent();
+  maybeTheoryCheckin();
   // Erst-Login: zuerst die Abholung einrichten (Pflicht) – danach erst die Einführung.
   if (!state.user.pickup_onboarded && !state._pickupOnbShown) {
     state._pickupOnbShown = true; setTimeout(openPickupOnboarding, 500);
@@ -2940,6 +2954,7 @@ async function syncStudent() {
     refreshStudentLive();
     renderWeekCard(mine.weekInfo, mine.bookings, mine.progress);
     renderMyLessons(mine.bookings);
+    renderTheorieCard(); renderCostsCard();
     renderFehlerbuch();
     renderReviewCard(mine.progress);
     renderStudentMessages();
@@ -5025,6 +5040,8 @@ function drawInstrTab() {
   if (t === 'bewertungen') return tabBewertungen();
   if (t === 'protokoll') return tabProtokoll();
   if (t === 'einstellungen') return tabEinstellungen();
+  if (t === 'fahrzeuge') return tabFahrzeuge();
+  if (t === 'portal') { location.href = '/portal'; return; }
 }
 
 // ---- Tab: KI-Planer (Fahrlehrer) ----
@@ -5957,7 +5974,15 @@ function addMin(hhmm, min) {
 }
 
 // Modal: Stunde bearbeiten / abschließen
+// Kennzeichen-Vorschläge (angelegte Fahrzeuge) für das Abschluss-Formular
+let _plateCache = null;
+async function fillPlateList() {
+  const dl = document.getElementById('plate-list'); if (!dl) return;
+  try { if (!_plateCache) _plateCache = (await api('/api/portal/vehicles')).vehicles || []; } catch { return; }
+  dl.innerHTML = _plateCache.map((v) => `<option value="${esc(v.plate)}">${esc(v.name)} · ${v.gearbox === 'schalt' ? 'Schalter' : 'Automatik'}</option>`).join('');
+}
 function openMarkModal(id) {
+  setTimeout(fillPlateList, 50);
   const b = window.__instrBookings.find((x) => String(x.id) === String(id));
   if (!b) return;
   const _who = b.student_name ? esc(b.student_name) : (b.title ? esc(b.title) : 'Termin');
@@ -6000,7 +6025,7 @@ function openMarkModal(id) {
       </div>
       <div class="hint" id="m-hint"></div>
       <details class="mk-more"><summary>Mehr Angaben (Kennzeichen, Datum/Zeit, Treffpunkt, Notiz)</summary>
-        <div class="field" style="margin-top:.5rem"><label>Kennzeichen (optional)</label><input id="m-plate" value="${esc(b.plate || '')}" placeholder="z.B. B-FS 1234"></div>
+        <div class="field" style="margin-top:.5rem"><label>Kennzeichen (optional)</label><input id="m-plate" value="${esc(b.plate || '')}" placeholder="z.B. EW-AZ 11" list="plate-list"><datalist id="plate-list"></datalist></div>
         <div class="row">
           <div class="field"><label>Datum (verschieben)</label><input type="date" id="m-date" value="${b.date}"></div>
           <div class="field"><label>Uhrzeit</label><input id="m-time" value="${b.start_time}"></div>
@@ -7887,6 +7912,11 @@ function openBulkTheory() {
 async function tabTheorie() {
   const box = $('#itab');
   box.innerHTML = `<div class="card">
+    <h2>📚 Theorie-Anwesenheit per QR</h2>
+    <p class="hint">Theoriestunde starten, QR-Code an die Wand/Beamer – er <strong>wechselt alle 5 Minuten</strong>. Die Fahrschüler scannen ihn mit der Handykamera, die Teilnahme steht sofort in ihrer Akte (Lektion 1–14).</p>
+    <div class="inline"><a class="btnlink" href="/portal#theorie" style="text-decoration:none"><button>▶️ Theoriestunde starten &amp; QR zeigen</button></a></div>
+  </div>
+  <div class="card">
     <h2>Theorie & Ausnahmen</h2>
     <p class="hint">Blockiere Zeiten, in denen keine Fahrstunden buchbar sein sollen – z.B. Theorieunterricht (auch als <strong>Serie</strong>), Sondertermine oder Freistunden.</p>
     <div class="row">
@@ -8348,3 +8378,125 @@ const _origRenderInstrDay = renderInstrDay;
   // iOS liefert kein beforeinstallprompt -> Button trotzdem anbieten (fuehrt zur Anleitung)
   if (isIOS) window.addEventListener('load', ensureBtn);
 })();
+
+// ====================== Portal-System: Fahrzeuge (Schaltwagen-Uhr) ======================
+// Jeder Fahrlehrer hat sein Automatik-Auto – die Schaltwagen werden geteilt.
+// Wer einen braucht, nimmt ihn hier; alle sehen die Uhr (rot → orange → gelb → grün).
+const vehState = { data: null, tick: null };
+const vehCarSvg = (color) => `<svg class="carimg" viewBox="0 0 120 52" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <path d="M10 36c-4 0-6-2-6-6v-6c0-3 2-5 5-6l16-3 12-10c2-1 4-2 7-2h22c3 0 6 1 8 3l10 9 20 3c4 1 6 3 6 7v5c0 4-2 6-6 6H10z" fill="${color}"/>
+  <path d="M38 17l9-8c1-1 3-2 5-2h10v10H38zM66 7h8c2 0 4 1 5 2l8 8H66V7z" fill="#0e131a" opacity=".85"/>
+  <circle cx="30" cy="38" r="9" fill="#0e131a"/><circle cx="30" cy="38" r="4.5" fill="#93a1b3"/><circle cx="92" cy="38" r="9" fill="#0e131a"/><circle cx="92" cy="38" r="4.5" fill="#93a1b3"/>
+  <rect x="4" y="27" width="6" height="3" rx="1.5" fill="#ffd166"/><rect x="110" y="27" width="6" height="3" rx="1.5" fill="#ff6b6b"/></svg>`;
+function vehClockSvg() {
+  const R = 90, C = 2 * Math.PI * R; let ticks = '';
+  for (let i = 0; i < 12; i++) { const a = i * Math.PI / 6; ticks += `<line x1="${100 + Math.cos(a) * 78}" y1="${100 + Math.sin(a) * 78}" x2="${100 + Math.cos(a) * 82}" y2="${100 + Math.sin(a) * 82}"/>`; }
+  return `<svg viewBox="0 0 200 200"><circle class="track" cx="100" cy="100" r="${R}"/><g class="ticks">${ticks}</g><circle class="ring" cx="100" cy="100" r="${R}" stroke-dasharray="${C}" stroke-dashoffset="0"/></svg>`;
+}
+const vehHHMM = (iso) => new Date(iso).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+function vehPhase(v, now) {
+  if (!v.current) return { cls: 'free', frac: 1 };
+  const s = new Date(v.current.start_at).getTime(), e = new Date(v.current.end_at).getTime();
+  const frac = Math.max(0, Math.min(1, (e - now) / Math.max(1, e - s))); const rem = e - now;
+  return { cls: rem <= 10 * 60000 || frac < 0.2 ? 'soon' : frac < 0.6 ? 'mid' : 'busy', frac, rem };
+}
+async function tabFahrzeuge() {
+  const box = $('#itab');
+  box.innerHTML = `<div class="card"><h2>🚘 Fahrzeuge <span class="sub">Schaltwagen teilen – mit Uhr</span></h2>
+    <p class="hint">Brauchst du einen Schalter? <strong>Jetzt nehmen</strong> – die Uhr läuft, das Team bekommt eine Push-Nachricht. Bist du früher zurück: <strong>Zurück – frei</strong>. Rot = gerade erst los · Orange = dauert noch · Gelb = bald frei · Grün = frei. Vorab buchen, Verlauf und neue Fahrzeuge: im <a href="/portal#fahrzeuge" style="color:var(--brand)">Team-Portal</a>.</p>
+    <div class="cars" id="veh-cars">${gLoad('Lädt…')}</div></div>`;
+  await vehLoad();
+  clearInterval(vehState.tick);
+  vehState.tick = setInterval(() => { if (state.instrTab !== 'fahrzeuge' || !$('#veh-cars')) return clearInterval(vehState.tick); vehTick(); }, 1000);
+}
+async function vehLoad() {
+  try { vehState.data = await api('/api/portal/vehicles'); } catch (e) { const el = $('#veh-cars'); if (el) el.innerHTML = `<p class="hint">${esc(e.message)}</p>`; return; }
+  vehRender();
+}
+function vehRender() {
+  const box = $('#veh-cars'); if (!box || !vehState.data) return;
+  const d = vehState.data;
+  const mine = (b) => b && ((d.me.kind === 'instructor' && b.by_kind === 'instructor') || (d.me.kind === 'staff' && b.by_kind === 'staff' && b.by_id === d.me.id));
+  box.innerHTML = d.vehicles.map((v) => `<div class="car ${v.current ? 'pulse' : ''}" data-vid="${v.id}">
+      <div><span class="plate">${esc(v.plate)}</span><span class="gear">${v.gearbox === 'schalt' ? '🕹️ Schalter' : '⚙️ Automatik'}</span></div>
+      <div class="cname">${esc(v.name)}</div>
+      <div class="clock">${vehClockSvg()}<div class="mid">${vehCarSvg(v.color)}<div class="big" data-big></div><div class="sml" data-sml></div></div></div>
+      <div class="state" data-state></div>
+      <div class="acts">${v.current
+        ? (mine(v.current) || d.me.kind === 'instructor' ? `<button data-vreturn="${v.current.id}">✅ Zurück – frei</button><button class="sec" data-vextend="${v.current.id}">＋40 Min</button>` : '<span class="hint" style="margin:0">belegt</span>')
+        : `<button data-vtake="${v.id}" data-min="80">🚘 Jetzt nehmen · 80 Min</button><button class="sec" data-vtake="${v.id}" data-min="40">40</button><button class="sec" data-vtake="${v.id}" data-min="120">120</button>`}</div>
+      ${v.upcoming.length ? `<div class="next">${v.upcoming.slice(0, 2).map((b) => `<div><span>📌 ${vehHHMM(b.start_at)}–${vehHHMM(b.end_at)} · ${esc(b.by_name)}</span></div>`).join('')}</div>` : ''}
+    </div>`).join('') || '<p class="hint">Keine Fahrzeuge angelegt – im Team-Portal anlegen.</p>';
+  box.querySelectorAll('[data-vtake]').forEach((b) => b.onclick = async () => {
+    try { await api(`/api/portal/vehicles/${b.dataset.vtake}/book`, { method: 'POST', body: { duration_min: Number(b.dataset.min) } }); toast('Gute Fahrt! Die Uhr läuft 🚘', 'ok'); vehLoad(); } catch (e) { toast(e.message, 'err', 5000); }
+  });
+  box.querySelectorAll('[data-vreturn]').forEach((b) => b.onclick = async () => { try { await api(`/api/portal/vehicle-bookings/${b.dataset.vreturn}/return`, { method: 'POST' }); toast('Wieder frei ✓', 'ok'); vehLoad(); } catch (e) { toast(e.message, 'err'); } });
+  box.querySelectorAll('[data-vextend]').forEach((b) => b.onclick = async () => { try { await api(`/api/portal/vehicle-bookings/${b.dataset.vextend}/extend`, { method: 'POST', body: { minutes: 40 } }); toast('＋40 Minuten ✓', 'ok'); vehLoad(); } catch (e) { toast(e.message, 'err'); } });
+  vehTick();
+}
+function vehTick() {
+  const d = vehState.data; if (!d) return; const now = Date.now(); let reload = false;
+  for (const v of d.vehicles) {
+    const el = document.querySelector(`.car[data-vid="${v.id}"]`); if (!el) continue;
+    if (v.current && new Date(v.current.end_at).getTime() <= now) { reload = true; continue; }
+    if (!v.current && v.upcoming[0] && new Date(v.upcoming[0].start_at).getTime() <= now) { reload = true; continue; }
+    const ph = vehPhase(v, now);
+    el.classList.remove('free', 'soon', 'mid', 'busy'); el.classList.add(ph.cls);
+    el.querySelector('.ring').style.strokeDashoffset = String(2 * Math.PI * 90 * (1 - ph.frac));
+    const big = el.querySelector('[data-big]'), sml = el.querySelector('[data-sml]'), st = el.querySelector('[data-state]');
+    if (v.current) {
+      const s = Math.max(0, Math.floor(ph.rem / 1000)); const h = Math.floor(s / 3600), mi = Math.floor((s % 3600) / 60), se = s % 60;
+      big.textContent = h ? `${h}:${String(mi).padStart(2, '0')}:${String(se).padStart(2, '0')}` : `${mi}:${String(se).padStart(2, '0')}`;
+      sml.textContent = `frei ab ${vehHHMM(v.current.end_at)} Uhr`;
+      st.innerHTML = `${ph.cls === 'soon' ? '🟡 Bald wieder frei' : ph.cls === 'mid' ? '🟠 Noch unterwegs' : '🔴 Gerade erst los'}<span class="who">${esc(v.current.by_name)} · seit ${vehHHMM(v.current.start_at)} Uhr</span>`;
+    } else {
+      big.textContent = 'FREI'; const nx = v.upcoming[0];
+      sml.textContent = nx ? `bis ${vehHHMM(nx.start_at)} Uhr` : 'keine Buchung';
+      st.innerHTML = `🟢 Verfügbar<span class="who">${nx ? 'nächste Buchung: ' + esc(nx.by_name) : 'einfach nehmen'}</span>`;
+    }
+  }
+  if (reload) vehLoad();
+}
+
+// ====================== Portal-System: Schüler – Kosten & Theorie ======================
+// Was wurde gefahren, was kostet es, was ist schon abgerechnet – so wie es auf der Rechnung steht.
+async function renderCostsCard() {
+  const card = $('#costs-card'); if (!card) return;
+  let d; try { d = await api('/api/my/costs'); } catch { card.classList.add('hidden'); return; }
+  const euro = (c) => (Number(c || 0) / 100).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' });
+  const TL = { ueberland: '🌄 Überland', autobahn: '🛣️ Autobahn', nacht: '🌙 Nachtfahrt' };
+  card.classList.remove('hidden');
+  card.innerHTML = `<h2>💶 Kosten &amp; Rechnung <span class="sub">Klasse ${esc(d.license_class)}</span></h2>
+    <p class="hint">Eine Fahrstunde = ${d.unit_min} Minuten (${euro(d.prices.fahrstunde * 100)}), Sonderfahrt ${euro(d.prices.sonderfahrt * 100)} je Einheit. Grundbetrag ${euro(d.prices.grund * 100)}, Vorstellung Theorie ${euro(d.prices.pruef_theorie * 100)}, Praxis ${euro(d.prices.pruef_praxis * 100)}. „abgerechnet" heißt: steht auf einer Rechnung.</p>
+    <div class="inline" style="gap:1rem;margin-bottom:.6rem"><span class="pill">Fahrstunden gesamt <strong>${euro(d.total_cents)}</strong></span><span class="pill">davon abgerechnet <strong>${euro(d.billed_cents)}</strong></span></div>
+    ${d.lessons.length ? `<div style="overflow-x:auto"><table><tr><th>Auf der Rechnung</th><th>Dauer</th><th>Art</th><th>Auto</th><th style="text-align:right">Preis</th><th></th></tr>
+      ${d.lessons.map((l) => `<tr><td><strong>${fmtDT ? fmtDT(l.bill_date, l.bill_time) : l.bill_date + ' ' + l.bill_time}</strong>${l.bill_date !== l.date ? `<div class="hint" style="margin:0">gefahren ${fmtDT ? fmtDT(l.date, l.start_time) : l.date}</div>` : ''}</td><td>${l.duration_min} Min (${l.units}×)</td><td>${TL[l.lesson_type] || 'Übungsfahrt'}${l.attended ? '' : ' <span class="badge" style="background:var(--bad-bg);color:var(--bad)">nicht erschienen</span>'}</td><td>${esc(l.plate || '')}${l.gearbox === 'schalt' ? ' 🕹️' : l.gearbox === 'automatik' ? ' ⚙️' : ''}</td><td style="text-align:right"><strong>${euro(l.price_cents)}</strong></td><td>${l.billed ? '<span class="badge" style="background:var(--good-bg);color:var(--good)">abgerechnet</span>' : '<span class="muted">offen</span>'}</td></tr>`).join('')}</table></div>` : '<p class="hint">Noch keine gefahrenen Stunden.</p>'}`;
+}
+async function renderTheorieCard() {
+  const card = $('#theorie-card'); if (!card) return;
+  let d; try { d = await api('/api/my/theory'); } catch { card.classList.add('hidden'); return; }
+  const done = new Set(d.theory.map((t) => t.lesson_no));
+  card.classList.remove('hidden');
+  card.innerHTML = `<h2>📚 Theorie <span class="sub">${done.size} von ${d.need} Lektionen</span></h2>
+    <p class="hint">Im Unterricht hängt ein QR-Code, der alle 5 Minuten wechselt. Handykamera drauf halten – deine Anwesenheit landet sofort hier.</p>
+    <div class="theo-grid">${Array.from({ length: d.need }, (_, i) => i + 1).map((n) => `<span class="${done.has(n) ? 'on' : ''}" title="${esc(d.lessons[n] || '')}">${n}</span>`).join('')}</div>
+    ${d.theory.length ? `<details style="margin-top:.6rem"><summary class="hint" style="cursor:pointer;margin:0">Besuchte Lektionen</summary><ul class="hint" style="margin:.3rem 0 0 1rem">${d.theory.map((t) => `<li>${fmtDT ? fmtDT(t.date) : t.date} · Lektion ${t.lesson_no} – ${esc(t.title || d.lessons[t.lesson_no] || '')}</li>`).join('')}</ul></details>` : ''}`;
+}
+// QR-Code aus dem Theorieunterricht (/?theorie=TOKEN): Anwesenheit einlösen.
+async function maybeTheoryCheckin() {
+  let token = null;
+  try { token = sessionStorage.getItem('ginoco-theorie'); } catch {}
+  if (!token) return;
+  try { sessionStorage.removeItem('ginoco-theorie'); } catch {}
+  // Sofort einlösen (der Code läuft ab) – das Ergebnis erst zeigen, wenn kein anderes
+  // Fenster (z. B. die Abhol-Einrichtung beim ersten Login) offen ist.
+  let html;
+  try {
+    const r = await api('/api/my/theory/checkin', { method: 'POST', body: { token } });
+    html = `<h3>📚 Anwesenheit bestätigt ✓</h3><p>Lektion <strong>${r.lesson_no}</strong> – ${esc(r.title || '')}${r.already ? '<br><span class="hint">Du warst schon eingetragen.</span>' : ''}</p><div class="form-actions"><button onclick="closeModal()">Super</button></div>`;
+    renderTheorieCard();
+  } catch (e) { html = `<h3>📚 Das hat nicht geklappt</h3><p>${esc(e.message)}</p><div class="form-actions"><button onclick="closeModal()">OK</button></div>`; }
+  let tries = 0;
+  const show = () => { if ($('.modal-bg') && tries++ < 120) return setTimeout(show, 1000); modal(html); };
+  setTimeout(show, 700);
+}
