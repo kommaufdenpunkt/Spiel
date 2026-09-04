@@ -4277,6 +4277,23 @@ function setSecurityHeaders(req, res) {
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
   res.setHeader('Permissions-Policy', 'geolocation=(self)'); // Standort nur fuer die eigene App
   if (isHttps(req)) res.setHeader('Strict-Transport-Security', 'max-age=15552000; includeSubDomains');
+  // Content-Security-Policy: zusaetzliches Schutznetz gegen XSS/Injektion. 'unsafe-inline'
+  // ist noetig, weil die App Inline-Handler (onclick=...) und Inline-Styles nutzt; externe
+  // Skripte werden aber blockiert (Leaflet ist selbst gehostet unter /vendor/). Erlaubte
+  // Fremdquellen: Karten-Kacheln (OSM/Carto), Adresssuche (Nominatim) und Routen (OSRM).
+  res.setHeader('Content-Security-Policy', [
+    "default-src 'self'",
+    "script-src 'self' 'unsafe-inline'",
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: blob: https://tile.openstreetmap.org https://*.basemaps.cartocdn.com",
+    "connect-src 'self' https://nominatim.openstreetmap.org https://router.project-osrm.org",
+    "font-src 'self' data:",
+    "worker-src 'self'",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "frame-ancestors 'self'",
+    "form-action 'self'",
+  ].join('; '));
 }
 
 const server = createServer(async (req, res) => {
