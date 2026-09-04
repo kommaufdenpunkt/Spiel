@@ -2505,6 +2505,10 @@ async function loadReviewMarquee() {
   try { reviews = (await api('/api/reviews')).reviews || []; } catch { return; }
   if (!reviews.length) return;
   const stars = (n) => '★★★★★'.slice(0, n) + '☆☆☆☆☆'.slice(0, 5 - n);
+  // Gesamt-Note (Durchschnitt + Anzahl) als prominentes Vertrauenssiegel oben.
+  const count = reviews.length;
+  const avg = reviews.reduce((s, r) => s + (r.rating || 0), 0) / count;
+  const avg1 = avg.toFixed(1).replace('.', ',');
   const card = (r) => `<div class="rev-card${r.featured ? ' feat' : ''}">
     <div class="rev-stars">${stars(r.rating)}${r.featured ? ' <span class="rev-toptag">★ Top</span>' : ''}</div>
     <div class="rev-text">„${esc(r.text)}"</div>
@@ -2512,8 +2516,13 @@ async function loadReviewMarquee() {
   </div>`;
   // Inhalt doppelt fuer nahtlose Endlosschleife
   const items = reviews.map(card).join('');
-  el.innerHTML = `<div class="rev-title">Das sagen Fahrschüler über Ginoco &amp; die Fahrschule Untern Buchen (Eberswalde)</div>
-    <div class="rev-track" style="--rev-n:${reviews.length}">${items}${items}</div>`;
+  el.innerHTML = `<div class="rev-agg">
+      <span class="rev-agg-num">${avg1}</span>
+      <span class="rev-agg-stars" aria-label="${avg1} von 5 Sternen">${stars(Math.round(avg))}</span>
+      <span class="rev-agg-count">aus <strong>${count}</strong> ${count === 1 ? 'Bewertung' : 'Bewertungen'}</span>
+    </div>
+    <div class="rev-title">Das sagen Fahrschüler über Ginoco &amp; die Fahrschule Untern Buchen (Eberswalde)</div>
+    <div class="rev-track" style="--rev-n:${count}">${items}${items}</div>`;
   el.hidden = false;
 }
 

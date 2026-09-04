@@ -1771,3 +1771,10 @@ header .brand .brandname{
 
 /* 40-Min-Länge nur als dezente Ausnahme */
 .dur-chip.dur-exc{opacity:.75}
+
+/* Bewertungen: prominente Gesamt-Note über der Laufschrift */
+.rev-agg{display:flex;align-items:center;justify-content:center;gap:.55rem;flex-wrap:wrap;margin:.1rem 0 .35rem}
+.rev-agg-num{font-size:2rem;font-weight:900;color:var(--brand);line-height:1}
+.rev-agg-stars{font-size:1.2rem;letter-spacing:2px;color:#f5a623;text-shadow:0 1px 0 rgba(0,0,0,.12)}
+.rev-agg-count{font-size:.9rem;color:var(--muted,#8a8a8a);font-weight:600}
+.rev-agg-count strong{color:var(--ink)}
