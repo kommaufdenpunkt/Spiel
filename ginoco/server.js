@@ -12,6 +12,7 @@ import {
   hashPassword, verifyPassword,
 } from './db.js';
 import { sendMail } from './mail.js';
+import { createPortal } from './portal.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PUBLIC = join(__dirname, 'public');
@@ -20,7 +21,7 @@ const HOST = process.env.HOST || '0.0.0.0'; // hinter Caddy: HOST=127.0.0.1 (nur
 const SESSION_DAYS = 30;
 const APP_VERSION = "3.72.0";
 // Einstellungen, die Schueler/Oeffentlichkeit sehen duerfen (Rest bleibt beim Fahrlehrer)
-const PUBLIC_SETTINGS = ['instructor_name', 'instructor_phone', 'policy_text',
+const PUBLIC_SETTINGS = ['instructor_name', 'instructor_phone', 'policy_text', 'school_name',
   'cancel_hours', 'lock_hours', 'reserve_expire_min', 'booking_horizon_days', 'booking_horizon_days_rank2',
   'live_lead_min', 'lesson_min', 'break_min', 'start_time', 'last_start', 'max_per_week', 'release_time',
   'registration_open', 'self_registration', 'sonder_min_ueberland', 'sonder_min_autobahn', 'sonder_min_nacht',
@@ -123,11 +124,11 @@ function parseCookies(req) {
 
 function newToken() { return randomBytes(24).toString('hex'); }
 
-function createSession(res, kind, studentId = null, secure = false, remember = true) {
+function createSession(res, kind, studentId = null, secure = false, remember = true, staffId = null) {
   const token = newToken();
   const expires = Date.now() + SESSION_DAYS * 864e5;
-  db.prepare('INSERT INTO sessions(token,kind,student_id,expires) VALUES(?,?,?,?)')
-    .run(token, kind, studentId, expires);
+  db.prepare('INSERT INTO sessions(token,kind,student_id,expires,staff_id) VALUES(?,?,?,?,?)')
+    .run(token, kind, studentId, expires, staffId);
   // „Angemeldet bleiben": persistentes Cookie (Max-Age). Sonst Sitzungs-Cookie,
   // das der Browser beim Schließen verwirft (Serverseitig bleibt die Sitzung gültig).
   const maxAge = remember ? `; Max-Age=${SESSION_DAYS * 86400}` : '';
@@ -263,6 +264,11 @@ function getSession(req) {
   if (s.expires < Date.now()) {
     db.prepare('DELETE FROM sessions WHERE token = ?').run(token);
     return null;
+  }
+  if (s.kind === 'staff') { // Team-Konto: Rolle mitgeben (inaktive Konten sind sofort draussen)
+    const st = db.prepare('SELECT role,name,active FROM staff WHERE id = ?').get(s.staff_id);
+    if (!st || !st.active) return null;
+    s.role = st.role; s.staff_name = st.name;
   }
   return s;
 }
@@ -438,6 +444,17 @@ function pushToStudent(studentId, message, url = '/', title = 'Ginoco') {
       }).catch(() => {});
     }
   } catch (e) { console.error('pushToStudent', e); }
+}
+// Push an genau ein Abo (Team-Portal: Fahrzeug gebucht, Urlaub genehmigt ...).
+function pushRaw(sub, message, url = '/', title = 'Ginoco') {
+  try {
+    if (!getSettingRaw('vapid_public')) return;
+    const payload = JSON.stringify({ title: String(title).slice(0, 80) || 'Ginoco', body: String(message).slice(0, 300), url });
+    let body; try { body = encryptPush(payload, sub.p256dh, sub.auth); } catch { return; }
+    postPush(sub.endpoint, body, vapidAuth(sub.endpoint)).then((r) => {
+      if (r.status === 404 || r.status === 410) db.prepare('DELETE FROM push_subscriptions WHERE id = ?').run(sub.id);
+    }).catch(() => {});
+  } catch (e) { console.error('pushRaw', e); }
 }
 // Push an alle Geraete des Fahrlehrers (fuer neue Schueler-Nachrichten).
 function pushToInstructor(message, url = '/') {
@@ -671,16 +688,27 @@ async function handleApi(req, res, url) {
   const p = url.pathname;
   const method = req.method;
   const sess = getSession(req);
-  const requireInstructor = () => sess && sess.kind === 'instructor';
+  // Inhaber (PIN) darf alles; Team-Konten je nach Rolle (admin/fahrlehrer: alles, buero: Schuelerverwaltung).
+  const requireInstructor = () => !!sess && (sess.kind === 'instructor' || (sess.kind === 'staff' && portal.staffAllowedPath(sess.role, p)));
   const requireStudent = () => sess && sess.kind === 'student';
+
+  // ===== PORTAL-SYSTEM (Team, Fahrzeuge, Abrechnung, Theorie-QR) =====
+  if (p.startsWith('/api/portal/') || p === '/api/auth/staff' || p.startsWith('/api/my/theory') || p === '/api/my/costs') {
+    const handled = await portal.handle(req, res, url, sess);
+    if (handled !== false) return handled;
+  }
 
   // ===== AUTH =====
   if (p === '/api/auth/me' && method === 'GET') {
     if (!sess) return ok(res, { user: null });
     if (sess.kind === 'instructor') {
-      return ok(res, { user: { role: 'instructor', name: getSettingRaw('instructor_name') } });
+      return ok(res, { user: { role: 'instructor', name: getSettingRaw('instructor_name'), owner: true } });
     }
-    const st = db.prepare('SELECT id,name,email,phone,username,allowed_durations,pickup_onboarded,pickup_mode,home_label,home_lat,home_lng,approved,email_verified,registered_self,exam_date FROM students WHERE id = ?').get(sess.student_id);
+    if (sess.kind === 'staff') {
+      // Team-Konto: admin/fahrlehrer arbeiten in der Fahrlehrer-App mit, alle im Team-Portal.
+      return ok(res, { user: { role: (sess.role === 'admin' || sess.role === 'fahrlehrer') ? 'instructor' : 'staff', staff_role: sess.role, staff_id: sess.staff_id, name: sess.staff_name } });
+    }
+    const st = db.prepare('SELECT id,name,email,phone,username,allowed_durations,pickup_onboarded,pickup_mode,home_label,home_lat,home_lng,approved,email_verified,registered_self,exam_date,license_class FROM students WHERE id = ?').get(sess.student_id);
     if (!st) return ok(res, { user: null });
     return ok(res, { user: { role: 'student', ...st, pickup_onboarded: !!st.pickup_onboarded,
       approved: !!st.approved, email_verified: !!st.email_verified, registered_self: !!st.registered_self } });
@@ -1157,16 +1185,17 @@ async function handleApi(req, res, url) {
     return ok(res, { key: getSettingRaw('vapid_public') || null });
   }
   if (p === '/api/push/subscribe' && method === 'POST') {
-    if (!requireStudent() && !requireInstructor()) return bad(res, 'Bitte anmelden', 401);
+    if (!sess) return bad(res, 'Bitte anmelden', 401);
     const b = await readBody(req);
     const endpoint = b.endpoint && String(b.endpoint);
     const p256dh = b.keys && b.keys.p256dh, auth = b.keys && b.keys.auth;
     if (!endpoint || !p256dh || !auth) return bad(res, 'Ungültige Push-Daten');
     const sid = sess.kind === 'student' ? sess.student_id : null;
-    db.prepare(`INSERT INTO push_subscriptions(student_id,kind,endpoint,p256dh,auth,created_at)
-      VALUES(?,?,?,?,?,?)
-      ON CONFLICT(endpoint) DO UPDATE SET student_id=excluded.student_id, kind=excluded.kind, p256dh=excluded.p256dh, auth=excluded.auth`)
-      .run(sid, sess.kind, endpoint, String(p256dh), String(auth), new Date().toISOString());
+    const stid = sess.kind === 'staff' ? sess.staff_id : null;
+    db.prepare(`INSERT INTO push_subscriptions(student_id,kind,endpoint,p256dh,auth,created_at,staff_id)
+      VALUES(?,?,?,?,?,?,?)
+      ON CONFLICT(endpoint) DO UPDATE SET student_id=excluded.student_id, kind=excluded.kind, p256dh=excluded.p256dh, auth=excluded.auth, staff_id=excluded.staff_id`)
+      .run(sid, sess.kind, endpoint, String(p256dh), String(auth), new Date().toISOString(), stid);
     return ok(res, { subscribed: true });
   }
   if (p === '/api/push/unsubscribe' && method === 'POST') {
@@ -4225,7 +4254,14 @@ async function loadStatic(full) {
 }
 async function serveStatic(req, res, url) {
   let path = decodeURIComponent(url.pathname);
-  if (path === '/') path = '/index.html';
+  if (path === '/portal' || path === '/portal/') path = '/portal.html';
+  if (path === '/') {
+    // buero.ginoco.de, abrechnung.ginoco.de, steuer.ginoco.de, team.ginoco.de -> direkt das Team-Portal
+    const host = String(req.headers.host || '').split(':')[0].toLowerCase();
+    const sub = host.split('.')[0];
+    const portalHosts = (getSettingRaw('portal_hosts') || '').split(',').map((x) => x.trim()).filter(Boolean);
+    path = (host.includes('.') && portalHosts.includes(sub)) ? '/portal.html' : '/index.html';
+  }
   const full = normalize(join(PUBLIC, path));
   if (!full.startsWith(PUBLIC)) return bad(res, 'Verboten', 403);
   try {
@@ -4252,6 +4288,13 @@ async function serveStatic(req, res, url) {
     } catch { bad(res, 'Nicht gefunden', 404); }
   }
 }
+
+// ---------- Portal-System verdrahten ----------
+const portal = createPortal({
+  db, ok, bad, readBody, hashPassword, verifyPassword, passwordProblem,
+  getSettingRaw, setSettingRaw, getSettings, createSession, loginBlocked, noteLoginFail, noteLoginOk,
+  isHttps, logEvent, notify, pushToInstructor, pushRaw,
+});
 
 // ---------- Server ----------
 function setSecurityHeaders(req, res) {

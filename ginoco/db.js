@@ -344,6 +344,110 @@ db.exec(`CREATE TABLE IF NOT EXISTS day_status (
   updated_at TEXT
 );`);
 
+// ====================== Portal-System (Team, Fahrzeuge, Abrechnung, Theorie) ======================
+// Ein Datentopf, mehrere Zugänge: Fahrschüler · Fahrlehrer · Büro · Abrechnung (fsmanager/DataPart)
+// · Steuerbüro · Inhaber (Admin). Jede Rolle sieht nur, was sie wirklich braucht.
+
+// Team-Konten (alle ausser Fahrschuelern). Der klassische PIN-Login bleibt der Inhaber-Zugang.
+db.exec(`CREATE TABLE IF NOT EXISTS staff (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  name       TEXT NOT NULL,
+  role       TEXT NOT NULL,              -- admin | fahrlehrer | buero | abrechnung | steuer
+  username   TEXT NOT NULL UNIQUE,
+  pass       TEXT NOT NULL,
+  phone      TEXT,
+  email      TEXT,
+  color      TEXT,                       -- Kalenderfarbe des Fahrlehrers
+  active     INTEGER NOT NULL DEFAULT 1,
+  vacation_days INTEGER NOT NULL DEFAULT 30,
+  created_at TEXT NOT NULL
+);`);
+ensureColumn('sessions', 'staff_id', 'staff_id INTEGER');           // kind = 'staff'
+ensureColumn('push_subscriptions', 'staff_id', 'staff_id INTEGER'); // Push an Team-Mitglieder (Fahrzeug gebucht ...)
+
+// Fahrschüler: Führerscheinklasse (inkl. Schlüsselzahl, z.B. B197) + zugewiesener Fahrlehrer
+ensureColumn('students', 'license_class', "license_class TEXT NOT NULL DEFAULT 'B'");
+ensureColumn('students', 'instructor_id', 'instructor_id INTEGER');  // staff.id (Rolle fahrlehrer) oder NULL = Inhaber
+ensureColumn('students', 'class_note', 'class_note TEXT');           // z.B. „Aufstieg A2 → A", „mit Anhänger"
+
+// Fahrzeuge (Schaltwagen werden geteilt -> Buchung mit Uhr)
+db.exec(`CREATE TABLE IF NOT EXISTS vehicles (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  name       TEXT NOT NULL,              -- z.B. Audi A4 Avant
+  plate      TEXT NOT NULL UNIQUE,       -- Kennzeichen, z.B. EW-AZ 11
+  gearbox    TEXT NOT NULL DEFAULT 'schalt',  -- schalt | automatik
+  color      TEXT NOT NULL DEFAULT '#4d8dff',
+  shared     INTEGER NOT NULL DEFAULT 1, -- 1 = geteiltes Fahrzeug (buchbar), 0 = fest zugeordnet
+  owner_id   INTEGER,                    -- staff.id bei fest zugeordnetem Fahrzeug
+  active     INTEGER NOT NULL DEFAULT 1,
+  sort       INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL
+);`);
+db.exec(`CREATE TABLE IF NOT EXISTS vehicle_bookings (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  vehicle_id  INTEGER NOT NULL,
+  by_kind     TEXT NOT NULL,             -- instructor (Inhaber) | staff
+  by_id       INTEGER,
+  by_name     TEXT NOT NULL,
+  start_at    TEXT NOT NULL,             -- ISO
+  end_at      TEXT NOT NULL,             -- ISO (geplantes Ende)
+  returned_at TEXT,                      -- tatsaechlich zurueck (frueher frei)
+  note        TEXT,
+  created_at  TEXT NOT NULL
+);`);
+db.exec('CREATE INDEX IF NOT EXISTS idx_vb_vehicle ON vehicle_bookings(vehicle_id, start_at)');
+// Fahrstunde <-> Fahrzeug (Kennzeichen bleibt als Text, Verknuepfung fuer die Abrechnung)
+ensureColumn('bookings', 'vehicle_id', 'vehicle_id INTEGER');
+// Abrechnung: Preis zum Zeitpunkt des Abschlusses + „abgerechnet"-Haken der Abrechnungsstelle
+ensureColumn('bookings', 'price_cents', 'price_cents INTEGER');
+ensureColumn('bookings', 'billed_at', 'billed_at TEXT');
+ensureColumn('bookings', 'billed_by', 'billed_by TEXT');
+// Startbestand: die drei Schaltwagen
+if (!db.prepare('SELECT 1 FROM vehicles LIMIT 1').get()) {
+  const ins = db.prepare('INSERT INTO vehicles(name,plate,gearbox,color,shared,sort,created_at) VALUES(?,?,?,?,1,?,?)');
+  const now = new Date().toISOString();
+  ins.run('Audi A4 Avant', 'EW-AZ 11', 'schalt', '#e5605f', 1, now);
+  ins.run('Schaltwagen', 'EW-AZ 29', 'schalt', '#4d8dff', 2, now);
+  ins.run('Schaltwagen', 'EW-AZ 27', 'schalt', '#35c07d', 3, now);
+}
+
+// Urlaub / Krankmeldung der Fahrlehrer – eingereicht im eigenen Portal, genehmigt vom Inhaber
+db.exec(`CREATE TABLE IF NOT EXISTS absences (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  by_kind    TEXT NOT NULL,              -- instructor | staff
+  by_id      INTEGER,
+  by_name    TEXT NOT NULL,
+  kind       TEXT NOT NULL,              -- urlaub | krank | frei
+  from_date  TEXT NOT NULL,
+  to_date    TEXT NOT NULL,
+  note       TEXT,
+  status     TEXT NOT NULL DEFAULT 'offen', -- offen | genehmigt | abgelehnt (Krankmeldung: sofort 'gemeldet')
+  decided_by TEXT,
+  decided_at TEXT,
+  created_at TEXT NOT NULL
+);`);
+
+// Theorieunterricht mit QR-Anwesenheit: alle 5 Minuten ein neuer Code, der Schueler scannt
+// ihn mit der Handykamera -> Teilnahme landet in seiner Akte.
+db.exec(`CREATE TABLE IF NOT EXISTS theory_sessions (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  date       TEXT NOT NULL,
+  lesson_no  INTEGER NOT NULL,           -- Lektion 1..14 (Grundstoff 1-12, Zusatzstoff B 13-14)
+  title      TEXT,
+  secret     TEXT NOT NULL,              -- Basis fuer die rotierenden Codes
+  by_name    TEXT,
+  started_at TEXT NOT NULL,
+  ended_at   TEXT
+);`);
+db.exec(`CREATE TABLE IF NOT EXISTS theory_attendance (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  session_id INTEGER NOT NULL,
+  student_id INTEGER NOT NULL,
+  at         TEXT NOT NULL,
+  UNIQUE(session_id, student_id)
+);`);
+db.exec('CREATE INDEX IF NOT EXISTS idx_theory_att_student ON theory_attendance(student_id)');
+
 // ---- Voreinstellungen (einmalig setzen) ----
 const DEFAULTS = {
   instructor_name: 'Fahrlehrer',
@@ -419,6 +523,12 @@ const DEFAULTS = {
   mail_from_name: 'Fahrschule Untern Buchen',
   support_to: '',            // Ziel fuer Support-Mails (leer = mail_from)
   public_url: 'https://ginoco.de',  // oeffentliche Adresse des Portals (fuer Links in E-Mails)
+  // Abrechnung: Preise je Fuehrerscheinklasse (JSON, im Team-Portal unter „Preise" editierbar).
+  // Einheit = 1 Fahrstunde à unit_min Minuten (Standard 40). Betraege in Euro.
+  price_unit_min: '40',
+  price_list: '',            // leer = Standard-Preisliste aus portal.js
+  school_name: 'Fahrschule Untern Buchen',
+  portal_hosts: 'buero,abrechnung,steuer,team,admin', // Subdomains, die direkt das Team-Portal zeigen
   policy_text: 'Gebuchte Termine sind verbindlich. Kostenfrei stornieren nur bis '
     + '48 Std. vorher; ab 36 Std. vorher steht der Termin fest. Bei Nichterscheinen '
     + 'werden bis zu 75 % berechnet. Ab 20 Min Verspätung verkürzt sich die Fahrstunde '
