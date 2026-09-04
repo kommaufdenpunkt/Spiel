@@ -4229,7 +4229,7 @@ async function loadStatic(full) {
 function serveAssetLinks(res) {
   const fps = (getSettingRaw('android_fingerprint') || '').split(/[\s,]+/)
     .map((x) => x.trim().toUpperCase()).filter((f) => /^([0-9A-F]{2}:){31}[0-9A-F]{2}$/.test(f));
-  const pkg = getSettingRaw('android_package') || 'de.ginoco.app';
+  const pkg = getSettingRaw('android_package') || 'de.ginoco.twa';
   const body = fps.length ? [{
     relation: ['delegate_permission/common.handle_all_urls'],
     target: { namespace: 'android_app', package_name: pkg, sha256_cert_fingerprints: fps },

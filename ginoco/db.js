@@ -409,7 +409,7 @@ const DEFAULTS = {
   // Android-App (TWA/Play Store): SHA-256-Signatur-Fingerabdruck(e) für Digital Asset Links.
   // Leer = /.well-known/assetlinks.json liefert eine leere Liste. Mehrere per Komma/Zeile.
   android_fingerprint: '',
-  android_package: 'de.ginoco.app',
+  android_package: 'de.ginoco.twa',
   registration_open: '0',    // '1' = neue Fahrschüler dürfen sich mit Code registrieren, '0' = geschlossen (privat)
   self_registration: '1',    // '1' = Schüler dürfen sich selbst anmelden (E-Mail bestätigen + Freischaltung), '0' = aus
   // E-Mail-Versand (SMTP, eigene Domain-Mailbox). Standard: aus, bis eingerichtet.
