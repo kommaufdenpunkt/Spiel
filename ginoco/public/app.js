@@ -4839,30 +4839,30 @@ async function disablePush() {
   } catch (e) { toast(e.message, 'err'); }
 }
 async function refreshPushCtl() {
-  const el = $('#push-ctl'); if (!el) return;
+  const els = document.querySelectorAll('.push-ctl'); if (!els.length) return;
   const st = await pushState();
   const blocked = ('Notification' in window) && Notification.permission === 'denied';
+  let html;
   if (st === 'unsupported') {
-    el.innerHTML = '<span class="hint">🔔 <strong>Handy-Benachrichtigungen</strong> gehen auf diesem Gerät leider nicht. Tipp fürs iPhone: die Seite über das Teilen-Symbol „Zum Home-Bildschirm" hinzufügen und die App von dort öffnen.</span>';
-    return;
-  }
-  if (blocked && st !== 'on') {
-    el.innerHTML = `<div class="hint">🔕 <strong>Benachrichtigungen sind blockiert.</strong> So erlaubst du sie wieder:
+    html = '<span class="hint">🔔 <strong>Handy-Benachrichtigungen</strong> gehen auf diesem Gerät leider nicht. Tipp fürs iPhone: die Seite über das Teilen-Symbol „Zum Home-Bildschirm" hinzufügen und die App von dort öffnen.</span>';
+  } else if (blocked && st !== 'on') {
+    html = `<div class="hint">🔕 <strong>Benachrichtigungen sind blockiert.</strong> So erlaubst du sie wieder:
       <br>• <strong>Handy:</strong> im Browser oben auf das Schloss-/„aA"-Symbol neben der Adresse tippen → „Benachrichtigungen" → „Erlauben".
       <br>• <strong>PC:</strong> auf das Schloss-Symbol links neben der Adresse klicken → „Benachrichtigungen: Zulassen".
       Danach diese Seite neu laden.</div>`;
-    return;
-  }
-  if (st === 'on') {
-    el.innerHTML = `<span class="pill" style="background:var(--good-bg);color:var(--good)">🔔 Benachrichtigungen sind an</span>
-      <button class="ghost sm" id="push-test">Test senden</button><button class="ghost sm" id="push-off">Ausschalten</button>`;
+  } else if (st === 'on') {
+    html = `<span class="pill" style="background:var(--good-bg);color:var(--good)">🔔 Benachrichtigungen sind an</span>
+      <button class="ghost sm" data-push="test">Test senden</button><button class="ghost sm" data-push="off">Ausschalten</button>`;
   } else {
-    el.innerHTML = `<div class="hint" style="margin-bottom:.5rem">🔔 <strong>Handy-Benachrichtigungen einschalten:</strong> Erinnerungen, Verschiebungen, Absagen und Angebote direkt aufs Handy – auch wenn die App geschlossen ist. Beim nächsten Schritt fragt dein Browser einmal um Erlaubnis – bitte auf „Erlauben" tippen.</div>
-      <button class="sm" id="push-on">🔔 Jetzt einschalten</button>`;
+    html = `<div class="hint" style="margin-bottom:.5rem">🔔 <strong>Handy-Benachrichtigungen einschalten:</strong> Erinnerungen, neue Buchungen, Absagen und Nachrichten direkt aufs Handy – auch wenn die App geschlossen ist. Beim nächsten Schritt fragt dein Browser einmal um Erlaubnis – bitte auf „Erlauben" tippen.</div>
+      <button class="sm" data-push="on">🔔 Jetzt einschalten</button>`;
   }
-  const on = $('#push-on'); if (on) on.onclick = enablePush;
-  const off = $('#push-off'); if (off) off.onclick = disablePush;
-  const test = $('#push-test'); if (test) test.onclick = async () => { try { await api('/api/push/test', { method: 'POST' }); toast('Test-Benachrichtigung gesendet 🔔', 'ok'); } catch (e) { toast(e.message, 'err'); } };
+  els.forEach((el) => {
+    el.innerHTML = html;
+    const on = el.querySelector('[data-push="on"]'); if (on) on.onclick = enablePush;
+    const off = el.querySelector('[data-push="off"]'); if (off) off.onclick = disablePush;
+    const test = el.querySelector('[data-push="test"]'); if (test) test.onclick = async () => { try { await api('/api/push/test', { method: 'POST' }); toast('Test-Benachrichtigung gesendet 🔔', 'ok'); } catch (e) { toast(e.message, 'err'); } };
+  });
 }
 function renderNotifications(notifs, unread) {
   const card = $('#notif-card');
@@ -5209,11 +5209,23 @@ function renderInstructor() {
   drawInstrTab();
   mountEdgeMenus('instructor');
   refreshEventBadge();
+  // Live-Puls: solange das Cockpit offen ist, regelmäßig auf neue Aktivität prüfen –
+  // dann kommt bei einer neuen Buchung/Absage sofort ein Ton (siehe refreshEventBadge).
+  if (instrEventPoll) clearInterval(instrEventPoll);
+  instrEventPoll = setInterval(() => { if (!document.hidden) refreshEventBadge(); }, 20000);
 }
 
+let instrEventPoll = null, _lastEventUnseen = null;
 async function refreshEventBadge() {
   try {
     const { unseen } = await api('/api/instructor/events');
+    // Bei OFFENEM Cockpit: Ton + kurzer Hinweis, sobald etwas Neues reinkommt.
+    // (Bei geschlossener App übernimmt die Handy-Push-Benachrichtigung.)
+    if (_lastEventUnseen != null && unseen > _lastEventUnseen) {
+      playChime();
+      toast('🔔 Neue Aktivität – ein Fahrschüler war gerade aktiv.', 'ok');
+    }
+    _lastEventUnseen = unseen;
     const el = $('#ev-badge');
     if (el) el.innerHTML = unseen ? `<span class="badge offer">${unseen}</span>` : '';
   } catch {}
@@ -8418,6 +8430,11 @@ function tabEinstellungen() {
       <button class="sec sm" id="e-announce" type="button">📣 Neuigkeiten schreiben &amp; senden …</button>
       ${s.mail_configured ? '' : '<div class="hint" style="margin:.5rem 0 0;color:var(--bad)">Zum Senden zuerst „E-Mail/SMTP“ oben einrichten.</div>'}`, false)}
 
+    ${sec('🔔', 'Benachrichtigungen (dieses Gerät)', 'Push aufs Handy bei Buchung, Absage, Nachricht …', `
+      <p class="hint" style="margin:.1rem 0 .6rem">Schalte Handy-Benachrichtigungen für <strong>dieses Gerät</strong> ein. Dann wirst du sofort benachrichtigt, wenn ein Fahrschüler <strong>bucht</strong>, absagt, verschiebt, eine Stunde abgibt oder dir schreibt – auch wenn das Cockpit geschlossen ist. Tipp: das Cockpit vorher über das Browser-Menü „Zum Home-Bildschirm hinzufügen“ installieren, dann kommt der Ton wie bei einer echten App.</p>
+      <div class="push-ctl" id="push-ctl-instr"></div>
+      <div class="hint" style="margin:.5rem 0 0">🔊 Bei <strong>offenem</strong> Cockpit spielt zusätzlich ein Ton (wählbar unter „🎨 Aussehen → Benachrichtigungston“).</div>`, true)}
+
     ${sec('📱', 'Android-App (Play Store)', 'Verknüpfung für die TWA-App', `
       <p class="hint" style="margin:.1rem 0 .6rem">Für die Android-App (Trusted Web Activity) muss ginoco.de mit der App verknüpft sein. Trag hier den <strong>SHA-256-Fingerabdruck</strong> deines App-Signatur-Schlüssels ein (aus Bubblewrap bzw. Google Play → „App-Signatur"). Mehrere durch Komma trennen.</p>
       <div class="field"><label>SHA-256-Fingerabdruck</label>
@@ -8470,6 +8487,7 @@ function tabEinstellungen() {
     } finally { mailTestBtn.disabled = false; }
   };
   const annBtn = $('#e-announce'); if (annBtn) annBtn.onclick = () => openAnnounceModal();
+  refreshPushCtl(); // Fahrlehrer-Push-Schalter (dieses Gerät) befüllen
   $('#e-save').onclick = async () => {
     const workdays = [...box.querySelectorAll('[data-day]')].filter((c) => c.checked).map((c) => c.dataset.day).join(',');
     try {

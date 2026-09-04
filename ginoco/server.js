@@ -939,6 +939,8 @@ async function handleApi(req, res, url) {
         }
         if (!recent) logEvent('reset', { actor: 'student', studentId: st.id,
           detail: `${st.name} hat „Passwort vergessen" angefragt (Login ${st.username || '?'})${mailed ? ' – Reset-Mail wurde verschickt.' : '. Bitte ein neues Passwort setzen und mitteilen.'}` });
+        // Nur wenn KEINE Self-Service-Mail rausging, muss der Fahrlehrer selbst ran -> Handy-Push.
+        if (!recent && !mailed) pushToInstructor(`🔑 ${st.name} hat „Passwort vergessen" – bitte ein neues Passwort setzen und mitteilen.`, '/');
       }
     }
     return ok(res, { requested: true });
@@ -976,6 +978,7 @@ async function handleApi(req, res, url) {
           + `<p style="white-space:pre-wrap;border-left:3px solid #e6934d;padding-left:12px;color:#2b2320">${escHtml(msg)}</p>`),
       });
     }
+    pushToInstructor(`📮 Support-Anfrage von ${who}: ${subject}`, '/');
     return ok(res, { received: true, mailed });
   }
   // Reset-Token pruefen (zeigt der Client, um das Formular anzuzeigen).
@@ -1177,6 +1180,10 @@ async function handleApi(req, res, url) {
   }
   // Test-Push an das eigene Gerät (Button "Test")
   if (p === '/api/push/test' && method === 'POST') {
+    if (sess && sess.kind === 'instructor') {
+      pushToInstructor('🔔 Test: So sieht eine Cockpit-Benachrichtigung aus.');
+      return ok(res, { sent: true });
+    }
     if (!requireStudent()) return bad(res, 'Bitte anmelden', 401);
     pushToStudent(sess.student_id, '🔔 Test: So sieht eine Benachrichtigung von Ginoco aus.');
     return ok(res, { sent: true });
@@ -1311,6 +1318,7 @@ async function handleApi(req, res, url) {
         .run(sess.student_id, rating, text, mode, showPhoto, authorName, ratingsJson, new Date().toISOString());
     }
     logEvent('info', { actor: 'student', studentId: sess.student_id, detail: `Bewertung abgegeben (${rating}★)` });
+    pushToInstructor(`⭐ Neue Bewertung (${rating}★) von ${st.name}.`, '/');
     return ok(res, { saved: true });
   }
 
@@ -1659,6 +1667,8 @@ async function handleApi(req, res, url) {
     for (const sid of otherStudentIds(sess.student_id)) notify(sid, 'offer', msg, bk.date, bk.id);
     logEvent('offer', { actor: 'student', studentId: bk.student_id, bookingId: bk.id, date: bk.date,
       detail: `zur Übernahme angeboten: ${wdShort(bk.date)} ${dmy(bk.date)} ${bk.start_time} Uhr` });
+    const offName = db.prepare('SELECT name FROM students WHERE id=?').get(bk.student_id)?.name || 'Ein Fahrschüler';
+    pushToInstructor(`🎁 ${offName} bietet die Fahrstunde am ${wdShort(bk.date)} ${dmy(bk.date)} um ${bk.start_time} Uhr zur Übernahme an.`, '/');
     return ok(res);
   }
   // Angebot zuruecknehmen
