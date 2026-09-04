@@ -3665,6 +3665,9 @@ function printLessonProof(name, done, adk, stats) {
   const list = (done || []).slice().sort((a, z) => (a.date + a.start_time).localeCompare(z.date + z.start_time));
   const driven = list.filter((b) => b.attended !== 0);
   const totalMin = driven.reduce((s, b) => s + (b.duration_min || 0), 0);
+  const schaltN = driven.filter((b) => b.gearbox === 'schalt').length;
+  const autoN = driven.filter((b) => b.gearbox === 'automatik').length;
+  const gearL = (g) => g === 'schalt' ? 'Schalt' : g === 'automatik' ? 'Automatik' : '—';
   const rows = list.map((b, i) => {
     const noshow = b.attended === 0;
     const late = b.late_minutes || 0;
@@ -3678,6 +3681,7 @@ function printLessonProof(name, done, adk, stats) {
       <td class="c">${noshow ? '—' : addMinHHMM(b.start_time, b.duration_min)}</td>
       <td class="c">${noshow ? 'nicht erschienen' : b.duration_min + ' Min'}</td>
       <td class="c">${noshow ? '' : artL}</td>
+      <td class="c gear-col">${noshow ? '' : gearL(b.gearbox)}</td>
       <td>${late ? `Fahrschüler ${late} Min zu spät` : ''}</td>
       <td>${esc(b.feedback || '')}</td>
       <td class="c sig-col">
@@ -3752,8 +3756,8 @@ function printLessonProof(name, done, adk, stats) {
       <div class="brand">${LOGO}<div><div class="school">${school}</div>${addr ? `<div class="addr">${addr}</div>` : ''}</div></div>
       <div class="titleblock"><h1>Fahrstunden-Nachweis</h1><div class="stud">${esc(name)}</div><div class="meta">${(state.mlFrom || state.mlTo) ? `Zeitraum: ${state.mlFrom ? fmtDT(state.mlFrom) : '…'} – ${state.mlTo ? fmtDT(state.mlTo) : '…'} · ` : ''}Stand: ${today}</div></div>
     </div>
-    <div class="sum"><b>${driven.length} gefahrene Fahrstunden · ${hLabel(totalMin)} gesamt</b></div>
-    <table><thead><tr><th>#</th><th>Datum &amp; Uhrzeit (gefahren)</th><th>Auf der Rechnung</th><th>Ende</th><th>Dauer</th><th>Art</th><th>Verspätung</th><th>Vermerk</th><th>Unterschrift</th></tr></thead>
+    <div class="sum"><b>${driven.length} gefahrene Fahrstunden · ${hLabel(totalMin)} gesamt</b>${(schaltN || autoN) ? ` · ${schaltN}× Schalt · ${autoN}× Automatik` : ''}</div>
+    <table><thead><tr><th>#</th><th>Datum &amp; Uhrzeit (gefahren)</th><th>Auf der Rechnung</th><th>Ende</th><th>Dauer</th><th>Art</th><th>Getriebe</th><th>Verspätung</th><th>Vermerk</th><th>Unterschrift</th></tr></thead>
       <tbody>${rows}</tbody></table>
     <div class="sign"><div>Unterschrift Fahrlehrer</div><div>Unterschrift Fahrschüler</div></div>
     ${adkSection}
