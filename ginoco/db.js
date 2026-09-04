@@ -324,6 +324,13 @@ db.exec(`CREATE TABLE IF NOT EXISTS learnpoint_photos (
 );`);
 db.exec('CREATE INDEX IF NOT EXISTS idx_learnpoint_photos_pt ON learnpoint_photos(point_id)');
 
+// Einmal-Merker für zeitgesteuerte Benachrichtigungen (Morgen-Übersicht,
+// Prüfungs-Countdown, Rang-2 usw.) – verhindert Doppel-Versand.
+db.exec(`CREATE TABLE IF NOT EXISTS sent_notices (
+  key TEXT PRIMARY KEY,
+  at  TEXT NOT NULL
+);`);
+
 // Live-Standort des Fahrlehrers (genau eine Zeile)
 db.exec(`CREATE TABLE IF NOT EXISTS live_location (
   id INTEGER PRIMARY KEY CHECK(id = 1),
@@ -410,6 +417,19 @@ const DEFAULTS = {
   // Leer = /.well-known/assetlinks.json liefert eine leere Liste. Mehrere per Komma/Zeile.
   android_fingerprint: '',
   android_package: 'de.ginoco.twa',
+  // Benachrichtigungs-Optionen (zeitgesteuerte Erinnerungen + Ruhezeiten).
+  quiet_enabled: '0',        // '1' = nachts keine Push (Ereignisse landen trotzdem im Postfach)
+  quiet_start: '22:00',      // Beginn der Ruhezeit
+  quiet_end: '07:00',        // Ende der Ruhezeit
+  notice_morning: '1',       // ☀️ Fahrlehrer: Morgen-Übersicht der heutigen Fahrstunden
+  notice_morning_time: '07:00',
+  notice_next_lesson: '1',   // ⏰ Fahrlehrer: 30 Min vor der nächsten Fahrstunde
+  notice_exam: '1',          // 🎓 Prüfung naht (Fahrlehrer + Schüler, 7/3/1/0 Tage)
+  notice_ready: '1',         // ✅ Fahrlehrer: Schüler ist prüfungsreif
+  notice_rank2: '1',         // 🏆 Schüler + Fahrlehrer: Rang 2 erreicht
+  notice_contract: '1',      // 📄 Fahrlehrer: Vertrags-Stundenmarke erreicht
+  contract_min_h: '80',      // Marke für „Vertrags-Stunden erreicht"
+  notice_weekly: '0',        // 🔔 Schüler: sanfter Wochen-Nudge (Mo, keine Buchung) – Standard aus
   registration_open: '0',    // '1' = neue Fahrschüler dürfen sich mit Code registrieren, '0' = geschlossen (privat)
   self_registration: '1',    // '1' = Schüler dürfen sich selbst anmelden (E-Mail bestätigen + Freischaltung), '0' = aus
   // E-Mail-Versand (SMTP, eigene Domain-Mailbox). Standard: aus, bis eingerichtet.

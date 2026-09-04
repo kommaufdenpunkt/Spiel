@@ -424,10 +424,28 @@ function postPush(endpoint, body, auth) {
     req.write(body); req.end();
   });
 }
+// Ruhezeit aktiv? (z. B. 22:00–07:00 -> nachts keine Push). Über Mitternacht korrekt.
+function quietNow() {
+  if (getSettingRaw('quiet_enabled') !== '1') return false;
+  const s = getSettingRaw('quiet_start') || '22:00';
+  const e = getSettingRaw('quiet_end') || '07:00';
+  const now = nowHHMM();
+  return s <= e ? (now >= s && now < e) : (now >= s || now < e);
+}
+// Einmal-Merker: liefert true, wenn diese Meldung (key) noch NICHT gesendet wurde
+// (und merkt sie sofort vor). So feuert jede zeitgesteuerte Meldung genau einmal.
+function onceNotice(key) {
+  try {
+    if (db.prepare('SELECT 1 FROM sent_notices WHERE key=?').get(key)) return false;
+    db.prepare('INSERT INTO sent_notices(key,at) VALUES(?,?)').run(key, new Date().toISOString());
+    return true;
+  } catch { return false; }
+}
 // Push an alle Geraete eines Schuelers (fire-and-forget). Tote Abos (404/410) werden entfernt.
-function pushToStudent(studentId, message, url = '/', title = 'Ginoco') {
+function pushToStudent(studentId, message, url = '/', title = 'Ginoco', force = false) {
   try {
     if (!studentId || !getSettingRaw('vapid_public')) return;
+    if (!force && quietNow()) return; // Ruhezeit: Postfach/E-Mail bleiben, nur der Push schweigt
     const subs = db.prepare('SELECT * FROM push_subscriptions WHERE student_id = ?').all(studentId);
     if (!subs.length) return;
     const payload = JSON.stringify({ title: String(title).slice(0, 80) || 'Ginoco', body: String(message).slice(0, 300), url });
@@ -440,9 +458,10 @@ function pushToStudent(studentId, message, url = '/', title = 'Ginoco') {
   } catch (e) { console.error('pushToStudent', e); }
 }
 // Push an alle Geraete des Fahrlehrers (fuer neue Schueler-Nachrichten).
-function pushToInstructor(message, url = '/') {
+function pushToInstructor(message, url = '/', force = false) {
   try {
     if (!getSettingRaw('vapid_public')) return;
+    if (!force && quietNow()) return; // Ruhezeit: nur der Push schweigt
     const subs = db.prepare("SELECT * FROM push_subscriptions WHERE kind = 'instructor'").all();
     if (!subs.length) return;
     const payload = JSON.stringify({ title: 'Ginoco', body: String(message).slice(0, 300), url });
@@ -1181,11 +1200,11 @@ async function handleApi(req, res, url) {
   // Test-Push an das eigene Gerät (Button "Test")
   if (p === '/api/push/test' && method === 'POST') {
     if (sess && sess.kind === 'instructor') {
-      pushToInstructor('🔔 Test: So sieht eine Cockpit-Benachrichtigung aus.');
+      pushToInstructor('🔔 Test: So sieht eine Cockpit-Benachrichtigung aus.', '/', true);
       return ok(res, { sent: true });
     }
     if (!requireStudent()) return bad(res, 'Bitte anmelden', 401);
-    pushToStudent(sess.student_id, '🔔 Test: So sieht eine Benachrichtigung von Ginoco aus.');
+    pushToStudent(sess.student_id, '🔔 Test: So sieht eine Benachrichtigung von Ginoco aus.', '/', 'Ginoco', true);
     return ok(res, { sent: true });
   }
 
@@ -1700,6 +1719,8 @@ async function handleApi(req, res, url) {
         `Niemand konnte deine Fahrstunde am ${wdShort(bk.date)} ${dmy(bk.date)} um ${bk.start_time} Uhr übernehmen. Sie bleibt fest bei dir (zahlungspflichtig).`, bk.date, bk.id);
       logEvent('info', { actor: 'system', studentId: bk.student_id, bookingId: bk.id, date: bk.date,
         detail: `Angebot ${wdShort(bk.date)} ${dmy(bk.date)} ${bk.start_time} – alle haben abgelehnt, bleibt beim Schüler` });
+      const noName = db.prepare('SELECT name FROM students WHERE id=?').get(bk.student_id)?.name || 'einem Fahrschüler';
+      pushToInstructor(`🎁 Niemand hat die abgegebene Fahrstunde von ${noName} (${wdShort(bk.date)} ${dmy(bk.date)} ${bk.start_time} Uhr) übernommen – sie bleibt bei ihm.`, '/');
     }
     return ok(res, { closed: others.length > 0 && declined >= others.length });
   }
@@ -3094,7 +3115,9 @@ async function handleApi(req, res, url) {
       'school_label', 'school2_label', 'school2_lat', 'school2_lng',
       'instructor_home_label', 'instructor_home_lat', 'instructor_home_lng',
       'mail_enabled', 'smtp_host', 'smtp_port', 'smtp_secure', 'smtp_user',
-      'mail_from', 'mail_from_name', 'support_to', 'public_url', 'android_fingerprint', 'android_package'];
+      'mail_from', 'mail_from_name', 'support_to', 'public_url', 'android_fingerprint', 'android_package',
+      'quiet_enabled', 'quiet_start', 'quiet_end', 'notice_morning', 'notice_morning_time', 'notice_next_lesson',
+      'notice_exam', 'notice_ready', 'notice_rank2', 'notice_contract', 'notice_weekly'];
     const emptyOk = new Set(['instructor_phone', 'meet_default_label', 'meet_default_lat', 'meet_default_lng', 'policy_text',
       'instructor_home_label', 'instructor_home_lat', 'instructor_home_lng', 'traffic_key',
       'smtp_host', 'smtp_user', 'mail_from', 'mail_from_name', 'support_to', 'android_fingerprint']);
@@ -4012,6 +4035,109 @@ function sendDueReminders() {
   return sent;
 }
 
+// Tage von heute bis zu einem Datum (YYYY-MM-DD). Negativ = in der Vergangenheit.
+function daysUntil(dateStr) {
+  const b = Date.parse(String(dateStr) + 'T00:00:00');
+  if (isNaN(b)) return null;
+  return Math.round((b - Date.parse(todayStr() + 'T00:00:00')) / 86400000);
+}
+// Prüfungsreife (vereinfachte, ehrliche Definition): Rang 2 erreicht UND alle
+// Pflicht-Sonderfahrten (Überland/Autobahn/Nacht) in UE erfüllt (1 UE = 45 Min).
+function examReadyInfo(studentId) {
+  const rk = studentRank(studentId);
+  const st = lessonStats(studentId);
+  const need = (k) => Number(getSettingRaw('req_' + k)) || 0;
+  const have = (k) => (st.sonder[k]?.minutes || 0) / 45;
+  const sonderOk = have('ueberland') >= need('ueberland') && have('autobahn') >= need('autobahn') && have('nacht') >= need('nacht');
+  return { ready: rk.rank >= 2 && sonderOk, rank: rk.rank, sonderOk };
+}
+
+// Zeitgesteuerte Benachrichtigungen (alle 5 Min geprüft, jede genau einmal via onceNotice).
+function runScheduledNotices() {
+  try {
+    const today = todayStr();
+    const now = nowHHMM();
+    const S = (k) => getSettingRaw(k) === '1';
+    const nameOf = (id) => (db.prepare('SELECT name FROM students WHERE id=?').get(id)?.name || 'Ein Fahrschüler');
+
+    // 1) ☀️ Morgen-Übersicht (Fahrlehrer) – einmal pro Tag ab notice_morning_time
+    if (S('notice_morning')) {
+      const mt = getSettingRaw('notice_morning_time') || '07:00';
+      if (now >= mt && onceNotice('morning:' + today)) {
+        const ls = db.prepare("SELECT b.start_time AS t, s.name AS n FROM bookings b LEFT JOIN students s ON s.id=b.student_id WHERE b.date=? AND b.status='booked' AND b.student_id IS NOT NULL ORDER BY b.start_time").all(today);
+        if (ls.length) pushToInstructor(`☀️ Heute: ${ls.length} Fahrstunde${ls.length > 1 ? 'n' : ''}. Erste um ${ls[0].t} Uhr mit ${ls[0].n || 'Fahrschüler'}.`, '/');
+      }
+    }
+
+    // 2) ⏰ Nächste Fahrstunde (Fahrlehrer) – ~30 Min vorher, je Buchung einmal
+    if (S('notice_next_lesson')) {
+      const rows = db.prepare("SELECT id,student_id,start_time,date FROM bookings WHERE date=? AND status='booked' AND student_id IS NOT NULL").all(today);
+      for (const b of rows) {
+        const mins = hoursUntil(b.date, b.start_time) * 60;
+        if (mins > 0 && mins <= 30 && onceNotice('instrnext:' + b.id)) {
+          pushToInstructor(`⏰ In ${Math.round(mins)} Min: Fahrstunde mit ${nameOf(b.student_id)} um ${b.start_time} Uhr.`, '/');
+        }
+      }
+    }
+
+    // Aktive, freigeschaltete Schüler (nicht archiviert) – Basis der schülerbezogenen Meldungen.
+    const active = db.prepare("SELECT id,name,exam_date FROM students WHERE approved=1 AND archived_at IS NULL").all();
+
+    // 3) 🎓 Prüfung naht (Fahrlehrer + Schüler) – 7/3/1/0 Tage vorher
+    if (S('notice_exam')) {
+      for (const s of active) {
+        if (!s.exam_date) continue;
+        const dl = daysUntil(s.exam_date);
+        if (dl == null || dl < 0) continue;
+        if ([7, 3, 1, 0].includes(dl) && onceNotice(`exam:${s.id}:${s.exam_date}:${dl}`)) {
+          const whenTxt = dl === 0 ? 'heute' : `in ${dl} Tag${dl > 1 ? 'en' : ''}`;
+          pushToInstructor(`🎓 ${s.name} hat ${whenTxt} Prüfung.`, '/');
+          notify(s.id, 'reminder', dl === 0 ? '🎓 Heute ist deine Prüfung – du schaffst das!' : `🎓 Deine Prüfung ist ${whenTxt} – viel Erfolg bei der Vorbereitung!`, s.exam_date, null, { pushTitle: '🎓 Prüfung' });
+        }
+      }
+    }
+
+    // 4) 🏆 Rang 2 erreicht (Schüler + Fahrlehrer)
+    if (S('notice_rank2')) {
+      for (const s of active) {
+        if (studentRank(s.id).rank >= 2 && onceNotice('rank2:' + s.id)) {
+          notify(s.id, 'info', '🏆 Glückwunsch – du hast Rang 2 erreicht! Sonderfahrten sind jetzt freigeschaltet und du kannst weiter im Voraus buchen.', null, null, { pushTitle: '🏆 Rang 2 erreicht' });
+          pushToInstructor(`🏆 ${s.name} hat Rang 2 erreicht (Sonderfahrten frei).`, '/');
+        }
+      }
+    }
+
+    // 5) ✅ Alle Pflicht-Sonderfahrten erledigt (Fahrlehrer)
+    if (S('notice_ready')) {
+      for (const s of active) {
+        if (examReadyInfo(s.id).ready && onceNotice('ready:' + s.id)) {
+          pushToInstructor(`✅ ${s.name}: alle Pflicht-Sonderfahrten erledigt – Prüfung rückt näher.`, '/');
+        }
+      }
+    }
+
+    // 6) 📄 Vertrags-Stundenmarke erreicht (Fahrlehrer)
+    if (S('notice_contract')) {
+      const thr = Number(getSettingRaw('contract_min_h')) || 80;
+      for (const s of active) {
+        if (lessonStats(s.id).hours >= thr && onceNotice(`contract:${s.id}:${thr}`)) {
+          pushToInstructor(`📄 ${s.name} hat die ${thr}-Stunden-Marke erreicht.`, '/');
+        }
+      }
+    }
+
+    // 7) 🔔 Wochen-Nudge (Schüler) – montags, wenn diese Woche noch nichts gebucht
+    if (S('notice_weekly') && isoDow(today) === 1) {
+      for (const s of active) {
+        const wi = weekInfoForStudent(s.id);
+        if (wi.count === 0 && onceNotice(`weekly:${s.id}:${wi.from}`)) {
+          notify(s.id, 'info', '🚗 Neue Woche – noch keine Fahrstunde gebucht? Sichere dir gleich deinen nächsten Termin.', null, null, { pushTitle: '🚗 Nächste Fahrstunde?' });
+        }
+      }
+    }
+  } catch (e) { console.error('runScheduledNotices', e); }
+}
+
 // Naechtliche Server-Pflege: einmal pro Tag (nach 03:00) den Server sauber halten,
 // OHNE gueltige Anmeldungen anzutasten. Es werden nur ABGELAUFENE Sitzungen und
 // alte, gelesene Postfach-Eintraege entfernt; danach die WAL-Datei zusammengefuehrt
@@ -4326,11 +4452,13 @@ server.listen(PORT, HOST, () => {
   try { ensureVapidKeys(); } catch (e) { console.error('vapid', e); } // Push-Schlüssel sicherstellen
   // Erinnerungen im Hintergrund pruefen (alle 5 Minuten) + naechtliche Server-Pflege
   try { sendDueReminders(); } catch (e) { console.error(e); }
+  try { runScheduledNotices(); } catch (e) { console.error(e); }
   try { expireStaleReservations(); } catch (e) { console.error(e); }
   try { autoWeatherStatus().catch(() => {}); } catch (e) { console.error(e); }
   try { nightlyMaintenance(); } catch (e) { console.error(e); }
   setInterval(() => {
     try { sendDueReminders(); } catch (e) { console.error(e); }
+    try { runScheduledNotices(); } catch (e) { console.error(e); }
     try { expireStaleReservations(); } catch (e) { console.error(e); }
     try { autoWeatherStatus().catch(() => {}); } catch (e) { console.error(e); }
     try { nightlyMaintenance(); } catch (e) { console.error(e); }

@@ -8435,6 +8435,22 @@ function tabEinstellungen() {
       <div class="push-ctl" id="push-ctl-instr"></div>
       <div class="hint" style="margin:.5rem 0 0">🔊 Bei <strong>offenem</strong> Cockpit spielt zusätzlich ein Ton (wählbar unter „🎨 Aussehen → Benachrichtigungston“).</div>`, true)}
 
+    ${sec('🌙', 'Benachrichtigungs-Optionen', 'Ruhezeiten & welche Erinnerungen du bekommst', `
+      <label class="ck-line"><input type="checkbox" id="e-quiet" ${s.quiet_enabled === '1' ? 'checked' : ''}> 🌙 Ruhezeit – nachts kein Push-Ton</label>
+      <div class="row" style="margin:.3rem 0 .5rem">
+        <div class="field"><label>von</label><input id="e-quiet-start" type="time" value="${esc(s.quiet_start || '22:00')}"></div>
+        <div class="field"><label>bis</label><input id="e-quiet-end" type="time" value="${esc(s.quiet_end || '07:00')}"></div></div>
+      <div class="hint" style="margin:.1rem 0 .8rem">In der Ruhezeit kommt kein Push aufs Handy – die Ereignisse landen trotzdem im Postfach, du siehst sie morgens.</div>
+      <div class="hint" style="font-weight:800;color:var(--ink);margin:.2rem 0 .3rem">Welche Erinnerungen möchtest du?</div>
+      <label class="ck-line"><input type="checkbox" id="e-nc-morning" ${s.notice_morning === '1' ? 'checked' : ''}> ☀️ Morgen-Übersicht der heutigen Fahrstunden</label>
+      <div class="row" style="margin:.2rem 0 .5rem"><div class="field"><label>Uhrzeit der Übersicht</label><input id="e-nc-morning-time" type="time" value="${esc(s.notice_morning_time || '07:00')}"></div></div>
+      <label class="ck-line"><input type="checkbox" id="e-nc-next" ${s.notice_next_lesson === '1' ? 'checked' : ''}> ⏰ 30 Min vor der nächsten Fahrstunde</label>
+      <label class="ck-line"><input type="checkbox" id="e-nc-exam" ${s.notice_exam === '1' ? 'checked' : ''}> 🎓 Prüfung eines Schülers naht (7/3/1 Tage) – auch an den Schüler</label>
+      <label class="ck-line"><input type="checkbox" id="e-nc-ready" ${s.notice_ready === '1' ? 'checked' : ''}> ✅ Schüler hat alle Pflicht-Sonderfahrten erledigt</label>
+      <label class="ck-line"><input type="checkbox" id="e-nc-rank2" ${s.notice_rank2 === '1' ? 'checked' : ''}> 🏆 Schüler erreicht Rang 2 – auch an den Schüler</label>
+      <label class="ck-line"><input type="checkbox" id="e-nc-contract" ${s.notice_contract === '1' ? 'checked' : ''}> 📄 Schüler erreicht die Vertrags-Stundenmarke</label>
+      <label class="ck-line"><input type="checkbox" id="e-nc-weekly" ${s.notice_weekly === '1' ? 'checked' : ''}> 🔔 Schüler-Wochen-Nudge (Mo, wenn nichts gebucht) – optional</label>`, false)}
+
     ${sec('📱', 'Android-App (Play Store)', 'Verknüpfung für die TWA-App', `
       <p class="hint" style="margin:.1rem 0 .6rem">Für die Android-App (Trusted Web Activity) muss ginoco.de mit der App verknüpft sein. Trag hier den <strong>SHA-256-Fingerabdruck</strong> deines App-Signatur-Schlüssels ein (aus Bubblewrap bzw. Google Play → „App-Signatur"). Mehrere durch Komma trennen.</p>
       <div class="field"><label>SHA-256-Fingerabdruck</label>
@@ -8531,6 +8547,15 @@ function tabEinstellungen() {
         smtp_pass: $('#e-smtp-pass').value || '',
         mail_from: $('#e-mail-from').value.trim(), mail_from_name: $('#e-mail-fromname').value.trim(),
         support_to: $('#e-mail-support').value.trim(), public_url: $('#e-mail-url').value.trim(),
+        quiet_enabled: $('#e-quiet')?.checked ? '1' : '0',
+        quiet_start: $('#e-quiet-start')?.value || '22:00', quiet_end: $('#e-quiet-end')?.value || '07:00',
+        notice_morning: $('#e-nc-morning')?.checked ? '1' : '0', notice_morning_time: $('#e-nc-morning-time')?.value || '07:00',
+        notice_next_lesson: $('#e-nc-next')?.checked ? '1' : '0',
+        notice_exam: $('#e-nc-exam')?.checked ? '1' : '0',
+        notice_ready: $('#e-nc-ready')?.checked ? '1' : '0',
+        notice_rank2: $('#e-nc-rank2')?.checked ? '1' : '0',
+        notice_contract: $('#e-nc-contract')?.checked ? '1' : '0',
+        notice_weekly: $('#e-nc-weekly')?.checked ? '1' : '0',
         new_pin: $('#e-pin').value || undefined } });
       state.settings = r.settings; state.user.name = r.settings.instructor_name;
       toast('Einstellungen gespeichert ✓', 'ok'); $('#e-msg').textContent = 'Gespeichert.';
