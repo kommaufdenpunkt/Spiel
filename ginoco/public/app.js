@@ -111,7 +111,11 @@ const I18N = {
     offer_named_btn: '🙋 Mit „{name}" abgeben', offer_named_sub: 'Andere sehen nur deinen Vornamen',
     toast_offered: 'Ins Angebot gestellt ✓',
     role_student: 'Fahrschüler', role_instructor: 'Fahrlehrer', logout: 'Abmelden',
-    tip_tour: 'Kurze Einführung', tip_profile: 'Mein Profil', tip_appearance: 'Aussehen & Farben',
+    tip_tour: 'Hilfe & Einführung', tip_profile: 'Mein Profil', tip_appearance: 'Aussehen & Farben',
+    help_title: 'Hilfe', help_sub: 'Womit können wir helfen?',
+    help_tour: 'Kurze Einführung', help_tour_sub: 'In 5 Schritten durch die App',
+    help_support: 'Hilfe & Support', help_support_sub: 'Schreib uns dein Anliegen',
+    help_news: 'Was ist neu?', help_news_sub: 'Die neuesten Verbesserungen',
     tip_live_stop: 'Standort-Teilen beenden', live_stop: '🛰️ Live · Stopp',
     nav_grp_overview: 'Übersicht', nav_grp_more: 'Mehr',
     nav_week: 'Meine Woche', nav_book: 'Termin buchen', nav_lessons: 'Meine Fahrstunden',
@@ -320,7 +324,11 @@ const I18N = {
     offer_named_btn: '🙋 Give up as “{name}”', offer_named_sub: 'Others only see your first name',
     toast_offered: 'Added to offers ✓',
     role_student: 'Student', role_instructor: 'Instructor', logout: 'Sign out',
-    tip_tour: 'Quick intro', tip_profile: 'My profile', tip_appearance: 'Appearance & colours',
+    tip_tour: 'Help & intro', tip_profile: 'My profile', tip_appearance: 'Appearance & colours',
+    help_title: 'Help', help_sub: 'How can we help?',
+    help_tour: 'Quick intro', help_tour_sub: 'Through the app in 5 steps',
+    help_support: 'Help & support', help_support_sub: 'Tell us what you need',
+    help_news: 'What’s new?', help_news_sub: 'The latest improvements',
     tip_live_stop: 'Stop sharing location', live_stop: '🛰️ Live · Stop',
     nav_grp_overview: 'Overview', nav_grp_more: 'More',
     nav_week: 'My week', nav_book: 'Book a lesson', nav_lessons: 'My lessons',
@@ -529,7 +537,11 @@ const I18N = {
     offer_named_btn: '🙋 „{name}" olarak bırak', offer_named_sub: 'Diğerleri yalnızca adını görür',
     toast_offered: 'Teklife eklendi ✓',
     role_student: 'Öğrenci', role_instructor: 'Eğitmen', logout: 'Çıkış',
-    tip_tour: 'Kısa tanıtım', tip_profile: 'Profilim', tip_appearance: 'Görünüm ve renkler',
+    tip_tour: 'Yardım ve tanıtım', tip_profile: 'Profilim', tip_appearance: 'Görünüm ve renkler',
+    help_title: 'Yardım', help_sub: 'Nasıl yardımcı olabiliriz?',
+    help_tour: 'Kısa tanıtım', help_tour_sub: '5 adımda uygulama',
+    help_support: 'Yardım ve destek', help_support_sub: 'Sorununu bize yaz',
+    help_news: 'Yenilikler', help_news_sub: 'En son iyileştirmeler',
     tip_live_stop: 'Konum paylaşımını durdur', live_stop: '🛰️ Canlı · Durdur',
     nav_grp_overview: 'Genel bakış', nav_grp_more: 'Daha fazla',
     nav_week: 'Haftam', nav_book: 'Randevu al', nav_lessons: 'Derslerim',
@@ -738,7 +750,11 @@ const I18N = {
     offer_named_btn: '🙋 التنازل باسم «{name}»', offer_named_sub: 'يرى الآخرون اسمك الأول فقط',
     toast_offered: 'أُضيف إلى العروض ✓',
     role_student: 'طالب', role_instructor: 'المدرّب', logout: 'تسجيل الخروج',
-    tip_tour: 'مقدمة سريعة', tip_profile: 'ملفي', tip_appearance: 'المظهر والألوان',
+    tip_tour: 'المساعدة والمقدمة', tip_profile: 'ملفي', tip_appearance: 'المظهر والألوان',
+    help_title: 'المساعدة', help_sub: 'كيف يمكننا المساعدة؟',
+    help_tour: 'مقدمة سريعة', help_tour_sub: 'التطبيق في 5 خطوات',
+    help_support: 'المساعدة والدعم', help_support_sub: 'اكتب لنا ما تحتاجه',
+    help_news: 'ما الجديد؟', help_news_sub: 'أحدث التحسينات',
     tip_live_stop: 'إيقاف مشاركة الموقع', live_stop: '🛰️ مباشر · إيقاف',
     nav_grp_overview: 'نظرة عامة', nav_grp_more: 'المزيد',
     nav_week: 'أسبوعي', nav_book: 'حجز موعد', nav_lessons: 'دروسي',
@@ -1491,6 +1507,22 @@ function openTour() {
 }
 window.__openTour = openTour;
 
+// Hilfe-Menü (Schüler): sauberer „?"-Knopf oben rechts -> kurze Auswahl.
+function openHelpMenu() {
+  modal(`<h3 style="margin:.1rem 0 .3rem">${t('help_title')}</h3>
+    <p class="hint" style="margin:0 0 .8rem">${t('help_sub')}</p>
+    <div class="help-menu">
+      <button class="help-row" id="help-tour"><span class="hm-ic">🚗</span><span class="hm-tx"><strong>${t('help_tour')}</strong><span>${t('help_tour_sub')}</span></span><span class="hm-go">›</span></button>
+      <button class="help-row" id="help-support"><span class="hm-ic">✉️</span><span class="hm-tx"><strong>${t('help_support')}</strong><span>${t('help_support_sub')}</span></span><span class="hm-go">›</span></button>
+      <button class="help-row" id="help-news"><span class="hm-ic">🆕</span><span class="hm-tx"><strong>${t('help_news')}</strong><span>${t('help_news_sub')}</span></span><span class="hm-go">›</span></button>
+    </div>
+    <div class="actions"><button class="sec" onclick="window.__closeModal()">${t('close')}</button></div>`);
+  $('#help-tour').onclick = () => { closeModal(); openTour(); };
+  $('#help-support').onclick = () => { closeModal(); openSupportModal(); };
+  $('#help-news').onclick = () => { closeModal(); (window.__openWhatsNew || (() => {}))(); };
+}
+window.__openHelp = openHelpMenu;
+
 // ---------- Was ist neu? (Changelog) ----------
 const CHANGELOG_VER = '4.2';
 const CHANGELOG = [
@@ -2015,7 +2047,7 @@ function header() {
       <span class="role">${u.role === 'instructor' ? t('role_instructor') : t('role_student')}</span>
       ${u.role === 'instructor' ? '' : `<strong>${esc(u.name || '')}</strong>`}${u.username ? `<span class="pill">${esc(u.username)}</span>` : ''}
       ${state.liveSharing ? `<button class="ghost sm" onclick="window.__stopLive()" title="${t('tip_live_stop')}" style="color:var(--good)">${t('live_stop')}</button>` : ''}
-      ${u.role === 'student' ? `<button class="ghost sm" onclick="window.__openTour()" title="${t('tip_tour')}">❓</button>` : ''}
+      ${u.role === 'student' ? `<button class="ghost sm help-btn" onclick="window.__openHelp()" title="${t('tip_tour')}" aria-label="Hilfe">?</button>` : ''}
       ${u.role === 'student' ? `<button class="ghost sm" onclick="window.__openProfile()" title="${t('tip_profile')}">👤</button>` : ''}
       <button class="ghost sm" onclick="window.__openThemePicker()" title="${t('tip_appearance')}">🎨</button>
       <button class="ghost sm" id="logout">${t('logout')}</button>

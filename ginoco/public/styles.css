@@ -1742,3 +1742,16 @@ header .brand .brandname{
 .fb-item.fb-done{opacity:.85}
 .fb-item.fb-done .fb-text{text-decoration:none}
 .lp-row.resolved{border-color:color-mix(in srgb,var(--good) 45%,var(--line))}
+
+/* Sauberer Hilfe-Knopf (statt rotem ❓-Emoji) + Hilfe-Menü */
+.help-btn{font-weight:900;font-size:1rem;color:var(--brand);border:1.5px solid color-mix(in srgb,var(--brand) 55%,var(--line));
+  border-radius:50%;width:30px;height:30px;min-width:30px;padding:0;display:inline-flex;align-items:center;justify-content:center;line-height:1;background:transparent}
+.help-btn:hover{background:color-mix(in srgb,var(--brand) 12%,transparent)}
+.help-menu{display:grid;gap:.5rem;margin:.2rem 0 .6rem}
+.help-row{display:flex;align-items:center;gap:.7rem;width:100%;text-align:start;border:1px solid var(--line);
+  background:var(--card2,rgba(127,127,127,.05));border-radius:12px;padding:.65rem .75rem;box-shadow:none}
+.help-row:hover{border-color:color-mix(in srgb,var(--brand) 45%,var(--line))}
+.hm-ic{font-size:1.5rem;flex:0 0 auto}
+.hm-tx{flex:1 1 auto;display:flex;flex-direction:column;line-height:1.25}
+.hm-tx span{color:var(--muted);font-size:.82rem}
+.hm-go{color:var(--muted);font-size:1.2rem;flex:0 0 auto}
