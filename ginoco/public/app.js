@@ -2497,32 +2497,64 @@ function maybeShowLegalGate() {
   const later = document.getElementById('legal-later'); if (later) later.onclick = done;
 }
 
-// Bewertungen als Laufschrift (rechts -> links) auf der Startseite.
-async function loadReviewMarquee() {
-  const el = $('#rev-marquee');
-  if (!el) return;
-  let reviews = [];
-  try { reviews = (await api('/api/reviews')).reviews || []; } catch { return; }
-  if (!reviews.length) return;
-  const stars = (n) => '★★★★★'.slice(0, n) + '☆☆☆☆☆'.slice(0, 5 - n);
-  // Gesamt-Note (Durchschnitt + Anzahl) als prominentes Vertrauenssiegel oben.
-  const count = reviews.length;
-  const avg = reviews.reduce((s, r) => s + (r.rating || 0), 0) / count;
-  const avg1 = avg.toFixed(1).replace('.', ',');
-  const card = (r) => `<div class="rev-card${r.featured ? ' feat' : ''}">
-    <div class="rev-stars">${stars(r.rating)}${r.featured ? ' <span class="rev-toptag">★ Top</span>' : ''}</div>
+// ---- Bewertungen auf der Startseite: Laufschrift ODER Diashow (per Einstellung) ----
+let _revSlideTimer = null;
+function _revStars(n) { return '★★★★★'.slice(0, n) + '☆☆☆☆☆'.slice(0, 5 - n); }
+function _revCardHtml(r) {
+  return `<div class="rev-card${r.featured ? ' feat' : ''}">
+    <div class="rev-stars">${_revStars(r.rating)}${r.featured ? ' <span class="rev-toptag">★ Top</span>' : ''}</div>
     <div class="rev-text">„${esc(r.text)}"</div>
     <div class="rev-who">${r.photo ? `<img class="rev-pic" src="${esc(r.photo)}" alt="">` : '<span class="rev-pic ph">🙂</span>'}<span>${esc(r.author)}</span>${r.verified ? '<span class="rev-verif" title="Echter Fahrschüler">✓</span>' : ''}</div>
   </div>`;
-  // Inhalt doppelt fuer nahtlose Endlosschleife
-  const items = reviews.map(card).join('');
-  el.innerHTML = `<div class="rev-agg">
+}
+function _revAggHtml(reviews) {
+  const count = reviews.length;
+  const avg = reviews.reduce((s, r) => s + (r.rating || 0), 0) / count;
+  const avg1 = avg.toFixed(1).replace('.', ',');
+  return `<div class="rev-agg">
       <span class="rev-agg-num">${avg1}</span>
-      <span class="rev-agg-stars" aria-label="${avg1} von 5 Sternen">${stars(Math.round(avg))}</span>
+      <span class="rev-agg-stars" aria-label="${avg1} von 5 Sternen">${_revStars(Math.round(avg))}</span>
       <span class="rev-agg-count">aus <strong>${count}</strong> ${count === 1 ? 'Bewertung' : 'Bewertungen'}</span>
-    </div>
-    <div class="rev-title">Das sagen Fahrschüler über Ginoco &amp; die Fahrschule Untern Buchen (Eberswalde)</div>
-    <div class="rev-track" style="--rev-n:${count}">${items}${items}</div>`;
+    </div>`;
+}
+async function loadReviewMarquee() {
+  const el = $('#rev-marquee');
+  if (!el) return;
+  if (_revSlideTimer) { clearInterval(_revSlideTimer); _revSlideTimer = null; }
+  let data;
+  try { data = await api('/api/reviews'); } catch { return; }
+  const reviews = data.reviews || [];
+  const display = data.display || 'marquee';
+  if (display === 'off' || !reviews.length) { el.hidden = true; return; }
+  const title = '<div class="rev-title">Das sagen Fahrschüler über Ginoco &amp; die Fahrschule Untern Buchen (Eberswalde)</div>';
+
+  if (display === 'slideshow') {
+    el.classList.add('rev-mode-slide');
+    el.innerHTML = _revAggHtml(reviews) + title
+      + '<div class="rev-slide" id="rev-slide"></div>'
+      + `<div class="rev-dots" id="rev-dots">${reviews.map((_, i) => `<span class="rev-dot${i === 0 ? ' on' : ''}" data-i="${i}"></span>`).join('')}</div>`;
+    el.hidden = false;
+    const slide = $('#rev-slide'); if (!slide) return;
+    const dots = [...el.querySelectorAll('.rev-dot')];
+    let i = 0;
+    const reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const restart = () => { if (_revSlideTimer) clearInterval(_revSlideTimer); if (!reduce && reviews.length > 1) _revSlideTimer = setInterval(() => show(i + 1), 5500); };
+    const show = (n) => {
+      i = (n + reviews.length) % reviews.length;
+      slide.innerHTML = _revCardHtml(reviews[i]);
+      slide.classList.remove('rev-fade'); void slide.offsetWidth; slide.classList.add('rev-fade');
+      dots.forEach((d, k) => d.classList.toggle('on', k === i));
+    };
+    dots.forEach((d) => d.onclick = () => { show(Number(d.dataset.i)); restart(); });
+    show(0); restart();
+    return;
+  }
+
+  // Standard: Laufschrift (marquee) – Inhalt doppelt für nahtlose Endlosschleife.
+  el.classList.remove('rev-mode-slide');
+  const items = reviews.map(_revCardHtml).join('');
+  el.innerHTML = _revAggHtml(reviews) + title
+    + `<div class="rev-track" style="--rev-n:${reviews.length}">${items}${items}</div>`;
   el.hidden = false;
 }
 
@@ -8438,6 +8470,15 @@ function tabEinstellungen() {
       <label class="ck-line"><input type="checkbox" id="e-reg-open" ${s.registration_open === '1' ? 'checked' : ''}> Zusätzlich: Anmeldung mit Einladungs-Code erlauben</label>
       <div class="hint" style="margin:.4rem 0 0">Ist <strong>beides weg</strong>, läuft Ginoco im <strong>Privatmodus</strong>: keine Anmelde-Reiter auf der Startseite, niemand Neues kann sich anmelden. Deine bestehenden Zugänge (und du selbst) funktionieren weiter.</div>`, s.self_registration !== '1' && s.registration_open !== '1')}
 
+    ${sec('⭐', 'Bewertungen auf der Startseite', 'Laufschrift, Diashow oder aus', `
+      <div class="field"><label>Anzeige der Kundenstimmen</label>
+        <select id="e-reviews-display">
+          <option value="marquee" ${s.reviews_display !== 'slideshow' && s.reviews_display !== 'off' ? 'selected' : ''}>Laufschrift (läuft seitlich durch)</option>
+          <option value="slideshow" ${s.reviews_display === 'slideshow' ? 'selected' : ''}>Diashow (eine nach der anderen, mit Punkten)</option>
+          <option value="off" ${s.reviews_display === 'off' ? 'selected' : ''}>Aus (keine Bewertungen zeigen)</option>
+        </select></div>
+      <div class="hint" style="margin:.3rem 0 0">Oben erscheint immer die <strong>Gesamt-Note</strong> (Durchschnitt ★ + Anzahl). „Diashow" blendet die einzelnen Stimmen nacheinander sanft ein – automatisch alle paar Sekunden oder per Klick auf die Punkte.</div>`, false)}
+
     ${sec('📣', 'Neuigkeiten an alle', 'Rundmail an deine Fahrschüler', `
       <p class="hint" style="margin:.1rem 0 .6rem">Schick allen aktiven Fahrschülern (mit E-Mail &amp; aktivierten Benachrichtigungen) eine kurze Nachricht – z.&nbsp;B. Neuigkeiten in der App. Mit Vorschau und Bestätigung, bevor etwas rausgeht.</p>
       <button class="sec sm" id="e-announce" type="button">📣 Neuigkeiten schreiben &amp; senden …</button>
@@ -8560,6 +8601,7 @@ function tabEinstellungen() {
         smtp_pass: $('#e-smtp-pass').value || '',
         mail_from: $('#e-mail-from').value.trim(), mail_from_name: $('#e-mail-fromname').value.trim(),
         support_to: $('#e-mail-support').value.trim(), public_url: $('#e-mail-url').value.trim(),
+        reviews_display: $('#e-reviews-display')?.value || 'marquee',
         quiet_enabled: $('#e-quiet')?.checked ? '1' : '0',
         quiet_start: $('#e-quiet-start')?.value || '22:00', quiet_end: $('#e-quiet-end')?.value || '07:00',
         notice_morning: $('#e-nc-morning')?.checked ? '1' : '0', notice_morning_time: $('#e-nc-morning-time')?.value || '07:00',

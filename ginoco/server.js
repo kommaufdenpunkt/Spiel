@@ -1171,7 +1171,7 @@ async function handleApi(req, res, url) {
         date: r.created_at ? r.created_at.slice(0, 10) : null,
       };
     });
-    return ok(res, { reviews });
+    return ok(res, { reviews, display: getSettingRaw('reviews_display') || 'marquee' });
   }
 
   // ===== Web Push: Handy-Benachrichtigungen =====
@@ -3117,7 +3117,7 @@ async function handleApi(req, res, url) {
       'mail_enabled', 'smtp_host', 'smtp_port', 'smtp_secure', 'smtp_user',
       'mail_from', 'mail_from_name', 'support_to', 'public_url', 'android_fingerprint', 'android_package',
       'quiet_enabled', 'quiet_start', 'quiet_end', 'notice_morning', 'notice_morning_time', 'notice_next_lesson',
-      'notice_exam', 'notice_ready', 'notice_rank2', 'notice_contract', 'notice_weekly'];
+      'notice_exam', 'notice_ready', 'notice_rank2', 'notice_contract', 'notice_weekly', 'reviews_display'];
     const emptyOk = new Set(['instructor_phone', 'meet_default_label', 'meet_default_lat', 'meet_default_lng', 'policy_text',
       'instructor_home_label', 'instructor_home_lat', 'instructor_home_lng', 'traffic_key',
       'smtp_host', 'smtp_user', 'mail_from', 'mail_from_name', 'support_to', 'android_fingerprint']);

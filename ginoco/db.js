@@ -430,6 +430,7 @@ const DEFAULTS = {
   notice_contract: '1',      // 📄 Fahrlehrer: Vertrags-Stundenmarke erreicht
   contract_min_h: '80',      // Marke für „Vertrags-Stunden erreicht"
   notice_weekly: '0',        // 🔔 Schüler: sanfter Wochen-Nudge (Mo, keine Buchung) – Standard aus
+  reviews_display: 'marquee', // Bewertungen auf der Startseite: 'marquee' (Laufschrift) | 'slideshow' (Diashow) | 'off'
   registration_open: '0',    // '1' = neue Fahrschüler dürfen sich mit Code registrieren, '0' = geschlossen (privat)
   self_registration: '1',    // '1' = Schüler dürfen sich selbst anmelden (E-Mail bestätigen + Freischaltung), '0' = aus
   // E-Mail-Versand (SMTP, eigene Domain-Mailbox). Standard: aus, bis eingerichtet.
