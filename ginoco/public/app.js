@@ -1524,8 +1524,16 @@ function openHelpMenu() {
 window.__openHelp = openHelpMenu;
 
 // ---------- Was ist neu? (Changelog) ----------
-const CHANGELOG_VER = '4.3';
+const CHANGELOG_VER = '4.4';
 const CHANGELOG = [
+  { v: '4.4', d: '04.09.2026', title: '🚗 Großes Update – das ist neu!', items: [
+    '<strong>Hallo zusammen! Wir haben eure App ordentlich aufpoliert – das erwartet euch:</strong>',
+    '✅ <strong>Selbst anmelden:</strong> Neu dabei? Meld dich direkt in der App an – Name, Geburtsdatum, Adresse (mit Vorschlägen) und wann du Zeit hast. E-Mail bestätigen, freischalten lassen, fertig.',
+    '⏱️ <strong>Klarer buchen:</strong> Erst die Dauer wählen (80/120/160 Min) – dann zeigt dir der Kalender nur noch die Zeiten, die wirklich passen.',
+    '📖 <strong>Fehlerbuch mit Karte:</strong> Deine Lernpunkte als nummerierte Nadeln auf der Karte – mit Foto und Tipp. Was du gemeistert hast, wird <strong>grün</strong> („sitzt jetzt!").',
+    '🛰️ <strong>Live sehen, wann’s losgeht:</strong> Kurz vor der Stunde siehst du auf der Karte, wo dein Fahrlehrer ist – mit Ankunftszeit und „gleich rausgehen"-Hinweis.',
+    '🎓 <strong>Prüfungs-Countdown:</strong> Sobald dein Termin feststeht: „Noch X Tage" – plus kurzer Reifecheck (Sonderfahrten, offene Punkte, Fahrstunden).',
+    '🔔 <strong>Und noch mehr:</strong> aufgeräumte Mitteilungen, ein klarer Hilfe-Knopf (oben rechts), neue Farben und eine größere Karte. Viel Erfolg beim Üben – wir sehen uns auf der Straße! 🚗'] },
   { v: '4.3', d: '04.09.2026', title: '🎓 Prüfungs-Countdown', items: [
     '🎓 <strong>Countdown bis zur Prüfung.</strong> Sobald dein Fahrlehrer deinen Prüfungstermin einträgt, siehst du oben <strong>„Noch X Tage bis zur Prüfung"</strong> – mit einer kurzen Ampel: Sonderfahrten, offene 🔴 und deine Fahrstunden. Ein Tipp öffnet den vollen Reifecheck.'] },
   { v: '4.2', d: '03.09.2026', title: '🗺️ Fehlerbuch mit Karte', items: [
@@ -4734,7 +4742,7 @@ async function declineOffer(id) {
   catch (e) { toast(e.message, 'err'); }
 }
 
-// Erlaubte Fahrstunden-Längen des Schülers (40/80/120), aufsteigend.
+// Erlaubte Fahrstunden-Längen des Schülers (Standard 80/120/160, 40 als Ausnahme), aufsteigend.
 function studentDurs() { return String(state.user?.allowed_durations || '80').split(',').map(Number).filter((n) => n > 0).sort((a, b) => a - b); }
 // Gewählte Dauer merken (Standard: 80, sonst die längste erlaubte).
 function initBookDur() { const d = studentDurs(); if (!d.length) return; if (!state.bookDur || !d.includes(state.bookDur)) state.bookDur = d.includes(80) ? 80 : d[d.length - 1]; }
@@ -6832,7 +6840,7 @@ async function tabSchueler(scope) {
     </div>
     <p class="hint">${scope === 'archived'
       ? 'Bestandene / archivierte Fahrschüler. Ihre Daten und Fahrstunden bleiben einsehbar; sie tauchen nicht in der aktiven Liste auf. Über „Reaktivieren“ kommen sie zurück.'
-      : 'Lege Fahrschüler an – jeder bekommt automatisch Login + Startpasswort. Über die Zeilen: bearbeiten, Notiz, Stundenlängen (40/80/120), Treffpunkt, Zugangsdaten, archivieren (bestanden) oder löschen.'}</p>
+      : 'Lege Fahrschüler an – jeder bekommt automatisch Login + Startpasswort. Über die Zeilen: bearbeiten, Notiz, Stundenlängen (80/120/160), Treffpunkt, Zugangsdaten, archivieren (bestanden) oder löschen.'}</p>
     <div id="s-signups"></div>
     <div id="s-list"></div></div>`;
   $('#s-add').onclick = () => openCreateStudentModal();
@@ -6873,7 +6881,7 @@ async function tabSchueler(scope) {
       ${students.map((s) => {
         const searchStr = [s.name, s.username, s.email, s.phone].filter(Boolean).join(' ').toLowerCase();
         const durs = String(s.allowed_durations || '80').split(',').map(Number);
-        const boxes = [40, 80, 120].map((d) => `<label class="dur-chip ${durs.includes(d) ? 'on' : ''}"><input type="checkbox" data-sdur="${s.id}" value="${d}" ${durs.includes(d) ? 'checked' : ''}> ${d}</label>`).join('');
+        const boxes = [80, 120, 160, 40].map((d) => `<label class="dur-chip ${durs.includes(d) ? 'on' : ''}${d === 40 ? ' dur-exc' : ''}"><input type="checkbox" data-sdur="${s.id}" value="${d}" ${durs.includes(d) ? 'checked' : ''}> ${d}</label>`).join('');
         const hasHome = s.home_label || s.home_lat != null;
         const homeCell = hasHome
           ? `<span class="pill" style="background:var(--good-bg);color:var(--good)">📍 ${esc(s.home_label || 'gesetzt')}</span>`
@@ -6997,7 +7005,7 @@ function openCreateStudentModal() {
     </div>
     <div class="field"><label>Login-Name (optional – sonst automatisch)</label><input id="cs-user" placeholder="z.B. MB1997" style="text-transform:uppercase"></div>
     <div class="field"><label>Erlaubte Stundenlängen</label>
-      <div class="inline">${[40, 80, 120].map((d) => `<label style="margin:0;font-weight:600"><input type="checkbox" class="cs-dur" value="${d}" ${d === 80 ? 'checked' : ''} style="width:auto"> ${d} Min</label>`).join(' ')}</div></div>
+      <div class="inline">${[80, 120, 160, 40].map((d) => `<label style="margin:0;font-weight:600;${d === 40 ? 'opacity:.7' : ''}"><input type="checkbox" class="cs-dur" value="${d}" ${d === 80 ? 'checked' : ''} style="width:auto"> ${d} Min${d === 40 ? ' (Ausnahme)' : ''}</label>`).join(' ')}</div></div>
     <div class="actions">
       <button class="sec" onclick="window.__closeModal()">Abbrechen</button>
       <button id="cs-go">Anlegen</button>

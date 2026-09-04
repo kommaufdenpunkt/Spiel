@@ -1768,3 +1768,6 @@ header .brand .brandname{
 .ex-amp.todo{color:var(--muted)}
 .er-countdown{background:color-mix(in srgb,var(--brand) 12%,transparent);border:1px solid color-mix(in srgb,var(--brand) 40%,var(--line));
   border-radius:10px;padding:.55rem .7rem;margin:.2rem 0 .6rem;font-size:.92rem}
+
+/* 40-Min-Länge nur als dezente Ausnahme */
+.dur-chip.dur-exc{opacity:.75}
