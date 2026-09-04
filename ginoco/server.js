@@ -680,7 +680,7 @@ async function handleApi(req, res, url) {
     if (sess.kind === 'instructor') {
       return ok(res, { user: { role: 'instructor', name: getSettingRaw('instructor_name') } });
     }
-    const st = db.prepare('SELECT id,name,email,phone,username,allowed_durations,pickup_onboarded,pickup_mode,home_label,home_lat,home_lng,approved,email_verified,registered_self FROM students WHERE id = ?').get(sess.student_id);
+    const st = db.prepare('SELECT id,name,email,phone,username,allowed_durations,pickup_onboarded,pickup_mode,home_label,home_lat,home_lng,approved,email_verified,registered_self,exam_date FROM students WHERE id = ?').get(sess.student_id);
     if (!st) return ok(res, { user: null });
     return ok(res, { user: { role: 'student', ...st, pickup_onboarded: !!st.pickup_onboarded,
       approved: !!st.approved, email_verified: !!st.email_verified, registered_self: !!st.registered_self } });
@@ -2594,7 +2594,7 @@ async function handleApi(req, res, url) {
     const archived = url.searchParams.get('scope') === 'archived';
     const rows = db.prepare(
       `SELECT s.id,s.name,s.first_name,s.last_name,s.email,s.phone,s.username,s.birth_year,s.birth_date,
-        s.street,s.house_no,s.zip,s.city,s.allowed_durations,s.created_at,
+        s.street,s.house_no,s.zip,s.city,s.allowed_durations,s.created_at,s.exam_date,
         s.home_label,s.home_lat,s.home_lng,s.travel_min,s.home_base,s.availability,s.archived_at,s.notes,
         (s.photo IS NOT NULL) AS has_photo,
         (SELECT COUNT(*) FROM bookings b WHERE b.student_id=s.id AND b.status='done') AS done_count
@@ -2616,7 +2616,7 @@ async function handleApi(req, res, url) {
     const b = await readBody(req);
     const sid = Number(stm[1]);
     // Stammdaten bearbeiten (Vorname/Nachname bzw. Name / Telefon / E-Mail / Jahrgang / Notiz)
-    if ('first_name' in b || 'last_name' in b || 'name' in b || 'phone' in b || 'email' in b || 'birth_year' in b || 'birth_date' in b || 'street' in b || 'house_no' in b || 'zip' in b || 'city' in b || 'notes' in b || 'travel_min' in b || 'availability' in b || 'home_base' in b) {
+    if ('first_name' in b || 'last_name' in b || 'name' in b || 'phone' in b || 'email' in b || 'birth_year' in b || 'birth_date' in b || 'street' in b || 'house_no' in b || 'zip' in b || 'city' in b || 'notes' in b || 'travel_min' in b || 'availability' in b || 'home_base' in b || 'exam_date' in b) {
       const st = db.prepare('SELECT id FROM students WHERE id=?').get(sid);
       if (!st) return bad(res, 'Schueler nicht gefunden', 404);
       const fields = [], vals = [];
@@ -2642,6 +2642,17 @@ async function handleApi(req, res, url) {
       }
       for (const k of ['street', 'house_no', 'zip', 'city']) {
         if (k in b) { fields.push(`${k}=?`); vals.push(b[k] ? String(b[k]).trim() : null); }
+      }
+      // Prüfungstermin (praktisch): YYYY-MM-DD oder leer (= keiner). Echtes Datum prüfen.
+      if ('exam_date' in b) {
+        const ed = b.exam_date ? String(b.exam_date).trim() : null;
+        if (ed) {
+          const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(ed);
+          const dt = m ? new Date(ed + 'T00:00:00') : null;
+          if (!m || !dt || isNaN(dt) || (dt.getMonth() + 1) !== Number(m[2]) || dt.getDate() !== Number(m[3]))
+            return bad(res, 'Prüfungsdatum ungültig');
+        }
+        fields.push('exam_date=?'); vals.push(ed);
       }
       // Abholzeit (Minuten): leer/None -> automatisch schaetzen (NULL)
       if ('travel_min' in b) {

@@ -1524,8 +1524,10 @@ function openHelpMenu() {
 window.__openHelp = openHelpMenu;
 
 // ---------- Was ist neu? (Changelog) ----------
-const CHANGELOG_VER = '4.2';
+const CHANGELOG_VER = '4.3';
 const CHANGELOG = [
+  { v: '4.3', d: '04.09.2026', title: '🎓 Prüfungs-Countdown', items: [
+    '🎓 <strong>Countdown bis zur Prüfung.</strong> Sobald dein Fahrlehrer deinen Prüfungstermin einträgt, siehst du oben <strong>„Noch X Tage bis zur Prüfung"</strong> – mit einer kurzen Ampel: Sonderfahrten, offene 🔴 und deine Fahrstunden. Ein Tipp öffnet den vollen Reifecheck.'] },
   { v: '4.2', d: '03.09.2026', title: '🗺️ Fehlerbuch mit Karte', items: [
     '🗺️ <strong>Dein Fehlerbuch hat jetzt eine Karte.</strong> Oben siehst du alle Stellen als <strong>nummerierte Nadeln (1, 2, 3 …)</strong>, darunter die passende Liste mit Foto und Tipp – so hast du genau vor Augen, <strong>wo</strong> was war und worauf du beim nächsten Mal achtest.',
     '🟢 <strong>„Sitzt jetzt!":</strong> Hast du eine Sache gemeistert, markiert dein Fahrlehrer sie als geübt – die <strong>Nadel wird grün</strong>. So siehst du deinen Fortschritt und was noch offen ist.'] },
@@ -2820,6 +2822,7 @@ async function renderStudent() {
     <div class="card hidden" id="lesson-card"></div>
     <div class="card hidden" id="live-card"></div>
     <div class="card hidden" id="notif-card"></div>
+    <div class="card hidden" id="exam-card"></div>
     <div class="card hidden" id="profile-card"></div>
     <div id="daystatus-banner"></div>
     <div class="card" id="week-card"></div>
@@ -2924,6 +2927,7 @@ async function syncStudent() {
     renderAway(away.away);
     renderDayStatusBanner(dstat.status, mine.bookings);
     renderNotifications(notif.notifications, notif.unread);
+    renderExamCountdown(mine);
     renderLessonTimer(mine.bookings);
     refreshStudentLive();
     renderWeekCard(mine.weekInfo, mine.bookings, mine.progress);
@@ -3827,6 +3831,38 @@ function studentBookingItem(b) {
 }
 
 // ---------- Fehlerbuch (Schüler sieht seine Lernpunkte) ----------
+// Tage bis zum Prüfungstermin (0 = heute, negativ = vorbei). null = kein/ungültiges Datum.
+function examDaysLeft(d) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(d || '')) return null;
+  const t0 = new Date(); t0.setHours(0, 0, 0, 0);
+  const ex = new Date(d + 'T00:00:00'); if (isNaN(ex)) return null;
+  return Math.round((ex - t0) / 864e5);
+}
+// Prüfungs-Countdown + kurze Reife-Ampel (Schüler). Nutzt die schon geladenen Daten.
+function renderExamCountdown(mine) {
+  const card = $('#exam-card'); if (!card) return;
+  const d = state.user && state.user.exam_date;
+  const dl = examDaysLeft(d);
+  if (dl == null || dl < -3) { card.classList.add('hidden'); return; }  // >3 Tage vorbei -> ausblenden
+  card.classList.remove('hidden');
+  const prog = mine.progress || {}; const req = prog.req || { ueberland: 5, autobahn: 4, nacht: 3 }; const have = prog.sonder || {};
+  const sonderOpen = ['ueberland', 'autobahn', 'nacht'].filter((k) => (have[k] || 0) < (req[k] || 0)).length;
+  const red = ((mine.adk && mine.adk.needWork) || []).length;
+  const units = (mine.stats && mine.stats.units) || 0;
+  const amp = (ok, label) => `<span class="ex-amp ${ok ? 'ok' : 'todo'}">${ok ? '✅' : '⬜'} ${label}</span>`;
+  const dateFmt = new Date(d + 'T00:00:00').toLocaleDateString(LOCALE, { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
+  const big = dl < 0 ? 'Deine Prüfung war' : dl === 0 ? 'Heute ist deine Prüfung! 🍀' : dl === 1 ? 'Morgen ist es so weit! 🍀' : `Noch ${dl} Tage bis zur Prüfung`;
+  const cls = dl <= 3 ? ' soon' : '';
+  card.innerHTML = `<div class="exam-head${cls}"><div class="exam-emoji">🎓</div>
+      <div><div class="exam-big">${big}</div><div class="exam-date">${esc(dateFmt)}</div></div></div>
+    <div class="exam-amps">
+      ${amp(sonderOpen === 0, sonderOpen === 0 ? 'Sonderfahrten komplett' : `Sonderfahrten (${sonderOpen} offen)`)}
+      ${amp(red === 0, red === 0 ? 'Nichts mehr auf 🔴' : `${red}× 🔴 offen`)}
+      ${amp(units > 0, `${fmtUnits(units)} Fahrstunden`)}
+    </div>
+    <button class="sec sm" style="margin-top:.6rem" onclick="window.__openExamReadiness()">🎓 Bin ich bereit? – Reifecheck</button>`;
+}
+
 async function renderFehlerbuch() {
   const card = $('#fehlerbuch-card'); if (!card) return;
   let points = [];
@@ -6861,6 +6897,7 @@ async function tabSchueler(scope) {
             ${s.units ? `<span class="pill">🚗 ${fmtUnits(s.units)} FS${s.schaltUnits ? ' · ' + fmtUnits(s.schaltUnits) + ' Schalt' : ''}</span>` : ''}
             ${s.redCount ? `<span class="pill" style="background:rgba(255,70,70,.16);color:#ff6b6b">🔴 ${s.redCount} offen</span>` : ''}
             ${!isArch && nearReady(s) ? '<span class="pill" style="background:var(--good-bg);color:var(--good)">🎓 fast prüfungsreif</span>' : ''}
+            ${!isArch && s.exam_date ? (() => { const dl = examDaysLeft(s.exam_date); return dl == null ? '' : `<span class="pill" style="background:color-mix(in srgb,var(--brand) 18%,transparent);color:var(--brand);font-weight:800">🎓 ${dl < 0 ? 'Prüfung war' : dl === 0 ? 'Prüfung heute!' : 'Prüfung in ' + dl + ' T'}</span>`; })() : ''}
             ${isArch ? '<span class="pill" style="background:var(--good-bg);color:var(--good)">✅ bestanden</span>' : ''}
           </div>
           ${s.notes ? `<div class="stu-note" title="${esc(s.notes)}">📝 ${esc(s.notes.length > 80 ? s.notes.slice(0, 80) + '…' : s.notes)}</div>` : ''}
@@ -7104,6 +7141,8 @@ function openEditStudentModal(s) {
       <div class="field" style="max-width:130px"><label>PLZ</label><input id="es-zip" inputmode="numeric" value="${esc(s.zip || '')}"></div>
       <div class="field" style="flex:2"><label>Ort</label><input id="es-city" value="${esc(s.city || '')}"></div>
     </div>
+    <div class="field"><label>🎓 Prüfungstermin (praktisch) <span class="muted" style="font-weight:400">— zeigt dem Schüler einen Countdown + Reifecheck</span></label>
+      <input id="es-exam" type="date" value="${esc(s.exam_date || '')}"></div>
     <div class="row">
       <div class="field"><label>🚗 Abholzeit (Min)</label>
         <input id="es-travel" inputmode="numeric" value="${s.travel_min != null ? s.travel_min : ''}" placeholder="z.B. 30"></div>
@@ -7135,6 +7174,7 @@ function openEditStudentModal(s) {
         phone: $('#es-phone').value || null, email: $('#es-email').value || null,
         travel_min: $('#es-travel').value.trim() === '' ? '' : $('#es-travel').value.trim(),
         home_base: $('#es-base').value || null,
+        exam_date: $('#es-exam').value || null,
         availability: avSerialize(avOn),
         notes: $('#es-notes').value || null } });
       closeModal(); toast('Gespeichert ✓', 'ok'); tabSchueler();
@@ -7479,7 +7519,12 @@ async function openExamReadiness() {
     : `Alle Pflichtfahrten komplett (${sonderRows.map((r) => `${r.have}/${r.need}`).join(' · ')})`;
   const redSub = red.length ? red.slice(0, 8).map(esc).join(' · ') + (red.length > 8 ? ' …' : '') : 'Nichts steht mehr auf 🔴.';
   const secSub = openSections.length ? 'Noch nicht begonnen: ' + openSections.map((s) => esc(s.title.replace(/^[^ ]+ /, ''))).slice(0, 6).join(' · ') : `Alle Abschnitte begonnen · ${coveredItems}/${CURR_TOTAL} Punkte (${covPct}%)`;
+  const exDl = examDaysLeft(state.user && state.user.exam_date);
+  const exBanner = exDl != null && exDl >= -3
+    ? `<div class="er-countdown">🎓 <strong>${exDl < 0 ? 'Prüfung war' : exDl === 0 ? 'Heute ist deine Prüfung!' : exDl === 1 ? 'Morgen ist deine Prüfung!' : `Noch ${exDl} Tage bis zur Prüfung`}</strong> · ${esc(new Date(state.user.exam_date + 'T00:00:00').toLocaleDateString(LOCALE, { day: '2-digit', month: 'long', year: 'numeric' }))}</div>`
+    : '';
   modal(`<h3>🎓 Bin ich bald prüfungsreif?</h3>
+    ${exBanner}
     <div class="er-verdict ${ready ? 'ok' : ''}">${ready
       ? '🎉 Sieht stark aus! Sprich deinen Fahrlehrer auf den Prüfungstermin an.'
       : 'Fast geschafft – das fehlt noch. Deinen Prüfungstermin bespricht am Ende dein Fahrlehrer.'}</div>

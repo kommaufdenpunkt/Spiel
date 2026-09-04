@@ -1755,3 +1755,16 @@ header .brand .brandname{
 .hm-tx{flex:1 1 auto;display:flex;flex-direction:column;line-height:1.25}
 .hm-tx span{color:var(--muted);font-size:.82rem}
 .hm-go{color:var(--muted);font-size:1.2rem;flex:0 0 auto}
+
+/* Prüfungs-Countdown (Schüler) + Reife-Ampel */
+#exam-card .exam-head{display:flex;align-items:center;gap:.8rem}
+.exam-emoji{font-size:2.2rem;flex:0 0 auto}
+.exam-big{font-size:1.2rem;font-weight:800;color:var(--ink);line-height:1.15}
+.exam-head.soon .exam-big{color:var(--brand)}
+.exam-date{color:var(--muted);font-size:.88rem;text-transform:capitalize}
+.exam-amps{display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.7rem}
+.ex-amp{font-size:.82rem;font-weight:700;padding:.3rem .6rem;border-radius:999px;border:1px solid var(--line);background:var(--card2,rgba(127,127,127,.06))}
+.ex-amp.ok{color:var(--good);border-color:color-mix(in srgb,var(--good) 45%,var(--line))}
+.ex-amp.todo{color:var(--muted)}
+.er-countdown{background:color-mix(in srgb,var(--brand) 12%,transparent);border:1px solid color-mix(in srgb,var(--brand) 40%,var(--line));
+  border-radius:10px;padding:.55rem .7rem;margin:.2rem 0 .6rem;font-size:.92rem}

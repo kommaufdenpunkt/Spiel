@@ -277,6 +277,7 @@ ensureColumn('students', 'approved', 'approved INTEGER NOT NULL DEFAULT 1');
 ensureColumn('students', 'email_verified', 'email_verified INTEGER NOT NULL DEFAULT 1'); // E-Mail per Link bestaetigt?
 ensureColumn('students', 'registered_self', 'registered_self INTEGER NOT NULL DEFAULT 0'); // 1 = Selbst-Anmeldung (fuer die Freischalt-Liste)
 ensureColumn('students', 'terms_at', 'terms_at TEXT');         // Zeitpunkt der AGB-/Datenschutz-Zustimmung
+ensureColumn('students', 'exam_date', 'exam_date TEXT');        // Prüfungstermin (praktisch, YYYY-MM-DD) – für Countdown & Reifecheck
 
 // E-Mail-Bestaetigung fuer Selbst-Anmeldungen: kurzlebige Einmal-Token (Anti-Spam).
 db.exec(`CREATE TABLE IF NOT EXISTS email_verifications (
