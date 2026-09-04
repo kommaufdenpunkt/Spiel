@@ -1,0 +1,38 @@
+/* Fahrzeug-Uhr (Schaltwagen teilen) – genutzt von der Fahrlehrer-App und dem Team-Portal */
+/* ---------- Fahrzeug-Uhr ---------- */
+.cars{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:1.1rem}
+.car{background:var(--card);border:1px solid var(--line);border-radius:22px;padding:1.1rem 1rem 1rem;position:relative;overflow:hidden;
+  box-shadow:var(--shadow);transition:border-color .2s ease}
+.car::before{content:"";position:absolute;inset:-40% -20% auto;height:70%;background:radial-gradient(60% 60% at 50% 40%,var(--ring-glow,transparent),transparent 70%);opacity:.45;pointer-events:none}
+.car .plate{display:inline-block;font-family:"DIN Alternate",ui-monospace,Menlo,monospace;font-weight:800;letter-spacing:.06em;background:#f4f6f8;color:#111;
+  padding:.15rem .6rem .15rem .5rem;border-radius:5px;border:2px solid #222;font-size:.95rem;box-shadow:0 1px 0 #fff inset}
+.car .plate::before{content:"D";display:inline-block;background:#0a3fa8;color:#fde047;font-size:.55rem;padding:.35rem .22rem;margin:-.15rem .45rem -.15rem -.5rem;border-radius:3px 0 0 3px;vertical-align:middle;font-weight:900}
+.car .cname{font-size:.82rem;color:var(--muted);margin-top:.35rem}
+.car .gear{font-size:.7rem;font-weight:700;background:#212b38;padding:.12rem .5rem;border-radius:20px;margin-left:.4rem;color:var(--muted)}
+.clock{position:relative;width:200px;height:200px;margin:.8rem auto .4rem}
+.clock > svg{width:100%;height:100%;transform:rotate(-90deg)}
+.clock .track{fill:none;stroke:#1b2430;stroke-width:12}
+.clock .ring{fill:none;stroke:var(--ring,var(--good));stroke-width:12;stroke-linecap:round;
+  transition:stroke-dashoffset 1s linear,stroke .8s ease;filter:drop-shadow(0 0 8px var(--ring,var(--good)))}
+.clock .ticks line{stroke:#2c3746;stroke-width:2}
+.clock .mid{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}
+.clock .carimg{width:74px;height:auto;margin-bottom:.1rem;filter:drop-shadow(0 6px 10px rgba(0,0,0,.45))}
+.clock .big{font-size:1.35rem;font-weight:900;letter-spacing:-.02em;font-variant-numeric:tabular-nums;line-height:1.1;margin-top:.15rem}
+.clock .sml{font-size:.72rem;color:var(--muted);font-weight:600}
+.car.free{--ring:var(--good);--ring-glow:rgba(53,192,125,.5)}
+.car.soon{--ring:#f5c518;--ring-glow:rgba(245,197,24,.45)}     /* bald wieder frei */
+.car.mid{--ring:#f6890d;--ring-glow:rgba(246,137,13,.45)}      /* noch eine Weile */
+.car.busy{--ring:var(--bad);--ring-glow:rgba(229,96,95,.5)}    /* gerade erst los */
+.car .state{text-align:center;font-weight:700;margin:.2rem 0 .6rem;font-size:.92rem}
+.car .state .who{color:var(--muted);font-weight:500;font-size:.82rem;display:block}
+.car .acts{display:flex;gap:.4rem;flex-wrap:wrap;justify-content:center}
+.car .acts button{font-size:.85rem;padding:.5rem .8rem}
+.car .next{margin-top:.7rem;border-top:1px solid var(--line);padding-top:.5rem;font-size:.78rem;color:var(--muted)}
+.car .next div{display:flex;justify-content:space-between;gap:.5rem;padding:.12rem 0}
+.car .next button{font-size:.7rem;padding:.15rem .45rem;background:transparent;border:1px solid var(--line);color:var(--muted);box-shadow:none}
+.car.pulse .ring{animation:ringPulse 1.6s ease-in-out infinite}
+@keyframes ringPulse{0%,100%{filter:drop-shadow(0 0 6px var(--ring))}50%{filter:drop-shadow(0 0 16px var(--ring))}}
+.dur-chips{display:flex;gap:.4rem;flex-wrap:wrap;margin:.4rem 0 .8rem}
+.dur-chips button{background:#1b2430;border:1px solid var(--line);color:var(--ink);padding:.45rem .8rem;box-shadow:none}
+.dur-chips button.on{background:var(--brand);border-color:var(--brand);color:#fff}
+
