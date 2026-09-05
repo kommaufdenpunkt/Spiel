@@ -2640,8 +2640,11 @@ async function handleApi(req, res, url) {
        FROM students s WHERE s.archived_at IS ${archived ? 'NOT NULL' : 'NULL'} AND s.approved=1 AND s.deleted_at IS NULL ORDER BY s.name`
     ).all().map((s) => {
       const adk = adkSummary(s.id); const st = lessonStats(s.id);
+      const stand = { ok: 0, geuebt: 0, mehr: 0 };
+      for (const k in adk.items) { const ls = adk.items[k].lastStatus; if (stand[ls] != null) stand[ls]++; }
       return { ...s, ...studentRank(s.id), sonder: sonderCounts(s.id), travel_est: travelMin(s.id),
-        redCount: adk.needWork.length, adkDistinct: adk.distinct, units: st.units, schaltUnits: st.schalt.units };
+        redCount: adk.needWork.length, adkDistinct: adk.distinct, adkStand: stand, needWorkKeys: adk.needWork,
+        units: st.units, schaltUnits: st.schalt.units };
     });
     const activeCount = db.prepare('SELECT COUNT(*) AS c FROM students WHERE archived_at IS NULL AND approved=1').get().c;
     const archivedCount = db.prepare('SELECT COUNT(*) AS c FROM students WHERE archived_at IS NOT NULL').get().c;

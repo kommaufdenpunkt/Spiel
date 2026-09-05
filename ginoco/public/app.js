@@ -7253,6 +7253,7 @@ async function tabSchueler(scope) {
           </div>
         </div>
         <div class="prof-sec"><h4>🎯 Ausbildung</h4>
+          <div id="pf-stand"><span class="muted">Lädt…</span></div>
           <div class="prof-sonder">${sonderCell(s)}</div>
           <div class="prof-lengths"><span class="pl">⏱️ Stundenlängen</span> <span class="pf-durs">${boxes}</span> <button class="linklike" id="pf-savedur">speichern</button></div>
         </div>
@@ -7285,6 +7286,7 @@ async function tabSchueler(scope) {
       const loadProfLessons = async () => {
         const box = $('#pf-les'); if (!box) return;
         let data; try { data = await api('/api/students/' + s.id + '/lessons'); } catch { box.innerHTML = '<span class="muted">Konnte Fahrstunden nicht laden.</span>'; return; }
+        { const stBox = $('#pf-stand'); if (stBox) stBox.innerHTML = adkStandHtml(data.adk); }
         const les = (data.lessons || []).slice().sort((a, z) => (z.date + z.start_time).localeCompare(a.date + a.start_time));
         if (!les.length) { box.innerHTML = '<span class="muted">Noch keine gefahrenen Stunden.</span>'; return; }
         const classes = [...new Set(les.map((l) => l.license_class || 'B'))].sort((a, z) => a === 'B' ? -1 : z === 'B' ? 1 : a.localeCompare(z));
@@ -7313,15 +7315,49 @@ async function tabSchueler(scope) {
       };
       loadProfLessons();
     };
+    // Ausbildungs-Gesamtübersicht: wer ist wie weit, was fehlt noch (alle Schüler auf einen Blick)
+    const openOverview = () => {
+      const list = students.slice().sort((a, z) => {
+        const na = nearReady(a), nz = nearReady(z); if (na !== nz) return na ? -1 : 1;          // fast reif zuerst
+        return (z.adkDistinct || 0) - (a.adkDistinct || 0) || (a.name || '').localeCompare(z.name || '');
+      });
+      const rowsHtml = list.map((s) => {
+        const stand = s.adkStand || { ok: 0, geuebt: 0, mehr: 0 };
+        const distinct = s.adkDistinct != null ? s.adkDistinct : (stand.ok + stand.geuebt + stand.mehr);
+        const pct = CURR_TOTAL ? Math.round(distinct / CURR_TOTAL * 100) : 0;
+        const need = (s.needWorkKeys || []).map(currLabel).filter(Boolean);
+        const son = sonderDone(s);
+        const badge = nearReady(s) ? '<span class="ovr-badge good">🎓 fast reif</span>'
+          : stand.mehr ? `<span class="ovr-badge warn">🔴 ${stand.mehr}</span>` : '';
+        return `<div class="ovr-row" data-ovr="${s.id}" tabindex="0" role="button">
+          <div class="ovr-line1"><span class="ovr-name">${esc(s.name)}</span>${badge}
+            <span class="ovr-h">${s.done_count} Std${s.units ? ` · ${fmtUnits(s.units)} FS` : ''}</span></div>
+          <div class="ovr-bar"><i style="width:${pct}%"></i></div>
+          <div class="ovr-sub">${distinct}/${CURR_TOTAL} Punkte · ${pct}% &nbsp;·&nbsp; 🟢 ${stand.ok} · 🟡 ${stand.geuebt} · 🔴 ${stand.mehr} &nbsp;·&nbsp; ${son ? '✅ Sonderfahrten' : '🚗 Sonderf. offen'}</div>
+          ${need.length ? `<div class="ovr-need">🔴 ${need.slice(0, 4).map(esc).join(' · ')}${need.length > 4 ? ` … +${need.length - 4}` : ''}</div>` : ''}
+        </div>`;
+      }).join('');
+      modal(`<div class="ovr">
+        <h3>📊 Ausbildungs-Gesamtübersicht</h3>
+        <p class="hint">Alle ${list.length} Fahrschüler auf einen Blick – wer wie weit ist und was noch fehlt. Tippe eine Zeile für das volle Profil.</p>
+        <div class="ovr-list">${rowsHtml || '<p class="muted">Noch keine Fahrschüler.</p>'}</div>
+      </div>`, 'wide');
+      document.querySelectorAll('.ovr-row[data-ovr]').forEach((r) => {
+        const go = () => { closeModal(); const st = students.find((x) => x.id === Number(r.dataset.ovr)); if (st) openProfile(st); };
+        r.onclick = go;
+        r.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } };
+      });
+    };
     // Gesamtübersicht: Kennzahlen über alle (angezeigten) Fahrschüler
     const nRed = students.filter((s) => s.redCount > 0).length;
     const nNear = students.filter(nearReady).length;
     const nR2 = students.filter((s) => s.rank >= 2).length;
-    const ovBar = scope === 'archived' ? '' : `<div class="ov-bar">
+    const ovBar = scope === 'archived' ? '' : `<div class="ov-bar" id="ov-bar" role="button" tabindex="0" title="Ausbildungs-Gesamtübersicht öffnen">
       <div class="ov-tile"><b>${students.length}</b><span>Fahrschüler</span></div>
       <div class="ov-tile ${nRed ? 'warn' : ''}"><b>${nRed}</b><span>mit 🔴 offen</span></div>
       <div class="ov-tile"><b>${nR2}</b><span>Rang 2</span></div>
       <div class="ov-tile ${nNear ? 'good' : ''}"><b>${nNear}</b><span>fast prüfungsreif</span></div>
+      <div class="ov-more">📊 Gesamtübersicht ›</div>
     </div>`;
     $('#s-list').innerHTML = `
       ${ovBar}
@@ -7360,6 +7396,7 @@ async function tabSchueler(scope) {
     // Längen-Chips: optisch mitschalten
     // Karte anklicken -> Profil mit allen Daten + Aktionen öffnen
     const openById = (id) => { const st = students.find((x) => x.id === Number(id)); if (st) openProfile(st); };
+    { const ob = $('#ov-bar'); if (ob) { ob.onclick = openOverview; ob.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openOverview(); } }; } }
     $('#s-list').querySelectorAll('.stu-card[data-profile]').forEach((c) => {
       c.onclick = () => openById(c.dataset.profile);
       c.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openById(c.dataset.profile); } };
@@ -7754,6 +7791,33 @@ function adkNeedWorkHtml(adk) {
   if (!items.length) return '';
   return `<div class="adk-need"><div class="adk-need-t">🔴 Das üben wir noch (${items.length})</div>
     <ul>${items.map((it) => `<li>${esc(it)}</li>`).join('')}</ul></div>`;
+}
+// Ausbildungsstand zusammenfassen: wie viele Punkte sitzen 🟢 / geübt 🟡 / muss noch 🔴,
+// wie viele wurden schon berührt (distinct) und wie viele sind noch gar nicht begonnen (offen).
+function adkStandFrom(adk) {
+  const stand = { ok: 0, geuebt: 0, mehr: 0 };
+  if (adk && adk.items) for (const k in adk.items) { const ls = adk.items[k].lastStatus; if (stand[ls] != null) stand[ls]++; }
+  const distinct = (adk && adk.distinct != null) ? adk.distinct : (stand.ok + stand.geuebt + stand.mehr);
+  return { ok: stand.ok, geuebt: stand.geuebt, mehr: stand.mehr, distinct, offen: Math.max(0, CURR_TOTAL - distinct), total: CURR_TOTAL };
+}
+// Ausbildungsstand-Kachel fürs Schülerprofil: Fortschrittsbalken + Ampel-Zähler + „noch offen"
+function adkStandHtml(adk) {
+  const s = adkStandFrom(adk);
+  const pct = CURR_TOTAL ? Math.round(s.distinct / CURR_TOTAL * 100) : 0;
+  const need = ((adk && adk.needWork) || []).map(currLabel).filter(Boolean);
+  const needLine = need.length
+    ? `<div class="pf-stand-need"><b>🔴 Das üben wir noch:</b> ${need.slice(0, 6).map(esc).join(' · ')}${need.length > 6 ? ` … +${need.length - 6}` : ''}</div>`
+    : (s.distinct ? '<div class="pf-stand-need okline">✅ Nichts als „muss noch" offen – super!</div>' : '<div class="pf-stand-need muted">Noch keine Ausbildungspunkte abgehakt.</div>');
+  return `<div class="pf-stand">
+    <div class="pf-stand-top"><span>Fortschritt</span><b>${s.distinct}/${s.total} Punkte · ${pct}%</b></div>
+    <div class="pf-stand-bar"><i style="width:${pct}%"></i></div>
+    <div class="pf-stand-chips">
+      <span class="pill st-ok">🟢 ${s.ok} sitzt</span>
+      <span class="pill st-geuebt">🟡 ${s.geuebt} geübt</span>
+      <span class="pill st-mehr">🔴 ${s.mehr} muss noch</span>
+      <span class="pill st-off">⚪ ${s.offen} offen</span>
+    </div>
+    ${needLine}</div>`;
 }
 // Häufigkeits-Übersicht: je geübte Aufgabe wie oft gesamt (+ letzter Stand, + je Tag)
 function adkFreqHtml(adk) {
