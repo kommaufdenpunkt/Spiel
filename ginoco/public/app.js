@@ -7392,6 +7392,7 @@ async function openBulkRoster() {
       <div class="bh-row"><span class="bh-k">Namenszeile</span><span><b>Nachname, Vorname [Jahrgang]</b></span></div>
       <div class="bh-row"><span class="bh-k">Fahrstunde</span><span><b>Datum, Uhrzeit, Dauer</b> <span class="muted">+ optional Art (Überland/Autobahn/Nacht) &amp; Getriebe (Schalt/Automatik)</span></span></div>
       <div class="bh-row"><span class="bh-k">Fehlstunde</span><span class="muted">einfach <b>Fehlstunde</b> ans Zeilenende → wird als „nicht erschienen" übernommen</span></div>
+      <div class="bh-row"><span class="bh-k">Rechnung</span><span class="muted">gefahren ≠ auf der Rechnung? Ein <b>zweites Datum</b> ans Zeilenende → das ist das Rechnungsdatum (z. B. <code>02.09.2026, 18:00, 40, 05.09.2026</code>)</span></div>
       <div class="bh-row"><span class="bh-k">Trenner</span><span class="muted">Leerzeile zwischen zwei Fahrschülern (hübscher, nicht Pflicht)</span></div>
     </div>
     <div class="field"><label>Fahrschüler &amp; Fahrstunden</label>
@@ -7434,6 +7435,7 @@ function renderRosterPreview(el, r) {
     return ` <span class="type-badge" style="background:${c.bg};color:${c.fg};border-color:${c.bd}">${TYPE_ICON[row.art] || ''} ${TYPE_LABEL[row.art]}</span>`;
   };
   const gearPill = (row) => row.gear ? ` <span class="pill" style="background:var(--card);color:var(--muted)">⚙️ ${row.gear === 'schalt' ? 'Schalt' : 'Automatik'}</span>` : '';
+  const invPill = (row) => row.invDate ? ` <span class="pill" style="background:var(--card);color:#d3a24a">🧾 Rechnung: ${fmtShort(row.invDate)}${row.invTime ? ' ' + row.invTime : ''}</span>` : '';
   const lessonLine = (row) => {
     if (row.status === 'ok') {
       const statePill = row.noshow
@@ -7441,7 +7443,7 @@ function renderRosterPreview(el, r) {
         : (row.done ? ' <span class="pill" style="background:var(--good-bg);color:var(--good)">gefahren</span>' : '');
       const ic = row.noshow ? '🚫' : (row.done ? '🅿️' : '🗓️');
       return `<div class="bulk-row ok"><span class="br-ic">${ic}</span>
-        <div><div>${WD[isoDow(row.date) - 1]} ${fmtShort(row.date)} · ${row.time} <span class="muted">(${row.dur} Min)</span>${statePill}${artPill(row)}${gearPill(row)}${row.note ? ' <span class="muted">· ' + esc(row.note) + '</span>' : ''}</div></div></div>`;
+        <div><div>${WD[isoDow(row.date) - 1]} ${fmtShort(row.date)} · ${row.time} <span class="muted">(${row.dur} Min)</span>${statePill}${artPill(row)}${gearPill(row)}${invPill(row)}${row.note ? ' <span class="muted">· ' + esc(row.note) + '</span>' : ''}</div></div></div>`;
     }
     return `<div class="bulk-row error"><span class="br-ic">⚠️</span><div><div class="muted">${esc(row.input)}</div><div class="br-msg error">${esc(row.msg)}</div></div></div>`;
   };
