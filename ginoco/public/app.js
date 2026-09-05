@@ -3804,7 +3804,7 @@ function printLessonProof(name, done, adk, stats, cls) {
       body{font-family:-apple-system,Segoe UI,Arial,Helvetica,sans-serif;color:#22201d;margin:0;padding:16px 20px;font-size:12px}
       .head{display:flex;align-items:center;gap:16px;margin-bottom:12px}
       .brand{display:flex;align-items:center;gap:11px;flex:1}
-      .brand .wm{font-size:22px;font-weight:900;letter-spacing:-.01em;line-height:1;background:linear-gradient(135deg,#e9530a,#f6890d 45%,#ffc21a);-webkit-background-clip:text;background-clip:text;color:transparent}
+      .brand .wm{font-size:22px;font-weight:900;letter-spacing:-.01em;line-height:1.18;padding-bottom:.04em;background:linear-gradient(135deg,#e9530a,#f6890d 45%,#ffc21a);-webkit-background-clip:text;background-clip:text;color:transparent}
       .brand .school{font-size:12.5px;font-weight:700;color:#3a352f;margin-top:2px}
       .brand .addr{font-size:10.5px;color:#8a8378}
       .titleblock{text-align:right}

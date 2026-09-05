@@ -28,7 +28,7 @@ body{background:
 .sp-spokes{opacity:0;animation:spFade .4s ease .78s forwards}
 .sp-needle{opacity:0;transform-box:fill-box;transform-origin:60px 30px;transform:scale(.3) rotate(-25deg);animation:spNeedle .5s cubic-bezier(.2,.8,.3,1.4) .92s forwards}
 .sp-spark{opacity:0;animation:spFade .35s ease 1.18s forwards}
-.sp-word{opacity:0;transform:translateY(10px);font-size:2rem;font-weight:900;letter-spacing:-.02em;
+.sp-word{opacity:0;transform:translateY(10px);font-size:2rem;font-weight:900;letter-spacing:-.02em;line-height:1.16;padding-bottom:.06em;
   background:linear-gradient(100deg,#ef6a12,#f5c518);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
   animation:spWord .55s ease 1.05s forwards}
 @keyframes spDraw{to{stroke-dashoffset:0}}
@@ -95,7 +95,7 @@ header{position:sticky;top:0;z-index:20;background:rgba(14,19,26,.9);backdrop-fi
   border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:.7rem 1.2rem}
 header .brand{display:flex;align-items:center;gap:.45rem;font-weight:800;letter-spacing:-.01em}
 header .brand .logo{width:24px;height:24px;object-fit:contain}
-header .brand .brandname{background:linear-gradient(100deg,#ef6a12,#f5c518);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+header .brand .brandname{display:inline-block;line-height:1.15;padding-bottom:.05em;background:linear-gradient(100deg,#ef6a12,#f5c518);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
 header .brand .logo{font-size:1.4rem}
 header .who{display:flex;align-items:center;gap:.8rem;font-size:.88rem}
 header .who .role{background:#212b38;padding:.2rem .6rem;border-radius:20px;color:var(--muted);font-weight:600}
@@ -1080,7 +1080,7 @@ body:has(.fp-overlay) .pwa-install{display:none}
 .auth-logo img,.auth-logo span{position:relative;z-index:3;width:72px;height:72px;object-fit:contain;font-size:2.9rem;
   display:flex;align-items:center;justify-content:center;
   filter:drop-shadow(0 2px 6px rgba(0,0,0,.5)) drop-shadow(0 0 10px rgba(248,170,25,.38))}
-.auth-name{font-size:2.6rem;font-weight:900;letter-spacing:-.03em;margin:0 0 .15rem;line-height:1;
+.auth-name{font-size:2.6rem;font-weight:900;letter-spacing:-.03em;margin:0 0 .15rem;line-height:1.12;padding-bottom:.06em;
   background:linear-gradient(100deg,#ef6a12 0%,#f59a1c 45%,#f5c518 100%);
   -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
 .auth-feats{display:flex;flex-wrap:wrap;justify-content:center;gap:.4rem;margin:0 0 1.1rem}
