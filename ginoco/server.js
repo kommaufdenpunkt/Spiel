@@ -1263,7 +1263,7 @@ async function handleApi(req, res, url) {
   if (p === '/api/my/bookings' && method === 'GET') {
     if (!requireStudent()) return bad(res, 'Bitte anmelden', 401);
     const rows = db.prepare(
-      `SELECT id,date,start_time,duration_min,status,gearbox,plate,note,started_at,ended_at,confirmed,feedback,lesson_type,license_class,late_minutes,attended,needs_sign,signed_at,signature,instr_signature,instr_signed_at,curriculum,invoice_date,invoice_time,reschedule_req,reschedule_note,created_at
+      `SELECT id,date,start_time,duration_min,status,gearbox,plate,note,started_at,ended_at,confirmed,feedback,lesson_type,license_class,late_minutes,attended,needs_sign,signed_at,signature,instr_signature,instr_signed_at,curriculum,invoice_date,invoice_time,instructor_name,reschedule_req,reschedule_note,created_at
        FROM bookings WHERE student_id = ? AND status != 'cancelled' ORDER BY date, start_time`
     ).all(sess.student_id);
     return ok(res, { bookings: rows, weekInfo: weekInfoForStudent(sess.student_id),
@@ -1462,12 +1462,14 @@ async function handleApi(req, res, url) {
     // Abweichendes fsmanager-Datum (optional): gefahren an X, im fsmanager gefuehrt an Y.
     const invDate = /^\d{4}-\d{2}-\d{2}$/.test(b.invoice_date || '') ? b.invoice_date : null;
     const invTime = /^([01]?\d|2[0-3]):[0-5]\d$/.test(b.invoice_time || '') ? b.invoice_time : null;
+    // Fahrlehrer dieser Stunde (optional): leer = Standard-Fahrlehrer der Fahrschule (z. B. Kollegen).
+    const instrName = b.instructor_name ? String(b.instructor_name).trim().slice(0, 80) || null : null;
     // Nachgetragene, tatsächlich gefahrene Stunden müssen vom Schüler unterschrieben werden.
     const needsSign = attended ? 1 : 0;
     const info = db.prepare(
-      `INSERT INTO bookings(student_id,date,start_time,duration_min,status,gearbox,lesson_type,late_minutes,attended,feedback,confirmed,needs_sign,invoice_date,invoice_time,created_at)
-       VALUES(?,?,?,?,'done',?,?,?,?,?,1,?,?,?,?)`
-    ).run(sid, date, start, dur, gear, type, late, attended, vermerk, needsSign, invDate, invTime, new Date().toISOString());
+      `INSERT INTO bookings(student_id,date,start_time,duration_min,status,gearbox,lesson_type,late_minutes,attended,feedback,confirmed,needs_sign,invoice_date,invoice_time,instructor_name,created_at)
+       VALUES(?,?,?,?,'done',?,?,?,?,?,1,?,?,?,?,?)`
+    ).run(sid, date, start, dur, gear, type, late, attended, vermerk, needsSign, invDate, invTime, instrName, new Date().toISOString());
     const bid = Number(info.lastInsertRowid);
     const typeLbl = { ueberland: 'Überland', autobahn: 'Autobahn', nacht: 'Nachtfahrt' }[type];
     const detail = attended
@@ -1577,6 +1579,7 @@ async function handleApi(req, res, url) {
       if ('note' in b) { fields.push('note=?'); vals.push(b.note ? String(b.note).trim() : null); }
       if ('reason' in b) { fields.push('reason=?'); vals.push(b.reason ? String(b.reason).trim() : null); }
       if ('feedback' in b) { fields.push('feedback=?'); vals.push(b.feedback ? String(b.feedback).trim() : null); }
+      if ('instructor_name' in b) { fields.push('instructor_name=?'); vals.push(b.instructor_name ? String(b.instructor_name).trim().slice(0, 80) : null); }
       if ('lesson_type' in b) { fields.push('lesson_type=?'); vals.push(['ueberland', 'autobahn', 'nacht', 'normal'].includes(b.lesson_type) ? b.lesson_type : null); }
       if ('meet_label' in b) { fields.push('meet_label=?'); vals.push(b.meet_label ? String(b.meet_label).trim() : null); }
       if ('meet_lat' in b) { fields.push('meet_lat=?'); vals.push(b.meet_lat == null || b.meet_lat === '' ? null : Number(b.meet_lat)); }
@@ -2937,7 +2940,7 @@ async function handleApi(req, res, url) {
     const st = db.prepare('SELECT name FROM students WHERE id=?').get(sid);
     if (!st) return bad(res, 'Schüler nicht gefunden', 404);
     const lessons = db.prepare(
-      `SELECT id,date,start_time,duration_min,status,gearbox,plate,lesson_type,license_class,late_minutes,attended,feedback,needs_sign,signed_at,signature,instr_signature,instr_signed_at,curriculum,invoice_date,invoice_time,created_at
+      `SELECT id,date,start_time,duration_min,status,gearbox,plate,lesson_type,license_class,late_minutes,attended,feedback,needs_sign,signed_at,signature,instr_signature,instr_signed_at,curriculum,invoice_date,invoice_time,instructor_name,created_at
        FROM bookings WHERE student_id=? AND status='done' ORDER BY date,start_time`).all(sid);
     return ok(res, { lessons, name: st.name, stats: lessonStats(sid), adk: adkSummary(sid) });
   }

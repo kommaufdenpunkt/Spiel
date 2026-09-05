@@ -252,6 +252,7 @@ ensureColumn('bookings', 'meet_lng', 'meet_lng REAL');
 ensureColumn('bookings', 'lesson_type', 'lesson_type TEXT'); // normal | ueberland | autobahn | nacht
 ensureColumn('bookings', 'license_class', "license_class TEXT NOT NULL DEFAULT 'B'"); // Führerschein-Klasse der Fahrt: B, A1, A2, A, AM, BE … (Vorbildung getrennt anzeigen)
 ensureColumn('bookings', 'offer_named', 'offer_named INTEGER NOT NULL DEFAULT 0'); // 1 = Anbieter zeigt beim Feed-Angebot freiwillig seinen Vornamen
+ensureColumn('bookings', 'instructor_name', 'instructor_name TEXT'); // Fahrlehrer, der diese Stunde gefahren ist (leer = Standard-Fahrlehrer der Fahrschule; z. B. Kollegen)
 ensureColumn('bookings', 'started_at', 'started_at TEXT');   // Fahrstunden-Timer: Zeitpunkt, an dem "Start" gedrueckt wurde
 // confirmed: hat der Schueler den Termin bestaetigt? DEFAULT 1, damit bestehende
 // Buchungen als bestaetigt gelten – nur NEUE vom Fahrlehrer eingetragene Termine

@@ -578,6 +578,19 @@ th{color:var(--muted);font-weight:600;font-size:.78rem;text-transform:uppercase;
 .sign-time{background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:.5rem .75rem;margin:.5rem 0;font-size:.9rem}
 .ml-note{color:var(--muted);max-width:260px}
 .ml-noshow td{opacity:.7}
+/* Fahrlehrer-Spalte + anklickbare Zeile (öffnet Detailansicht) */
+.ml-fl{white-space:nowrap}
+.ml-flname{font-weight:600;color:var(--ink)}
+.ml-row{cursor:pointer;transition:background .1s ease}
+.ml-table tbody tr.ml-row:hover td{background:color-mix(in srgb,var(--brand) 8%,transparent)}
+.ml-row:focus-visible{outline:2px solid var(--brand);outline-offset:-2px}
+/* Einzel-Fahrstunde: Detailansicht */
+.ld h3{margin:0 0 .6rem}
+.ld-row{display:flex;gap:.7rem;padding:.4rem 0;border-top:1px solid var(--line)}
+.ld-row:first-of-type{border-top:none}
+.ld-l{flex:0 0 42%;max-width:170px;color:var(--muted);font-size:.86rem}
+.ld-v{flex:1;min-width:0;overflow-wrap:anywhere}
+.ld-actions{margin-top:.7rem}
 /* Am Handy: keine seitliche Tabelle – jede Fahrstunde als Karte, alles untereinander */
 @media(max-width:560px){
   .ml-wrap{overflow:visible;border:none;border-radius:0}

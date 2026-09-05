@@ -129,7 +129,8 @@ const I18N = {
     ml_overview_btn: '📋 Ausbildungs-Übersicht', ml_print_btn: '📄 Nachweis drucken',
     ml_filter_from: 'von', ml_filter_to: 'bis', ml_filter_reset: 'ganzer Zeitraum', ml_filter_title: '🧾 Nachweise · Zeitraum wählen',
     ml_filter_count: '{n} von {all} Fahrstunden im Zeitraum', ml_filter_none: 'Keine Fahrstunden in diesem Zeitraum.',
-    ml_th_when: 'Datum &amp; Uhrzeit', ml_th_end: 'Ende', ml_th_dur: 'Dauer', ml_th_type: 'Art', ml_th_late: 'Verspät.', ml_th_note: 'Vermerk / Ausbildungskarte',
+    ml_th_when: 'Datum &amp; Uhrzeit', ml_th_end: 'Ende', ml_th_dur: 'Dauer', ml_th_type: 'Art', ml_th_late: 'Verspät.', ml_th_note: 'Vermerk / Ausbildungskarte', ml_th_fl: 'Fahrlehrer',
+    ml_detail_open: 'Antippen für Details',
     ml_dl_when: 'Wann', ml_dl_late: 'Verspätung', ml_dl_note: 'Vermerk',
     ml_driven_on: 'gefahren am', ml_entered_on: 'vom Fahrlehrer eingetragen am {date}',
     ml_on_invoice: '🧾 Auf der Rechnung zu sehen am {date}', ml_on_invoice_time: '🧾 Auf der Rechnung zu sehen am {date} um {time} Uhr',
@@ -3320,22 +3321,19 @@ function renderMyLessons(bookings) {
   // 🧾 Nachweise: nach Zeitraum filtern (leer = alles). Filter gilt für Liste UND Ausdruck.
   const fFrom = state.mlFrom || '', fTo = state.mlTo || '';
   const shown = (fFrom || fTo) ? done.filter((b) => (!fFrom || b.date >= fFrom) && (!fTo || b.date <= fTo)) : done;
+  const flDefault = state.settings?.instructor_name || t('ml_th_fl');
   const rows = shown.map((b) => {
     const noshow = b.attended === 0;
-    const late = b.late_minutes || 0;
-    const entryDate = b.created_at ? String(b.created_at).slice(0, 10) : null;
-    const nachgetragen = entryDate && entryDate !== b.date;
-    const adkN = lessonAdkParse(b.curriculum).length;
+    const flName = (b.instructor_name && String(b.instructor_name).trim()) || flDefault;
     const sign = b.needs_sign
       ? `<button class="sm ml-sign" data-sign="${b.id}">${t('ml_sign_btn')}</button>`
       : (b.signed_at ? `<span class="pill" style="background:var(--good-bg);color:var(--good)">${t('ml_signed')}</span>` : '');
-    return `<tr class="${noshow ? 'ml-noshow' : ''} ${b.needs_sign ? 'ml-tosign' : ''}">
-      <td class="ml-when" data-label="${t('ml_dl_when')}">${nachgetragen ? `<span class="ml-drovelbl">${t('ml_driven_on')}</span>` : ''}<strong>${fmtDT(b.date, b.start_time)}</strong>${nachgetragen ? `<span class="ml-entry">${t('ml_entered_on', { date: fmtEntry(b.created_at) })}</span>` : ''}${b.invoice_date ? `<span class="ml-entry ml-inv">${b.invoice_time ? t('ml_on_invoice_time', { date: fmtDT(b.invoice_date), time: b.invoice_time }) : t('ml_on_invoice', { date: fmtDT(b.invoice_date) })}</span>` : ''}${(() => { const a = actualTime(b); return a ? `<span class="ml-entry ml-time">${a.end ? t('ml_actual', { begin: a.begin, end: a.end }) : t('ml_actual_open', { begin: a.begin })}${a.mins != null ? ` · ${a.mins} ${t('min')}` : ''}</span>` : ''; })()}${(b.instr_signature && b.signed_at) ? `<span class="ml-entry ml-both">${t('both_confirmed')}</span>` : ''}${sign ? `<div class="ml-signcell">${sign}</div>` : ''}</td>
+    return `<tr class="ml-row ${noshow ? 'ml-noshow' : ''} ${b.needs_sign ? 'ml-tosign' : ''}" data-lesson="${b.id}" tabindex="0" role="button" title="${t('ml_detail_open')}">
+      <td class="ml-when" data-label="${t('ml_dl_when')}"><strong>${fmtDT(b.date, b.start_time)}</strong>${b.invoice_date ? `<span class="ml-entry ml-inv">${b.invoice_time ? t('ml_on_invoice_time', { date: fmtDT(b.invoice_date), time: b.invoice_time }) : t('ml_on_invoice', { date: fmtDT(b.invoice_date) })}</span>` : ''}${(() => { const a = actualTime(b); return a ? `<span class="ml-entry ml-time">${a.end ? t('ml_actual', { begin: a.begin, end: a.end }) : t('ml_actual_open', { begin: a.begin })}${a.mins != null ? ` · ${a.mins} ${t('min')}` : ''}</span>` : ''; })()}${(b.instr_signature && b.signed_at) ? `<span class="ml-entry ml-both">${t('both_confirmed')}</span>` : ''}${sign ? `<div class="ml-signcell">${sign}</div>` : ''}</td>
+      <td class="ml-fl" data-label="${t('ml_th_fl')}">${noshow ? '' : `<span class="ml-flname">👨‍🏫 ${esc(flName)}</span>`}</td>
       <td data-label="${t('ml_th_end')}">${noshow ? '—' : t('ml_until', { end: addMinHHMM(b.start_time, b.duration_min) })}</td>
       <td data-label="${t('ml_th_dur')}">${noshow ? t('ml_absent') : (b.duration_min + ' ' + t('min'))}</td>
       <td data-label="${t('ml_th_type')}">${noshow ? '' : typeBadge(b.lesson_type)}</td>
-      <td data-label="${t('ml_dl_late')}">${late ? t('ml_late', { late }) : ''}</td>
-      <td class="ml-note" data-label="${t('ml_dl_note')}">${b.feedback ? esc(b.feedback) : ''}${adkN ? `<button class="linkbtn ml-adk" data-adk="${b.id}">${t('ml_adk_card', { n: adkN })}</button>` : ''}</td>
     </tr>`;
   }).join('');
   const banner = toSign.length
@@ -3360,8 +3358,8 @@ function renderMyLessons(bookings) {
       <button class="sm" id="ml-print" style="margin-left:auto" ${shown.length ? '' : 'disabled'}>${t('ml_print_btn')}</button>
     </div>
     <div class="ml-wrap"><table class="ml-table">
-      <thead><tr><th>${t('ml_th_when')}</th><th>${t('ml_th_end')}</th><th>${t('ml_th_dur')}</th><th>${t('ml_th_type')}</th><th>${t('ml_th_late')}</th><th>${t('ml_th_note')}</th></tr></thead>
-      <tbody>${rows || `<tr><td colspan="6" class="muted" style="text-align:center;padding:1rem">${t('ml_filter_none')}</td></tr>`}</tbody>
+      <thead><tr><th>${t('ml_th_when')}</th><th>${t('ml_th_fl')}</th><th>${t('ml_th_end')}</th><th>${t('ml_th_dur')}</th><th>${t('ml_th_type')}</th></tr></thead>
+      <tbody>${rows || `<tr><td colspan="5" class="muted" style="text-align:center;padding:1rem">${t('ml_filter_none')}</td></tr>`}</tbody>
     </table></div>`;
   card.querySelectorAll('[data-cls]').forEach((btn) => btn.onclick = () => { state.mlClass = btn.dataset.cls; renderMyLessons(myBookingsCache); });
   const pb = $('#ml-print'); if (pb) pb.onclick = () => printLessonProof(state.user?.name || 'Fahrschüler', shown, isB ? myAdk : null, isB ? myStats : null, activeCls);
@@ -3376,7 +3374,40 @@ function renderMyLessons(bookings) {
   card.querySelectorAll('[data-adk]').forEach((btn) => btn.onclick = () => {
     const bk = done.find((x) => x.id === Number(btn.dataset.adk)); if (bk) openLessonAdk(bk, state.user?.name || 'Fahrschüler');
   });
+  // Zeile antippen -> Detailansicht mit allen Fakten (Vermerk, Verspätung, Rechnung, Karte …)
+  card.querySelectorAll('.ml-row[data-lesson]').forEach((tr) => {
+    const open = (e) => { if (e && e.target && e.target.closest('button,a,.linkbtn,.ml-sign')) return; const bk = done.find((x) => x.id === Number(tr.dataset.lesson)); if (bk) openLessonDetail(bk); };
+    tr.onclick = open;
+    tr.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); open(e); } };
+  });
   const sf = $('#ml-sign-first'); if (sf) sf.onclick = () => openSignModal(toSign[0]);
+}
+
+// Detailansicht einer einzelnen Fahrstunde (Schüler): alle Fakten auf einen Blick,
+// damit die Tabelle selbst schlank bleibt („bei Bedarf einzeln aufrufen").
+function openLessonDetail(b) {
+  const noshow = b.attended === 0;
+  const late = b.late_minutes || 0;
+  const flName = (b.instructor_name && String(b.instructor_name).trim()) || (state.settings?.instructor_name || t('ml_th_fl'));
+  const adkN = lessonAdkParse(b.curriculum).length;
+  const end = addMinHHMM(b.start_time, b.duration_min);
+  const row = (label, val) => val ? `<div class="ld-row"><span class="ld-l">${label}</span><span class="ld-v">${val}</span></div>` : '';
+  const signState = (b.instr_signature && b.signed_at) ? t('both_confirmed')
+    : b.signed_at ? '🔒 ' + t('ml_signed') : b.needs_sign ? '○ ' + t('ml_sign_btn') : '';
+  modal(`<div class="ld">
+    <h3>${noshow ? '🚫 ' : '🚗 '}${fmtDT(b.date, b.start_time)}${noshow ? ' · ' + t('ml_absent') : ''}</h3>
+    ${row('👨‍🏫 ' + t('ml_th_fl'), esc(flName))}
+    ${noshow ? '' : row('🕒 ' + t('ml_th_end'), `${b.start_time} – ${end} Uhr · ${b.duration_min} ${t('min')}`)}
+    ${noshow ? '' : row('🚦 ' + t('ml_th_type'), typeBadge(b.lesson_type))}
+    ${noshow ? '' : row('⚙️ Getriebe', gearBadge(b.gearbox))}
+    ${b.invoice_date ? row('🧾 Auf der Rechnung', `${fmtDT(b.invoice_date)}${b.invoice_time ? ' · ' + b.invoice_time + ' Uhr' : ''}`) : ''}
+    ${late ? row('⏱ ' + t('ml_dl_late'), t('ml_late', { late })) : ''}
+    ${b.feedback ? row('📝 ' + t('ml_dl_note'), esc(b.feedback)) : ''}
+    ${signState ? row('✍️ Unterschrift', signState) : ''}
+    ${adkN ? `<div class="ld-actions"><button class="sm" id="ld-adk">🗂️ ${t('ml_adk_card', { n: adkN })}</button></div>` : ''}
+    <div class="actions"><button onclick="window.__closeModal()">Schließen</button></div>
+  </div>`);
+  const a = $('#ld-adk'); if (a) a.onclick = () => openLessonAdk(b, state.user?.name || 'Fahrschüler');
 }
 
 // Unterschrift-Fenster: der Fahrschüler bestätigt & unterschreibt eine nachgetragene Fahrstunde.
@@ -3752,27 +3783,25 @@ function printLessonProof(name, done, adk, stats, cls) {
   driven.forEach((b) => { if (sMin[b.lesson_type] != null) sMin[b.lesson_type] += (b.duration_min || 0); });
   const sUE = (t) => Math.round(sMin[t] / 45);
   const gearBadge = (g) => g === 'schalt' ? '<span class="gb gb-s">Schalt</span>' : g === 'automatik' ? '<span class="gb gb-a">Automatik</span>' : '<span class="wg">—</span>';
+  const flDefault = state.settings?.instructor_name || 'Fahrlehrer';
   const rows = list.map((b, i) => {
     const noshow = b.attended === 0;
-    const late = b.late_minutes || 0;
-    const entryDate = b.created_at ? String(b.created_at).slice(0, 10) : null;
-    const nachgetragen = entryDate && entryDate !== b.date;
+    const flName = (b.instructor_name && String(b.instructor_name).trim()) || flDefault;
     const artName = { ueberland: 'Überland', autobahn: 'Autobahn', nacht: 'Nachtfahrt' }[b.lesson_type] || 'Übung';
     const artC = typeTint(TYPE_LABEL[b.lesson_type] ? b.lesson_type : 'normal');
     const artIco = { ueberland: '🌄', autobahn: '🛣️', nacht: '🌙' }[b.lesson_type] || '';
     const artL = `<span class="art" style="background:${artC.bg};color:${artC.fg};border:1px solid ${artC.bd}">${artIco ? artIco + ' ' : ''}${artName}</span>`;
     const timeLine = noshow ? '<span class="wg">nicht erschienen</span>' : `von ${b.start_time} bis ${addMinHHMM(b.start_time, b.duration_min)} Uhr`;
-    const vermerk = [esc(b.feedback || ''), late ? `<span class="late">⏱ ${late} Min zu spät</span>` : ''].filter(Boolean).join(' · ');
     const sig = `${b.instr_signature ? `<span class="s2"><span class="s2l">FL</span><img src="${b.instr_signature}" alt=""></span>` : ''}${b.signature ? `<span class="s2"><span class="s2l">FS</span><img src="${b.signature}" alt=""></span>` : (b.signed_at ? '<span class="s2"><span class="s2l">FS</span><span class="ok">✔</span></span>' : '')}` || '<span class="wg">–</span>';
     return `<tr class="${noshow ? 'ns' : ''}">
       <td class="c n">${i + 1}</td>
       ${multiClass ? `<td class="c"><b>${esc(b.license_class || 'B')}</b></td>` : ''}
       <td class="dt"><b>${fmtDT(b.date)}</b><div class="tm">${timeLine}</div></td>
+      <td class="fl">${noshow ? '' : esc(flName)}</td>
       <td class="c">${noshow ? '<span class="wg">nicht erschienen</span>' : artL}</td>
       <td class="c dur">${noshow ? '—' : '<b>' + b.duration_min + '</b> Min'}</td>
       <td class="c">${noshow ? '' : gearBadge(b.gearbox)}</td>
       <td class="c inv">${b.invoice_date ? `<b>${fmtDT(b.invoice_date)}</b><br>${b.invoice_time || b.start_time} Uhr` : '<span class="wg">wie gefahren</span>'}</td>
-      <td class="vm">${vermerk || ''}</td>
       <td class="c sig">${noshow ? '' : sig}</td>
     </tr>`;
   }).join('');
@@ -3825,7 +3854,8 @@ function printLessonProof(name, done, adk, stats, cls) {
       tbody tr.ns{background:#faf3f3;color:#a06}
       tbody tr:last-child td{border-bottom:none}
       td.c{text-align:center;white-space:nowrap}
-      td.dt,td.vm{text-align:center}
+      td.dt{text-align:center}
+      td.fl{text-align:center;font-weight:600;color:#3a352f}
       td.n{color:#b3a892;font-weight:700}
       td.dt b{font-size:12.5px}.dt .tm{font-size:11px;color:#4a453d;margin-top:1px}
       td.dur b{font-size:12.5px}
@@ -3865,10 +3895,10 @@ function printLessonProof(name, done, adk, stats, cls) {
       ${autoN ? `<div class="tile"><div class="k">Automatik</div><div class="v">${autoN}</div></div>` : ''}
       ${(!cls || cls === 'B') ? [['ueberland', '🌄 Überland', 5], ['autobahn', '🛣️ Autobahn', 4], ['nacht', '🌙 Nacht', 3]].map(([k, lb, tgt]) => `<div class="tile son ${sUE(k) >= tgt ? 'ok' : ''}"><div class="k">${lb}</div><div class="v">${sUE(k)}/${tgt}${sUE(k) >= tgt ? ' ✓' : ''}</div></div>`).join('') : ''}
     </div>
-    <table><thead><tr><th>#</th>${multiClass ? '<th>Kl.</th>' : ''}<th>Datum &amp; Uhrzeit (gefahren)</th><th>Art</th><th>Dauer</th><th>Getriebe</th><th>Auf der Rechnung</th><th>Vermerk</th><th>Unterschrift</th></tr></thead>
+    <table><thead><tr><th>#</th>${multiClass ? '<th>Kl.</th>' : ''}<th>Datum &amp; Uhrzeit (gefahren)</th><th>Fahrlehrer</th><th>Art</th><th>Dauer</th><th>Getriebe</th><th>Auf der Rechnung</th><th>Unterschrift</th></tr></thead>
       <tbody>${rows}</tbody></table>
     ${adkSection}
-    <div class="foot">Erstellt mit ginoco · ${today}. Maßgeblich ist stets das <b>Fahrdatum</b> (Datum &amp; Uhrzeit, gefahren). „Vom Fahrlehrer eingetragen am …" nennt nur, wann die Stunde ins System eingetragen wurde – am Fahrdatum ändert das nichts. „Auf der Rechnung" = Datum/Uhrzeit, unter dem die Stunde abgerechnet wird (kann vom Fahrdatum abweichen, z. B. wegen der 495-Minuten-Tagesgrenze); „wie gefahren" = identisch zum Fahrdatum. „Fahrschüler … Min zu spät" = der Fahrschüler ist verspätet zur Fahrstunde erschienen. Mit ✔ markierte Stunden hat der Fahrschüler in der App bestätigt.</div>
+    <div class="foot">Erstellt mit ginoco · ${today}. Maßgeblich ist stets das <b>Fahrdatum</b> (Datum &amp; Uhrzeit, gefahren). <b>Fahrlehrer</b> = wer die Stunde gefahren ist. „Auf der Rechnung" = Datum/Uhrzeit, unter dem die Stunde abgerechnet wird (kann vom Fahrdatum abweichen, z. B. wegen der 495-Minuten-Tagesgrenze); „wie gefahren" = identisch zum Fahrdatum. Mit ✔ markierte Stunden hat der Fahrschüler in der App bestätigt.</div>
     <script>window.onload=function(){setTimeout(function(){window.print()},250)}<\/script></body></html>`;
   const w = window.open('', '_blank');
   if (!w) { toast('Bitte Pop-ups erlauben, um den Nachweis zu drucken.', 'err'); return; }
@@ -6553,7 +6583,7 @@ window.__openMarkModal = openMarkModal;
 function openLogLessonModal(sid, name) {
   const s = state.settings || {};
   modal(`<h3>➕ Fahrstunde nachtragen</h3>
-    <p class="hint">Trage eine bereits gefahrene Stunde für <strong>${esc(name)}</strong> ein – mit dem <strong>echten Fahrdatum &amp; Uhrzeit</strong>. Das Eintragedatum (heute) wird automatisch zusätzlich vermerkt, damit klar ist: gefahren am X, eingetragen am Y.</p>
+    <p class="hint">Trage eine bereits gefahrene Stunde für <strong>${esc(name)}</strong> ein – mit dem <strong>echten Fahrdatum &amp; Uhrzeit</strong>. Wenn ein Kollege gefahren ist, trag ihn unten als Fahrlehrer ein (sonst erscheint automatisch dein Name).</p>
     <div class="row">
       <div class="field"><label>Fahrdatum</label><input type="date" id="lg-date" value="${todayStr()}"></div>
       <div class="field"><label>Uhrzeit (Beginn)</label><input id="lg-time" value="" placeholder="z.B. 20:00"></div>
@@ -6564,6 +6594,8 @@ function openLogLessonModal(sid, name) {
     </div>
     <div class="field"><label>Fahrt-Art</label>
       <select id="lg-type"><option value="">Normal</option><option value="ueberland">🌄 Überland</option><option value="autobahn">🛣️ Autobahn</option><option value="nacht">🌙 Nachtfahrt</option></select></div>
+    <div class="field"><label>Fahrlehrer <span class="muted">(leer = ${esc(s.instructor_name || 'du selbst')}; Kollegen hier eintragen)</span></label>
+      <input id="lg-fl" placeholder="${esc(s.instructor_name || 'Fahrlehrer')}" value="" autocomplete="off"></div>
     <label class="ck-line"><input type="checkbox" id="lg-att" checked> Fahrschüler ist erschienen (gefahren)</label>
     <div class="field"><label>Vermerk <span class="muted">(sieht der Fahrschüler – z.B. Verlauf/Besonderes)</span></label>
       <textarea id="lg-note" rows="3" placeholder="z.B. 20 Min zu spät gekommen, restliche 60 Min gefahren – Kreisverkehr & Vorfahrt geübt." style="resize:vertical"></textarea></div>
@@ -6583,7 +6615,7 @@ function openLogLessonModal(sid, name) {
         student_id: sid, date, start_time: time,
         duration_min: Number($('#lg-dur').value), late_minutes: Number($('#lg-late').value) || 0,
         lesson_type: $('#lg-type').value || 'normal', attended: $('#lg-att').checked,
-        feedback: $('#lg-note').value,
+        feedback: $('#lg-note').value, instructor_name: $('#lg-fl').value.trim(),
         invoice_date: $('#lg-invdate').value || '', invoice_time: $('#lg-invtime').value.trim() } });
       closeModal(); toast('Fahrstunde nachgetragen ✓', 'ok');
       try { refreshEventBadge(); } catch {}
