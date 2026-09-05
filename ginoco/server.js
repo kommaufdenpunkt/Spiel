@@ -3832,9 +3832,12 @@ function bulkRoster(res, body) {
       // damit dieselbe echte Historie mehrerer Schüler am selben Tag nicht kollidiert -> nur DB prüfen).
       const ns = toMin(time), ne = ns + dur;
       const iv = dayIntervals(date);
-      if (iv.some((x) => overlaps(ns, ne, x.s, x.e))) { row.status = 'error'; row.msg = 'Überschneidet einen vorhandenen Termin'; grp.lessons.push(row); grp.errCount++; totalErr++; continue; }
+      // Überschneidungs-Schutz nur für ZUKÜNFTIGE Termine (die belegen echte Slots).
+      // Vergangene/gefahrene Stunden sind Historie und dürfen sich überschneiden –
+      // z. B. wenn parallel ein Kollege einen anderen Fahrschüler gefahren hat.
+      if (!row.done && iv.some((x) => overlaps(ns, ne, x.s, x.e))) { row.status = 'error'; row.msg = 'Überschneidet einen vorhandenen Termin'; grp.lessons.push(row); grp.errCount++; totalErr++; continue; }
       row.status = 'ok'; row.msg = row.noshow ? 'wird als nicht erschienen übernommen' : (row.done ? 'wird als gefahren übernommen' : 'wird reserviert');
-      iv.push({ s: ns, e: ne });
+      if (!row.done) iv.push({ s: ns, e: ne }); // nur künftige Termine belegen einen Slot
       grp.lessons.push(row); grp.okCount++; totalOk++;
       if (row.noshow) totalNoshow++; else if (row.done) totalDone++; else totalFuture++;
     }
