@@ -7445,6 +7445,9 @@ function renderRosterPreview(el, r) {
       return `<div class="bulk-row ok"><span class="br-ic">${ic}</span>
         <div><div>${WD[isoDow(row.date) - 1]} ${fmtShort(row.date)} · ${row.time} <span class="muted">(${row.dur} Min)</span>${statePill}${artPill(row)}${gearPill(row)}${invPill(row)}${row.note ? ' <span class="muted">· ' + esc(row.note) + '</span>' : ''}</div></div></div>`;
     }
+    if (row.status === 'dup') {
+      return `<div class="bulk-row"><span class="br-ic">↩︎</span><div><div class="muted">${WD[isoDow(row.date) - 1]} ${fmtShort(row.date)} · ${row.time} – schon vorhanden, übersprungen</div></div></div>`;
+    }
     return `<div class="bulk-row error"><span class="br-ic">⚠️</span><div><div class="muted">${esc(row.input)}</div><div class="br-msg error">${esc(row.msg)}</div></div></div>`;
   };
   const groupCard = (g) => {
@@ -7454,7 +7457,7 @@ function renderRosterPreview(el, r) {
     return `<div class="roster-grp" style="border:1px solid var(--line);border-radius:12px;padding:.6rem .7rem;margin-bottom:.6rem">
       <div class="inline" style="justify-content:space-between;align-items:center;margin-bottom:.35rem">
         <b>${esc(g.name || '—')}</b> ${tag}
-        <span class="muted" style="font-size:.8rem">${g.okCount || 0} ok${g.errCount ? ' · ' + g.errCount + ' ⚠️' : ''}</span>
+        <span class="muted" style="font-size:.8rem">${g.okCount || 0} ok${g.dupCount ? ' · ' + g.dupCount + ' ↩︎' : ''}${g.errCount ? ' · ' + g.errCount + ' ⚠️' : ''}</span>
       </div>
       ${g.error ? `<div class="br-msg error" style="margin-bottom:.3rem">${esc(g.error)}</div>` : ''}
       ${g.lessons.map(lessonLine).join('')}
@@ -7465,6 +7468,7 @@ function renderRosterPreview(el, r) {
       ${r.totalDone ? `<span class="pill" style="background:var(--good-bg);color:var(--good)">🅿️ ${r.totalDone} gefahren</span>` : ''}
       ${r.totalFuture ? `<span class="pill" style="background:var(--booked);color:#8fb4ff">🗓️ ${r.totalFuture} reserviert</span>` : ''}
       ${r.totalNoshow ? `<span class="pill" style="background:var(--bad-bg);color:var(--bad)">🚫 ${r.totalNoshow} nicht erschienen</span>` : ''}
+      ${r.totalDup ? `<span class="pill" style="background:var(--card);color:var(--muted)">↩︎ ${r.totalDup} schon vorhanden</span>` : ''}
       ${!r.totalOk ? `<span class="pill">0 bereit</span>` : ''}
       ${r.totalErr ? `<span class="pill" style="background:var(--bad-bg);color:var(--bad)">⚠️ ${r.totalErr} zu prüfen</span>` : ''}
     </div>

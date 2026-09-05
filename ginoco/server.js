@@ -3800,16 +3800,22 @@ function bulkRoster(res, body) {
   const artLabel = { ueberland: 'Überland', autobahn: 'Autobahn', nacht: 'Nachtfahrt', normal: '' };
   const gearLabel = { schalt: 'Schalt', automatik: 'Automatik' };
   const out = [];
-  let totalOk = 0, totalErr = 0, totalDone = 0, totalFuture = 0, totalNoshow = 0, newStudents = 0;
+  let totalOk = 0, totalErr = 0, totalDone = 0, totalFuture = 0, totalNoshow = 0, totalDup = 0, newStudents = 0;
   for (const blk of blocks) {
     if (!blk.nameLine) { out.push({ name: '', error: 'Fahrstunde ohne Fahrschüler-Namen davor', input: blk.orphan, lessons: [] }); totalErr++; continue; }
     const nm = parseNameLine(blk.nameLine);
-    const grp = { name: nm.name, input: blk.nameLine, lessons: [], okCount: 0, errCount: 0 };
+    const grp = { name: nm.name, input: blk.nameLine, lessons: [], okCount: 0, errCount: 0, dupCount: 0 };
     if (!nm.name) { grp.error = 'Name nicht erkannt'; out.push(grp); totalErr++; continue; }
     const match = matchStudent(existing, nm.name);
     if (match.student) { grp.studentId = match.student.id; grp.existing = true; grp.name = match.student.name; }
     else if (match.error && /mehrdeutig/.test(match.error)) { grp.error = match.error; out.push(grp); totalErr++; continue; }
     else { grp.existing = false; grp.willCreate = true; newStudents++; }
+    // Bereits vorhandene Fahrten dieses Schülers (Datum + Uhrzeit) – zum Überspringen von Doppeln.
+    const existKeys = new Set();
+    if (grp.studentId) {
+      for (const r of db.prepare("SELECT date,start_time FROM bookings WHERE student_id=? AND status!='cancelled'").all(grp.studentId))
+        existKeys.add(r.date + ' ' + r.start_time);
+    }
     for (const lline of blk.lessons) {
       const f = parseRosterLesson(lline);
       const row = { input: lline };
@@ -3820,6 +3826,8 @@ function bulkRoster(res, body) {
       if (!date) { row.status = 'error'; row.msg = 'Datum unklar (z. B. 22.7. oder 22.07.2026)'; grp.lessons.push(row); grp.errCount++; totalErr++; continue; }
       if (!time) { row.status = 'error'; row.msg = 'Uhrzeit unklar (z. B. 14:00)'; grp.lessons.push(row); grp.errCount++; totalErr++; continue; }
       row.date = date; row.time = time; row.dur = dur;
+      // Doppel-Schutz: existiert für diesen Schüler schon eine Fahrt zu Datum+Uhrzeit -> überspringen.
+      if (existKeys.has(date + ' ' + time)) { row.status = 'dup'; row.msg = 'schon vorhanden – übersprungen'; grp.lessons.push(row); grp.dupCount++; totalDup++; continue; }
       row.art = f.art || 'normal'; row.gear = f.gear || ''; row.note = f.note || '';
       row.artLabel = artLabel[row.art] || ''; row.gearLabel = gearLabel[row.gear] || '';
       row.invDate = f.invDate ? parseImportDate(f.invDate, today) : '';
@@ -3843,7 +3851,7 @@ function bulkRoster(res, body) {
     }
     out.push(grp);
   }
-  const summary = { groups: out, totalOk, totalErr, totalDone, totalFuture, totalNoshow, newStudents };
+  const summary = { groups: out, totalOk, totalErr, totalDone, totalFuture, totalNoshow, totalDup, newStudents };
   if (!commit) return ok(res, { dryRun: true, ...summary });
   // ---- Übernehmen ----
   let createdStudents = [], createdLessons = 0;

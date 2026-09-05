@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# Verlauf-Import: legt fehlende Fahrschueler an + traegt ihre Fahrstunden ein.
-# Bereits vorhandene Fahrschueler werden NICHT angefasst (kein Doppel), sondern
-# nur mit aktueller Fahrten-Zahl gemeldet. Aufruf auf dem Server:
+# Verlauf-Import (wiederholbar): legt fehlende Fahrschueler an und traegt Fahrten
+# ein. Bereits vorhandene Fahrten (gleiches Datum+Uhrzeit) werden uebersprungen,
+# es entstehen also keine Doppel. Aufruf auf dem Server:
 #   python3 /home/ginoco/spiel/ginoco/scripts/import-roster.py
-import os, json, sys, getpass, subprocess, urllib.request, urllib.error, http.cookiejar, unicodedata
+import os, json, sys, getpass, subprocess, urllib.request, urllib.error, http.cookiejar
 
 def detect_port():
     p = os.environ.get("GINOCO_PORT")
@@ -163,16 +163,12 @@ def call(path, obj=None, method="POST"):
     data = json.dumps(obj).encode() if obj is not None else None
     req = urllib.request.Request(BASE + path, data=data, headers={'Content-Type':'application/json'}, method=method)
     try:
-        return json.loads(op.open(req, timeout=90).read().decode())
+        return json.loads(op.open(req, timeout=120).read().decode())
     except urllib.error.HTTPError as e:
         try: return json.loads(e.read().decode() or '{}')
         except Exception: return {'_http': e.code}
     except Exception as e:
         return {'_err': str(e)}
-
-def norm(s):
-    s = unicodedata.normalize("NFKD", s or "").encode("ascii","ignore").decode().lower()
-    return " ".join(s.split())
 
 pin = getpass.getpass("Cockpit-PIN (Eingabe wird nicht angezeigt): ")
 res = call("/api/auth/instructor", {"pin": pin})
@@ -180,46 +176,20 @@ if isinstance(res, dict) and res.get("need2fa"):
     res = call("/api/auth/instructor", {"pin": pin, "code": input("Authenticator-Code: ").strip()})
 if not (isinstance(res, dict) and res.get("role") == "instructor"):
     print("!! Login fehlgeschlagen:", res); sys.exit(1)
-print("Login OK - pruefe Vorschau ...\n")
+print("Login OK - trage ein (Doppel werden automatisch uebersprungen) ...\n")
 
-full = "\n\n".join(BLOCKS)
-dry = call("/api/instructor/roster/bulk", {"text": full, "commit": False})
-if not dry.get("dryRun"):
-    print("!! Fehler bei der Vorschau:", json.dumps(dry)[:800]); sys.exit(1)
-groups = [g for g in dry.get("groups", []) if g.get("name")]
-# groups kommen in derselben Reihenfolge wie BLOCKS
-new_blocks, existing = [], []
-for i, g in enumerate(groups):
-    if g.get("willCreate"): new_blocks.append(BLOCKS[i])
-    elif g.get("existing"): existing.append(g["name"])
-
-if new_blocks:
-    out = call("/api/instructor/roster/bulk", {"text": "\n\n".join(new_blocks), "commit": True})
-    if not out.get("committed"):
-        print("!! Import-Fehler:", json.dumps(out)[:800]); sys.exit(1)
-    print("NEU eingetragen: %d Fahrstunden fuer %d Fahrschueler\n" % (out["createdLessons"], out["newStudents"]))
-    for g in out.get("groups", []):
-        if g.get("name"):
-            ex = "  (%d uebersprungen)" % g["errCount"] if g.get("errCount") else ""
-            print("  %-26s %d Fahrten%s" % (g["name"], g.get("okCount",0), ex))
-    print("\n=== ZUGANGSDATEN - bitte wegkopieren (nur jetzt sichtbar) ===")
+out = call("/api/instructor/roster/bulk", {"text": "\n\n".join(BLOCKS), "commit": True})
+if not out.get("committed"):
+    print("!! Import-Fehler:", json.dumps(out)[:800]); sys.exit(1)
+print("Neu eingetragen: %d Fahrstunden  ·  schon vorhanden (uebersprungen): %d\n" % (out.get("createdLessons",0), out.get("totalDup",0)))
+print("%-26s %-8s %-14s" % ("Fahrschueler","NEU","schon vorhanden"))
+for g in out.get("groups", []):
+    if g.get("name"):
+        print("  %-24s %-8d %-14d" % (g["name"], g.get("okCount",0), g.get("dupCount",0)))
+newc = out.get("createdStudents", [])
+if newc:
+    print("\n=== ZUGANGSDATEN neu angelegter Fahrschueler (wegkopieren!) ===")
     print("%-28s %-12s %s" % ("Name","Login","Passwort"))
-    for s in out.get("createdStudents", []):
+    for s in newc:
         print("%-28s %-12s %s" % (s["name"], s["username"], s["password"]))
-else:
-    print("Keine neuen Fahrschueler - alle existieren bereits.")
-
-if existing:
-    print("\n=== SCHON VORHANDEN (nichts eingetragen) ===")
-    allstuds = call("/api/students", method="GET").get("students", [])
-    byname = {norm(s["name"]): s for s in allstuds}
-    for name in existing:
-        s = byname.get(norm(name))
-        if s:
-            les = call("/api/students/%d/lessons" % s["id"], method="GET")
-            n = len(les.get("lessons", []))
-            print("  %-26s hat aktuell %d gefahrene Fahrstunden" % (name, n))
-        else:
-            print("  %-26s (vorhanden)" % name)
-    print("\n-> Klaus & Janez pruefen wir separat, damit nichts doppelt wird.")
-print("\nFertig.")
+print("\nFertig. Alle Fahrschueler sind vollstaendig - ohne Doppel.")
