@@ -1827,3 +1827,32 @@ header .brand .brandname{
 .ml-classtab .ct-vor{font-size:.66rem;font-weight:800;text-transform:uppercase;letter-spacing:.03em;
   background:rgba(0,0,0,.14);border-radius:6px;padding:.05rem .32rem}
 .ml-classtab.on .ct-vor{background:rgba(0,0,0,.22)}
+
+/* ---- Kompakte Fahrschüler-Karten (anklickbar) + Profil-Ansicht ---- */
+.stu-card.stu-compact{cursor:pointer;transition:border-color .12s,transform .06s,box-shadow .12s}
+.stu-card.stu-compact:hover{border-color:var(--brand);box-shadow:0 10px 26px -18px rgba(0,0,0,.6)}
+.stu-card.stu-compact:active{transform:translateY(1px)}
+.stu-card.stu-compact:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+.stu-open{margin-top:.6rem;padding-top:.55rem;border-top:1px solid var(--line);
+  color:var(--muted);font-size:.82rem;display:flex;justify-content:space-between;align-items:center;gap:.5rem}
+.stu-open span{color:var(--brand);font-weight:700;white-space:nowrap}
+/* Profil-Modal */
+.prof-head{display:flex;align-items:center;gap:.8rem;margin-bottom:.5rem}
+.stu-av.big{width:58px;height:58px;font-size:1.25rem;flex:0 0 auto}
+.stu-hours.big b{font-size:1.5rem}
+.prof-name{font-size:1.28rem;font-weight:800;line-height:1.15}
+.prof-sub{color:var(--muted);font-size:.9rem;margin-top:.15rem}
+.prof-chips{display:flex;gap:.4rem;flex-wrap:wrap;margin:.2rem 0 .8rem}
+.prof-sec{border:1px solid var(--line);border-radius:14px;padding:.7rem .85rem;margin-bottom:.7rem;background:color-mix(in srgb,var(--card) 60%,transparent)}
+.prof-sec h4{margin:0 0 .5rem;font-size:.82rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+.prof-grid{display:grid;grid-template-columns:1fr 1fr;gap:.5rem .9rem}
+@media (max-width:560px){.prof-grid{grid-template-columns:1fr}}
+.pf-row{display:flex;flex-direction:column;gap:.15rem;min-width:0}
+.pf-row .pl{font-size:.72rem;color:var(--muted);font-weight:700}
+.pf-row .pv{font-size:.95rem;word-break:break-word;display:flex;align-items:center;gap:.4rem;flex-wrap:wrap}
+.prof-sonder{display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:.6rem}
+.prof-lengths{display:flex;align-items:center;gap:.4rem;flex-wrap:wrap}
+.prof-lengths .pl{font-size:.8rem;color:var(--muted);font-weight:700;margin-right:.2rem}
+.prof-lengths .pf-durs{display:inline-flex;gap:.3rem;flex-wrap:wrap}
+.prof-actions{display:grid;grid-template-columns:repeat(4,1fr);gap:.5rem;margin-top:.3rem}
+@media (max-width:560px){.prof-actions{grid-template-columns:repeat(3,1fr)}}

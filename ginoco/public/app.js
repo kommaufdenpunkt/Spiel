@@ -7186,6 +7186,76 @@ async function tabSchueler(scope) {
     }).join(' ');
     const sonderDone = (s) => ['ueberland', 'autobahn', 'nacht'].every((k) => (s.sonder?.[k] || 0) >= req[k]);
     const nearReady = (s) => sonderDone(s) && !s.redCount && (s.adkDistinct || 0) >= CURR_TOTAL * 0.8;
+    const ageFrom = (bd) => { if (!bd) return null; const d = new Date(bd); if (isNaN(d)) return null; const t = new Date(); let a = t.getFullYear() - d.getFullYear(); if (t.getMonth() < d.getMonth() || (t.getMonth() === d.getMonth() && t.getDate() < d.getDate())) a--; return a; };
+    // Profil öffnen: alle Daten + Aktionen an einem Ort
+    const openProfile = (s) => {
+      const isArch = !!s.archived_at;
+      const av = s.has_photo ? `<img src="/api/students/${s.id}/photo" alt="">` : `<span>${esc(initials(s.name))}</span>`;
+      const durs = String(s.allowed_durations || '80').split(',').map(Number);
+      const boxes = [80, 120, 160, 40].map((d) => `<label class="dur-chip ${durs.includes(d) ? 'on' : ''}${d === 40 ? ' dur-exc' : ''}"><input type="checkbox" data-pdur value="${d}" ${durs.includes(d) ? 'checked' : ''}> ${d}</label>`).join('');
+      const hasHome = s.home_label || s.home_lat != null;
+      const age = ageFrom(s.birth_date);
+      const addr = [s.street ? esc(s.street) + (s.house_no ? ' ' + esc(s.house_no) : '') : '', (s.zip || s.city) ? [esc(s.zip || ''), esc(s.city || '')].filter(Boolean).join(' ') : ''].filter(Boolean).join(', ');
+      const examChip = (!isArch && s.exam_date) ? (() => { const dl = examDaysLeft(s.exam_date); return dl == null ? '' : `<span class="pill" style="background:color-mix(in srgb,var(--brand) 18%,transparent);color:var(--brand);font-weight:800">🎓 ${dl < 0 ? 'Prüfung war' : dl === 0 ? 'Prüfung heute!' : 'Prüfung in ' + dl + ' T'}</span>`; })() : '';
+      const contactHtml = s.phone
+        ? `${esc(s.phone)} ${contactButtons(s.phone, `Hallo ${s.name.split(' ')[0]}, hier ${state.settings?.instructor_name || 'deine Fahrschule'}:`)}`
+        : '<span class="muted">–</span>';
+      modal(`<div class="prof">
+        <div class="prof-head">
+          <span class="stu-av big">${av}</span>
+          <div style="flex:1;min-width:0">
+            <div class="prof-name">${esc(s.name)}</div>
+            <div class="prof-sub">🔑 <span class="codechip">${esc(s.username || '–')}</span>${s.birth_year ? ` · Jg. ${s.birth_year}` : ''}</div>
+          </div>
+          <div class="stu-hours big"><b>${s.done_count}</b><span>Std.</span></div>
+        </div>
+        <div class="prof-chips">
+          <span class="pill" style="${s.rank >= 2 ? 'background:var(--good-bg);color:var(--good)' : ''}">🏆 Rang ${s.rank} · ${s.horizon} T</span>
+          ${s.units ? `<span class="pill">🚗 ${fmtUnits(s.units)} FS${s.schaltUnits ? ' · ' + fmtUnits(s.schaltUnits) + ' Schalt' : ''}</span>` : ''}
+          ${s.redCount ? `<span class="pill" style="background:rgba(255,70,70,.16);color:#ff6b6b">🔴 ${s.redCount} offen</span>` : ''}
+          ${!isArch && nearReady(s) ? '<span class="pill" style="background:var(--good-bg);color:var(--good)">🎓 fast prüfungsreif</span>' : ''}
+          ${examChip}
+          ${isArch ? '<span class="pill" style="background:var(--good-bg);color:var(--good)">✅ bestanden</span>' : ''}
+        </div>
+        <div class="prof-sec"><h4>👤 Stammdaten</h4>
+          <div class="prof-grid">
+            <div class="pf-row"><span class="pl">📞 Telefon</span><span class="pv">${contactHtml}</span></div>
+            <div class="pf-row"><span class="pl">✉️ E-Mail</span><span class="pv">${s.email ? esc(s.email) : '<span class="muted">–</span>'}</span></div>
+            <div class="pf-row"><span class="pl">🏠 Anschrift</span><span class="pv">${addr || '<span class="muted">–</span>'}</span></div>
+            <div class="pf-row"><span class="pl">🎂 Geboren</span><span class="pv">${s.birth_date ? fmtDT(s.birth_date) + (age != null ? ` · ${age} J.` : '') : '<span class="muted">–</span>'}</span></div>
+            <div class="pf-row"><span class="pl">📍 Treffpunkt</span><span class="pv">${hasHome ? `📍 ${esc(s.home_label || 'gesetzt')}` : '<span class="muted">nicht vereinbart</span>'} <button class="linklike" id="pf-home">${hasHome ? 'ändern' : 'festlegen'}</button></span></div>
+            <div class="pf-row"><span class="pl">🎓 Prüfung</span><span class="pv">${s.exam_date ? fmtDT(s.exam_date) : '<span class="muted">–</span>'}</span></div>
+          </div>
+        </div>
+        <div class="prof-sec"><h4>🎯 Ausbildung</h4>
+          <div class="prof-sonder">${sonderCell(s)}</div>
+          <div class="prof-lengths"><span class="pl">⏱️ Stundenlängen</span> <span class="pf-durs">${boxes}</span> <button class="linklike" id="pf-savedur">speichern</button></div>
+        </div>
+        ${s.notes ? `<div class="prof-sec"><h4>📝 Notiz</h4><div class="stu-note" style="max-width:none">${esc(s.notes)}</div></div>` : ''}
+        <div class="prof-actions">
+          <button class="iconbtn" id="pf-edit"><span class="ib-ic">✏️</span><span class="ib-lb">Bearbeiten</span></button>
+          <button class="iconbtn" id="pf-log"><span class="ib-ic">➕</span><span class="ib-lb">Nachtragen</span></button>
+          <button class="iconbtn" id="pf-invoice"><span class="ib-ic">🧾</span><span class="ib-lb">Rechnung</span></button>
+          <button class="iconbtn" id="pf-proof"><span class="ib-ic">📄</span><span class="ib-lb">Nachweis</span></button>
+          <button class="iconbtn" id="pf-card"><span class="ib-ic">📋</span><span class="ib-lb">Karte</span></button>
+          <button class="iconbtn" id="pf-reset"><span class="ib-ic">🔑</span><span class="ib-lb">Zugang</span></button>
+          ${isArch ? '<button class="iconbtn ok" id="pf-react"><span class="ib-ic">↩︎</span><span class="ib-lb">Zurück</span></button>' : '<button class="iconbtn ok" id="pf-arch"><span class="ib-ic">✅</span><span class="ib-lb">Bestanden</span></button>'}
+          <button class="iconbtn danger" id="pf-del"><span class="ib-ic">🗑️</span><span class="ib-lb">Löschen</span></button>
+        </div>
+      </div>`, 'wide');
+      $('#pf-edit').onclick = () => openEditStudentModal(s);
+      $('#pf-log').onclick = () => openLogLessonModal(Number(s.id), s.name);
+      $('#pf-invoice').onclick = () => openInvoiceModal(Number(s.id), s.name);
+      $('#pf-proof').onclick = async () => { try { const r = await api('/api/students/' + s.id + '/lessons'); if (!r.lessons.length) { toast('Noch keine gefahrenen Stunden für den Nachweis.', 'err'); return; } printLessonProof(r.name || s.name, r.lessons, r.adk, r.stats); } catch (e) { toast(e.message, 'err'); } };
+      $('#pf-card').onclick = () => openTrainingCard(s.id, s.name);
+      $('#pf-reset').onclick = () => openResetModal(s.id, s.name, s.username || '');
+      const ph = $('#pf-home'); if (ph) ph.onclick = () => openStandortModal(s.id, s.name, s.home_label || '', s.home_lat != null ? s.home_lat : '', s.home_lng != null ? s.home_lng : '');
+      document.querySelectorAll('[data-pdur]').forEach((cb) => cb.onchange = () => cb.closest('.dur-chip')?.classList.toggle('on', cb.checked));
+      $('#pf-savedur').onclick = async () => { const vals = [...document.querySelectorAll('[data-pdur]')].filter((c) => c.checked).map((c) => Number(c.value)); if (!vals.length) { toast('Mindestens eine Länge wählen', 'err'); return; } try { await api('/api/students/' + s.id, { method: 'PATCH', body: { allowed_durations: vals } }); toast('Gespeichert ✓', 'ok'); } catch (e) { toast(e.message, 'err'); } };
+      const pa = $('#pf-arch'); if (pa) pa.onclick = async () => { if (!confirm(`„${s.name}" als bestanden markieren und ins Archiv verschieben? Daten & Fahrstunden bleiben einsehbar.`)) return; try { await api('/api/students/' + s.id + '/archive', { method: 'POST' }); toast('Ins Archiv verschoben ✅', 'ok'); closeModal(); tabSchueler(); } catch (e) { toast(e.message, 'err'); } };
+      const pr = $('#pf-react'); if (pr) pr.onclick = async () => { try { await api('/api/students/' + s.id + '/reactivate', { method: 'POST' }); toast('Reaktiviert ↩︎', 'ok'); closeModal(); tabSchueler(); } catch (e) { toast(e.message, 'err'); } };
+      $('#pf-del').onclick = () => deleteStudent(s.id, s.name);
+    };
     // Gesamtübersicht: Kennzahlen über alle (angezeigten) Fahrschüler
     const nRed = students.filter((s) => s.redCount > 0).length;
     const nNear = students.filter(nearReady).length;
@@ -7207,18 +7277,9 @@ async function tabSchueler(scope) {
       <div class="stu-grid">
       ${students.map((s) => {
         const searchStr = [s.name, s.username, s.email, s.phone].filter(Boolean).join(' ').toLowerCase();
-        const durs = String(s.allowed_durations || '80').split(',').map(Number);
-        const boxes = [80, 120, 160, 40].map((d) => `<label class="dur-chip ${durs.includes(d) ? 'on' : ''}${d === 40 ? ' dur-exc' : ''}"><input type="checkbox" data-sdur="${s.id}" value="${d}" ${durs.includes(d) ? 'checked' : ''}> ${d}</label>`).join('');
-        const hasHome = s.home_label || s.home_lat != null;
-        const homeCell = hasHome
-          ? `<span class="pill" style="background:var(--good-bg);color:var(--good)">📍 ${esc(s.home_label || 'gesetzt')}</span>`
-          : `<span class="muted">– nicht vereinbart –</span>`;
         const isArch = !!s.archived_at;
         const av = s.has_photo ? `<img src="/api/students/${s.id}/photo" alt="">` : `<span>${esc(initials(s.name))}</span>`;
-        const contact = s.phone
-          ? `<span class="muted">${esc(s.phone)}</span> ${contactButtons(s.phone, `Hallo ${s.name.split(' ')[0]}, hier ${state.settings?.instructor_name || 'deine Fahrschule'}:`)}`
-          : (s.email ? `<span class="muted">${esc(s.email)}</span>` : '<span class="muted">– kein Kontakt –</span>');
-        return `<div class="stu-card" data-search="${esc(searchStr)}">
+        return `<div class="stu-card stu-compact" data-profile="${s.id}" data-search="${esc(searchStr)}" tabindex="0" role="button" aria-label="Profil von ${esc(s.name)} öffnen">
           <div class="stu-head">
             <span class="stu-av">${av}</span>
             <div class="stu-namewrap">
@@ -7228,80 +7289,29 @@ async function tabSchueler(scope) {
             <div class="stu-hours"><b>${s.done_count}</b><span>Std.</span></div>
           </div>
           <div class="stu-chips">
-            <span class="pill" style="${s.rank >= 2 ? 'background:var(--good-bg);color:var(--good)' : ''}">🏆 Rang ${s.rank} · ${s.horizon} T</span>
-            ${s.units ? `<span class="pill">🚗 ${fmtUnits(s.units)} FS${s.schaltUnits ? ' · ' + fmtUnits(s.schaltUnits) + ' Schalt' : ''}</span>` : ''}
-            ${s.redCount ? `<span class="pill" style="background:rgba(255,70,70,.16);color:#ff6b6b">🔴 ${s.redCount} offen</span>` : ''}
-            ${!isArch && nearReady(s) ? '<span class="pill" style="background:var(--good-bg);color:var(--good)">🎓 fast prüfungsreif</span>' : ''}
-            ${!isArch && s.exam_date ? (() => { const dl = examDaysLeft(s.exam_date); return dl == null ? '' : `<span class="pill" style="background:color-mix(in srgb,var(--brand) 18%,transparent);color:var(--brand);font-weight:800">🎓 ${dl < 0 ? 'Prüfung war' : dl === 0 ? 'Prüfung heute!' : 'Prüfung in ' + dl + ' T'}</span>`; })() : ''}
+            <span class="pill" style="${s.rank >= 2 ? 'background:var(--good-bg);color:var(--good)' : ''}">🏆 Rang ${s.rank}</span>
+            ${s.units ? `<span class="pill">🚗 ${fmtUnits(s.units)} FS</span>` : ''}
+            ${s.redCount ? `<span class="pill" style="background:rgba(255,70,70,.16);color:#ff6b6b">🔴 ${s.redCount}</span>` : ''}
+            ${!isArch && nearReady(s) ? '<span class="pill" style="background:var(--good-bg);color:var(--good)">🎓 fast reif</span>' : ''}
+            ${!isArch && s.exam_date ? (() => { const dl = examDaysLeft(s.exam_date); return dl == null ? '' : `<span class="pill" style="background:color-mix(in srgb,var(--brand) 18%,transparent);color:var(--brand);font-weight:800">🎓 ${dl < 0 ? 'Prüfung war' : dl === 0 ? 'heute!' : 'in ' + dl + ' T'}</span>`; })() : ''}
             ${isArch ? '<span class="pill" style="background:var(--good-bg);color:var(--good)">✅ bestanden</span>' : ''}
           </div>
-          ${s.notes ? `<div class="stu-note" title="${esc(s.notes)}">📝 ${esc(s.notes.length > 80 ? s.notes.slice(0, 80) + '…' : s.notes)}</div>` : ''}
-          <div class="stu-info">
-            <div class="sir"><span class="sil">📞</span><span class="siv">${contact}</span></div>
-            <div class="sir"><span class="sil">📍</span><span class="siv">${homeCell}
-              <button class="linklike" data-home="${s.id}" data-sname="${esc(s.name)}" data-hlabel="${esc(s.home_label || '')}" data-hlat="${s.home_lat != null ? s.home_lat : ''}" data-hlng="${s.home_lng != null ? s.home_lng : ''}">${hasHome ? 'ändern' : 'festlegen'}</button></span></div>
-            <div class="sir"><span class="sil">🎯</span><span class="siv stu-sonder">${sonderCell(s)}</span></div>
-            <div class="sir"><span class="sil">⏱️</span><span class="siv stu-lengths">${boxes}<button class="linklike" data-savedur="${s.id}">speichern</button></span></div>
-          </div>
-          <div class="stu-actions">
-            <button class="iconbtn" data-edit="${s.id}" title="Bearbeiten" aria-label="Bearbeiten"><span class="ib-ic">✏️</span><span class="ib-lb">Bearbeiten</span></button>
-            <button class="iconbtn" data-log="${s.id}" data-lname="${esc(s.name)}" title="Fahrstunde nachtragen" aria-label="Fahrstunde nachtragen"><span class="ib-ic">➕</span><span class="ib-lb">Nachtragen</span></button>
-            <button class="iconbtn" data-invoice="${s.id}" data-iname="${esc(s.name)}" title="Rechnungsdatum" aria-label="Rechnungsdatum"><span class="ib-ic">🧾</span><span class="ib-lb">Rechnung</span></button>
-            <button class="iconbtn" data-proof="${s.id}" data-pname="${esc(s.name)}" title="Nachweis drucken" aria-label="Nachweis drucken"><span class="ib-ic">📄</span><span class="ib-lb">Nachweis</span></button>
-            <button class="iconbtn" data-card="${s.id}" data-cname="${esc(s.name)}" title="Ausbildungskarte" aria-label="Ausbildungskarte"><span class="ib-ic">📋</span><span class="ib-lb">Karte</span></button>
-            <button class="iconbtn" data-reset="${s.id}" data-uname="${esc(s.username || '')}" data-sname="${esc(s.name)}" title="Zugangsdaten" aria-label="Zugangsdaten"><span class="ib-ic">🔑</span><span class="ib-lb">Zugang</span></button>
-            ${isArch
-              ? `<button class="iconbtn ok" data-react="${s.id}" title="Reaktivieren" aria-label="Reaktivieren"><span class="ib-ic">↩︎</span><span class="ib-lb">Zurück</span></button>`
-              : `<button class="iconbtn ok" data-arch="${s.id}" data-aname="${esc(s.name)}" title="Als bestanden ins Archiv" aria-label="Bestanden"><span class="ib-ic">✅</span><span class="ib-lb">Bestanden</span></button>`}
-            <button class="iconbtn danger stu-del" data-del="${s.id}" data-dname="${esc(s.name)}" title="Löschen" aria-label="Löschen"><span class="ib-ic">🗑️</span><span class="ib-lb">Löschen</span></button>
-          </div>
+          <div class="stu-open">${s.phone ? '📞 ' + esc(s.phone) + ' · ' : s.email ? '✉️ ' + esc(s.email) + ' · ' : ''}<span>Profil &amp; alle Daten ›</span></div>
         </div>`;
       }).join('')}
       </div>`;
     // Längen-Chips: optisch mitschalten
-    $('#s-list').querySelectorAll('[data-sdur]').forEach((cb) => cb.onchange = () =>
-      cb.closest('.dur-chip')?.classList.toggle('on', cb.checked));
-    $('#s-list').querySelectorAll('[data-savedur]').forEach((btn) => btn.onclick = async () => {
-      const id = btn.dataset.savedur;
-      const vals = [...$('#s-list').querySelectorAll(`[data-sdur="${id}"]`)].filter((c) => c.checked).map((c) => Number(c.value));
-      if (!vals.length) { toast('Mindestens eine Länge wählen', 'err'); return; }
-      try { await api('/api/students/' + id, { method: 'PATCH', body: { allowed_durations: vals } }); toast('Gespeichert ✓', 'ok'); }
-      catch (e) { toast(e.message, 'err'); }
+    // Karte anklicken -> Profil mit allen Daten + Aktionen öffnen
+    const openById = (id) => { const st = students.find((x) => x.id === Number(id)); if (st) openProfile(st); };
+    $('#s-list').querySelectorAll('.stu-card[data-profile]').forEach((c) => {
+      c.onclick = () => openById(c.dataset.profile);
+      c.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openById(c.dataset.profile); } };
     });
-    $('#s-list').querySelectorAll('[data-reset]').forEach((btn) => btn.onclick = () =>
-      openResetModal(btn.dataset.reset, btn.dataset.sname, btn.dataset.uname));
-    $('#s-list').querySelectorAll('[data-home]').forEach((btn) => btn.onclick = () =>
-      openStandortModal(btn.dataset.home, btn.dataset.sname, btn.dataset.hlabel, btn.dataset.hlat, btn.dataset.hlng));
-    $('#s-list').querySelectorAll('[data-edit]').forEach((btn) => btn.onclick = () =>
-      openEditStudentModal(students.find((x) => x.id === Number(btn.dataset.edit))));
-    $('#s-list').querySelectorAll('[data-card]').forEach((btn) => btn.onclick = () =>
-      openTrainingCard(btn.dataset.card, btn.dataset.cname));
-    $('#s-list').querySelectorAll('[data-log]').forEach((btn) => btn.onclick = () =>
-      openLogLessonModal(Number(btn.dataset.log), btn.dataset.lname));
-    $('#s-list').querySelectorAll('[data-invoice]').forEach((btn) => btn.onclick = () =>
-      openInvoiceModal(Number(btn.dataset.invoice), btn.dataset.iname));
-    $('#s-list').querySelectorAll('[data-proof]').forEach((btn) => btn.onclick = async () => {
-      try { const r = await api('/api/students/' + btn.dataset.proof + '/lessons');
-        if (!r.lessons.length) { toast('Noch keine gefahrenen Stunden für den Nachweis.', 'err'); return; }
-        printLessonProof(r.name || btn.dataset.pname, r.lessons, r.adk, r.stats);
-      } catch (e) { toast(e.message, 'err'); }
-    });
-    $('#s-list').querySelectorAll('[data-del]').forEach((btn) => btn.onclick = () =>
-      deleteStudent(btn.dataset.del, btn.dataset.dname));
     { const pt = $('#s-purge-tests'); if (pt) pt.onclick = async () => {
       if (!confirm('Alle automatisch angelegten „Testschüler …" endgültig entfernen? Der Apple-Prüfer-Zugang (appletest) und echte Fahrschüler bleiben unberührt.')) return;
       try { const r = await api('/api/instructor/students/purge-tests', { method: 'POST' }); toast(`${r.removed} Testschüler entfernt`, 'ok'); tabSchueler(); }
       catch (e) { toast(e.message, 'err'); }
     } }
-    $('#s-list').querySelectorAll('[data-arch]').forEach((btn) => btn.onclick = async () => {
-      if (!confirm(`„${btn.dataset.aname}" als bestanden markieren und ins Archiv verschieben? Daten & Fahrstunden bleiben einsehbar, du kannst jederzeit reaktivieren.`)) return;
-      try { await api('/api/students/' + btn.dataset.arch + '/archive', { method: 'POST' }); toast('Ins Archiv verschoben ✅', 'ok'); tabSchueler(); }
-      catch (e) { toast(e.message, 'err'); }
-    });
-    $('#s-list').querySelectorAll('[data-react]').forEach((btn) => btn.onclick = async () => {
-      try { await api('/api/students/' + btn.dataset.react + '/reactivate', { method: 'POST' }); toast('Reaktiviert ↩︎', 'ok'); tabSchueler(); }
-      catch (e) { toast(e.message, 'err'); }
-    });
     // Suche: filtert die Zeilen nach Name / Login / Telefon / E-Mail
     const search = $('#s-search');
     if (search) search.oninput = () => {
