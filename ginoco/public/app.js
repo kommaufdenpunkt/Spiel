@@ -115,7 +115,8 @@ const I18N = {
     tip_tour: 'Hilfe & Einführung', tip_profile: 'Mein Profil', tip_appearance: 'Aussehen & Farben',
     help_title: 'Hilfe', help_sub: 'Womit können wir helfen?',
     help_tour: 'Kurze Einführung', help_tour_sub: 'In 5 Schritten durch die App',
-    help_support: 'Hilfe & Support', help_support_sub: 'Schreib uns dein Anliegen',
+    help_support: '💬 Feedback & Hilfe', help_support_sub: 'Deine Meinung, Ideen oder Fragen – direkt an deinen Fahrlehrer',
+    help_share: 'Weiterempfehlen', help_share_sub: 'Freunde zur Fahrschule einladen 💛',
     help_news: 'Was ist neu?', help_news_sub: 'Die neuesten Verbesserungen',
     tip_live_stop: 'Standort-Teilen beenden', live_stop: '🛰️ Live · Stopp',
     nav_grp_overview: 'Übersicht', nav_grp_more: 'Mehr',
@@ -1727,15 +1728,30 @@ function openHelpMenu() {
     <p class="hint" style="margin:0 0 .8rem">${t('help_sub')}</p>
     <div class="help-menu">
       <button class="help-row" id="help-tour"><span class="hm-ic">🚗</span><span class="hm-tx"><strong>${t('help_tour')}</strong><span>${t('help_tour_sub')}</span></span><span class="hm-go">›</span></button>
-      <button class="help-row" id="help-support"><span class="hm-ic">✉️</span><span class="hm-tx"><strong>${t('help_support')}</strong><span>${t('help_support_sub')}</span></span><span class="hm-go">›</span></button>
+      <button class="help-row" id="help-support"><span class="hm-ic">💬</span><span class="hm-tx"><strong>${t('help_support')}</strong><span>${t('help_support_sub')}</span></span><span class="hm-go">›</span></button>
+      <button class="help-row" id="help-share"><span class="hm-ic">💛</span><span class="hm-tx"><strong>${t('help_share')}</strong><span>${t('help_share_sub')}</span></span><span class="hm-go">›</span></button>
       <button class="help-row" id="help-news"><span class="hm-ic">🆕</span><span class="hm-tx"><strong>${t('help_news')}</strong><span>${t('help_news_sub')}</span></span><span class="hm-go">›</span></button>
     </div>
     <div class="actions"><button class="sec" onclick="window.__closeModal()">${t('close')}</button></div>`);
   $('#help-tour').onclick = () => { closeModal(); openTour(); };
   $('#help-support').onclick = () => { closeModal(); openSupportModal(); };
+  $('#help-share').onclick = () => { closeModal(); shareApp(); };
   $('#help-news').onclick = () => { closeModal(); (window.__openWhatsNew || (() => {}))(); };
 }
 window.__openHelp = openHelpMenu;
+
+// Weiterempfehlen: native Teilen-Auswahl (Handy), sonst WhatsApp, sonst Link kopieren.
+async function shareApp() {
+  const url = 'https://ginoco.de';
+  const text = 'Ich lerne mit Ginoco bei der Fahrschule Untern Buchen (Eberswalde) Auto fahren – Fahrstunden ganz easy online buchen. Schau mal:';
+  try {
+    if (navigator.share) { await navigator.share({ title: 'Ginoco – Fahrstunden buchen', text, url }); return; }
+  } catch { return; } // Nutzer hat die Teilen-Auswahl abgebrochen – nichts weiter tun
+  // Kein natives Teilen -> WhatsApp öffnen, zusätzlich Link in die Zwischenablage.
+  try { await navigator.clipboard.writeText(url); toast('Link kopiert 💛', 'ok'); } catch {}
+  try { window.open('https://wa.me/?text=' + encodeURIComponent(text + ' ' + url), '_blank', 'noopener'); } catch {}
+}
+window.__shareApp = shareApp;
 
 // ---------- Was ist neu? (Changelog) ----------
 const CHANGELOG_VER = '4.4';
@@ -3187,6 +3203,14 @@ async function syncStudent() {
       api('/api/day-status').catch(() => ({ status: null }))]);
     myBookingsCache = mine.bookings;
     myStats = mine.stats || null; myAdk = mine.adk || null; myProgress = mine.progress || null;
+    // 🏆 Meilenstein: Rang 2 frisch erreicht -> einmal feiern (pro Gerät gemerkt).
+    try {
+      if (myProgress) {
+        const prevRank = Number(localStorage.getItem('gino_rank') || '0');
+        if (myProgress.rank >= 2 && prevRank < 2) celebrate('🏆 Rang 2 erreicht – Sonderfahrten frei!');
+        localStorage.setItem('gino_rank', String(myProgress.rank));
+      }
+    } catch {}
     renderAway(away.away);
     renderDayStatusBanner(dstat.status, mine.bookings);
     renderNotifications(notif.notifications, notif.unread);
@@ -5137,7 +5161,11 @@ function bookSlot(start, dur, maxDur) {
     const chosen = $('#bk-dur') ? Number($('#bk-dur').value) : allowed[0];
     try {
       await api('/api/bookings', { method: 'POST', body: { date: state.date, start_time: start, duration_min: chosen } });
-      closeModal(); celebrate(t('celebrate_booked')); toast(t('toast_booked'), 'ok'); syncStudent();
+      closeModal();
+      let firstEver = false;
+      try { firstEver = !localStorage.getItem('gino_booked_once'); if (firstEver) localStorage.setItem('gino_booked_once', '1'); } catch {}
+      celebrate(firstEver ? '🎉 Deine allererste Fahrstunde!' : t('celebrate_booked'));
+      toast(t('toast_booked'), 'ok'); syncStudent();
     } catch (e) { toast(e.message, 'err'); }
   };
 }
