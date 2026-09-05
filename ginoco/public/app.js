@@ -3403,10 +3403,14 @@ function openLessonDetail(b) {
     ${b.invoice_date ? row('🧾 Auf der Rechnung', `${fmtDT(b.invoice_date)}${b.invoice_time ? ' · ' + b.invoice_time + ' Uhr' : ''}`) : ''}
     ${late ? row('⏱ ' + t('ml_dl_late'), t('ml_late', { late })) : ''}
     ${b.feedback ? row('📝 ' + t('ml_dl_note'), esc(b.feedback)) : ''}
-    ${signState ? row('✍️ Unterschrift', signState) : ''}
-    ${adkN ? `<div class="ld-actions"><button class="sm" id="ld-adk">🗂️ ${t('ml_adk_card', { n: adkN })}</button></div>` : ''}
+    ${b.signed_at ? row('✍️ Unterschrift', signState) : (!noshow ? row('✍️ Unterschrift', '<span class="ld-open">○ noch nicht unterschrieben</span>') : '')}
+    <div class="ld-actions">
+      ${(!noshow && !b.signed_at) ? `<button class="sm" id="ld-sign">✍️ Jetzt unterschreiben</button>` : ''}
+      ${adkN ? `<button class="sm ghost" id="ld-adk">🗂️ ${t('ml_adk_card', { n: adkN })}</button>` : ''}
+    </div>
     <div class="actions"><button onclick="window.__closeModal()">Schließen</button></div>
   </div>`);
+  const sg = $('#ld-sign'); if (sg) sg.onclick = () => openSignModal(b);
   const a = $('#ld-adk'); if (a) a.onclick = () => openLessonAdk(b, state.user?.name || 'Fahrschüler');
 }
 

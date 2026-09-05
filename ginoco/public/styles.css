@@ -590,7 +590,8 @@ th{color:var(--muted);font-weight:600;font-size:.78rem;text-transform:uppercase;
 .ld-row:first-of-type{border-top:none}
 .ld-l{flex:0 0 42%;max-width:170px;color:var(--muted);font-size:.86rem}
 .ld-v{flex:1;min-width:0;overflow-wrap:anywhere}
-.ld-actions{margin-top:.7rem}
+.ld-open{color:var(--warn)}
+.ld-actions{margin-top:.7rem;display:flex;gap:.5rem;flex-wrap:wrap}
 /* Am Handy: keine seitliche Tabelle – jede Fahrstunde als Karte, alles untereinander */
 @media(max-width:560px){
   .ml-wrap{overflow:visible;border:none;border-radius:0}
