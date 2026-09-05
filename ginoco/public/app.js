@@ -7391,6 +7391,7 @@ async function openBulkRoster() {
     <div class="bulk-help">
       <div class="bh-row"><span class="bh-k">Namenszeile</span><span><b>Nachname, Vorname [Jahrgang]</b></span></div>
       <div class="bh-row"><span class="bh-k">Fahrstunde</span><span><b>Datum, Uhrzeit, Dauer</b> <span class="muted">+ optional Art (Überland/Autobahn/Nacht) &amp; Getriebe (Schalt/Automatik)</span></span></div>
+      <div class="bh-row"><span class="bh-k">Fehlstunde</span><span class="muted">einfach <b>Fehlstunde</b> ans Zeilenende → wird als „nicht erschienen" übernommen</span></div>
       <div class="bh-row"><span class="bh-k">Trenner</span><span class="muted">Leerzeile zwischen zwei Fahrschülern (hübscher, nicht Pflicht)</span></div>
     </div>
     <div class="field"><label>Fahrschüler &amp; Fahrstunden</label>
@@ -7435,8 +7436,12 @@ function renderRosterPreview(el, r) {
   const gearPill = (row) => row.gear ? ` <span class="pill" style="background:var(--card);color:var(--muted)">⚙️ ${row.gear === 'schalt' ? 'Schalt' : 'Automatik'}</span>` : '';
   const lessonLine = (row) => {
     if (row.status === 'ok') {
-      return `<div class="bulk-row ok"><span class="br-ic">${row.done ? '🅿️' : '🗓️'}</span>
-        <div><div>${WD[isoDow(row.date) - 1]} ${fmtShort(row.date)} · ${row.time} <span class="muted">(${row.dur} Min)</span>${row.done ? ' <span class="pill" style="background:var(--good-bg);color:var(--good)">gefahren</span>' : ''}${artPill(row)}${gearPill(row)}${row.note ? ' <span class="muted">· ' + esc(row.note) + '</span>' : ''}</div></div></div>`;
+      const statePill = row.noshow
+        ? ' <span class="pill" style="background:var(--bad-bg);color:var(--bad)">nicht erschienen</span>'
+        : (row.done ? ' <span class="pill" style="background:var(--good-bg);color:var(--good)">gefahren</span>' : '');
+      const ic = row.noshow ? '🚫' : (row.done ? '🅿️' : '🗓️');
+      return `<div class="bulk-row ok"><span class="br-ic">${ic}</span>
+        <div><div>${WD[isoDow(row.date) - 1]} ${fmtShort(row.date)} · ${row.time} <span class="muted">(${row.dur} Min)</span>${statePill}${artPill(row)}${gearPill(row)}${row.note ? ' <span class="muted">· ' + esc(row.note) + '</span>' : ''}</div></div></div>`;
     }
     return `<div class="bulk-row error"><span class="br-ic">⚠️</span><div><div class="muted">${esc(row.input)}</div><div class="br-msg error">${esc(row.msg)}</div></div></div>`;
   };
@@ -7457,6 +7462,7 @@ function renderRosterPreview(el, r) {
       ${r.newStudents ? `<span class="pill" style="background:var(--booked);color:#8fb4ff">👤 ${r.newStudents} neu</span>` : ''}
       ${r.totalDone ? `<span class="pill" style="background:var(--good-bg);color:var(--good)">🅿️ ${r.totalDone} gefahren</span>` : ''}
       ${r.totalFuture ? `<span class="pill" style="background:var(--booked);color:#8fb4ff">🗓️ ${r.totalFuture} reserviert</span>` : ''}
+      ${r.totalNoshow ? `<span class="pill" style="background:var(--bad-bg);color:var(--bad)">🚫 ${r.totalNoshow} nicht erschienen</span>` : ''}
       ${!r.totalOk ? `<span class="pill">0 bereit</span>` : ''}
       ${r.totalErr ? `<span class="pill" style="background:var(--bad-bg);color:var(--bad)">⚠️ ${r.totalErr} zu prüfen</span>` : ''}
     </div>

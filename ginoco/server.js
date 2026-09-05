@@ -3725,9 +3725,10 @@ function parseRosterLesson(line) {
       if (ti >= 0) { time = toks[ti]; const du = toks[ti + 1]; if (du && /^\d{1,3}$/.test(du)) dur = du; extras = toks.slice(du && /^\d{1,3}$/.test(du) ? ti + 2 : ti + 1); }
     }
   }
-  let art = '', gear = '', note = [];
+  let art = '', gear = '', note = [], noshow = false;
   for (const tk of extras) {
-    const lw = tk.toLowerCase();
+    const lw = tk.toLowerCase().replace(/\s+/g, '');
+    if (/^(fehlstunde|fehlstd|fehl|nichterschienen|nicht-erschienen|abwesend|noshow)$/.test(lw)) { noshow = true; continue; }
     if (!art && /^(überland|ueberland|überlandfahrt|ueberlandfahrt|überlandf|land)$/.test(lw)) { art = 'ueberland'; continue; }
     if (!art && /^autobahn$/.test(lw)) { art = 'autobahn'; continue; }
     if (!art && /^(nacht|nachtfahrt|nachtf)$/.test(lw)) { art = 'nacht'; continue; }
@@ -3737,7 +3738,7 @@ function parseRosterLesson(line) {
     if (/schaltkompetenz/.test(lw)) { gear = gear || 'schalt'; note.push(tk); continue; }
     note.push(tk);
   }
-  return { date, time, dur, art, gear, note: note.join(' ').trim() };
+  return { date, time, dur, art, gear, note: note.join(' ').trim(), noshow };
 }
 
 // Kompletter Verlauf je Fahrschüler: Kopfzeile = Name (ohne Datum),
@@ -3788,7 +3789,7 @@ function bulkRoster(res, body) {
   const artLabel = { ueberland: 'Überland', autobahn: 'Autobahn', nacht: 'Nachtfahrt', normal: '' };
   const gearLabel = { schalt: 'Schalt', automatik: 'Automatik' };
   const out = [];
-  let totalOk = 0, totalErr = 0, totalDone = 0, totalFuture = 0, newStudents = 0;
+  let totalOk = 0, totalErr = 0, totalDone = 0, totalFuture = 0, totalNoshow = 0, newStudents = 0;
   for (const blk of blocks) {
     if (!blk.nameLine) { out.push({ name: '', error: 'Fahrstunde ohne Fahrschüler-Namen davor', input: blk.orphan, lessons: [] }); totalErr++; continue; }
     const nm = parseNameLine(blk.nameLine);
@@ -3812,18 +3813,20 @@ function bulkRoster(res, body) {
       row.artLabel = artLabel[row.art] || ''; row.gearLabel = gearLabel[row.gear] || '';
       const isPast = date < today || (date === today && toMin(time) <= toMin(now));
       row.done = isPast;
+      row.noshow = !!(f.noshow && isPast); // Fehlstunde: gilt nur für vergangene Termine
       // Überschneidung nur gegen echte Termine (nicht gegen künftige Zeilen des-/derselben Person hier,
       // damit dieselbe echte Historie mehrerer Schüler am selben Tag nicht kollidiert -> nur DB prüfen).
       const ns = toMin(time), ne = ns + dur;
       const iv = dayIntervals(date);
       if (iv.some((x) => overlaps(ns, ne, x.s, x.e))) { row.status = 'error'; row.msg = 'Überschneidet einen vorhandenen Termin'; grp.lessons.push(row); grp.errCount++; totalErr++; continue; }
-      row.status = 'ok'; row.msg = row.done ? 'wird als gefahren übernommen' : 'wird reserviert';
+      row.status = 'ok'; row.msg = row.noshow ? 'wird als nicht erschienen übernommen' : (row.done ? 'wird als gefahren übernommen' : 'wird reserviert');
       iv.push({ s: ns, e: ne });
-      grp.lessons.push(row); grp.okCount++; totalOk++; if (row.done) totalDone++; else totalFuture++;
+      grp.lessons.push(row); grp.okCount++; totalOk++;
+      if (row.noshow) totalNoshow++; else if (row.done) totalDone++; else totalFuture++;
     }
     out.push(grp);
   }
-  const summary = { groups: out, totalOk, totalErr, totalDone, totalFuture, newStudents };
+  const summary = { groups: out, totalOk, totalErr, totalDone, totalFuture, totalNoshow, newStudents };
   if (!commit) return ok(res, { dryRun: true, ...summary });
   // ---- Übernehmen ----
   let createdStudents = [], createdLessons = 0;
@@ -3845,12 +3848,12 @@ function bulkRoster(res, body) {
       if (r.status !== 'ok') continue;
       const status = r.done ? 'done' : 'booked';
       const confirmed = r.done ? 1 : 0;
-      const attended = r.done ? 1 : null;
+      const attended = r.noshow ? 0 : (r.done ? 1 : null);
       const info = db.prepare(
         `INSERT INTO bookings(student_id,date,start_time,duration_min,status,confirmed,attended,lesson_type,gearbox,feedback,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)`
       ).run(sid, r.date, r.time, r.dur, status, confirmed, attended, r.art || 'normal', r.gear || null, r.note || null, new Date().toISOString());
       logEvent('book', { actor: 'instructor', studentId: sid, bookingId: Number(info.lastInsertRowid), date: r.date,
-        detail: `${wdShort(r.date)} ${dmy(r.date)} ${r.time} Uhr (${r.dur} Min)${r.artLabel ? ' · ' + r.artLabel : ''}${r.gearLabel ? ' · ' + r.gearLabel : ''} – Verlauf-Import ${r.done ? '(gefahren)' : '(reserviert)'}` });
+        detail: `${wdShort(r.date)} ${dmy(r.date)} ${r.time} Uhr (${r.dur} Min)${r.artLabel ? ' · ' + r.artLabel : ''}${r.gearLabel ? ' · ' + r.gearLabel : ''} – Verlauf-Import ${r.noshow ? '(nicht erschienen)' : r.done ? '(gefahren)' : '(reserviert)'}` });
       if (!r.done) notify(sid, 'info',
         `Neuer Termin für dich reserviert: ${wdShort(r.date)} ${dmy(r.date)} um ${r.time} Uhr (${r.dur} Min). Bitte in der App bestätigen.`, r.date, Number(info.lastInsertRowid));
       createdLessons++;
