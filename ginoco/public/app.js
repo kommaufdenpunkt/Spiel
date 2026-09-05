@@ -4266,7 +4266,7 @@ async function openPointMap(lat, lng) {
   try { await ensureLeaflet(); } catch { return; }
   const el = document.getElementById('fb-map'); if (!el || !window.L) return;
   const map = L.map(el, { zoomControl: true, attributionControl: true, scrollWheelZoom: false }).setView([lat, lng], 16);
-  L.tileLayer(TILE_SOURCES[0].url, TILE_SOURCES[0].opt).addTo(map);
+  addTilesWithFallback(map, el);
   L.marker([lat, lng], { icon: _meetIcon() }).addTo(map);
   setTimeout(() => { try { map.invalidateSize(); } catch {} }, 200);
 }
@@ -4405,7 +4405,7 @@ async function fillPinsMap(elId, pins) {
   try { await ensureLeaflet(); } catch { return; }
   const el = document.getElementById(elId); if (!el || !window.L) return;
   const map = L.map(el, { zoomControl: true, attributionControl: true, scrollWheelZoom: false });
-  L.tileLayer(TILE_SOURCES[0].url, TILE_SOURCES[0].opt).addTo(map);
+  addTilesWithFallback(map, el);
   const pts = [];
   for (const p of pins) {
     if (p.lat == null || p.lng == null) continue;
@@ -4431,6 +4431,29 @@ const TILE_SOURCES = [
   { url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png', opt: { maxZoom: 19, attribution: '© OpenStreetMap' } },
   { url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', opt: { maxZoom: 20, subdomains: 'abcd', attribution: '© OpenStreetMap, © CARTO' } },
 ];
+// Kacheln robust laden: lädt der erste Anbieter (OSM) nicht, automatisch auf CARTO
+// wechseln – sonst bleibt die Karte grau. Wird von allen Karten genutzt.
+function addTilesWithFallback(map, el) {
+  let srcIdx = 0;
+  const dropLoader = () => { const l = el && el.querySelector('.lm-loading'); if (l) l.remove(); };
+  const add = () => {
+    const src = TILE_SOURCES[srcIdx];
+    const tl = L.tileLayer(src.url, src.opt).addTo(map);
+    let okT = 0, errT = 0;
+    tl.on('tileload', () => { okT++; dropLoader(); });
+    tl.on('tileerror', () => {
+      errT++;
+      if (okT === 0 && errT >= 3 && srcIdx < TILE_SOURCES.length - 1) {
+        srcIdx++; try { map.removeLayer(tl); } catch {} add(); // auf Ersatz-Anbieter umschalten
+      } else if (okT === 0 && errT >= 4) {
+        dropLoader();
+        if (el && !el.querySelector('.lm-hint')) { const h = L.DomUtil.create('div', 'lm-hint', el); h.textContent = '🛰️ Karte lädt gerade nicht – Internetverbindung?'; }
+      }
+    });
+    return tl;
+  };
+  return add();
+}
 async function initLiveMap(id) {
   await ensureLeaflet();
   const el = document.getElementById(id);
