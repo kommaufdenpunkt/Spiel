@@ -3323,7 +3323,7 @@ function renderMyLessons(bookings) {
       <td class="ml-when" data-label="${t('ml_dl_when')}">${nachgetragen ? `<span class="ml-drovelbl">${t('ml_driven_on')}</span>` : ''}<strong>${fmtDT(b.date, b.start_time)}</strong>${nachgetragen ? `<span class="ml-entry">${t('ml_entered_on', { date: fmtEntry(b.created_at) })}</span>` : ''}${b.invoice_date ? `<span class="ml-entry ml-inv">${b.invoice_time ? t('ml_on_invoice_time', { date: fmtDT(b.invoice_date), time: b.invoice_time }) : t('ml_on_invoice', { date: fmtDT(b.invoice_date) })}</span>` : ''}${(() => { const a = actualTime(b); return a ? `<span class="ml-entry ml-time">${a.end ? t('ml_actual', { begin: a.begin, end: a.end }) : t('ml_actual_open', { begin: a.begin })}${a.mins != null ? ` · ${a.mins} ${t('min')}` : ''}</span>` : ''; })()}${(b.instr_signature && b.signed_at) ? `<span class="ml-entry ml-both">${t('both_confirmed')}</span>` : ''}${sign ? `<div class="ml-signcell">${sign}</div>` : ''}</td>
       <td data-label="${t('ml_th_end')}">${noshow ? '—' : t('ml_until', { end: addMinHHMM(b.start_time, b.duration_min) })}</td>
       <td data-label="${t('ml_th_dur')}">${noshow ? t('ml_absent') : (b.duration_min + ' ' + t('min'))}</td>
-      <td data-label="${t('ml_th_type')}">${noshow ? '' : lessonTypeLabel(b.lesson_type)}</td>
+      <td data-label="${t('ml_th_type')}">${noshow ? '' : typeBadge(b.lesson_type)}</td>
       <td data-label="${t('ml_dl_late')}">${late ? t('ml_late', { late }) : ''}</td>
       <td class="ml-note" data-label="${t('ml_dl_note')}">${b.feedback ? esc(b.feedback) : ''}${adkN ? `<button class="linkbtn ml-adk" data-adk="${b.id}">${t('ml_adk_card', { n: adkN })}</button>` : ''}</td>
     </tr>`;
@@ -3738,7 +3738,9 @@ function printLessonProof(name, done, adk, stats) {
     const late = b.late_minutes || 0;
     const entryDate = b.created_at ? String(b.created_at).slice(0, 10) : null;
     const nachgetragen = entryDate && entryDate !== b.date;
-    const artL = { ueberland: 'Überland', autobahn: 'Autobahn', nacht: 'Nachtfahrt' }[b.lesson_type] || 'Normal';
+    const artName = { ueberland: 'Überland', autobahn: 'Autobahn', nacht: 'Nachtfahrt' }[b.lesson_type] || 'Normal';
+    const artC = typeTint(TYPE_LABEL[b.lesson_type] ? b.lesson_type : 'normal');
+    const artL = `<span style="display:inline-block;padding:1px 7px;border-radius:10px;font-weight:600;background:${artC.bg};color:${artC.fg};border:1px solid ${artC.bd}">${artName}</span>`;
     return `<tr>
       <td class="c">${i + 1}</td>
       <td>${nachgetragen ? '<span class="entry-lbl">gefahren am</span> ' : ''}${fmtDT(b.date, b.start_time)}${(() => { const a = actualTime(b); return a ? `<br><span class="entry">tatsächlich ${a.begin}${a.end ? '–' + a.end : ''} Uhr${a.mins != null ? ' · ' + a.mins + ' Min' : ''}</span>` : ''; })()}${nachgetragen ? `<br><span class="entry">vom Fahrlehrer eingetragen am ${fmtEntry(b.created_at)}</span>` : ''}</td>
@@ -3779,7 +3781,7 @@ function printLessonProof(name, done, adk, stats) {
   const doc = `<!doctype html><html lang="de"><head><meta charset="utf-8"><title>Fahrstunden-Nachweis – ${esc(name)}</title>
     <style>
       @page{size:A4 landscape;margin:12mm 14mm}
-      *{box-sizing:border-box}
+      *{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}
       body{font-family:Arial,Helvetica,sans-serif;color:#1a1a1a;margin:0;padding:20px 24px}
       .head{display:flex;align-items:center;gap:16px;border-bottom:3px solid #f2a01a;padding-bottom:12px;margin-bottom:14px}
       .brand{display:flex;align-items:center;gap:12px;flex:1}
@@ -6825,11 +6827,20 @@ function studentColor(id) { return id ? WK_COLORS[id % WK_COLORS.length] : '#5a6
 const TYPE_COLORS = { ueberland: '#2f9e57', autobahn: '#2f6fd0', nacht: '#6d4bb0', normal: '#5b6b7d' };
 const TYPE_ICON = { ueberland: '🌄', autobahn: '🛣️', nacht: '🌙', normal: '🚗' };
 const TYPE_LABEL = { ueberland: 'Überland', autobahn: 'Autobahn', nacht: 'Nachtfahrt', normal: 'Normale Stunde' };
+// Freundliche Farben je Fahrt-Art (heller Hintergrund + passende Schriftfarbe)
+// Übungsstunde hellblau · Überland hellgrün · Autobahn hellorange · Nachtfahrt weinrot
+const TYPE_TINT = {
+  normal:    { bg: '#dcebfb', fg: '#0f4c81', bd: '#b9d6f2' },
+  ueberland: { bg: '#ddf2e1', fg: '#1f6b39', bd: '#bfe2c8' },
+  autobahn:  { bg: '#ffe7cf', fg: '#9c4a06', bd: '#f6cfa8' },
+  nacht:     { bg: '#f2dbe1', fg: '#7a1f3d', bd: '#e3bcc7' },
+};
+function typeTint(type) { return TYPE_TINT[type] || TYPE_TINT.normal; }
 // Einheitliches, farbiges Abzeichen für die Fahrt-Art
 function typeBadge(type) {
   const t = TYPE_LABEL[type] ? type : 'normal';
-  const c = TYPE_COLORS[t];
-  return `<span class="type-badge" style="background:${c}22;color:${c};border-color:${c}66">${TYPE_ICON[t]} ${TYPE_LABEL[t]}</span>`;
+  const c = typeTint(t);
+  return `<span class="type-badge" style="background:${c.bg};color:${c.fg};border-color:${c.bd}">${TYPE_ICON[t]} ${TYPE_LABEL[t]}</span>`;
 }
 
 function renderWeek(el, monday, ov) {
