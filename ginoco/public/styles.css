@@ -1856,3 +1856,18 @@ header .brand .brandname{
 .prof-lengths .pf-durs{display:inline-flex;gap:.3rem;flex-wrap:wrap}
 .prof-actions{display:grid;grid-template-columns:repeat(4,1fr);gap:.5rem;margin-top:.3rem}
 @media (max-width:560px){.prof-actions{grid-template-columns:repeat(3,1fr)}}
+
+/* Fahrstunden im Profil (mit 🔒 unterschrieben) */
+.pf-les-sum{font-size:.85rem;color:var(--muted);margin-bottom:.45rem}
+.pf-les-sum b{color:var(--ink)}
+.pf-lestabs{display:flex;gap:.35rem;margin-bottom:.5rem}
+.pf-lestab{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:999px;padding:.2rem .6rem;font-weight:700;font-size:.78rem;cursor:pointer}
+.pf-lestab.on{background:var(--brand);color:#1b1206;border-color:var(--brand)}
+.pf-les-list{display:flex;flex-direction:column}
+.pf-les-row{display:grid;grid-template-columns:1fr auto auto auto;align-items:center;gap:.6rem;padding:.4rem 0;border-bottom:1px solid var(--line);font-size:.9rem}
+.pf-les-row:last-child{border-bottom:none}
+.pf-les-row.ns{opacity:.55}
+.pf-les-row .pll-d{font-weight:600}
+.pf-les-row .pll-x{color:var(--muted);font-size:.82rem;white-space:nowrap}
+.pf-lock{font-size:.95rem}
+.pf-open{color:var(--muted);font-size:1rem;line-height:1}

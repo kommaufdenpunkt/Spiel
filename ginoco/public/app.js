@@ -7231,6 +7231,7 @@ async function tabSchueler(scope) {
           <div class="prof-sonder">${sonderCell(s)}</div>
           <div class="prof-lengths"><span class="pl">⏱️ Stundenlängen</span> <span class="pf-durs">${boxes}</span> <button class="linklike" id="pf-savedur">speichern</button></div>
         </div>
+        <div class="prof-sec"><h4>📖 Letzte Fahrstunden</h4><div id="pf-les"><span class="muted">Lädt…</span></div></div>
         ${s.notes ? `<div class="prof-sec"><h4>📝 Notiz</h4><div class="stu-note" style="max-width:none">${esc(s.notes)}</div></div>` : ''}
         <div class="prof-actions">
           <button class="iconbtn" id="pf-edit"><span class="ib-ic">✏️</span><span class="ib-lb">Bearbeiten</span></button>
@@ -7255,6 +7256,37 @@ async function tabSchueler(scope) {
       const pa = $('#pf-arch'); if (pa) pa.onclick = async () => { if (!confirm(`„${s.name}" als bestanden markieren und ins Archiv verschieben? Daten & Fahrstunden bleiben einsehbar.`)) return; try { await api('/api/students/' + s.id + '/archive', { method: 'POST' }); toast('Ins Archiv verschoben ✅', 'ok'); closeModal(); tabSchueler(); } catch (e) { toast(e.message, 'err'); } };
       const pr = $('#pf-react'); if (pr) pr.onclick = async () => { try { await api('/api/students/' + s.id + '/reactivate', { method: 'POST' }); toast('Reaktiviert ↩︎', 'ok'); closeModal(); tabSchueler(); } catch (e) { toast(e.message, 'err'); } };
       $('#pf-del').onclick = () => deleteStudent(s.id, s.name);
+      // Fahrstunden im Profil laden (mit 🔒 unterschrieben + Klasse-Reiter A1/B)
+      const loadProfLessons = async () => {
+        const box = $('#pf-les'); if (!box) return;
+        let data; try { data = await api('/api/students/' + s.id + '/lessons'); } catch { box.innerHTML = '<span class="muted">Konnte Fahrstunden nicht laden.</span>'; return; }
+        const les = (data.lessons || []).slice().sort((a, z) => (z.date + z.start_time).localeCompare(a.date + a.start_time));
+        if (!les.length) { box.innerHTML = '<span class="muted">Noch keine gefahrenen Stunden.</span>'; return; }
+        const classes = [...new Set(les.map((l) => l.license_class || 'B'))].sort((a, z) => a === 'B' ? -1 : z === 'B' ? 1 : a.localeCompare(z));
+        const cls = (state._pfLesCls && classes.includes(state._pfLesCls)) ? state._pfLesCls : classes[0];
+        const list = les.filter((l) => (l.license_class || 'B') === cls);
+        const signedN = list.filter((l) => l.signed_at || l.instr_signature).length;
+        const clsTabs = classes.length > 1
+          ? `<div class="pf-lestabs">${classes.map((c) => `<button class="pf-lestab${c === cls ? ' on' : ''}" data-lcls="${esc(c)}">${c === 'B' ? '🚗 B' : c === 'A1' ? '🏍️ A1' : esc(c)}</button>`).join('')}</div>`
+          : '';
+        const rows = list.slice(0, 10).map((l) => {
+          const noshow = l.attended === 0;
+          const both = l.signed_at && l.instr_signature;
+          const signed = l.signed_at || l.instr_signature;
+          const lock = noshow ? '<span class="pf-open" title="nicht erschienen">🚫</span>'
+            : signed ? `<span class="pf-lock" title="${both ? 'von Fahrlehrer & Fahrschüler unterschrieben' : 'unterschrieben'}">🔒${both ? '✔' : ''}</span>`
+            : '<span class="pf-open" title="noch nicht unterschrieben">○</span>';
+          return `<div class="pf-les-row${noshow ? ' ns' : ''}">
+            <span class="pll-d">${fmtDT(l.date, l.start_time)}</span>
+            <span class="pll-x">${noshow ? '—' : l.duration_min + ' Min'}</span>
+            <span class="pll-a">${noshow ? '' : typeBadge(l.lesson_type)}</span>
+            <span class="pll-s">${lock}</span>
+          </div>`;
+        }).join('');
+        box.innerHTML = `<div class="pf-les-sum">${list.length} gefahren · <b>${signedN}</b> 🔒 unterschrieben</div>${clsTabs}<div class="pf-les-list">${rows}</div>${list.length > 10 ? `<div class="muted" style="font-size:.8rem;margin-top:.35rem">… und ${list.length - 10} weitere – vollständig im „📄 Nachweis"</div>` : ''}`;
+        box.querySelectorAll('[data-lcls]').forEach((b) => b.onclick = () => { state._pfLesCls = b.dataset.lcls; loadProfLessons(); });
+      };
+      loadProfLessons();
     };
     // Gesamtübersicht: Kennzahlen über alle (angezeigten) Fahrschüler
     const nRed = students.filter((s) => s.redCount > 0).length;
