@@ -3746,30 +3746,35 @@ function printLessonProof(name, done, adk, stats, cls) {
   const totalMin = driven.reduce((s, b) => s + (b.duration_min || 0), 0);
   const schaltN = driven.filter((b) => b.gearbox === 'schalt').length;
   const autoN = driven.filter((b) => b.gearbox === 'automatik').length;
-  const gearL = (g) => g === 'schalt' ? 'Schalt' : g === 'automatik' ? 'Automatik' : '—';
+  const multiClass = new Set(list.map((b) => b.license_class || 'B')).size > 1;
+  // Sonderfahrten-Stand (UE = 45 Min): Standard-Soll Überland 5 · Autobahn 4 · Nacht 3
+  const sMin = { ueberland: 0, autobahn: 0, nacht: 0 };
+  driven.forEach((b) => { if (sMin[b.lesson_type] != null) sMin[b.lesson_type] += (b.duration_min || 0); });
+  const sUE = (t) => Math.round(sMin[t] / 45);
+  const gearBadge = (g) => g === 'schalt' ? '<span class="gb gb-s">Schalt</span>' : g === 'automatik' ? '<span class="gb gb-a">Automatik</span>' : '<span class="wg">—</span>';
   const rows = list.map((b, i) => {
     const noshow = b.attended === 0;
     const late = b.late_minutes || 0;
     const entryDate = b.created_at ? String(b.created_at).slice(0, 10) : null;
     const nachgetragen = entryDate && entryDate !== b.date;
-    const artName = { ueberland: 'Überland', autobahn: 'Autobahn', nacht: 'Nachtfahrt' }[b.lesson_type] || 'Normal';
+    const artName = { ueberland: 'Überland', autobahn: 'Autobahn', nacht: 'Nachtfahrt' }[b.lesson_type] || 'Übung';
     const artC = typeTint(TYPE_LABEL[b.lesson_type] ? b.lesson_type : 'normal');
-    const artL = `<span style="display:inline-block;padding:1px 7px;border-radius:10px;font-weight:600;background:${artC.bg};color:${artC.fg};border:1px solid ${artC.bd}">${artName}</span>`;
-    return `<tr>
-      <td class="c">${i + 1}</td>
-      <td class="c"><strong>${esc(b.license_class || 'B')}</strong></td>
-      <td>${nachgetragen ? '<span class="entry-lbl">gefahren am</span> ' : ''}${fmtDT(b.date, b.start_time)}${(() => { const a = actualTime(b); return a ? `<br><span class="entry">tatsächlich ${a.begin}${a.end ? '–' + a.end : ''} Uhr${a.mins != null ? ' · ' + a.mins + ' Min' : ''}</span>` : ''; })()}${nachgetragen ? `<br><span class="entry">vom Fahrlehrer eingetragen am ${fmtEntry(b.created_at)}</span>` : ''}</td>
-      <td class="c inv-col">${b.invoice_date ? `<strong>${fmtDT(b.invoice_date)}</strong>${b.invoice_time ? '<br>' + b.invoice_time + ' Uhr' : ''}` : '<span class="wg">wie gefahren</span>'}</td>
-      <td class="c">${noshow ? '—' : addMinHHMM(b.start_time, b.duration_min)}</td>
-      <td class="c">${noshow ? 'nicht erschienen' : b.duration_min + ' Min'}</td>
-      <td class="c">${noshow ? '' : artL}</td>
-      <td class="c gear-col">${noshow ? '' : gearL(b.gearbox)}</td>
-      <td>${late ? `Fahrschüler ${late} Min zu spät` : ''}</td>
-      <td>${esc(b.feedback || '')}</td>
-      <td class="c sig-col">
-        ${b.instr_signature ? `<div class="sig2"><span class="sig2-l">FL</span><img class="sig-img" src="${b.instr_signature}" alt="Unterschrift Fahrlehrer"></div>` : ''}
-        ${b.signature ? `<div class="sig2"><span class="sig2-l">FS</span><img class="sig-img" src="${b.signature}" alt="Unterschrift Fahrschüler"></div>` : (b.signed_at ? `<div class="sig2"><span class="sig2-l">FS</span><span class="sig-ok">✔</span></div>` : '')}
-      </td>
+    const artIco = { ueberland: '🌄', autobahn: '🛣️', nacht: '🌙' }[b.lesson_type] || '';
+    const artL = `<span class="art" style="background:${artC.bg};color:${artC.fg};border:1px solid ${artC.bd}">${artIco ? artIco + ' ' : ''}${artName}</span>`;
+    const a = actualTime(b);
+    const sub = [a ? `tatsächlich ${a.begin}${a.end ? '–' + a.end : ''}${a.mins != null ? ' · ' + a.mins + ' Min' : ''}` : '', nachgetragen ? `eingetragen am ${fmtEntry(b.created_at)}` : ''].filter(Boolean).join(' · ');
+    const vermerk = [esc(b.feedback || ''), late ? `<span class="late">⏱ ${late} Min zu spät</span>` : '', (b.feedback && /prüfungsfahrt/i.test(b.feedback)) ? '' : ''].filter(Boolean).join(' · ');
+    const sig = `${b.instr_signature ? `<span class="s2"><span class="s2l">FL</span><img src="${b.instr_signature}" alt=""></span>` : ''}${b.signature ? `<span class="s2"><span class="s2l">FS</span><img src="${b.signature}" alt=""></span>` : (b.signed_at ? '<span class="s2"><span class="s2l">FS</span><span class="ok">✔</span></span>' : '')}` || '<span class="wg">–</span>';
+    return `<tr class="${noshow ? 'ns' : ''}">
+      <td class="c n">${i + 1}</td>
+      ${multiClass ? `<td class="c"><b>${esc(b.license_class || 'B')}</b></td>` : ''}
+      <td class="dt"><b>${fmtDT(b.date, b.start_time)}</b>${sub ? `<div class="sub">${sub}</div>` : ''}</td>
+      <td class="c">${noshow ? '<span class="wg">nicht erschienen</span>' : artL}</td>
+      <td class="c dur">${noshow ? '—' : '<b>' + b.duration_min + '</b> Min'}</td>
+      <td class="c">${noshow ? '' : gearBadge(b.gearbox)}</td>
+      <td class="c inv">${b.invoice_date ? `<b>${fmtDT(b.invoice_date)}</b>${b.invoice_time ? '<br>' + b.invoice_time : ''}` : '<span class="wg">wie gefahren</span>'}</td>
+      <td class="vm">${vermerk || ''}</td>
+      <td class="c sig">${noshow ? '' : sig}</td>
     </tr>`;
   }).join('');
   const addr = esc(state.settings?.school_label || '');
@@ -3795,34 +3800,49 @@ function printLessonProof(name, done, adk, stats, cls) {
   const LOGO = `<svg width="48" height="48" viewBox="-8 -8 116 116" fill="none" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="gc" x1="6" y1="96" x2="92" y2="8" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#e9530a"/><stop offset=".32" stop-color="#f6890d"/><stop offset=".62" stop-color="#ffc21a"/><stop offset=".85" stop-color="#ffe27a"/><stop offset="1" stop-color="#f7c40f"/></linearGradient></defs><path d="M87.6 36.3 A40 40 0 1 1 64.98 12.9" stroke="url(#gc)" stroke-width="14" stroke-linecap="round"/><circle cx="50" cy="50" r="10" stroke="url(#gc)" stroke-width="10"/><g stroke="url(#gc)" stroke-width="13" stroke-linecap="round"><line x1="35" y1="50" x2="17" y2="50"/><line x1="65" y1="50" x2="83" y2="50"/><line x1="50" y1="65" x2="50" y2="83"/></g><polygon points="62.1,44.2 78.9,13 52.7,36.8" fill="url(#gc)"/><g stroke="url(#gc)" stroke-width="6" stroke-linecap="round"><line x1="73.9" y1="11.8" x2="78.1" y2="5.1"/><line x1="82.4" y1="18.7" x2="88.1" y2="13.2"/><line x1="89" y1="27.5" x2="95.9" y2="23.5"/></g></svg>`;
   const doc = `<!doctype html><html lang="de"><head><meta charset="utf-8"><title>Fahrstunden-Nachweis – ${esc(name)}</title>
     <style>
-      @page{size:A4 landscape;margin:12mm 14mm}
+      @page{size:A4 landscape;margin:11mm 12mm}
       *{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-      body{font-family:Arial,Helvetica,sans-serif;color:#1a1a1a;margin:0;padding:20px 24px}
-      .head{display:flex;align-items:center;gap:16px;border-bottom:3px solid #f2a01a;padding-bottom:12px;margin-bottom:14px}
-      .brand{display:flex;align-items:center;gap:12px;flex:1}
-      .brand .school{font-size:18px;font-weight:800;line-height:1.15}
-      .brand .addr{font-size:11px;color:#666;margin-top:2px}
+      body{font-family:-apple-system,Segoe UI,Arial,Helvetica,sans-serif;color:#22201d;margin:0;padding:16px 20px;font-size:12px}
+      .head{display:flex;align-items:center;gap:16px;margin-bottom:12px}
+      .brand{display:flex;align-items:center;gap:11px;flex:1}
+      .brand .wm{font-size:22px;font-weight:900;letter-spacing:-.01em;line-height:1;background:linear-gradient(135deg,#e9530a,#f6890d 45%,#ffc21a);-webkit-background-clip:text;background-clip:text;color:transparent}
+      .brand .school{font-size:12.5px;font-weight:700;color:#3a352f;margin-top:2px}
+      .brand .addr{font-size:10.5px;color:#8a8378}
       .titleblock{text-align:right}
-      .titleblock h1{font-size:21px;margin:0;color:#111;letter-spacing:.01em}
-      .titleblock .stud{font-size:14px;margin-top:3px;font-weight:600}
-      .titleblock .meta{font-size:11px;color:#666;margin-top:2px}
-      .sum{font-size:13px;margin:2px 0 12px;color:#333}.sum b{color:#111}
-      table{width:100%;border-collapse:collapse;font-size:12px}
-      th,td{border:1px solid #ccc;padding:6px 8px;text-align:left;vertical-align:top}
-      th{background:#faf3e2;color:#7a5300;font-size:10.5px;text-transform:uppercase;letter-spacing:.03em}
-      tbody tr:nth-child(even){background:#fbfaf7}
-      td.c{text-align:center;white-space:nowrap} .entry{font-size:10px;color:#777}
-      .entry-lbl{font-size:9px;text-transform:uppercase;letter-spacing:.04em;color:#999;font-weight:700}
-      td.inv-col{color:#b26a00;font-weight:600} td.inv-col .wg{color:#aaa;font-weight:400;font-style:italic}
-      td.sig-col{text-align:center;vertical-align:middle}
-      .sig-img{height:30px;max-width:130px;object-fit:contain;display:block;margin:0 auto}
-      .sig-ok{color:#0a7d3b;font-weight:700;font-size:14px}
-      .sig2{display:flex;align-items:center;gap:4px;justify-content:center;margin:1px 0}
-      .sig2-l{font-size:8px;font-weight:700;color:#999;width:16px;text-align:right}
+      .titleblock h1{font-size:16px;margin:0;color:#8a5200;text-transform:uppercase;letter-spacing:.08em;font-weight:800}
+      .titleblock .stud{font-size:18px;margin-top:2px;font-weight:800;color:#111}
+      .titleblock .meta{font-size:10.5px;color:#8a8378;margin-top:2px}
+      .band{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 12px}
+      .tile{border:1px solid #ece3d2;border-radius:11px;padding:7px 12px;background:#fdfaf3;min-width:74px}
+      .tile .k{font-size:9px;text-transform:uppercase;letter-spacing:.05em;color:#a8895a;font-weight:800}
+      .tile .v{font-size:15px;font-weight:800;color:#2a2620;margin-top:1px}
+      .tile.son{background:#fff}
+      .tile.son.ok{background:#eef8f0;border-color:#bfe4c8}
+      .tile.son .v{font-size:13px}.tile.son.ok .v{color:#1f7a3b}
+      table{width:100%;border-collapse:separate;border-spacing:0;font-size:11.5px;border:1px solid #e7ddcb;border-radius:12px;overflow:hidden}
+      th,td{padding:6px 9px;text-align:left;vertical-align:middle;border-bottom:1px solid #eee5d6}
+      th{background:#f4a01a;color:#fff;font-size:10px;text-transform:uppercase;letter-spacing:.04em;font-weight:800;border-bottom:none}
+      tbody tr:nth-child(even){background:#fbf8f2}
+      tbody tr.ns{background:#faf3f3;color:#a06}
+      tbody tr:last-child td{border-bottom:none}
+      td.c{text-align:center;white-space:nowrap}
+      td.n{color:#b3a892;font-weight:700}
+      td.dt b{font-size:12px}.dt .sub{font-size:9.5px;color:#9a9182;margin-top:1px}
+      td.dur b{font-size:12.5px}
+      .art{display:inline-block;padding:2px 9px;border-radius:20px;font-weight:700;font-size:11px}
+      .gb{display:inline-block;padding:1px 8px;border-radius:20px;font-size:10.5px;font-weight:700;background:#efeae1;color:#5c5648}
+      .wg{color:#bcb4a6;font-style:italic}
+      td.inv b{color:#b26a00}
+      .late{color:#c2410c;font-weight:600}
+      td.sig{white-space:nowrap}
+      .s2{display:inline-flex;align-items:center;gap:3px;margin:0 3px}
+      .s2l{font-size:8px;font-weight:800;color:#b3a892}
+      .s2 img{height:26px;max-width:96px;object-fit:contain}
+      .ok{color:#0a7d3b;font-weight:800;font-size:13px}
       tr{break-inside:avoid}
-      .sign{margin-top:32px;display:flex;gap:64px}
-      .sign div{flex:1;border-top:1px solid #333;padding-top:6px;font-size:11px;color:#444}
-      .foot{margin-top:14px;font-size:10px;color:#777;border-top:1px solid #ddd;padding-top:8px;line-height:1.55}
+      .sign{margin-top:26px;display:flex;gap:60px}
+      .sign div{flex:1;border-top:1px solid #333;padding-top:6px;font-size:10.5px;color:#444}
+      .foot{margin-top:12px;font-size:9px;color:#9a9182;border-top:1px solid #eee5d6;padding-top:7px;line-height:1.5}
       .adk-page{page-break-before:always;padding-top:4px}
       .adk-h{font-size:16px;margin:0 0 6px;color:#111;border-bottom:2px solid #f2a01a;padding-bottom:6px}
       .sum2{font-size:12px;color:#333;margin:6px 0 10px;font-weight:600}
@@ -3835,11 +3855,17 @@ function printLessonProof(name, done, adk, stats, cls) {
       .adk-red{margin-top:12px;font-size:11.5px;padding:8px 10px;border:1px solid #e0a;border-left:4px solid #d0306a;border-radius:6px;background:#fdf0f5;color:#8a1c46}
     </style></head><body>
     <div class="head">
-      <div class="brand">${LOGO}<div><div class="school">${school}</div>${addr ? `<div class="addr">${addr}</div>` : ''}</div></div>
+      <div class="brand">${LOGO}<div><div class="wm">ginoco</div><div class="school">${school}</div>${addr ? `<div class="addr">${addr}</div>` : ''}</div></div>
       <div class="titleblock"><h1>Fahrstunden-Nachweis${clsTitle}</h1><div class="stud">${esc(name)}</div><div class="meta">${(state.mlFrom || state.mlTo) ? `Zeitraum: ${state.mlFrom ? fmtDT(state.mlFrom) : '…'} – ${state.mlTo ? fmtDT(state.mlTo) : '…'} · ` : ''}Stand: ${today}</div></div>
     </div>
-    <div class="sum"><b>${driven.length} gefahrene Fahrstunden · ${hLabel(totalMin)} gesamt</b>${(schaltN || autoN) ? ` · ${schaltN}× Schalt · ${autoN}× Automatik` : ''}</div>
-    <table><thead><tr><th>#</th><th>Kl.</th><th>Datum &amp; Uhrzeit (gefahren)</th><th>Auf der Rechnung</th><th>Ende</th><th>Dauer</th><th>Art</th><th>Getriebe</th><th>Verspätung</th><th>Vermerk</th><th>Unterschrift</th></tr></thead>
+    <div class="band">
+      <div class="tile"><div class="k">Fahrstunden</div><div class="v">${driven.length}</div></div>
+      <div class="tile"><div class="k">Zeit gesamt</div><div class="v">${hLabel(totalMin)}</div></div>
+      ${schaltN ? `<div class="tile"><div class="k">Schalt</div><div class="v">${schaltN}</div></div>` : ''}
+      ${autoN ? `<div class="tile"><div class="k">Automatik</div><div class="v">${autoN}</div></div>` : ''}
+      ${(!cls || cls === 'B') ? [['ueberland', '🌄 Überland', 5], ['autobahn', '🛣️ Autobahn', 4], ['nacht', '🌙 Nacht', 3]].map(([k, lb, tgt]) => `<div class="tile son ${sUE(k) >= tgt ? 'ok' : ''}"><div class="k">${lb}</div><div class="v">${sUE(k)}/${tgt}${sUE(k) >= tgt ? ' ✓' : ''}</div></div>`).join('') : ''}
+    </div>
+    <table><thead><tr><th>#</th>${multiClass ? '<th>Kl.</th>' : ''}<th>Datum &amp; Uhrzeit (gefahren)</th><th>Art</th><th>Dauer</th><th>Getriebe</th><th>Auf der Rechnung</th><th>Vermerk</th><th>Unterschrift</th></tr></thead>
       <tbody>${rows}</tbody></table>
     <div class="sign"><div>Unterschrift Fahrlehrer</div><div>Unterschrift Fahrschüler</div></div>
     ${adkSection}
