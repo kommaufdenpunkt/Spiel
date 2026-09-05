@@ -3820,11 +3820,12 @@ function printLessonProof(name, done, adk, stats, cls) {
       .tile.son .v{font-size:13px}.tile.son.ok .v{color:#1f7a3b}
       table{width:100%;border-collapse:separate;border-spacing:0;font-size:11.5px;border:1px solid #e7ddcb;border-radius:12px;overflow:hidden}
       th,td{padding:6px 9px;text-align:left;vertical-align:middle;border-bottom:1px solid #eee5d6}
-      th{background:#f4a01a;color:#fff;font-size:10px;text-transform:uppercase;letter-spacing:.04em;font-weight:800;border-bottom:none}
+      th{background:#f4a01a;color:#fff;font-size:10px;text-transform:uppercase;letter-spacing:.04em;font-weight:800;border-bottom:none;text-align:center}
       tbody tr:nth-child(even){background:#fbf8f2}
       tbody tr.ns{background:#faf3f3;color:#a06}
       tbody tr:last-child td{border-bottom:none}
       td.c{text-align:center;white-space:nowrap}
+      td.dt,td.vm{text-align:center}
       td.n{color:#b3a892;font-weight:700}
       td.dt b{font-size:12.5px}.dt .tm{font-size:11px;color:#4a453d;margin-top:1px}
       td.dur b{font-size:12.5px}
