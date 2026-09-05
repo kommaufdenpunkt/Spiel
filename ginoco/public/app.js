@@ -3761,18 +3761,17 @@ function printLessonProof(name, done, adk, stats, cls) {
     const artC = typeTint(TYPE_LABEL[b.lesson_type] ? b.lesson_type : 'normal');
     const artIco = { ueberland: '🌄', autobahn: '🛣️', nacht: '🌙' }[b.lesson_type] || '';
     const artL = `<span class="art" style="background:${artC.bg};color:${artC.fg};border:1px solid ${artC.bd}">${artIco ? artIco + ' ' : ''}${artName}</span>`;
-    const a = actualTime(b);
-    const sub = [a ? `tatsächlich ${a.begin}${a.end ? '–' + a.end : ''}${a.mins != null ? ' · ' + a.mins + ' Min' : ''}` : '', nachgetragen ? `eingetragen am ${fmtEntry(b.created_at)}` : ''].filter(Boolean).join(' · ');
-    const vermerk = [esc(b.feedback || ''), late ? `<span class="late">⏱ ${late} Min zu spät</span>` : '', (b.feedback && /prüfungsfahrt/i.test(b.feedback)) ? '' : ''].filter(Boolean).join(' · ');
+    const timeLine = noshow ? '<span class="wg">nicht erschienen</span>' : `von ${b.start_time} bis ${addMinHHMM(b.start_time, b.duration_min)} Uhr`;
+    const vermerk = [esc(b.feedback || ''), late ? `<span class="late">⏱ ${late} Min zu spät</span>` : ''].filter(Boolean).join(' · ');
     const sig = `${b.instr_signature ? `<span class="s2"><span class="s2l">FL</span><img src="${b.instr_signature}" alt=""></span>` : ''}${b.signature ? `<span class="s2"><span class="s2l">FS</span><img src="${b.signature}" alt=""></span>` : (b.signed_at ? '<span class="s2"><span class="s2l">FS</span><span class="ok">✔</span></span>' : '')}` || '<span class="wg">–</span>';
     return `<tr class="${noshow ? 'ns' : ''}">
       <td class="c n">${i + 1}</td>
       ${multiClass ? `<td class="c"><b>${esc(b.license_class || 'B')}</b></td>` : ''}
-      <td class="dt"><b>${fmtDT(b.date, b.start_time)}</b>${sub ? `<div class="sub">${sub}</div>` : ''}</td>
+      <td class="dt"><b>${fmtDT(b.date)}</b><div class="tm">${timeLine}</div></td>
       <td class="c">${noshow ? '<span class="wg">nicht erschienen</span>' : artL}</td>
       <td class="c dur">${noshow ? '—' : '<b>' + b.duration_min + '</b> Min'}</td>
       <td class="c">${noshow ? '' : gearBadge(b.gearbox)}</td>
-      <td class="c inv">${b.invoice_date ? `<b>${fmtDT(b.invoice_date)}</b>${b.invoice_time ? '<br>' + b.invoice_time : ''}` : '<span class="wg">wie gefahren</span>'}</td>
+      <td class="c inv">${b.invoice_date ? `<b>${fmtDT(b.invoice_date)}</b><br>${b.invoice_time || b.start_time} Uhr` : '<span class="wg">wie gefahren</span>'}</td>
       <td class="vm">${vermerk || ''}</td>
       <td class="c sig">${noshow ? '' : sig}</td>
     </tr>`;
@@ -3827,7 +3826,7 @@ function printLessonProof(name, done, adk, stats, cls) {
       tbody tr:last-child td{border-bottom:none}
       td.c{text-align:center;white-space:nowrap}
       td.n{color:#b3a892;font-weight:700}
-      td.dt b{font-size:12px}.dt .sub{font-size:9.5px;color:#9a9182;margin-top:1px}
+      td.dt b{font-size:12.5px}.dt .tm{font-size:11px;color:#4a453d;margin-top:1px}
       td.dur b{font-size:12.5px}
       .art{display:inline-block;padding:2px 9px;border-radius:20px;font-weight:700;font-size:11px}
       .gb{display:inline-block;padding:1px 8px;border-radius:20px;font-size:10.5px;font-weight:700;background:#efeae1;color:#5c5648}
