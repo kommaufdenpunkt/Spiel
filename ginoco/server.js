@@ -600,7 +600,7 @@ function studentRank(studentId) {
 function sonderCounts(studentId) {
   const UE = 45;
   const rows = db.prepare(
-    "SELECT lesson_type AS t, COALESCE(SUM(duration_min),0) AS m FROM bookings WHERE student_id=? AND status='done' AND (attended IS NULL OR attended=1) AND lesson_type IN ('ueberland','autobahn','nacht') GROUP BY lesson_type").all(studentId);
+    "SELECT lesson_type AS t, COALESCE(SUM(duration_min),0) AS m FROM bookings WHERE student_id=? AND status='done' AND (attended IS NULL OR attended=1) AND license_class='B' AND lesson_type IN ('ueberland','autobahn','nacht') GROUP BY lesson_type").all(studentId);
   const m = { ueberland: 0, autobahn: 0, nacht: 0 };
   for (const r of rows) m[r.t] = Math.round((r.m || 0) / UE);
   return m;
@@ -621,7 +621,7 @@ function sonderMin(type) {
 function lessonStats(studentId) {
   const UNIT = 80;
   const rows = db.prepare(
-    "SELECT duration_min AS d, gearbox AS g, lesson_type AS t FROM bookings WHERE student_id=? AND status='done' AND (attended IS NULL OR attended=1)").all(studentId);
+    "SELECT duration_min AS d, gearbox AS g, lesson_type AS t FROM bookings WHERE student_id=? AND status='done' AND (attended IS NULL OR attended=1) AND license_class='B'").all(studentId);
   const s = {
     sessions: 0, minutes: 0, units: 0,
     schalt: { sessions: 0, minutes: 0, units: 0 },
@@ -1263,7 +1263,7 @@ async function handleApi(req, res, url) {
   if (p === '/api/my/bookings' && method === 'GET') {
     if (!requireStudent()) return bad(res, 'Bitte anmelden', 401);
     const rows = db.prepare(
-      `SELECT id,date,start_time,duration_min,status,gearbox,plate,note,started_at,ended_at,confirmed,feedback,lesson_type,late_minutes,attended,needs_sign,signed_at,signature,instr_signature,instr_signed_at,curriculum,invoice_date,invoice_time,reschedule_req,reschedule_note,created_at
+      `SELECT id,date,start_time,duration_min,status,gearbox,plate,note,started_at,ended_at,confirmed,feedback,lesson_type,license_class,late_minutes,attended,needs_sign,signed_at,signature,instr_signature,instr_signed_at,curriculum,invoice_date,invoice_time,reschedule_req,reschedule_note,created_at
        FROM bookings WHERE student_id = ? AND status != 'cancelled' ORDER BY date, start_time`
     ).all(sess.student_id);
     return ok(res, { bookings: rows, weekInfo: weekInfoForStudent(sess.student_id),
@@ -2934,7 +2934,7 @@ async function handleApi(req, res, url) {
     const st = db.prepare('SELECT name FROM students WHERE id=?').get(sid);
     if (!st) return bad(res, 'Schüler nicht gefunden', 404);
     const lessons = db.prepare(
-      `SELECT id,date,start_time,duration_min,status,gearbox,plate,lesson_type,late_minutes,attended,feedback,needs_sign,signed_at,signature,instr_signature,instr_signed_at,curriculum,invoice_date,invoice_time,created_at
+      `SELECT id,date,start_time,duration_min,status,gearbox,plate,lesson_type,license_class,late_minutes,attended,feedback,needs_sign,signed_at,signature,instr_signature,instr_signed_at,curriculum,invoice_date,invoice_time,created_at
        FROM bookings WHERE student_id=? AND status='done' ORDER BY date,start_time`).all(sid);
     return ok(res, { lessons, name: st.name, stats: lessonStats(sid), adk: adkSummary(sid) });
   }
@@ -3725,9 +3725,14 @@ function parseRosterLesson(line) {
       if (ti >= 0) { time = toks[ti]; const du = toks[ti + 1]; if (du && /^\d{1,3}$/.test(du)) dur = du; extras = toks.slice(du && /^\d{1,3}$/.test(du) ? ti + 2 : ti + 1); }
     }
   }
-  let art = '', gear = '', note = [], noshow = false, invDate = '', invTime = '';
+  let art = '', gear = '', note = [], noshow = false, invDate = '', invTime = '', cls = '';
+  const CLASSES = { a1: 'A1', a2: 'A2', am: 'AM', a: 'A', b: 'B', be: 'BE', b96: 'B96', l: 'L', t: 'T', c1: 'C1', c: 'C', ce: 'CE', d1: 'D1', d: 'D', de: 'DE', mofa: 'Mofa' };
   for (const tk of extras) {
     const lw = tk.toLowerCase().replace(/\s+/g, '');
+    // Führerschein-Klasse: „A1", „B", auch „Kl.A1" / „KlasseA1"
+    const cm = lw.replace(/^(kl\.?|klasse)/, '');
+    if (!cls && CLASSES[cm]) { cls = CLASSES[cm]; continue; }
+    if (/^(prüfungsfahrt|pruefungsfahrt|prüfung|pruefung)$/.test(lw)) { note.push('Prüfungsfahrt'); continue; }
     // Rechnungsdatum (optional): ein Feld, das ein Datum enthält – z. B. „05.09.2026 06:00"
     // oder „Rechnung 05.09.2026". Steuert, wann die Fahrt AUF DER RECHNUNG erscheint.
     if (!invDate) {
@@ -3749,7 +3754,7 @@ function parseRosterLesson(line) {
     if (/schaltkompetenz/.test(lw)) { gear = gear || 'schalt'; note.push(tk); continue; }
     note.push(tk);
   }
-  return { date, time, dur, art, gear, note: note.join(' ').trim(), noshow, invDate, invTime };
+  return { date, time, dur, art, gear, note: note.join(' ').trim(), noshow, invDate, invTime, cls };
 }
 
 // Kompletter Verlauf je Fahrschüler: Kopfzeile = Name (ohne Datum),
@@ -3829,6 +3834,7 @@ function bulkRoster(res, body) {
       // Doppel-Schutz: existiert für diesen Schüler schon eine Fahrt zu Datum+Uhrzeit -> überspringen.
       if (existKeys.has(date + ' ' + time)) { row.status = 'dup'; row.msg = 'schon vorhanden – übersprungen'; grp.lessons.push(row); grp.dupCount++; totalDup++; continue; }
       row.art = f.art || 'normal'; row.gear = f.gear || ''; row.note = f.note || '';
+      row.cls = f.cls || 'B';
       row.artLabel = artLabel[row.art] || ''; row.gearLabel = gearLabel[row.gear] || '';
       row.invDate = f.invDate ? parseImportDate(f.invDate, today) : '';
       row.invTime = f.invTime ? parseImportTime(f.invTime) : '';
@@ -3875,8 +3881,8 @@ function bulkRoster(res, body) {
       const confirmed = r.done ? 1 : 0;
       const attended = r.noshow ? 0 : (r.done ? 1 : null);
       const info = db.prepare(
-        `INSERT INTO bookings(student_id,date,start_time,duration_min,status,confirmed,attended,lesson_type,gearbox,feedback,invoice_date,invoice_time,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`
-      ).run(sid, r.date, r.time, r.dur, status, confirmed, attended, r.art || 'normal', r.gear || null, r.note || null, r.invDate || null, r.invTime || null, new Date().toISOString());
+        `INSERT INTO bookings(student_id,date,start_time,duration_min,status,confirmed,attended,lesson_type,gearbox,feedback,invoice_date,invoice_time,license_class,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
+      ).run(sid, r.date, r.time, r.dur, status, confirmed, attended, r.art || 'normal', r.gear || null, r.note || null, r.invDate || null, r.invTime || null, r.cls || 'B', new Date().toISOString());
       logEvent('book', { actor: 'instructor', studentId: sid, bookingId: Number(info.lastInsertRowid), date: r.date,
         detail: `${wdShort(r.date)} ${dmy(r.date)} ${r.time} Uhr (${r.dur} Min)${r.artLabel ? ' · ' + r.artLabel : ''}${r.gearLabel ? ' · ' + r.gearLabel : ''}${r.invDate ? ' · Rechnung ' + dmy(r.invDate) : ''} – Verlauf-Import ${r.noshow ? '(nicht erschienen)' : r.done ? '(gefahren)' : '(reserviert)'}` });
       if (!r.done) notify(sid, 'info',

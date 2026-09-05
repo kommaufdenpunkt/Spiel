@@ -3302,10 +3302,20 @@ function fmtEntry(ts) {
 }
 function renderMyLessons(bookings) {
   const card = $('#lessons-card'); if (!card) return;
-  const done = (bookings || []).filter((b) => b.status === 'done')
+  const doneAll = (bookings || []).filter((b) => b.status === 'done')
     .sort((a, z) => (z.date + z.start_time).localeCompare(a.date + a.start_time));
-  if (!done.length) { card.classList.add('hidden'); return; }
+  if (!doneAll.length) { card.classList.add('hidden'); return; }
   card.classList.remove('hidden');
+  // Führerschein-Klassen als Reiter (z. B. B + Vorbildung A1). B immer zuerst.
+  const classes = [...new Set(doneAll.map((b) => b.license_class || 'B'))]
+    .sort((a, z) => (a === 'B' ? -1 : z === 'B' ? 1 : a.localeCompare(z)));
+  const activeCls = (state.mlClass && classes.includes(state.mlClass)) ? state.mlClass : classes[0];
+  const clsLabel = (c) => c === 'B' ? '🚗 Klasse B' : c === 'A1' ? '🏍️ A1' : c === 'A2' ? '🏍️ A2' : c === 'A' ? '🏍️ A' : c === 'AM' ? '🛵 AM' : 'Klasse ' + esc(c);
+  const classTabs = classes.length > 1
+    ? `<div class="ml-classtabs">${classes.map((c) => `<button class="ml-classtab${c === activeCls ? ' on' : ''}" data-cls="${esc(c)}">${clsLabel(c)}${c !== 'B' ? ' <span class="ct-vor">Vorbildung</span>' : ''}</button>`).join('')}</div>`
+    : '';
+  const isB = activeCls === 'B';
+  const done = doneAll.filter((b) => (b.license_class || 'B') === activeCls);
   const toSign = done.filter((b) => b.needs_sign);
   // 🧾 Nachweise: nach Zeitraum filtern (leer = alles). Filter gilt für Liste UND Ausdruck.
   const fFrom = state.mlFrom || '', fTo = state.mlTo || '';
@@ -3333,9 +3343,11 @@ function renderMyLessons(bookings) {
     : '';
   card.innerHTML = `<h2>${t('ml_title')}</h2>
     <p class="hint">${t('ml_hint')}</p>
+    ${classTabs}
+    ${classes.length > 1 && !isB ? `<p class="hint" style="margin:-.2rem 0 .6rem">🏍️ <strong>${clsLabel(activeCls).replace(/^\S+\s/, '')}</strong> – deine Vorbildung (abgeschlossene Ausbildung einer anderen Klasse). Nur zur Ansicht; zählt nicht zu deiner aktuellen Klasse-B-Ausbildung.</p>` : ''}
     ${banner}
-    ${statStripHtml(myStats)}
-    ${adkNeedWorkHtml(myAdk)}
+    ${isB ? statStripHtml(myStats) : ''}
+    ${isB ? adkNeedWorkHtml(myAdk) : ''}
     <div class="ml-filter">
       <span class="ml-filter-t">${t('ml_filter_title')}</span>
       <label>${t('ml_filter_from')} <input type="date" id="ml-from" value="${esc(fFrom)}"></label>
@@ -3351,7 +3363,8 @@ function renderMyLessons(bookings) {
       <thead><tr><th>${t('ml_th_when')}</th><th>${t('ml_th_end')}</th><th>${t('ml_th_dur')}</th><th>${t('ml_th_type')}</th><th>${t('ml_th_late')}</th><th>${t('ml_th_note')}</th></tr></thead>
       <tbody>${rows || `<tr><td colspan="6" class="muted" style="text-align:center;padding:1rem">${t('ml_filter_none')}</td></tr>`}</tbody>
     </table></div>`;
-  const pb = $('#ml-print'); if (pb) pb.onclick = () => printLessonProof(state.user?.name || 'Fahrschüler', shown, myAdk, myStats);
+  card.querySelectorAll('[data-cls]').forEach((btn) => btn.onclick = () => { state.mlClass = btn.dataset.cls; renderMyLessons(myBookingsCache); });
+  const pb = $('#ml-print'); if (pb) pb.onclick = () => printLessonProof(state.user?.name || 'Fahrschüler', shown, isB ? myAdk : null, isB ? myStats : null, activeCls);
   const ab = $('#ml-adk-all'); if (ab) ab.onclick = () => openMyTraining();
   const applyF = () => { state.mlFrom = $('#ml-from').value || ''; state.mlTo = $('#ml-to').value || ''; renderMyLessons(myBookingsCache); };
   const ff = $('#ml-from'); if (ff) ff.onchange = applyF;
@@ -3724,8 +3737,9 @@ function openReviewModal(existing, hasPhoto) {
 }
 function revRatingWord(n) { return n >= 1 && n <= 5 ? t('rw_' + n) : ''; }
 // Druckbarer Fahrstunden-Nachweis (Tabelle + Unterschriften) + optional ADK-Zusammenfassung
-function printLessonProof(name, done, adk, stats) {
+function printLessonProof(name, done, adk, stats, cls) {
   const school = esc(state.settings?.instructor_name || 'Fahrschule');
+  const clsTitle = cls && cls !== 'B' ? ` – Klasse ${esc(cls)}` : '';
   const today = new Date().toLocaleDateString(LOCALE, { day: '2-digit', month: '2-digit', year: 'numeric' });
   const list = (done || []).slice().sort((a, z) => (a.date + a.start_time).localeCompare(z.date + z.start_time));
   const driven = list.filter((b) => b.attended !== 0);
@@ -3743,6 +3757,7 @@ function printLessonProof(name, done, adk, stats) {
     const artL = `<span style="display:inline-block;padding:1px 7px;border-radius:10px;font-weight:600;background:${artC.bg};color:${artC.fg};border:1px solid ${artC.bd}">${artName}</span>`;
     return `<tr>
       <td class="c">${i + 1}</td>
+      <td class="c"><strong>${esc(b.license_class || 'B')}</strong></td>
       <td>${nachgetragen ? '<span class="entry-lbl">gefahren am</span> ' : ''}${fmtDT(b.date, b.start_time)}${(() => { const a = actualTime(b); return a ? `<br><span class="entry">tatsächlich ${a.begin}${a.end ? '–' + a.end : ''} Uhr${a.mins != null ? ' · ' + a.mins + ' Min' : ''}</span>` : ''; })()}${nachgetragen ? `<br><span class="entry">vom Fahrlehrer eingetragen am ${fmtEntry(b.created_at)}</span>` : ''}</td>
       <td class="c inv-col">${b.invoice_date ? `<strong>${fmtDT(b.invoice_date)}</strong>${b.invoice_time ? '<br>' + b.invoice_time + ' Uhr' : ''}` : '<span class="wg">wie gefahren</span>'}</td>
       <td class="c">${noshow ? '—' : addMinHHMM(b.start_time, b.duration_min)}</td>
@@ -3821,10 +3836,10 @@ function printLessonProof(name, done, adk, stats) {
     </style></head><body>
     <div class="head">
       <div class="brand">${LOGO}<div><div class="school">${school}</div>${addr ? `<div class="addr">${addr}</div>` : ''}</div></div>
-      <div class="titleblock"><h1>Fahrstunden-Nachweis</h1><div class="stud">${esc(name)}</div><div class="meta">${(state.mlFrom || state.mlTo) ? `Zeitraum: ${state.mlFrom ? fmtDT(state.mlFrom) : '…'} – ${state.mlTo ? fmtDT(state.mlTo) : '…'} · ` : ''}Stand: ${today}</div></div>
+      <div class="titleblock"><h1>Fahrstunden-Nachweis${clsTitle}</h1><div class="stud">${esc(name)}</div><div class="meta">${(state.mlFrom || state.mlTo) ? `Zeitraum: ${state.mlFrom ? fmtDT(state.mlFrom) : '…'} – ${state.mlTo ? fmtDT(state.mlTo) : '…'} · ` : ''}Stand: ${today}</div></div>
     </div>
     <div class="sum"><b>${driven.length} gefahrene Fahrstunden · ${hLabel(totalMin)} gesamt</b>${(schaltN || autoN) ? ` · ${schaltN}× Schalt · ${autoN}× Automatik` : ''}</div>
-    <table><thead><tr><th>#</th><th>Datum &amp; Uhrzeit (gefahren)</th><th>Auf der Rechnung</th><th>Ende</th><th>Dauer</th><th>Art</th><th>Getriebe</th><th>Verspätung</th><th>Vermerk</th><th>Unterschrift</th></tr></thead>
+    <table><thead><tr><th>#</th><th>Kl.</th><th>Datum &amp; Uhrzeit (gefahren)</th><th>Auf der Rechnung</th><th>Ende</th><th>Dauer</th><th>Art</th><th>Getriebe</th><th>Verspätung</th><th>Vermerk</th><th>Unterschrift</th></tr></thead>
       <tbody>${rows}</tbody></table>
     <div class="sign"><div>Unterschrift Fahrlehrer</div><div>Unterschrift Fahrschüler</div></div>
     ${adkSection}

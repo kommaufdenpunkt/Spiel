@@ -1817,3 +1817,13 @@ header .brand .brandname{
 .rev-mode-slide .rev-slide .rev-card .rev-text{font-size:1rem;line-height:1.5;-webkit-line-clamp:6;margin:.55rem 0 .65rem}
 .rev-mode-slide .rev-slide .rev-card::before{font-size:4.2rem;top:-.35rem}
 .rev-dot.on{background:linear-gradient(135deg,#f6b301,var(--brand))}
+
+/* Führerschein-Klassen als Reiter in „Meine Fahrstunden" (z. B. B + Vorbildung A1) */
+.ml-classtabs{display:flex;gap:.4rem;flex-wrap:wrap;margin:.2rem 0 .7rem}
+.ml-classtab{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:999px;
+  padding:.34rem .8rem;font-weight:700;font-size:.86rem;cursor:pointer;display:inline-flex;align-items:center;gap:.35rem}
+.ml-classtab:hover{border-color:var(--brand)}
+.ml-classtab.on{background:var(--brand);color:#1b1206;border-color:var(--brand)}
+.ml-classtab .ct-vor{font-size:.66rem;font-weight:800;text-transform:uppercase;letter-spacing:.03em;
+  background:rgba(0,0,0,.14);border-radius:6px;padding:.05rem .32rem}
+.ml-classtab.on .ct-vor{background:rgba(0,0,0,.22)}
