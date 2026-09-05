@@ -1,25 +1,25 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# Einmaliger Verlauf-Import der ersten Fahrschueler ueber die lokale Cockpit-API.
-# Aufruf auf dem Server:  python3 /home/ginoco/spiel/ginoco/scripts/import-roster.py
-# Fragt einmal die Cockpit-PIN ab, legt fehlende Fahrschueler an und traegt die
-# gefahrenen/geplanten Fahrstunden ein. Legt niemand doppelt an (Sicherheitsnetz).
-import os, json, sys, getpass, subprocess, urllib.request, urllib.error, http.cookiejar
+# Verlauf-Import: legt fehlende Fahrschueler an + traegt ihre Fahrstunden ein.
+# Bereits vorhandene Fahrschueler werden NICHT angefasst (kein Doppel), sondern
+# nur mit aktueller Fahrten-Zahl gemeldet. Aufruf auf dem Server:
+#   python3 /home/ginoco/spiel/ginoco/scripts/import-roster.py
+import os, json, sys, getpass, subprocess, urllib.request, urllib.error, http.cookiejar, unicodedata
 
 def detect_port():
     p = os.environ.get("GINOCO_PORT")
     if p: return p
     try:
-        out = subprocess.check_output(["systemctl", "show", "ginoco", "-p", "Environment", "--value"], text=True)
+        out = subprocess.check_output(["systemctl","show","ginoco","-p","Environment","--value"], text=True)
         for tok in out.split():
-            if tok.startswith("PORT="):
-                return tok[5:]
+            if tok.startswith("PORT="): return tok[5:]
     except Exception:
         pass
     return "3000"
 
 BASE = "http://127.0.0.1:%s" % detect_port()
-ROSTER = r"""
+BLOCKS = [
+    r"""
 Kaya, Aleyna
 03.08.2026, 08:30, 80, Schalt
 04.08.2026, 09:00, 80
@@ -45,7 +45,8 @@ Kaya, Aleyna
 07.09.2026, 11:00, 120
 09.09.2026, 14:40, 120
 15.09.2026, 11:00, 160
-
+""",
+    r"""
 Pohl, Klaus Benjamin
 11.07.2026, 13:00, 120
 17.07.2026, 18:40, 80
@@ -76,7 +77,8 @@ Pohl, Klaus Benjamin
 22.08.2026, 16:05, 120
 28.08.2026, 09:30, 400
 31.08.2026, 15:05, 80
-
+""",
+    r"""
 Fiedler, Elex
 26.03.2025, 16:30, 80
 07.08.2025, 17:00, 80
@@ -97,7 +99,8 @@ Fiedler, Elex
 07.09.2026, 13:30, 120
 09.09.2026, 12:30, 120
 10.09.2026, 12:35, 120
-
+""",
+    r"""
 Baumert, Selina
 08.08.2026, 11:15, 120
 12.08.2026, 19:30, 80
@@ -112,7 +115,8 @@ Baumert, Selina
 10.09.2026, 15:00, 120
 12.09.2026, 11:00, 225, Überland
 17.09.2026, 14:00, 180, Autobahn
-
+""",
+    r"""
 Homuth, Janez
 03.06.2026, 14:50, 80
 09.06.2026, 17:00, 120
@@ -131,7 +135,8 @@ Homuth, Janez
 02.09.2026, 18:00, 40, 05.09.2026 06:00
 02.09.2026, 18:40, 45, Autobahn, 05.09.2026 06:40
 02.09.2026, 19:25, 135, Nacht, 05.09.2026 07:25
-
+""",
+    r"""
 Esmatullah, Saraj
 29.04.2026, 09:00, 120
 15.05.2026, 09:00, 120
@@ -148,51 +153,73 @@ Esmatullah, Saraj
 07.09.2026, 19:00, 80
 09.09.2026, 19:00, 80
 14.09.2026, 13:15, 80
+""",
+]
 
-"""
 cj = http.cookiejar.CookieJar()
 op = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cj))
 
-def post(path, obj):
-    data = json.dumps(obj).encode()
-    req = urllib.request.Request(BASE + path, data=data, headers={'Content-Type': 'application/json'})
+def call(path, obj=None, method="POST"):
+    data = json.dumps(obj).encode() if obj is not None else None
+    req = urllib.request.Request(BASE + path, data=data, headers={'Content-Type':'application/json'}, method=method)
     try:
         return json.loads(op.open(req, timeout=90).read().decode())
     except urllib.error.HTTPError as e:
-        try:
-            return json.loads(e.read().decode() or '{}')
-        except Exception:
-            return {'_http': e.code}
+        try: return json.loads(e.read().decode() or '{}')
+        except Exception: return {'_http': e.code}
     except Exception as e:
         return {'_err': str(e)}
 
+def norm(s):
+    s = unicodedata.normalize("NFKD", s or "").encode("ascii","ignore").decode().lower()
+    return " ".join(s.split())
+
 pin = getpass.getpass("Cockpit-PIN (Eingabe wird nicht angezeigt): ")
-res = post("/api/auth/instructor", {"pin": pin})
+res = call("/api/auth/instructor", {"pin": pin})
 if isinstance(res, dict) and res.get("need2fa"):
-    res = post("/api/auth/instructor", {"pin": pin, "code": input("Authenticator-Code: ").strip()})
+    res = call("/api/auth/instructor", {"pin": pin, "code": input("Authenticator-Code: ").strip()})
 if not (isinstance(res, dict) and res.get("role") == "instructor"):
-    print("!! Login fehlgeschlagen:", res)
-    sys.exit(1)
+    print("!! Login fehlgeschlagen:", res); sys.exit(1)
 print("Login OK - pruefe Vorschau ...\n")
-dry = post("/api/instructor/roster/bulk", {"text": ROSTER, "commit": False})
+
+full = "\n\n".join(BLOCKS)
+dry = call("/api/instructor/roster/bulk", {"text": full, "commit": False})
 if not dry.get("dryRun"):
     print("!! Fehler bei der Vorschau:", json.dumps(dry)[:800]); sys.exit(1)
-existing = [g["name"] for g in dry.get("groups", []) if g.get("existing")]
+groups = [g for g in dry.get("groups", []) if g.get("name")]
+# groups kommen in derselben Reihenfolge wie BLOCKS
+new_blocks, existing = [], []
+for i, g in enumerate(groups):
+    if g.get("willCreate"): new_blocks.append(BLOCKS[i])
+    elif g.get("existing"): existing.append(g["name"])
+
+if new_blocks:
+    out = call("/api/instructor/roster/bulk", {"text": "\n\n".join(new_blocks), "commit": True})
+    if not out.get("committed"):
+        print("!! Import-Fehler:", json.dumps(out)[:800]); sys.exit(1)
+    print("NEU eingetragen: %d Fahrstunden fuer %d Fahrschueler\n" % (out["createdLessons"], out["newStudents"]))
+    for g in out.get("groups", []):
+        if g.get("name"):
+            ex = "  (%d uebersprungen)" % g["errCount"] if g.get("errCount") else ""
+            print("  %-26s %d Fahrten%s" % (g["name"], g.get("okCount",0), ex))
+    print("\n=== ZUGANGSDATEN - bitte wegkopieren (nur jetzt sichtbar) ===")
+    print("%-28s %-12s %s" % ("Name","Login","Passwort"))
+    for s in out.get("createdStudents", []):
+        print("%-28s %-12s %s" % (s["name"], s["username"], s["password"]))
+else:
+    print("Keine neuen Fahrschueler - alle existieren bereits.")
+
 if existing:
-    print("!! Diese Fahrschueler gibt es schon:", ", ".join(existing))
-    print("   Damit nichts DOPPELT wird, wurde NICHTS eingetragen.")
-    print("   Bitte Claude Bescheid geben - wir passen den Block an.")
-    sys.exit(0)
-out = post("/api/instructor/roster/bulk", {"text": ROSTER, "commit": True})
-if not out.get("committed"):
-    print("!! Import-Fehler:", json.dumps(out)[:800]); sys.exit(1)
-print("Eingetragen: %d Fahrstunden  -  %d neue Fahrschueler\n" % (out["createdLessons"], out["newStudents"]))
-for g in out.get("groups", []):
-    if g.get("name"):
-        ex = "  (%d uebersprungen)" % g["errCount"] if g.get("errCount") else ""
-        print("  %-26s %d Fahrten%s" % (g["name"], g.get("okCount", 0), ex))
-print("\n=== ZUGANGSDATEN - bitte wegkopieren (nur jetzt sichtbar) ===")
-print("%-28s %-12s %s" % ("Name", "Login", "Passwort"))
-for s in out.get("createdStudents", []):
-    print("%-28s %-12s %s" % (s["name"], s["username"], s["password"]))
-print("\nFertig. Alle Fahrschueler sind angelegt und die Fahrten hinterlegt.")
+    print("\n=== SCHON VORHANDEN (nichts eingetragen) ===")
+    allstuds = call("/api/students", method="GET").get("students", [])
+    byname = {norm(s["name"]): s for s in allstuds}
+    for name in existing:
+        s = byname.get(norm(name))
+        if s:
+            les = call("/api/students/%d/lessons" % s["id"], method="GET")
+            n = len(les.get("lessons", []))
+            print("  %-26s hat aktuell %d gefahrene Fahrstunden" % (name, n))
+        else:
+            print("  %-26s (vorhanden)" % name)
+    print("\n-> Klaus & Janez pruefen wir separat, damit nichts doppelt wird.")
+print("\nFertig.")
