@@ -7140,6 +7140,7 @@ async function tabSchueler(scope) {
     <div class="inline" style="justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:.6rem">
       <h2 style="margin:.1rem 0">Fahrschüler <span class="sub">anlegen & verwalten</span></h2>
       <div class="inline" style="gap:.4rem">
+        <button class="sm sec" id="s-roster">📥 Mit Verlauf importieren</button>
         <button class="sm sec" id="s-bulk">📋 Liste einfügen</button>
         <button class="sm" id="s-add">➕ Fahrschüler anlegen</button>
       </div>
@@ -7155,6 +7156,7 @@ async function tabSchueler(scope) {
     <div id="s-list"></div></div>`;
   $('#s-add').onclick = () => openCreateStudentModal();
   $('#s-bulk').onclick = () => openBulkStudentModal();
+  $('#s-roster').onclick = () => openBulkRoster();
   $('#sc-active').onclick = () => tabSchueler('active');
   $('#sc-arch').onclick = () => tabSchueler('archived');
   if (scope !== 'archived') renderSignups();
@@ -7375,6 +7377,91 @@ function showBulkResults(r) {
     const txt = 'Name\tLogin\tPasswort\n' + rows;
     navigator.clipboard.writeText(txt).then(() => toast('Alle Zugangsdaten kopiert ✓', 'ok')).catch(() => toast('Kopieren nicht möglich', 'err'));
   };
+}
+
+// ---- Fahrschüler MIT komplettem Verlauf importieren (ein Block pro Person) ----
+// Kopfzeile = Name, darunter je Zeile eine Fahrstunde. Legt fehlende Schüler an
+// und trägt alle Stunden gleich als „gefahren" ein und ordnet sie automatisch zu.
+async function openBulkRoster() {
+  const roPh = ['Kaya, Aleyna', '01.08.2026, 14:00, 80', '05.08.2026, 09:00, 225, Überland, Schalt',
+    '10.08.2026, 20:30, 135, Nacht', '01.09.2026, 13:00, 15, Schaltkompetenznachweis', '',
+    'Mustermann, Max 2005', '12.08.2026, 16:00, 180, Autobahn, Automatik'].join('\n');
+  modal(`<h3>📥 Fahrschüler mit Verlauf importieren</h3>
+    <p class="hint" style="margin-bottom:.5rem">Ein <strong>Block pro Fahrschüler</strong>: oben der Name, darunter je Zeile eine Fahrstunde. Fehlende Fahrschüler lege ich automatisch an, vergangene Stunden trage ich gleich als <strong>„gefahren"</strong> ein – alles wird direkt zugeordnet und hinterlegt. Erst Vorschau, dann Eintragen.</p>
+    <div class="bulk-help">
+      <div class="bh-row"><span class="bh-k">Namenszeile</span><span><b>Nachname, Vorname [Jahrgang]</b></span></div>
+      <div class="bh-row"><span class="bh-k">Fahrstunde</span><span><b>Datum, Uhrzeit, Dauer</b> <span class="muted">+ optional Art (Überland/Autobahn/Nacht) &amp; Getriebe (Schalt/Automatik)</span></span></div>
+      <div class="bh-row"><span class="bh-k">Trenner</span><span class="muted">Leerzeile zwischen zwei Fahrschülern (hübscher, nicht Pflicht)</span></div>
+    </div>
+    <div class="field"><label>Fahrschüler &amp; Fahrstunden</label>
+      <textarea id="ro-text" rows="12" placeholder="${roPh}"></textarea></div>
+    <div id="ro-preview"></div>
+    <div class="actions" style="justify-content:space-between">
+      <button class="sec" onclick="window.__closeModal()">Abbrechen</button>
+      <div class="inline" style="gap:.5rem">
+        <button class="sec" id="ro-check">Vorschau prüfen</button>
+        <button id="ro-commit" disabled>Eintragen</button>
+      </div>
+    </div>`, 'wide');
+  const preview = $('#ro-preview');
+  const commitBtn = $('#ro-commit');
+  const run = async (commit) => {
+    const text = $('#ro-text').value;
+    if (!text.trim()) { toast('Bitte erst Fahrschüler + Fahrstunden eintragen', 'err'); return; }
+    try {
+      const r = await api('/api/instructor/roster/bulk', { method: 'POST', body: { text, commit } });
+      if (commit && r.committed) {
+        closeModal();
+        const cs = (r.createdStudents || []).length;
+        toast(`${r.createdLessons} Fahrstunde${r.createdLessons === 1 ? '' : 'n'} eingetragen ✓${cs ? ` · ${cs} neue${cs === 1 ? 'r Fahrschüler' : ' Fahrschüler'}` : ''}`, 'ok');
+        if (cs) showBulkResults({ created: r.createdStudents, errors: [] });
+        else { tabSchueler(); }
+        return;
+      }
+      renderRosterPreview(preview, r);
+      commitBtn.disabled = r.totalOk === 0;
+      commitBtn.textContent = r.totalOk ? `${r.totalOk} Fahrstunde${r.totalOk === 1 ? '' : 'n'} eintragen` : 'Eintragen';
+    } catch (e) { toast(e.message, 'err'); }
+  };
+  $('#ro-check').onclick = () => run(false);
+  commitBtn.onclick = () => run(true);
+}
+function renderRosterPreview(el, r) {
+  const artPill = (row) => {
+    if (!row.art || row.art === 'normal') return '';
+    const c = typeTint(row.art);
+    return ` <span class="type-badge" style="background:${c.bg};color:${c.fg};border-color:${c.bd}">${TYPE_ICON[row.art] || ''} ${TYPE_LABEL[row.art]}</span>`;
+  };
+  const gearPill = (row) => row.gear ? ` <span class="pill" style="background:var(--card);color:var(--muted)">⚙️ ${row.gear === 'schalt' ? 'Schalt' : 'Automatik'}</span>` : '';
+  const lessonLine = (row) => {
+    if (row.status === 'ok') {
+      return `<div class="bulk-row ok"><span class="br-ic">${row.done ? '🅿️' : '🗓️'}</span>
+        <div><div>${WD[isoDow(row.date) - 1]} ${fmtShort(row.date)} · ${row.time} <span class="muted">(${row.dur} Min)</span>${row.done ? ' <span class="pill" style="background:var(--good-bg);color:var(--good)">gefahren</span>' : ''}${artPill(row)}${gearPill(row)}${row.note ? ' <span class="muted">· ' + esc(row.note) + '</span>' : ''}</div></div></div>`;
+    }
+    return `<div class="bulk-row error"><span class="br-ic">⚠️</span><div><div class="muted">${esc(row.input)}</div><div class="br-msg error">${esc(row.msg)}</div></div></div>`;
+  };
+  const groupCard = (g) => {
+    if (g.error && !g.lessons.length) return `<div class="bulk-row error"><span class="br-ic">⚠️</span><div><div><b>${esc(g.name || g.input || '?')}</b></div><div class="br-msg error">${esc(g.error)}${g.input && g.name ? '' : ''}</div></div></div>`;
+    const tag = g.willCreate ? '<span class="pill" style="background:var(--booked);color:#8fb4ff">neu anlegen</span>'
+      : (g.existing ? '<span class="pill" style="background:var(--good-bg);color:var(--good)">vorhanden</span>' : '');
+    return `<div class="roster-grp" style="border:1px solid var(--line);border-radius:12px;padding:.6rem .7rem;margin-bottom:.6rem">
+      <div class="inline" style="justify-content:space-between;align-items:center;margin-bottom:.35rem">
+        <b>${esc(g.name || '—')}</b> ${tag}
+        <span class="muted" style="font-size:.8rem">${g.okCount || 0} ok${g.errCount ? ' · ' + g.errCount + ' ⚠️' : ''}</span>
+      </div>
+      ${g.error ? `<div class="br-msg error" style="margin-bottom:.3rem">${esc(g.error)}</div>` : ''}
+      ${g.lessons.map(lessonLine).join('')}
+    </div>`;
+  };
+  el.innerHTML = `<div class="bulk-summary">
+      ${r.newStudents ? `<span class="pill" style="background:var(--booked);color:#8fb4ff">👤 ${r.newStudents} neu</span>` : ''}
+      ${r.totalDone ? `<span class="pill" style="background:var(--good-bg);color:var(--good)">🅿️ ${r.totalDone} gefahren</span>` : ''}
+      ${r.totalFuture ? `<span class="pill" style="background:var(--booked);color:#8fb4ff">🗓️ ${r.totalFuture} reserviert</span>` : ''}
+      ${!r.totalOk ? `<span class="pill">0 bereit</span>` : ''}
+      ${r.totalErr ? `<span class="pill" style="background:var(--bad-bg);color:var(--bad)">⚠️ ${r.totalErr} zu prüfen</span>` : ''}
+    </div>
+    <div class="bulk-list" style="max-height:44vh;overflow:auto">${(r.groups || []).map(groupCard).join('')}</div>
+    ${r.totalErr ? '<p class="hint">Zeilen mit ⚠️ werden übersprungen. Korrigier sie oben und prüfe erneut – oder trag den Rest schon mal ein.</p>' : ''}`;
 }
 
 // Präzise Verfügbarkeit: pro Wochentag beliebig viele „von–bis"-Zeiträume.

@@ -1491,6 +1491,14 @@ async function handleApi(req, res, url) {
     return bulkInstructorBookings(res, body);
   }
 
+  // Kompletter Verlauf je Fahrschüler in einem Rutsch: Namenskopf + darunter die
+  // gefahrenen/geplanten Fahrstunden. Legt fehlende Schüler an und ordnet alles zu.
+  if (p === '/api/instructor/roster/bulk' && method === 'POST') {
+    if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer darf das', 403);
+    const body = await readBody(req);
+    return bulkRoster(res, body);
+  }
+
   // /api/bookings/:id  (DELETE = stornieren, PATCH = aktualisieren)
   const bm = p.match(/^\/api\/bookings\/(\d+)$/);
   if (bm) {
@@ -3697,6 +3705,158 @@ function bulkInstructorBookings(res, body) {
     created++;
   }
   return ok(res, { committed: true, created, ...summary });
+}
+
+// ---- Verlauf-Import: eine Fahrstunden-Zeile (ohne Namen) zerlegen ----
+// Erkennt Datum, Uhrzeit, Dauer sowie optional Art (Überland/Autobahn/Nacht)
+// und Getriebe (Schalt/Automatik) – in beliebiger Reihenfolge nach der Dauer.
+function parseRosterLesson(line) {
+  const hasDelim = /[,;\t]/.test(line);
+  let date = '', time = '', dur = '', extras = [];
+  if (hasDelim) {
+    const p = line.split(/\s*[,;\t]\s*/).filter((x) => x !== '');
+    date = p[0] || ''; time = p[1] || ''; dur = p[2] || ''; extras = p.slice(3);
+  } else {
+    const toks = line.split(/\s+/).filter(Boolean);
+    const di = toks.findIndex((t) => /^\d{1,2}\.\d{1,2}\.?(\d{2,4})?$/.test(t));
+    if (di >= 0) {
+      date = toks[di];
+      const ti = toks.findIndex((t, i) => i > di && /^\d{1,2}([:.h]\d{2})?$/.test(t));
+      if (ti >= 0) { time = toks[ti]; const du = toks[ti + 1]; if (du && /^\d{1,3}$/.test(du)) dur = du; extras = toks.slice(du && /^\d{1,3}$/.test(du) ? ti + 2 : ti + 1); }
+    }
+  }
+  let art = '', gear = '', note = [];
+  for (const tk of extras) {
+    const lw = tk.toLowerCase();
+    if (!art && /^(überland|ueberland|überlandfahrt|ueberlandfahrt|überlandf|land)$/.test(lw)) { art = 'ueberland'; continue; }
+    if (!art && /^autobahn$/.test(lw)) { art = 'autobahn'; continue; }
+    if (!art && /^(nacht|nachtfahrt|nachtf)$/.test(lw)) { art = 'nacht'; continue; }
+    if (!art && /^(normal|übung|uebung|übungsstunde|uebungsstunde|grundstunde|standard)$/.test(lw)) { art = 'normal'; continue; }
+    if (!gear && /^(schalt|schaltung|schalter|manuell|handschalt|handschaltung)$/.test(lw)) { gear = 'schalt'; continue; }
+    if (!gear && /^(automatik|automatic|auto)$/.test(lw)) { gear = 'automatik'; continue; }
+    if (/schaltkompetenz/.test(lw)) { gear = gear || 'schalt'; note.push(tk); continue; }
+    note.push(tk);
+  }
+  return { date, time, dur, art, gear, note: note.join(' ').trim() };
+}
+
+// Kompletter Verlauf je Fahrschüler: Kopfzeile = Name (ohne Datum),
+// darunter je Zeile eine Fahrstunde. Legt fehlende Schüler an (commit),
+// trägt vergangene Stunden als „gefahren" ein, ordnet alles automatisch zu.
+function bulkRoster(res, body) {
+  const commit = !!body.commit;
+  const s = getSettings();
+  const today = todayStr();
+  const now = nowHHMM();
+  const existing = db.prepare('SELECT id,name,username FROM students WHERE archived_at IS NULL').all();
+  const rawLines = String(body.text || '').split(/\r?\n/);
+  if (rawLines.length > 800) return bad(res, 'Bitte höchstens 800 Zeilen auf einmal');
+  const hasDate = (l) => /\d{1,2}\.\d{1,2}\.?(\d{2,4})?/.test(l);
+  // Zeilen in Blöcke gruppieren: Namenszeile eröffnet einen neuen Block.
+  const blocks = [];
+  let cur = null;
+  for (const raw of rawLines) {
+    const line = raw.trim();
+    if (!line) continue;
+    if (!hasDate(line)) { cur = { nameLine: line, lessons: [] }; blocks.push(cur); }
+    else if (cur) cur.lessons.push(line);
+    else blocks.push({ nameLine: '', orphan: line, lessons: [] });
+  }
+  // Belegte Intervalle je Datum (bestehende Buchungen + in diesem Lauf akzeptierte).
+  const planned = {};
+  const dayIntervals = (date) => {
+    if (!planned[date]) {
+      const iv = db.prepare("SELECT start_time,duration_min FROM bookings WHERE date=? AND status!='cancelled'").all(date)
+        .map((b) => ({ s: toMin(b.start_time), e: toMin(b.start_time) + b.duration_min }));
+      for (const bl of db.prepare('SELECT start_time,end_time FROM blocks WHERE date=?').all(date))
+        iv.push({ s: toMin(bl.start_time), e: toMin(bl.end_time) });
+      planned[date] = iv;
+    }
+    return planned[date];
+  };
+  // Namenskopf zerlegen wie bei /students/bulk ("Nachname, Vorname [Jahrgang]").
+  const parseNameLine = (raw) => {
+    let rest = raw, by = null;
+    const ym = rest.match(/(?:^|[\s,;])((?:19|20)\d{2})\s*$/);
+    if (ym) { by = Number(ym[1]); rest = rest.slice(0, ym.index).trim().replace(/[;,]\s*$/, ''); }
+    let name = rest, first = '', last = '';
+    if (rest.includes(',')) { const pp = rest.split(','); last = (pp[0] || '').trim(); first = (pp[1] || '').trim(); name = `${first} ${last}`.trim(); }
+    name = name.replace(/\s+/g, ' ').trim();
+    if (!first && !last && name) { const sp = splitName(name); first = sp.first; last = sp.last; }
+    return { name, first, last, by };
+  };
+  const artLabel = { ueberland: 'Überland', autobahn: 'Autobahn', nacht: 'Nachtfahrt', normal: '' };
+  const gearLabel = { schalt: 'Schalt', automatik: 'Automatik' };
+  const out = [];
+  let totalOk = 0, totalErr = 0, totalDone = 0, totalFuture = 0, newStudents = 0;
+  for (const blk of blocks) {
+    if (!blk.nameLine) { out.push({ name: '', error: 'Fahrstunde ohne Fahrschüler-Namen davor', input: blk.orphan, lessons: [] }); totalErr++; continue; }
+    const nm = parseNameLine(blk.nameLine);
+    const grp = { name: nm.name, input: blk.nameLine, lessons: [], okCount: 0, errCount: 0 };
+    if (!nm.name) { grp.error = 'Name nicht erkannt'; out.push(grp); totalErr++; continue; }
+    const match = matchStudent(existing, nm.name);
+    if (match.student) { grp.studentId = match.student.id; grp.existing = true; grp.name = match.student.name; }
+    else if (match.error && /mehrdeutig/.test(match.error)) { grp.error = match.error; out.push(grp); totalErr++; continue; }
+    else { grp.existing = false; grp.willCreate = true; newStudents++; }
+    for (const lline of blk.lessons) {
+      const f = parseRosterLesson(lline);
+      const row = { input: lline };
+      const date = parseImportDate(f.date, today);
+      const time = parseImportTime(f.time);
+      let dur = f.dur ? parseInt(String(f.dur).replace(/[^\d]/g, ''), 10) : s.lesson_min;
+      if (!dur || dur < 10) dur = s.lesson_min;
+      if (!date) { row.status = 'error'; row.msg = 'Datum unklar (z. B. 22.7. oder 22.07.2026)'; grp.lessons.push(row); grp.errCount++; totalErr++; continue; }
+      if (!time) { row.status = 'error'; row.msg = 'Uhrzeit unklar (z. B. 14:00)'; grp.lessons.push(row); grp.errCount++; totalErr++; continue; }
+      row.date = date; row.time = time; row.dur = dur;
+      row.art = f.art || 'normal'; row.gear = f.gear || ''; row.note = f.note || '';
+      row.artLabel = artLabel[row.art] || ''; row.gearLabel = gearLabel[row.gear] || '';
+      const isPast = date < today || (date === today && toMin(time) <= toMin(now));
+      row.done = isPast;
+      // Überschneidung nur gegen echte Termine (nicht gegen künftige Zeilen des-/derselben Person hier,
+      // damit dieselbe echte Historie mehrerer Schüler am selben Tag nicht kollidiert -> nur DB prüfen).
+      const ns = toMin(time), ne = ns + dur;
+      const iv = dayIntervals(date);
+      if (iv.some((x) => overlaps(ns, ne, x.s, x.e))) { row.status = 'error'; row.msg = 'Überschneidet einen vorhandenen Termin'; grp.lessons.push(row); grp.errCount++; totalErr++; continue; }
+      row.status = 'ok'; row.msg = row.done ? 'wird als gefahren übernommen' : 'wird reserviert';
+      iv.push({ s: ns, e: ne });
+      grp.lessons.push(row); grp.okCount++; totalOk++; if (row.done) totalDone++; else totalFuture++;
+    }
+    out.push(grp);
+  }
+  const summary = { groups: out, totalOk, totalErr, totalDone, totalFuture, newStudents };
+  if (!commit) return ok(res, { dryRun: true, ...summary });
+  // ---- Übernehmen ----
+  let createdStudents = [], createdLessons = 0;
+  for (const grp of out) {
+    if (grp.error) continue;
+    let sid = grp.studentId;
+    if (!sid) {
+      const nm = parseNameLine(grp.input);
+      const username = genUsername(nm.name, nm.by);
+      const password = genStudentPassword();
+      const info = db.prepare('INSERT INTO students(name,first_name,last_name,pass,username,birth_year,allowed_durations,created_at) VALUES(?,?,?,?,?,?,?,?)')
+        .run(nm.name, nm.first || null, nm.last || null, hashPassword(password), username, nm.by || null, '80', new Date().toISOString());
+      sid = Number(info.lastInsertRowid);
+      grp.studentId = sid;
+      createdStudents.push({ name: nm.name, username, password });
+      logEvent('info', { actor: 'instructor', studentId: sid, detail: `Fahrschüler angelegt (${username}) – Verlauf-Import` });
+    }
+    for (const r of grp.lessons) {
+      if (r.status !== 'ok') continue;
+      const status = r.done ? 'done' : 'booked';
+      const confirmed = r.done ? 1 : 0;
+      const attended = r.done ? 1 : null;
+      const info = db.prepare(
+        `INSERT INTO bookings(student_id,date,start_time,duration_min,status,confirmed,attended,lesson_type,gearbox,feedback,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)`
+      ).run(sid, r.date, r.time, r.dur, status, confirmed, attended, r.art || 'normal', r.gear || null, r.note || null, new Date().toISOString());
+      logEvent('book', { actor: 'instructor', studentId: sid, bookingId: Number(info.lastInsertRowid), date: r.date,
+        detail: `${wdShort(r.date)} ${dmy(r.date)} ${r.time} Uhr (${r.dur} Min)${r.artLabel ? ' · ' + r.artLabel : ''}${r.gearLabel ? ' · ' + r.gearLabel : ''} – Verlauf-Import ${r.done ? '(gefahren)' : '(reserviert)'}` });
+      if (!r.done) notify(sid, 'info',
+        `Neuer Termin für dich reserviert: ${wdShort(r.date)} ${dmy(r.date)} um ${r.time} Uhr (${r.dur} Min). Bitte in der App bestätigen.`, r.date, Number(info.lastInsertRowid));
+      createdLessons++;
+    }
+  }
+  return ok(res, { committed: true, createdStudents, createdLessons, ...summary });
 }
 
 // ===================== KI-PLANER (Stufe 1) =====================
