@@ -3866,7 +3866,6 @@ function printLessonProof(name, done, adk, stats, cls) {
     </div>
     <table><thead><tr><th>#</th>${multiClass ? '<th>Kl.</th>' : ''}<th>Datum &amp; Uhrzeit (gefahren)</th><th>Art</th><th>Dauer</th><th>Getriebe</th><th>Auf der Rechnung</th><th>Vermerk</th><th>Unterschrift</th></tr></thead>
       <tbody>${rows}</tbody></table>
-    <div class="sign"><div>Unterschrift Fahrlehrer</div><div>Unterschrift Fahrschüler</div></div>
     ${adkSection}
     <div class="foot">Erstellt mit ginoco · ${today}. Maßgeblich ist stets das <b>Fahrdatum</b> (Datum &amp; Uhrzeit, gefahren). „Vom Fahrlehrer eingetragen am …" nennt nur, wann die Stunde ins System eingetragen wurde – am Fahrdatum ändert das nichts. „Auf der Rechnung" = Datum/Uhrzeit, unter dem die Stunde abgerechnet wird (kann vom Fahrdatum abweichen, z. B. wegen der 495-Minuten-Tagesgrenze); „wie gefahren" = identisch zum Fahrdatum. „Fahrschüler … Min zu spät" = der Fahrschüler ist verspätet zur Fahrstunde erschienen. Mit ✔ markierte Stunden hat der Fahrschüler in der App bestätigt.</div>
     <script>window.onload=function(){setTimeout(function(){window.print()},250)}<\/script></body></html>`;
