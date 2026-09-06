@@ -86,6 +86,27 @@ STUDENTS = [
             ("04.09.26", "15:05", 120, "", ""),
         ],
     },
+    {
+        "header": "Rusin, Mark",
+        "stamm": {},  # keine Stammdaten vorhanden
+        "match": ["mark", "rusin"],
+        "lessons": [
+            ("21.09.26", "17:00", 40, "", ""),
+            ("10.09.26", "18:00", 40, "", ""),
+            ("07.09.26", "18:10", 40, "", ""),
+            ("03.09.26", "18:00", 40, "", ""),
+            ("04.08.26", "18:20", 40, "", ""),
+            ("03.08.26", "18:20", 40, "", ""),
+            ("09.07.26", "18:00", 80, "", ""),
+            ("08.07.26", "19:30", 15, "", ""),
+            ("08.07.26", "18:05", 80, "", ""),
+            ("02.06.26", "18:30", 80, "", ""),
+            ("01.06.26", "18:30", 80, "", ""),
+            ("18.05.26", "17:30", 80, "", ""),
+            ("18.04.26", "16:30", 80, "", ""),
+            ("13.04.26", "17:00", 80, "", ""),
+        ],
+    },
 ]
 
 cj = http.cookiejar.CookieJar()
@@ -134,9 +155,12 @@ def main():
         s = next((x for x in sl.get("students", []) if all(tok in (x.get("name") or "").lower() for tok in stu["match"])), None)
         if not s: print("   [!] Schüler nach Import nicht gefunden – Stammdaten/Kollegen übersprungen."); continue
 
-        # 4) Stammdaten
-        st, _ = call("PATCH", f"/api/students/{s['id']}", stu["stamm"])
-        print("   Stammdaten:", "gesetzt ✓" if st == 200 else "Fehler")
+        # 4) Stammdaten (nur wenn vorhanden)
+        if stu.get("stamm"):
+            st, _ = call("PATCH", f"/api/students/{s['id']}", stu["stamm"])
+            print("   Stammdaten:", "gesetzt ✓" if st == 200 else "Fehler")
+        else:
+            print("   Stammdaten: keine hinterlegt (übersprungen)")
 
         # 5) Kollegen-Fahrlehrer je Stunde
         _, lr = call("GET", f"/api/students/{s['id']}/lessons")
