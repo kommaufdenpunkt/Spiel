@@ -1895,7 +1895,7 @@ async function handleApi(req, res, url) {
   const lpPhotos = (id) => db.prepare('SELECT id FROM learnpoint_photos WHERE point_id=? ORDER BY id').all(id).map((r) => r.id);
   const lpBookingDate = (bid) => bid ? (db.prepare('SELECT date FROM bookings WHERE id=?').get(bid)?.date || null) : null;
   const lpRow = (r) => ({ id: r.id, student_id: r.student_id, booking_id: r.booking_id, lat: r.lat, lng: r.lng,
-    place: r.place || '', text: r.text || '', done: !!r.done, resolved: !!r.resolved,
+    place: r.place || '', category: r.category || '', text: r.text || '', done: !!r.done, resolved: !!r.resolved,
     lesson_date: lpBookingDate(r.booking_id), created_at: r.created_at, updated_at: r.updated_at, photos: lpPhotos(r.id) });
   // 1) Anlegen (sofort beim Antippen – Standort wird gleich mitgeschickt). Entwurf (done=0).
   if (p === '/api/instructor/learnpoints' && method === 'POST') {
@@ -1907,9 +1907,10 @@ async function handleApi(req, res, url) {
     const lng = (b.lng == null || b.lng === '') ? null : Number(b.lng);
     const text = (typeof b.text === 'string' ? b.text : '').trim().slice(0, 2000);
     const place = (typeof b.place === 'string' ? b.place : '').trim().slice(0, 120);
+    const category = (typeof b.category === 'string' ? b.category : '').trim().slice(0, 40) || null;
     const now = new Date().toISOString();
-    const info = db.prepare('INSERT INTO learnpoints(student_id,booking_id,lat,lng,place,text,done,created_at,updated_at) VALUES(?,?,?,?,?,?,0,?,?)')
-      .run(sid, b.booking_id ? Number(b.booking_id) : null, isFinite(lat) ? lat : null, isFinite(lng) ? lng : null, place || null, text || null, now, now);
+    const info = db.prepare('INSERT INTO learnpoints(student_id,booking_id,lat,lng,place,category,text,done,created_at,updated_at) VALUES(?,?,?,?,?,?,?,0,?,?)')
+      .run(sid, b.booking_id ? Number(b.booking_id) : null, isFinite(lat) ? lat : null, isFinite(lng) ? lng : null, place || null, category, text || null, now, now);
     const row = db.prepare('SELECT * FROM learnpoints WHERE id=?').get(Number(info.lastInsertRowid));
     return ok(res, { point: lpRow(row) });
   }
@@ -1923,6 +1924,7 @@ async function handleApi(req, res, url) {
     const fields = [], vals = [];
     if ('text' in b) { fields.push('text=?'); vals.push((String(b.text || '').trim().slice(0, 2000)) || null); }
     if ('place' in b) { fields.push('place=?'); vals.push((String(b.place || '').trim().slice(0, 120)) || null); }
+    if ('category' in b) { fields.push('category=?'); vals.push((String(b.category || '').trim().slice(0, 40)) || null); }
     if ('lat' in b) { fields.push('lat=?'); vals.push((b.lat == null || b.lat === '') ? null : Number(b.lat)); }
     if ('lng' in b) { fields.push('lng=?'); vals.push((b.lng == null || b.lng === '') ? null : Number(b.lng)); }
     const wasDone = !!lp.done;

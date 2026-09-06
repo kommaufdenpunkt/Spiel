@@ -320,6 +320,8 @@ ensureColumn('learnpoints', 'resolved', 'resolved INTEGER NOT NULL DEFAULT 0');
 ensureColumn('learnpoints', 'resolved_at', 'resolved_at TEXT');
 // Kurzer Name der Stelle (z. B. „Kreisverkehr Marktplatz") – fürs Fehlerbuch als Überschrift.
 ensureColumn('learnpoints', 'place', 'place TEXT');
+// Kategorie/Thema (z. B. vorfahrt, einparken, autobahn) – zum Filtern/Farbe im Fehlerbuch.
+ensureColumn('learnpoints', 'category', 'category TEXT');
 db.exec(`CREATE TABLE IF NOT EXISTS learnpoint_photos (
   id         INTEGER PRIMARY KEY AUTOINCREMENT,
   point_id   INTEGER NOT NULL,

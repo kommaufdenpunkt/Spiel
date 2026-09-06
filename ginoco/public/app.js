@@ -4238,16 +4238,37 @@ async function renderFehlerbuch() {
   card.classList.remove('hidden');
   // Nadel-Nummern chronologisch (ältester Eintrag = 1), unabhängig von der Anzeige-Reihenfolge.
   points.slice().sort((a, z) => (a.created_at || '').localeCompare(z.created_at || '')).forEach((p, i) => p._n = i + 1);
-  const withGeo = points.filter((p) => p.lat != null);
-  // Nach Tag gruppieren (Fahrdatum der Stunde, sonst Eintragedatum) – neueste Tage zuerst.
+  state._fbPoints = points;
+  if (!state._fbFilter) state._fbFilter = { cat: '', openOnly: false };
+  paintFehlerbuch();
+}
+function paintFehlerbuch() {
+  const card = $('#fehlerbuch-card'); if (!card) return;
+  const all = state._fbPoints || [];
+  const flt = state._fbFilter || { cat: '', openOnly: false };
   const dayKey = (p) => (p.lesson_date || String(p.created_at || '').slice(0, 10));
-  const byDay = new Map();
-  for (const p of points) { const k = dayKey(p); (byDay.get(k) || byDay.set(k, []).get(k)).push(p); }
-  const days = [...byDay.keys()].sort((a, z) => z.localeCompare(a));
   const dayLabel = (k) => { try { return parseD(k).toLocaleDateString(LOCALE, { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' }); } catch { return k; } };
-  const openN = points.filter((p) => !p.resolved).length, okN = points.length - openN;
+  const openN = all.filter((p) => !p.resolved).length, okN = all.length - openN;
+  const withGeo = all.filter((p) => p.lat != null);
+  // Filter anwenden (Kategorie / nur offene)
+  const shown = all.filter((p) => (!flt.cat || p.category === flt.cat) && (!flt.openOnly || !p.resolved));
+  const byDay = new Map();
+  for (const p of shown) { const k = dayKey(p); (byDay.get(k) || byDay.set(k, []).get(k)).push(p); }
+  const days = [...byDay.keys()].sort((a, z) => z.localeCompare(a));
+  // Kategorien, die tatsächlich vorkommen (für die Filterleiste)
+  const catsPresent = LP_CATS.filter((c) => all.some((p) => p.category === c.k));
   const overview = withGeo.length
     ? `<div id="fb-overview-map" class="live-map fb-overview"><div class="lm-loading"><span class="tire">🛞</span></div></div>` : '';
+  // „Das üben wir als Nächstes" – offene Stellen als Fokus
+  const openPts = all.filter((p) => !p.resolved).sort((a, z) => dayKey(z).localeCompare(dayKey(a)));
+  const focus = openPts.length ? `<div class="fb-focus">
+    <div class="fb-focus-h">🎯 Das üben wir als Nächstes <span class="fb-focus-n">${openPts.length}</span></div>
+    <div class="fb-focus-list">${openPts.slice(0, 8).map((p) => `<button class="fb-focus-i" ${p.lat != null ? `data-lat="${p.lat}" data-lng="${p.lng}"` : ''}>${lpCat(p.category) ? `<span class="fb-dot" style="background:${lpCat(p.category).c}"></span>` : ''}<span class="fb-focus-t">${esc(p.place || (p.text || '').split('\n')[0] || ('Stelle ' + p._n))}</span><span class="fb-focus-d">${fmtDMY2(dayKey(p))}</span></button>`).join('')}${openPts.length > 8 ? `<div class="muted" style="font-size:.78rem;padding:.2rem .1rem">… und ${openPts.length - 8} weitere unten im Buch</div>` : ''}</div></div>` : '';
+  const filterBar = catsPresent.length || okN ? `<div class="fb-filters">
+    <button class="fb-fl${!flt.cat && !flt.openOnly ? ' on' : ''}" data-flt="all">Alle</button>
+    ${okN ? `<button class="fb-fl${flt.openOnly ? ' on' : ''}" data-flt="open">🟡 nur offene</button>` : ''}
+    ${catsPresent.map((c) => `<button class="fb-fl${flt.cat === c.k ? ' on' : ''}" data-flt="cat:${c.k}" style="--cc:${c.c}">${c.icon} ${esc(c.label)}</button>`).join('')}
+  </div>` : '';
   const entryHtml = (p) => {
     const photos = (p.photos || []).map((id) => `<img class="fb-ph" data-photo="/api/learnpoints/photo/${id}" src="/api/learnpoints/photo/${id}" alt="">`).join('');
     const text = esc(p.text || '').replace(/\n/g, '<br>');
@@ -4255,23 +4276,82 @@ async function renderFehlerbuch() {
     return `<div class="fb-entry${p.resolved ? ' fb-done' : ''}">
       <div class="fb-e-head"><span class="fb-num${p.resolved ? ' ok' : ''}">${p.resolved ? '✓' : p._n}</span>
         <span class="fb-e-title">${title}</span>
+        ${lpCatBadge(p.category)}
         ${p.resolved ? '<span class="fb-sit">sitzt jetzt ✓</span>' : '<span class="fb-open">üben</span>'}</div>
       ${text ? `<div class="fb-text">${text}</div>` : ''}
       ${photos ? `<div class="fb-photos">${photos}</div>` : ''}
       ${p.lat != null ? `<button class="sec sm fb-map" data-lat="${p.lat}" data-lng="${p.lng}">📍 ${t('fb_map')}</button>` : ''}
     </div>`;
   };
-  card.innerHTML = `<h2>${t('fb_title')}</h2><p class="hint">${t('fb_hint')}</p>
-    <div class="fb-sum"><span class="fb-sum-i">📅 ${days.length} Tag${days.length === 1 ? '' : 'e'}</span><span class="fb-sum-i">📖 ${points.length} Einträge</span>${okN ? `<span class="fb-sum-i ok">🟢 ${okN} sitzt</span>` : ''}${openN ? `<span class="fb-sum-i warn">🟡 ${openN} zu üben</span>` : ''}</div>
+  card.innerHTML = `<div class="fb-top"><h2 style="margin:0">${t('fb_title')}</h2><button class="ghost sm" id="fb-pdf">📄 Als PDF</button></div>
+    <p class="hint">${t('fb_hint')}</p>
+    <div class="fb-sum"><span class="fb-sum-i">📅 ${new Set(all.map(dayKey)).size} Tage</span><span class="fb-sum-i">📖 ${all.length} Einträge</span>${okN ? `<span class="fb-sum-i ok">🟢 ${okN} sitzt</span>` : ''}${openN ? `<span class="fb-sum-i warn">🟡 ${openN} zu üben</span>` : ''}</div>
+    ${focus}
     ${overview}
-    <div class="fb-diary">${days.map((k) => `
+    ${filterBar}
+    <div class="fb-diary">${days.length ? days.map((k) => `
       <div class="fb-day">
         <div class="fb-day-h">📅 ${dayLabel(k)} <span class="fb-day-n">${byDay.get(k).length} Stelle${byDay.get(k).length === 1 ? '' : 'n'}</span></div>
         <div class="fb-day-entries">${byDay.get(k).map(entryHtml).join('')}</div>
-      </div>`).join('')}</div>`;
+      </div>`).join('') : '<p class="muted" style="padding:.6rem 0">Keine Einträge in diesem Filter.</p>'}</div>`;
   card.querySelectorAll('[data-photo]').forEach((im) => im.onclick = () => openPhotoLightbox(im.dataset.photo));
-  card.querySelectorAll('.fb-map').forEach((b) => b.onclick = () => openPointMap(Number(b.dataset.lat), Number(b.dataset.lng)));
+  card.querySelectorAll('.fb-map, .fb-focus-i[data-lat]').forEach((b) => b.onclick = () => openPointMap(Number(b.dataset.lat), Number(b.dataset.lng)));
+  card.querySelectorAll('[data-flt]').forEach((b) => b.onclick = () => {
+    const v = b.dataset.flt;
+    if (v === 'all') state._fbFilter = { cat: '', openOnly: false };
+    else if (v === 'open') state._fbFilter = { cat: '', openOnly: !flt.openOnly };
+    else if (v.startsWith('cat:')) state._fbFilter = { cat: flt.cat === v.slice(4) ? '' : v.slice(4), openOnly: false };
+    paintFehlerbuch();
+  });
+  const pdf = $('#fb-pdf'); if (pdf) pdf.onclick = () => printFehlerbuch(all, state.user?.name || 'Fahrschüler');
   if (withGeo.length) fillPinsMap('fb-overview-map', withGeo.map((p) => ({ lat: p.lat, lng: p.lng, n: p._n, resolved: p.resolved, label: (p.place || (p.text || '').split('\n')[0] || ('Eintrag ' + p._n)).slice(0, 60) })));
+}
+// Fehlerbuch als druckbares PDF (nach Tagen, mit Stelle/Kategorie/Text/Fotos).
+function printFehlerbuch(points, name) {
+  if (!points || !points.length) { toast('Noch keine Einträge im Fehlerbuch.', 'err'); return; }
+  const school = esc(state.settings?.instructor_name || 'Fahrschule');
+  const today = new Date().toLocaleDateString(LOCALE, { day: '2-digit', month: '2-digit', year: 'numeric' });
+  const dayKey = (p) => (p.lesson_date || String(p.created_at || '').slice(0, 10));
+  const dayLabel = (k) => { try { return parseD(k).toLocaleDateString(LOCALE, { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' }); } catch { return k; } };
+  const catLabel = (k) => { const c = lpCat(k); return c ? `${c.icon} ${c.label}` : ''; };
+  const byDay = new Map();
+  points.forEach((p) => { const k = dayKey(p); (byDay.get(k) || byDay.set(k, []).get(k)).push(p); });
+  const days = [...byDay.keys()].sort((a, z) => z.localeCompare(a));
+  const openN = points.filter((p) => !p.resolved).length, okN = points.length - openN;
+  const rowsFor = (k) => byDay.get(k).map((p) => `<div class="fp-e${p.resolved ? ' done' : ''}">
+      <div class="fp-e-h"><b>${p.place ? esc(p.place) : 'Stelle'}</b>${p.category ? `<span class="fp-cat">${esc(catLabel(p.category))}</span>` : ''}<span class="fp-st ${p.resolved ? 'ok' : 'open'}">${p.resolved ? 'sitzt ✓' : 'üben'}</span></div>
+      ${p.text ? `<div class="fp-t">${esc(p.text).replace(/\n/g, '<br>')}</div>` : ''}
+      ${(p.photos || []).length ? `<div class="fp-ph">${p.photos.map((id) => `<img src="/api/learnpoints/photo/${id}">`).join('')}</div>` : ''}
+    </div>`).join('');
+  const doc = `<!doctype html><html lang="de"><head><meta charset="utf-8"><title>Fehlerbuch – ${esc(name)}</title>
+    <style>@page{size:A4;margin:12mm}*{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    body{font-family:-apple-system,Segoe UI,Arial,sans-serif;color:#22201d;font-size:12px;margin:0}
+    .head{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #f4a01a;padding-bottom:8px;margin-bottom:12px}
+    .wm{font-size:22px;font-weight:900;background:linear-gradient(135deg,#e9530a,#f6890d 45%,#ffc21a);-webkit-background-clip:text;background-clip:text;color:transparent;line-height:1.2;padding-bottom:.05em}
+    .school{font-size:12px;color:#3a352f;font-weight:700}
+    h1{font-size:15px;margin:0;color:#8a5200;text-transform:uppercase;letter-spacing:.06em}
+    .stud{font-size:16px;font-weight:800}
+    .sum{margin:0 0 12px;color:#6a6157;font-size:11.5px}
+    .day{margin:0 0 12px;break-inside:avoid}
+    .day-h{font-weight:800;font-size:13px;border-left:3px solid #f4a01a;padding-left:8px;margin-bottom:6px;text-transform:capitalize}
+    .fp-e{border:1px solid #e7ddcb;border-radius:8px;padding:7px 9px;margin:0 0 6px;break-inside:avoid}
+    .fp-e.done{background:#f4fbf6;border-color:#cfe9d6}
+    .fp-e-h{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+    .fp-cat{font-size:10px;background:#f1ece2;border-radius:20px;padding:1px 7px;color:#6a5a3b}
+    .fp-st{margin-left:auto;font-size:10px;font-weight:800;padding:1px 8px;border-radius:20px}
+    .fp-st.ok{background:#e6f6ec;color:#1f7a3b}.fp-st.open{background:#fdf2df;color:#a8730a}
+    .fp-t{margin-top:3px;line-height:1.4;white-space:normal}
+    .fp-ph{display:flex;gap:5px;flex-wrap:wrap;margin-top:5px}.fp-ph img{width:96px;height:96px;object-fit:cover;border-radius:6px;border:1px solid #e7ddcb}
+    .foot{margin-top:10px;color:#8a8378;font-size:10px}</style></head><body>
+    <div class="head"><div><div class="wm">ginoco</div><div class="school">${school}</div></div>
+      <div style="text-align:right"><h1>Fehlerbuch</h1><div class="stud">${esc(name)}</div><div style="font-size:10.5px;color:#8a8378">Stand: ${today}</div></div></div>
+    <div class="sum">📖 ${points.length} Einträge · 🟢 ${okN} sitzt · 🟡 ${openN} zu üben · ${days.length} Tage</div>
+    ${days.map((k) => `<div class="day"><div class="day-h">${dayLabel(k)}</div>${rowsFor(k)}</div>`).join('')}
+    <div class="foot">Erstellt mit ginoco · ${today}. „üben" = wird noch geübt · „sitzt ✓" = gemeistert.</div>
+    <script>window.onload=function(){var imgs=[].slice.call(document.images),n=imgs.length;function go(){setTimeout(function(){window.print()},150);}if(!n)return go();var c=0,done=function(){if(++c>=n)go();};imgs.forEach(function(im){if(im.complete)done();else{im.onload=done;im.onerror=done;}});setTimeout(go,2500);}<\/script></body></html>`;
+  const w = window.open('', '_blank');
+  if (!w) { toast('Bitte Pop-ups erlauben, um das Fehlerbuch zu drucken.', 'err'); return; }
+  w.document.open(); w.document.write(doc); w.document.close();
 }
 function openPhotoLightbox(src) {
   modal(`<div style="text-align:center"><img src="${src}" style="max-width:100%;max-height:74vh;border-radius:12px" alt=""></div>
@@ -6159,25 +6239,60 @@ function renderInstrDay(el, date, bookings, blocks) {
 const LP_CHIPS = ['Vorfahrt missachtet', 'Schulterblick vergessen', 'Blinker vergessen', 'Zu schnell',
   'Zu langsam', 'Abstand zu gering', 'Spur nicht gehalten', 'Zu dicht aufgefahren', 'Zu spät gebremst',
   'Kupplung/Schalten', 'Blick zu kurz', 'Vorfahrt beachten üben', 'Einordnen üben', 'Rechts vor links'];
+// Kategorien/Themen fürs Fehlerbuch (Farbe + Icon) – zum schnellen Einordnen & Filtern.
+const LP_CATS = [
+  { k: 'vorfahrt', label: 'Vorfahrt', icon: '⛔', c: '#e0483f' },
+  { k: 'abbiegen', label: 'Abbiegen', icon: '↩️', c: '#7c5cf0' },
+  { k: 'kreisverkehr', label: 'Kreisverkehr', icon: '🔄', c: '#2f8fae' },
+  { k: 'einparken', label: 'Einparken', icon: '🅿️', c: '#c98705' },
+  { k: 'blick', label: 'Blick/Spiegel', icon: '👀', c: '#2fae67' },
+  { k: 'tempo', label: 'Tempo/Abstand', icon: '📏', c: '#d64f8d' },
+  { k: 'schalten', label: 'Schalten', icon: '⚙️', c: '#8a6d3b' },
+  { k: 'autobahn', label: 'Autobahn', icon: '🛣️', c: '#3a6fd4' },
+  { k: 'ueberland', label: 'Überland', icon: '🌄', c: '#2aa568' },
+  { k: 'nacht', label: 'Nacht', icon: '🌙', c: '#6155c9' },
+  { k: 'sonstiges', label: 'Sonstiges', icon: '📌', c: '#8a8a8a' },
+];
+const lpCat = (k) => LP_CATS.find((c) => c.k === k) || null;
+function lpCatBadge(k) { const c = lpCat(k); return c ? `<span class="fb-cat" style="background:${c.c}22;color:${c.c};border:1px solid ${c.c}55">${c.icon} ${esc(c.label)}</span>` : ''; }
 // Antippen: vorhandene Einträge dieser Fahrstunde zeigen (oder gleich neuen anlegen).
 async function openLearnpoint(b) {
-  let points = [];
-  try { points = (await api(`/api/instructor/learnpoints?booking_id=${b.id}&student_id=${b.student_id}`)).points || []; } catch {}
-  if (!points.length) return newLearnpoint(b);
-  points.forEach((p, i) => p._n = i + 1);
-  const withGeo = points.filter((p) => p.lat != null);
+  let all = [];
+  try { all = (await api(`/api/instructor/learnpoints?student_id=${b.student_id}`)).points || []; } catch {}
+  const mine = all.filter((p) => String(p.booking_id) === String(b.id));
+  // Offene Stellen aus FRÜHEREN Stunden (fertig gestellt, noch nicht gemeistert) – zum Mitnehmen.
+  const openEarlier = all.filter((p) => p.done && !p.resolved && String(p.booking_id) !== String(b.id))
+    .sort((a, z) => (z.lesson_date || z.created_at || '').localeCompare(a.lesson_date || a.created_at || ''));
+  if (!mine.length && !openEarlier.length) return newLearnpoint(b);
+  mine.forEach((p, i) => p._n = i + 1);
+  const withGeo = mine.filter((p) => p.lat != null);
   const overview = withGeo.length
     ? `<div id="lp-overview-map" class="live-map" style="margin:.3rem 0 .7rem"><div class="lm-loading"><span class="tire">🛞</span></div></div>` : '';
+  const dmy = (p) => fmtDMY2(p.lesson_date || String(p.created_at || '').slice(0, 10));
+  const carry = openEarlier.length ? `<div class="lp-carry">
+    <div class="lp-carry-h">↩︎ Weiter offen aus früheren Stunden <span class="lp-carry-n">${openEarlier.length}</span></div>
+    <p class="hint" style="margin:.1rem 0 .5rem">Kam es heute wieder vor? Tipp „nochmal". Saß es? „🟢 sitzt".</p>
+    ${openEarlier.map((p) => `<div class="lp-carry-i">
+      <span class="lp-ci-tx">${lpCat(p.category) ? `<span class="fb-dot" style="background:${lpCat(p.category).c}"></span>` : ''}<b>${esc(p.place || (p.text || '').split('\n')[0] || 'Stelle')}</b> <span class="muted">· ${dmy(p)}</span></span>
+      <span class="lp-ci-btns"><button class="ghost sm" data-lpagain="${p.id}">↻ nochmal</button><button class="sec sm" data-lpresolve="${p.id}">🟢 sitzt</button></span>
+    </div>`).join('')}</div>` : '';
   modal(`<h3>📍 Fehlerbuch · ${esc(b.student_name || 'Fahrschüler')}</h3>
-    <p class="hint">${points.length} Eintrag${points.length === 1 ? '' : 'e'} zu dieser Fahrstunde${withGeo.length ? ' · Nadeln = Orte' : ''}.</p>
+    ${carry}
+    <div class="lp-sech">Diese Fahrstunde ${mine.length ? `· ${mine.length}` : ''}</div>
+    <div class="lp-list">${mine.length ? mine.map((p) => lpListItem(p)).join('') : '<p class="muted" style="margin:.2rem 0">Noch kein Eintrag zu dieser Stunde.</p>'}</div>
     ${overview}
-    <div class="lp-list">${points.map((p) => lpListItem(p)).join('')}</div>
     <div class="actions"><button class="sec" onclick="window.__closeModal()">Schließen</button><button id="lp-new">＋ Neuer Eintrag</button></div>`, 'wide');
   $('#lp-new').onclick = () => newLearnpoint(b);
   document.querySelectorAll('[data-lpopen]').forEach((el) => el.onclick = () => {
-    const pt = points.find((x) => String(x.id) === el.dataset.lpopen); if (pt) openLearnpointEditor(pt, b.student_name);
+    const pt = mine.find((x) => String(x.id) === el.dataset.lpopen); if (pt) openLearnpointEditor(pt, b.student_name);
   });
-  if (withGeo.length) fillPinsMap('lp-overview-map', withGeo.map((p) => ({ lat: p.lat, lng: p.lng, n: p._n, resolved: p.resolved, label: (p.text || '').split('\n')[0].slice(0, 60) || ('Eintrag ' + p._n) })));
+  document.querySelectorAll('[data-lpresolve]').forEach((el) => el.onclick = async () => {
+    try { await api('/api/instructor/learnpoints/' + el.dataset.lpresolve, { method: 'PATCH', body: { resolved: true } }); toast('🟢 „Sitzt jetzt!" – super.', 'ok'); openLearnpoint(b); } catch (e) { toast(e.message, 'err'); }
+  });
+  document.querySelectorAll('[data-lpagain]').forEach((el) => el.onclick = () => {
+    const pt = openEarlier.find((x) => String(x.id) === el.dataset.lpagain); if (pt) openLearnpointEditor(pt, b.student_name);
+  });
+  if (withGeo.length) fillPinsMap('lp-overview-map', withGeo.map((p) => ({ lat: p.lat, lng: p.lng, n: p._n, resolved: p.resolved, label: (p.place || (p.text || '').split('\n')[0] || ('Eintrag ' + p._n)).slice(0, 60) })));
 }
 function lpListItem(p) {
   const when = fmtEntry(p.created_at);
@@ -6220,6 +6335,8 @@ function openLearnpointEditor(point, studentName) {
     <p class="hint"><strong>${esc(studentName || 'Fahrschüler')}</strong> · <span id="lp-geo">${point.lat != null ? '📍 Standort gesetzt ✓' : '📍 Standort …'}</span></p>
     <div class="field"><label>📍 Welche Stelle?</label>
       <input id="lp-place" maxlength="120" placeholder="z. B. Kreisverkehr Marktplatz · Ampel Bahnhofstr." value="${esc(point.place || '')}" autocomplete="off"></div>
+    <label class="lp-lbl">Kategorie</label>
+    <div class="lp-cats" id="lp-cats">${LP_CATS.map((c) => `<button type="button" class="lp-cat${point.category === c.k ? ' on' : ''}" data-cat="${c.k}" style="--cc:${c.c}">${c.icon} ${esc(c.label)}</button>`).join('')}</div>
     <label class="lp-lbl">Was ging schief / worauf achten?</label>
     <div class="lp-chips">${LP_CHIPS.map((c) => `<button type="button" class="lp-chip" data-chip="${esc(c)}">${esc(c)}</button>`).join('')}</div>
     <div class="field" style="margin-top:.4rem"><textarea id="lp-text" rows="3" placeholder="Tipp oben auf einen Fehler oder schreib frei – wird sofort gespeichert.">${esc(point.text || '')}</textarea></div>
@@ -6265,6 +6382,12 @@ function openLearnpointEditor(point, studentName) {
     };
     placeEl.onblur = savePlace;
   }
+  // Kategorie wählen (Umschalten) – sofort sichern.
+  document.querySelectorAll('[data-cat]').forEach((cb) => cb.onclick = async () => {
+    const k = cb.dataset.cat; const nv = (point.category === k) ? '' : k;
+    document.querySelectorAll('[data-cat]').forEach((x) => x.classList.toggle('on', x.dataset.cat === nv));
+    try { const r = await api('/api/instructor/learnpoints/' + point.id, { method: 'PATCH', body: { category: nv } }); point.category = r.point.category; setSaved('✓ gespeichert'); } catch { setSaved('⚠️ Kategorie nicht gespeichert'); }
+  });
   const redrawPhotos = () => { const el = $('#lp-photos'); if (el) { el.innerHTML = photoGrid(); wireDel(); } };
   const wireDel = () => document.querySelectorAll('[data-delph]').forEach((db2) => db2.onclick = async () => {
     try { await api(`/api/instructor/learnpoints/${point.id}/photo/${db2.dataset.delph}`, { method: 'DELETE' });
