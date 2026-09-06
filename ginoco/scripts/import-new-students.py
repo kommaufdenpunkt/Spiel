@@ -74,6 +74,18 @@ STUDENTS = [
             ("26.06.24", "13:15", 60,  "", "Zieroth André"),
         ],
     },
+    {
+        "header": "Bennewitz, Mike",
+        "stamm": {"phone": "01779070944", "email": "benne1969@t-online.de",
+                   "street": "Hof", "house_no": "35",
+                   "zip": "16247", "city": "Friedrichswalde OT Parlow-Glambeck",
+                   "birth_date": "1969-07-06"},
+        "match": ["mike", "bennewitz"],
+        "lessons": [
+            ("11.09.26", "11:00", 240, "", ""),
+            ("04.09.26", "15:05", 120, "", ""),
+        ],
+    },
 ]
 
 cj = http.cookiejar.CookieJar()
