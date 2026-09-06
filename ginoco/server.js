@@ -518,6 +518,17 @@ function freeStarts(date, studentId) {
   }
   // Heute: keine Startzeiten in der Vergangenheit anbieten (auf jetzt vorziehen).
   const nowClamp = (date === todayStr()) ? Math.ceil(toMin(nowHHMM()) / 5) * 5 : -1;
+  const WISH = 30;
+  // Große Lücke: zusätzlich frühere Wunschzeiten (30-Min-Raster) anbieten, damit ein
+  // isoliertes Fenster (z. B. vor einem festen 19-Uhr-Termin) sich füllen kann.
+  const rasterExtra = (earliest, cap) => {
+    if (cap - earliest < f.lessonMin + WISH) return; // nur bei wirklich großer Lücke
+    for (let t = Math.ceil(earliest / WISH) * WISH; t + f.lessonMin <= cap; t += WISH) {
+      let start = t; if (nowClamp >= 0) start = Math.max(start, nowClamp);
+      if (start < earliest || start + minDur > cap) continue;
+      if (!out.some((o) => o.start === start)) out.push({ start, cap });
+    }
+  };
   // „danach": lueckenlos NACH einer Buchung (Pause + Abholzeit), Fenster ggf. nach rechts begrenzt.
   const addAfter = (winStart, winEnd) => {
     if (winEnd <= winStart) return;
@@ -528,6 +539,7 @@ function freeStarts(date, studentId) {
     const interior = winEnd < f.workEnd;
     const cap = interior ? winEnd - brk : winEnd;
     if (start + minDur <= cap) out.push({ start, cap });
+    rasterExtra(start, cap); // große Lücke danach: zusätzlich Wunschzeiten
   };
   // „davor": lueckenlos VOR der ersten Buchung. Die Stunde endet buendig, danach
   // Pause + Abholzeit bis zur Buchung. Die erste Stunde des Tages braucht Abholzeit voraus.
@@ -542,11 +554,11 @@ function freeStarts(date, studentId) {
     start = Math.round(start / 5) * 5;
     if (nowClamp >= 0) start = Math.max(start, nowClamp);
     if (start + minDur <= cap) out.push({ start, cap });
+    rasterExtra(earliest, cap); // große Lücke davor (z. B. Vormittag vor 19-Uhr-Termin): frühere Wunschzeiten
   };
   if (!iv.length) {
     // Leerer Tag: freie Wunschzeit – mehrere Startzeiten im 30-Min-Raster anbieten.
     // Sobald der Schueler eine bucht, fliesst der Rest lueckenlos davor & danach.
-    const WISH = 30;
     const first = Math.ceil((f.dayStart + travel) / WISH) * WISH; // Abholung vor der 1. Stunde
     const seen = new Set();
     const push = (t) => {
@@ -567,6 +579,7 @@ function freeStarts(date, studentId) {
       const winEnd = (i + 1 < iv.length) ? iv[i + 1].s : f.workEnd;
       addAfter(winStart, Math.min(winEnd, f.workEnd));
     }
+    out.sort((a, z) => a.start - z.start);
   }
   return out;
 }
