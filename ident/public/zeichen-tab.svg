@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="4ever1.tv">
+  <title>4ever1.tv – Tab-Zeichen</title>
+  <!--
+    Das Zeichen für die Browser-Leiste.
+
+    Vorher lag dort icon-192.png: das volle Logo, vom Browser auf 16 Pixel
+    heruntergerechnet. Der Schriftzug „4EVER1.TV" wurde dabei zu einem
+    Farbklecks, den man von keinem anderen Tab-Klecks unterscheiden konnte —
+    er sah aus wie ein Adressbuch-Symbol.
+
+    Hier ist nur die Acht, ohne Schriftzug. Die bleibt bis 16 Pixel
+    erkennbar.
+
+    Der dunkle Grund ist Absicht und der Unterschied zu zeichen.svg: Ein
+    freigestelltes Gold verschwimmt in einer hellen Tab-Leiste und ein heller
+    Grund leuchtet in einer dunklen. Die dunkle Kachel sitzt in beiden gleich
+    gut — dieselbe Überlegung wie beim PK-Board.
+
+    Die Acht ist gegenüber zeichen.svg etwas kleiner gezogen, damit sie in
+    der Kachel Luft hat und der Rand sie nicht anschneidet.
+  -->
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"   stop-color="#FFF7D6"/>
+      <stop offset="22%"  stop-color="#F9CE55"/>
+      <stop offset="48%"  stop-color="#DFA412"/>
+      <stop offset="50%"  stop-color="#A96E05"/>
+      <stop offset="70%"  stop-color="#F3C34A"/>
+      <stop offset="100%" stop-color="#7A4D04"/>
+    </linearGradient>
+    <linearGradient id="gl" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%"   stop-color="#fff" stop-opacity=".45"/>
+      <stop offset="40%"  stop-color="#fff" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#fff" stop-opacity=".25"/>
+    </linearGradient>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%"   stop-color="#2A1D06"/>
+      <stop offset="100%" stop-color="#120C02"/>
+    </linearGradient>
+    <path id="l" d="M 256 256 C 256 206, 218 176, 175 176 C 127 176, 94 211, 94 256
+                    C 94 301, 127 336, 175 336 C 218 336, 256 306, 256 256 Z"/>
+    <path id="r" d="M 256 256 C 256 206, 294 176, 337 176 C 385 176, 418 211, 418 256
+                    C 418 301, 385 336, 337 336 C 294 336, 256 306, 256 256 Z"/>
+  </defs>
+
+  <rect x="0" y="0" width="512" height="512" rx="112" fill="url(#bg)"/>
+  <use href="#l" fill="none" stroke="#2E1C00" stroke-width="60"/>
+  <use href="#r" fill="none" stroke="#2E1C00" stroke-width="60"/>
+  <use href="#l" fill="none" stroke="url(#g)" stroke-width="48"/>
+  <use href="#r" fill="none" stroke="url(#g)" stroke-width="48"/>
+  <use href="#l" fill="none" stroke="url(#gl)" stroke-width="48"/>
+  <use href="#r" fill="none" stroke="url(#gl)" stroke-width="48"/>
+</svg>
