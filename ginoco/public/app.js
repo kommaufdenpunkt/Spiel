@@ -4236,25 +4236,42 @@ async function renderFehlerbuch() {
   try { points = (await api('/api/my/learnpoints')).points || []; } catch { return; }
   if (!points.length) { card.classList.add('hidden'); return; }
   card.classList.remove('hidden');
-  points.forEach((p, i) => p._n = i + 1);
+  // Nadel-Nummern chronologisch (ältester Eintrag = 1), unabhängig von der Anzeige-Reihenfolge.
+  points.slice().sort((a, z) => (a.created_at || '').localeCompare(z.created_at || '')).forEach((p, i) => p._n = i + 1);
   const withGeo = points.filter((p) => p.lat != null);
+  // Nach Tag gruppieren (Fahrdatum der Stunde, sonst Eintragedatum) – neueste Tage zuerst.
+  const dayKey = (p) => (p.lesson_date || String(p.created_at || '').slice(0, 10));
+  const byDay = new Map();
+  for (const p of points) { const k = dayKey(p); (byDay.get(k) || byDay.set(k, []).get(k)).push(p); }
+  const days = [...byDay.keys()].sort((a, z) => z.localeCompare(a));
+  const dayLabel = (k) => { try { return parseD(k).toLocaleDateString(LOCALE, { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' }); } catch { return k; } };
+  const openN = points.filter((p) => !p.resolved).length, okN = points.length - openN;
   const overview = withGeo.length
     ? `<div id="fb-overview-map" class="live-map fb-overview"><div class="lm-loading"><span class="tire">🛞</span></div></div>` : '';
+  const entryHtml = (p) => {
+    const photos = (p.photos || []).map((id) => `<img class="fb-ph" data-photo="/api/learnpoints/photo/${id}" src="/api/learnpoints/photo/${id}" alt="">`).join('');
+    const text = esc(p.text || '').replace(/\n/g, '<br>');
+    const title = p.place ? esc(p.place) : `Stelle ${p._n}`;
+    return `<div class="fb-entry${p.resolved ? ' fb-done' : ''}">
+      <div class="fb-e-head"><span class="fb-num${p.resolved ? ' ok' : ''}">${p.resolved ? '✓' : p._n}</span>
+        <span class="fb-e-title">${title}</span>
+        ${p.resolved ? '<span class="fb-sit">sitzt jetzt ✓</span>' : '<span class="fb-open">üben</span>'}</div>
+      ${text ? `<div class="fb-text">${text}</div>` : ''}
+      ${photos ? `<div class="fb-photos">${photos}</div>` : ''}
+      ${p.lat != null ? `<button class="sec sm fb-map" data-lat="${p.lat}" data-lng="${p.lng}">📍 ${t('fb_map')}</button>` : ''}
+    </div>`;
+  };
   card.innerHTML = `<h2>${t('fb_title')}</h2><p class="hint">${t('fb_hint')}</p>
+    <div class="fb-sum"><span class="fb-sum-i">📅 ${days.length} Tag${days.length === 1 ? '' : 'e'}</span><span class="fb-sum-i">📖 ${points.length} Einträge</span>${okN ? `<span class="fb-sum-i ok">🟢 ${okN} sitzt</span>` : ''}${openN ? `<span class="fb-sum-i warn">🟡 ${openN} zu üben</span>` : ''}</div>
     ${overview}
-    <div class="fb-list">${points.map((p) => {
-      const photos = (p.photos || []).map((id) => `<img class="fb-ph" data-photo="/api/learnpoints/photo/${id}" src="/api/learnpoints/photo/${id}" alt="">`).join('');
-      const text = esc(p.text || '').replace(/\n/g, '<br>');
-      return `<div class="fb-item${p.resolved ? ' fb-done' : ''}">
-        <div class="fb-when"><span class="fb-num${p.resolved ? ' ok' : ''}">${p.resolved ? '✓' : p._n}</span> ${esc(fmtEntry(p.created_at))}${p.resolved ? ' <span class="fb-sit">sitzt jetzt ✓</span>' : ''}</div>
-        ${text ? `<div class="fb-text">${text}</div>` : ''}
-        ${photos ? `<div class="fb-photos">${photos}</div>` : ''}
-        ${p.lat != null ? `<button class="sec sm fb-map" data-lat="${p.lat}" data-lng="${p.lng}">📍 ${t('fb_map')}</button>` : ''}
-      </div>`;
-    }).join('')}</div>`;
+    <div class="fb-diary">${days.map((k) => `
+      <div class="fb-day">
+        <div class="fb-day-h">📅 ${dayLabel(k)} <span class="fb-day-n">${byDay.get(k).length} Stelle${byDay.get(k).length === 1 ? '' : 'n'}</span></div>
+        <div class="fb-day-entries">${byDay.get(k).map(entryHtml).join('')}</div>
+      </div>`).join('')}</div>`;
   card.querySelectorAll('[data-photo]').forEach((im) => im.onclick = () => openPhotoLightbox(im.dataset.photo));
   card.querySelectorAll('.fb-map').forEach((b) => b.onclick = () => openPointMap(Number(b.dataset.lat), Number(b.dataset.lng)));
-  if (withGeo.length) fillPinsMap('fb-overview-map', withGeo.map((p) => ({ lat: p.lat, lng: p.lng, n: p._n, resolved: p.resolved, label: (p.text || '').split('\n')[0].slice(0, 60) || ('Eintrag ' + p._n) })));
+  if (withGeo.length) fillPinsMap('fb-overview-map', withGeo.map((p) => ({ lat: p.lat, lng: p.lng, n: p._n, resolved: p.resolved, label: (p.place || (p.text || '').split('\n')[0] || ('Eintrag ' + p._n)).slice(0, 60) })));
 }
 function openPhotoLightbox(src) {
   modal(`<div style="text-align:center"><img src="${src}" style="max-width:100%;max-height:74vh;border-radius:12px" alt=""></div>
@@ -4268,7 +4285,7 @@ async function openPointMap(lat, lng) {
   const map = L.map(el, { zoomControl: true, attributionControl: true, scrollWheelZoom: false }).setView([lat, lng], 16);
   addTilesWithFallback(map, el);
   L.marker([lat, lng], { icon: _meetIcon() }).addTo(map);
-  setTimeout(() => { try { map.invalidateSize(); } catch {} }, 200);
+  kickMap(map, el);
 }
 
 // ---------- Abholung: Schüler teilt Standort / setzt Abholort ----------
@@ -4415,7 +4432,8 @@ async function fillPinsMap(elId, pins) {
   }
   if (pts.length === 1) map.setView(pts[0], 16);
   else if (pts.length > 1) map.fitBounds(pts, { padding: [34, 34], maxZoom: 16 });
-  setTimeout(() => { try { map.invalidateSize(); } catch {} }, 200);
+  else map.setView([52.834, 13.821], 12); // Fallback: Eberswalde, damit die Karte nie leer/ohne View bleibt
+  kickMap(map, el);
 }
 // Ansicht so einstellen, dass beide Punkte sichtbar sind (programmatisch, ohne „userMoved" zu setzen)
 function _fitLive(m) {
@@ -4439,20 +4457,23 @@ function addTilesWithFallback(map, el) {
   const add = () => {
     const src = TILE_SOURCES[srcIdx];
     const tl = L.tileLayer(src.url, src.opt).addTo(map);
-    let okT = 0, errT = 0;
+    let okT = 0, errT = 0, switched = false;
+    const next = () => {
+      if (switched || okT > 0) return;
+      if (srcIdx < TILE_SOURCES.length - 1) { switched = true; srcIdx++; try { map.removeLayer(tl); } catch {} add(); }
+      else { dropLoader(); if (el && !el.querySelector('.lm-hint')) { const h = L.DomUtil.create('div', 'lm-hint', el); h.textContent = '🛰️ Karte lädt gerade nicht – Internetverbindung?'; } }
+    };
     tl.on('tileload', () => { okT++; dropLoader(); });
-    tl.on('tileerror', () => {
-      errT++;
-      if (okT === 0 && errT >= 3 && srcIdx < TILE_SOURCES.length - 1) {
-        srcIdx++; try { map.removeLayer(tl); } catch {} add(); // auf Ersatz-Anbieter umschalten
-      } else if (okT === 0 && errT >= 4) {
-        dropLoader();
-        if (el && !el.querySelector('.lm-hint')) { const h = L.DomUtil.create('div', 'lm-hint', el); h.textContent = '🛰️ Karte lädt gerade nicht – Internetverbindung?'; }
-      }
-    });
+    tl.on('tileerror', () => { errT++; if (okT === 0 && errT >= 3) next(); });
+    // Manche Anbieter feuern kein tileerror, die Kacheln „hängen" nur -> nach 3,5 s hart umschalten.
+    setTimeout(next, 3500);
     return tl;
   };
   return add();
+}
+// Karte nach dem Einblenden mehrfach neu vermessen (Container-Größe war bei L.map() evtl. noch 0).
+function kickMap(map, el) {
+  [80, 300, 700, 1400].forEach((ms) => setTimeout(() => { try { map.invalidateSize(false); } catch {} }, ms));
 }
 async function initLiveMap(id) {
   await ensureLeaflet();
@@ -6160,11 +6181,11 @@ async function openLearnpoint(b) {
 }
 function lpListItem(p) {
   const when = fmtEntry(p.created_at);
-  const first = (p.text || '').split('\n')[0].slice(0, 60) || '(ohne Text)';
+  const title = p.place ? p.place.slice(0, 60) : ((p.text || '').split('\n')[0].slice(0, 60) || '(ohne Stelle)');
   return `<button class="lp-row${p.resolved ? ' resolved' : ''}" data-lpopen="${p.id}">
     ${p._n ? `<span class="lp-num${p.resolved ? ' ok' : ''}">${p.resolved ? '✓' : p._n}</span>` : ''}
     <span class="lp-row-ic">${p.resolved ? '🟢' : (p.done ? '✅' : '✏️')}</span>
-    <span class="lp-row-tx"><strong>${esc(first)}</strong><span class="muted">${when}${p.photos.length ? ' · 📷 ' + p.photos.length : ''}${p.lat != null ? ' · 📍' : ''}${p.resolved ? ' · 🟢 sitzt jetzt' : (p.done ? '' : ' · Entwurf')}</span></span>
+    <span class="lp-row-tx"><strong>${esc(title)}</strong><span class="muted">${when}${p.photos.length ? ' · 📷 ' + p.photos.length : ''}${p.lat != null ? ' · 📍' : ''}${p.resolved ? ' · 🟢 sitzt jetzt' : (p.done ? '' : ' · Entwurf')}</span></span>
     <span class="lp-row-go">›</span></button>`;
 }
 // Ein-Tipp-Merker fürs FAHREN: legt sofort einen Entwurf an (Standort + Zeit),
@@ -6197,8 +6218,11 @@ function openLearnpointEditor(point, studentName) {
     `<div class="lp-thumb"><img src="/api/learnpoints/photo/${id}" alt=""><button class="lp-del" data-delph="${id}" title="Foto entfernen">✕</button></div>`).join('');
   modal(`<h3>📍 Fehler festhalten</h3>
     <p class="hint"><strong>${esc(studentName || 'Fahrschüler')}</strong> · <span id="lp-geo">${point.lat != null ? '📍 Standort gesetzt ✓' : '📍 Standort …'}</span></p>
+    <div class="field"><label>📍 Welche Stelle?</label>
+      <input id="lp-place" maxlength="120" placeholder="z. B. Kreisverkehr Marktplatz · Ampel Bahnhofstr." value="${esc(point.place || '')}" autocomplete="off"></div>
+    <label class="lp-lbl">Was ging schief / worauf achten?</label>
     <div class="lp-chips">${LP_CHIPS.map((c) => `<button type="button" class="lp-chip" data-chip="${esc(c)}">${esc(c)}</button>`).join('')}</div>
-    <div class="field" style="margin-top:.4rem"><textarea id="lp-text" rows="3" placeholder="Tipp einfach oben auf einen Fehler – wird sofort gespeichert. (Freitext optional.)">${esc(point.text || '')}</textarea></div>
+    <div class="field" style="margin-top:.4rem"><textarea id="lp-text" rows="3" placeholder="Tipp oben auf einen Fehler oder schreib frei – wird sofort gespeichert.">${esc(point.text || '')}</textarea></div>
     <div id="lp-saved" class="lp-saved" aria-live="polite"></div>
     <div class="lp-photos" id="lp-photos">${photoGrid()}</div>
     <input type="file" id="lp-file" accept="image/*" capture="environment" multiple style="display:none">
@@ -6231,6 +6255,16 @@ function openLearnpointEditor(point, studentName) {
     doSave();   // sofort sichern – kein „Fertig" nötig, damit nichts verloren geht
   });
   ta.oninput = queueSave;
+  // Stelle/Ort separat sofort sichern (beim Verlassen des Feldes).
+  const placeEl = $('#lp-place');
+  if (placeEl) {
+    let lastPlace = point.place || '';
+    const savePlace = async () => {
+      const v = placeEl.value.trim(); if (v === lastPlace) return;
+      try { const r = await api('/api/instructor/learnpoints/' + point.id, { method: 'PATCH', body: { place: v } }); point.place = r.point.place; lastPlace = v; setSaved('✓ gespeichert'); } catch { setSaved('⚠️ Stelle nicht gespeichert'); }
+    };
+    placeEl.onblur = savePlace;
+  }
   const redrawPhotos = () => { const el = $('#lp-photos'); if (el) { el.innerHTML = photoGrid(); wireDel(); } };
   const wireDel = () => document.querySelectorAll('[data-delph]').forEach((db2) => db2.onclick = async () => {
     try { await api(`/api/instructor/learnpoints/${point.id}/photo/${db2.dataset.delph}`, { method: 'DELETE' });
