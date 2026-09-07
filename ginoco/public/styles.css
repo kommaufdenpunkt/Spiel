@@ -905,8 +905,10 @@ th{color:var(--muted);font-weight:600;font-size:.78rem;text-transform:uppercase;
 .wk-head .sub{display:block;font-weight:500;color:var(--muted);font-size:.68rem}
 .wk-head .daytag{display:block;font-weight:600;font-size:.64rem;margin-top:.1rem}
 .wk-corner{border-bottom:1px solid var(--line);background:#131a23}
-.wk-body{position:relative;border-left:1px solid var(--line)}
+.wk-body{position:relative;border-left:1px solid var(--line);cursor:copy}
 .wk-body.today{background:rgba(77,141,255,.05)}
+/* Fahrlehrer im Termin (nur wenn ein Kollege gefahren ist) */
+.wk-fl{font-size:.62rem;opacity:.9;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .wk-hour{height:42px;border-bottom:1px dashed var(--line)}
 .wk-times .wk-hour{position:relative}
 .wk-times .wk-hour span{position:absolute;top:-7px;right:.3rem;font-size:.66rem;color:var(--muted)}

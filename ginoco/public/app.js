@@ -7137,10 +7137,14 @@ function renderWeek(el, monday, ov) {
       const who = b.student_name || b.title || 'Termin';
       const tIco = TYPE_ICON[b.lesson_type] || '';
       const badge = b.status === 'done' ? ' ✓' : b.status === 'offered' ? ' 🔄' : '';
+      // Fahrlehrer: nur zeigen, wenn ein Kollege gefahren ist (leer = du selbst)
+      const fl = (b.instructor_name || '').trim();
+      const flLine = fl && h >= 44 ? `<div class="wk-fl">👨‍🏫 ${esc(fl)}</div>` : '';
+      const end = addMinHHMM(b.start_time, b.duration_min);
       inner += `<div class="wk-block" data-wk="${b.id}" style="top:${top}px;height:${h}px;background:${col}"
-        title="${b.start_time} ${esc(who)}"><div class="t">${b.start_time}${badge} ${tIco}</div>${esc(who)}</div>`;
+        title="${b.start_time}–${end} · ${esc(who)}${fl ? ' · Fahrlehrer: ' + esc(fl) : ''}${b.status === 'done' ? ' · gefahren ✓' : ''}"><div class="t">${b.start_time}${badge} ${tIco}${fl && h < 44 ? ' 👨‍🏫' : ''}</div>${esc(who)}${flLine}</div>`;
     }
-    return `<div class="wk-body ${isToday ? 'today' : ''}" style="height:${bodyH}px">${hourLines}${inner}</div>`;
+    return `<div class="wk-body ${isToday ? 'today' : ''}" data-date="${d}" style="height:${bodyH}px" title="Auf eine freie Stelle tippen: Termin anlegen">${hourLines}${inner}</div>`;
   };
 
   el.innerHTML = `<div class="weekwrap"><div class="weekgrid">
@@ -7154,14 +7158,24 @@ function renderWeek(el, monday, ov) {
     <div class="wk-times">${hourLabels.join('')}</div>
     ${days.map(dayCol).join('')}
   </div></div>
-  <div class="hint" style="margin-top:.7rem">Tipp: auf einen Termin tippen zum Bearbeiten/Abschließen. Farbe = Fahrschüler (bzw. Fahrt-Art), 🔄 = wird abgegeben, ✓ = gefahren.</div>
+  <div class="hint" style="margin-top:.7rem">Tipp: auf einen <strong>Termin</strong> tippen zum Bearbeiten/Abschließen/Unterschreiben · auf eine <strong>freie Stelle</strong> tippen legt dort einen neuen Termin an. Farbe = Fahrschüler (bzw. Fahrt-Art), 🔄 = wird abgegeben, ✓ = gefahren, 👨‍🏫 = Kollege gefahren.</div>
   <div class="legend"><span class="muted">Fahrt-Arten:</span>
     <span class="legend-chip"><span class="sw" style="background:${TYPE_COLORS.ueberland}"></span>🌄 Überland</span>
     <span class="legend-chip"><span class="sw" style="background:${TYPE_COLORS.autobahn}"></span>🛣️ Autobahn</span>
     <span class="legend-chip"><span class="sw" style="background:${TYPE_COLORS.nacht}"></span>🌙 Nachtfahrt</span>
     <span class="legend-chip"><span class="sw" style="background:${TYPE_COLORS.normal}"></span>🚗 Normale Stunde</span>
   </div>`;
-  el.querySelectorAll('[data-wk]').forEach((b) => b.onclick = () => openMarkModal(b.dataset.wk));
+  el.querySelectorAll('[data-wk]').forEach((b) => b.onclick = (e) => { e.stopPropagation(); openMarkModal(b.dataset.wk); });
+  // Auf eine freie Stelle im Tag tippen -> neuer Termin, Tag + Uhrzeit schon ausgefüllt.
+  const hhmm = (m) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(Math.round(m % 60)).padStart(2, '0')}`;
+  el.querySelectorAll('.wk-body[data-date]').forEach((body) => body.onclick = (e) => {
+    if (e.target.closest('.wk-block')) return;            // Termine haben ihren eigenen Klick
+    const r = body.getBoundingClientRect();
+    if (!r.height) return;
+    const min = lo + ((e.clientY - r.top) / r.height) * total;
+    const snap = Math.max(lo, Math.min(hi - 15, Math.round(min / 15) * 15)); // auf 15 Min runden
+    openAddBooking(body.dataset.date, hhmm(snap));
+  });
 }
 
 // ---- Monatsansicht ----
@@ -7250,15 +7264,15 @@ async function openGapModal() {
   };
 }
 
-async function openAddBooking() {
+async function openAddBooking(preDate, preTime) {
   let students = [];
   try { students = (await api('/api/students')).students; } catch {}
   const s = state.settings;
   modal(`<h3>Eigenen Termin anlegen</h3>
     <p class="hint">Frei buchen – für einen Fahrschüler oder als Sondertermin (z.B. Prüfung).</p>
-    <div class="field"><label>Datum</label><input type="date" id="a-date" value="${state.date}"></div>
+    <div class="field"><label>Datum</label><input type="date" id="a-date" value="${preDate || state.date}"></div>
     <div class="row">
-      <div class="field"><label>Uhrzeit</label><input id="a-time" value="${s.start_time || '12:00'}" placeholder="HH:MM"></div>
+      <div class="field"><label>Uhrzeit</label><input id="a-time" value="${preTime || s.start_time || '12:00'}" placeholder="HH:MM"></div>
       <div class="field"><label>Dauer (Min)</label><input id="a-dur" type="number" value="${s.lesson_min}" step="5" min="10"></div>
     </div>
     <div class="field"><label>Fahrschüler <span class="muted" style="font-weight:400">(optional)</span></label>
@@ -9123,47 +9137,11 @@ function tabEinstellungen() {
 window.__instrBookings = [];
 const _origRenderInstrDay = renderInstrDay;
 
-// ====================== PWA: "App installieren"-Angebot ======================
+// ====================== PWA: "App installieren" ======================
+// Der früher schwebende Button unten wurde entfernt – er hat die Fußzeile
+// (Nutzungsbedingungen · Impressum · Hilfe) überdeckt. Das Installieren geht
+// weiterhin über das Browser-Menü ("Zum Home-Bildschirm" / Installieren).
 (function () {
-  const standalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
-  if (standalone) return; // laeuft schon als installierte App
-  const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
-  let deferred = null;
-
-  function ensureBtn() {
-    let b = document.getElementById('pwa-install');
-    if (!b) {
-      b = document.createElement('button');
-      b.id = 'pwa-install';
-      b.className = 'pwa-install';
-      b.innerHTML = '📲 App installieren';
-      b.onclick = onClick;
-      document.body.appendChild(b);
-    }
-    return b;
-  }
-  function hide() { const b = document.getElementById('pwa-install'); if (b) b.remove(); }
-
-  async function onClick() {
-    if (deferred) {
-      deferred.prompt();
-      const res = await deferred.userChoice.catch(() => ({}));
-      deferred = null;
-      if (res && res.outcome === 'accepted') hide();
-    } else if (isIOS && typeof modal === 'function') {
-      modal(`<h3>ginoco als App installieren</h3>
-        <p class="hint">So legst du ginoco wie eine echte App auf deinen Startbildschirm:</p>
-        <ol class="hint" style="padding-left:1.1rem;line-height:1.6">
-          <li>Tippe unten in Safari auf das <strong>Teilen-Symbol</strong> (Viereck mit Pfeil nach oben).</li>
-          <li>Wähle <strong>„Zum Home-Bildschirm"</strong>.</li>
-          <li>Auf <strong>„Hinzufügen"</strong> tippen – fertig. 🚗</li>
-        </ol>
-        <div class="actions"><button onclick="window.__closeModal()">Alles klar</button></div>`);
-    }
-  }
-
-  window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); deferred = e; ensureBtn(); });
-  window.addEventListener('appinstalled', hide);
-  // iOS liefert kein beforeinstallprompt -> Button trotzdem anbieten (fuehrt zur Anleitung)
-  if (isIOS) window.addEventListener('load', ensureBtn);
+  // Das Browser-Angebot nicht selbst aufpoppen lassen; kein eigener Button mehr.
+  window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); });
 })();
