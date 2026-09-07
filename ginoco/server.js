@@ -3715,18 +3715,19 @@ function bulkInstructorBookings(res, body) {
   let created = 0;
   for (const r of okRows) {
     // Vergangene Stunde -> als "gefahren" (done, bestätigt, anwesend) übernehmen.
-    // Zukünftige -> reserviert (confirmed=0), der Schüler bestätigt.
+    // Künftige -> fest eingetragen (confirmed=1): Sammel-Eintragen sind bereits
+    // vereinbarte Termine, keine Vorschläge – sie dürfen nicht automatisch verfallen.
     const status = r.done ? 'done' : 'booked';
-    const confirmed = r.done ? 1 : 0;
+    const confirmed = 1;
     const attended = r.done ? 1 : null;
     const info = db.prepare(
       `INSERT INTO bookings(student_id,date,start_time,duration_min,status,confirmed,attended,created_at) VALUES(?,?,?,?,?,?,?,?)`
     ).run(r.studentId, r.date, r.time, r.dur, status, confirmed, attended, new Date().toISOString());
     logEvent('book', { actor: 'instructor', studentId: r.studentId, bookingId: Number(info.lastInsertRowid), date: r.date,
       detail: `${wdShort(r.date)} ${dmy(r.date)} ${r.time} Uhr (${r.dur} Min) – Sammel-Import ${r.done ? '(gefahren)' : '(reserviert)'}` });
-    // Nur bei zukünftigen Terminen den Schüler zum Bestätigen anstupsen (nicht bei Historie).
+    // Nur bei zukünftigen Terminen den Schüler informieren (nicht bei Historie).
     if (!r.done && r.studentId) notify(r.studentId, 'info',
-      `Neuer Termin für dich reserviert: ${wdShort(r.date)} ${dmy(r.date)} um ${r.time} Uhr (${r.dur} Min). Bitte in der App bestätigen.`, r.date, Number(info.lastInsertRowid));
+      `Neuer Termin für dich eingetragen: ${wdShort(r.date)} ${dmy(r.date)} um ${r.time} Uhr (${r.dur} Min).`, r.date, Number(info.lastInsertRowid));
     created++;
   }
   return ok(res, { committed: true, created, ...summary });
@@ -3903,7 +3904,10 @@ function bulkRoster(res, body) {
     for (const r of grp.lessons) {
       if (r.status !== 'ok') continue;
       const status = r.done ? 'done' : 'booked';
-      const confirmed = r.done ? 1 : 0;
+      // Importierte Termine sind FEST vereinbart (aus dem alten Programm), kein
+      // Vorschlag -> confirmed=1. Sonst würden sie von expireStaleReservations()
+      // als "Vorschlag ohne Antwort" automatisch storniert werden.
+      const confirmed = 1;
       const attended = r.noshow ? 0 : (r.done ? 1 : null);
       const info = db.prepare(
         `INSERT INTO bookings(student_id,date,start_time,duration_min,status,confirmed,attended,lesson_type,gearbox,feedback,invoice_date,invoice_time,license_class,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
@@ -3911,7 +3915,7 @@ function bulkRoster(res, body) {
       logEvent('book', { actor: 'instructor', studentId: sid, bookingId: Number(info.lastInsertRowid), date: r.date,
         detail: `${wdShort(r.date)} ${dmy(r.date)} ${r.time} Uhr (${r.dur} Min)${r.artLabel ? ' · ' + r.artLabel : ''}${r.gearLabel ? ' · ' + r.gearLabel : ''}${r.invDate ? ' · Rechnung ' + dmy(r.invDate) : ''} – Verlauf-Import ${r.noshow ? '(nicht erschienen)' : r.done ? '(gefahren)' : '(reserviert)'}` });
       if (!r.done) notify(sid, 'info',
-        `Neuer Termin für dich reserviert: ${wdShort(r.date)} ${dmy(r.date)} um ${r.time} Uhr (${r.dur} Min). Bitte in der App bestätigen.`, r.date, Number(info.lastInsertRowid));
+        `Neuer Termin für dich eingetragen: ${wdShort(r.date)} ${dmy(r.date)} um ${r.time} Uhr (${r.dur} Min).`, r.date, Number(info.lastInsertRowid));
       createdLessons++;
     }
   }
