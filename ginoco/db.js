@@ -530,6 +530,18 @@ export function setSettingRaw(key, value) {
   setSetting.run(key, String(value));
 }
 
+// Notfall-Codes fuer den Fahrlehrer-Zugang erzeugen.
+// Gibt den Klartext EINMAL zurueck; gespeichert werden nur Hashes.
+// Alphabet ohne I/O/0/1 – damit man beim Abschreiben nichts verwechselt.
+export function genInstructorRecovery(n = 8) {
+  const AL = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const grp = () => { let s = ''; const r = randomBytes(5); for (let i = 0; i < 5; i++) s += AL[r[i] % AL.length]; return s; };
+  const codes = [];
+  for (let i = 0; i < n; i++) codes.push(grp() + '-' + grp());
+  setSettingRaw('instructor_recovery', JSON.stringify(codes.map((c) => hashPassword(c))));
+  return codes;
+}
+
 // ---- Passwoerter / PINs ----
 export function hashPassword(pw) {
   const salt = randomBytes(16);

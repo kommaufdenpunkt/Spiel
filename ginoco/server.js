@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join, extname, normalize } from 'node:path';
 import {
   db, getSettings, getSettingRaw, setSettingRaw,
-  hashPassword, verifyPassword,
+  hashPassword, verifyPassword, genInstructorRecovery,
 } from './db.js';
 import { sendMail } from './mail.js';
 
@@ -240,16 +240,6 @@ function parseAuthData(ad) {
     out.coseKey = ad.subarray(o);
   }
   return out;
-}
-
-// Wiederherstellungs-Codes für den Fahrlehrer erzeugen (Klartext zurück, Hashes speichern).
-function genInstructorRecovery(n = 8) {
-  const AL = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  const grp = () => { let s = ''; const r = randomBytes(5); for (let i = 0; i < 5; i++) s += AL[r[i] % AL.length]; return s; };
-  const codes = [];
-  for (let i = 0; i < n; i++) codes.push(grp() + '-' + grp());
-  setSettingRaw('instructor_recovery', JSON.stringify(codes.map((c) => hashPassword(c))));
-  return codes;
 }
 
 function getSession(req) {
