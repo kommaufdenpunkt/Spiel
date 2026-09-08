@@ -2225,10 +2225,14 @@ function esc(s) { return String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp
 
 function modal(html, extra) {
   closeModal();
+  // extra kann mehrere Schalter enthalten, z.B. 'sheet locked':
+  //  wide  = breiter · locked = kein Schliessen per Hintergrund · sheet = faehrt
+  //  auf dem Handy von unten hoch (Knoepfe im Daumenbereich).
+  const opt = String(extra || '');
   const bg = document.createElement('div');
-  bg.className = 'modal-bg';
+  bg.className = 'modal-bg' + (opt.includes('sheet') ? ' sheet-bg' : '');
   const m = document.createElement('div');
-  m.className = 'modal' + (extra === 'wide' ? ' wide' : '');
+  m.className = 'modal' + (opt.includes('wide') ? ' wide' : '') + (opt.includes('sheet') ? ' sheet' : '');
   m.innerHTML = html;
   // Inhalt in einen eigenen Scroll-Bereich packen; die Aktionsleiste (falls vorhanden)
   // bleibt als fester Footer außen – so überlappt nichts und nichts scheint durch.
@@ -2239,7 +2243,7 @@ function modal(html, extra) {
   m.insertBefore(body, m.firstChild);
   bg.appendChild(m);
   // 'locked' = Pflicht-Dialog: kein Schließen per Klick auf den Hintergrund.
-  if (extra !== 'locked') bg.addEventListener('click', (e) => { if (e.target === bg) closeModal(); });
+  if (!opt.includes('locked')) bg.addEventListener('click', (e) => { if (e.target === bg) closeModal(); });
   document.body.appendChild(bg);
   const pwa = document.getElementById('pwa-install'); if (pwa) pwa.style.display = 'none';  // überlappt sonst das Fenster
   return bg;
@@ -6224,7 +6228,10 @@ function renderInstrDay(el, date, bookings, blocks) {
   items.sort((a, b) => a.start_time.localeCompare(b.start_time));
   if (!items.length) { el.innerHTML = '<p class="muted">Keine Termine an diesem Tag.</p>'; return; }
   el.innerHTML = `<div class="blist">${items.map((it) => it.kind === 'block' ? blockItem(it) : instrBookingItem(it)).join('')}</div>`;
-  el.querySelectorAll('[data-mark]').forEach((b) => b.onclick = () => openMarkModal(b.dataset.mark));
+  el.querySelectorAll('[data-mark]').forEach((b) => {
+    b.onclick = () => { if (b._held) { b._held = false; return; } openMarkModal(b.dataset.mark); };
+    bindHold(b, () => { b._held = true; openQuickMenu(b.dataset.mark); });
+  });
   el.querySelectorAll('[data-cancel]').forEach((b) => b.onclick = () => instrCancel(b.dataset.cancel));
   el.querySelectorAll('[data-delblock]').forEach((b) => b.onclick = () => delBlock(b.dataset.delblock));
   el.querySelectorAll('[data-startlesson]').forEach((b) => b.onclick = () => instrStartLesson(b.dataset.startlesson));
@@ -6516,11 +6523,14 @@ function openMarkModal(id) {
   const b = window.__instrBookings.find((x) => String(x.id) === String(id));
   if (!b) return;
   const _who = b.student_name ? esc(b.student_name) : (b.title ? esc(b.title) : 'Termin');
-  modal(`<h3>✅ Fahrstunde abschließen</h3>
+  // Ohne Fahrschueler ist es ein eigener Termin – dann nicht von einer
+  // „Fahrstunde" sprechen, sonst verwechselt man die beiden.
+  const _own = !b.student_id;
+  modal(`<h3>${_own ? '📌 Eigener Termin' : '✅ Fahrstunde abschließen'}</h3>
     <p class="mk-sub">${_who} · ${WD[isoDow(b.date) - 1]} ${fmtShort(b.date)} · ${b.start_time} Uhr</p>
 
     <div class="mk-step glass" style="--i:0">
-      <div class="mk-step-h"><span class="mk-step-n">1</span> Hat die Fahrstunde stattgefunden?</div>
+      <div class="mk-step-h"><span class="mk-step-n">1</span> ${_own ? 'Termin bearbeiten' : 'Hat die Fahrstunde stattgefunden?'}</div>
       <div class="row">
         <div class="field"><label>Erschienen?</label>
           <select id="m-att">
@@ -6926,7 +6936,8 @@ async function tabKalender() {
       <button class="ghost sm" id="k-late"${mode === 'tag' ? '' : ' style="margin-left:auto"'}>⏱️ Ich komme später</button>
       <button class="ghost sm" id="k-gap">🧩 Lücken schließen</button>
       <button class="ghost sm" id="k-bulk">📋 Sammel-Eintragen</button>
-      <button class="sm" id="k-add">+ Eigener Termin</button>
+      <button class="ghost sm" id="k-sign" style="display:none">✍️</button>
+      <button class="sm" id="k-add">+ Termin</button>
     </div>
     <div id="k-list"></div>
   </div>`;
@@ -6940,7 +6951,8 @@ async function tabKalender() {
   $('#k-prev').onclick = () => shift(-1);
   $('#k-next').onclick = () => shift(1);
   $('#k-date').onchange = (e) => { state.date = e.target.value; loadK(); };
-  $('#k-add').onclick = () => openAddBooking();
+  $('#k-add').onclick = () => openSlotChooser(state.date, state.settings?.start_time || '12:00');
+  $('#k-sign').onclick = () => openSignBatch();
   $('#k-gap').onclick = () => openGapModal();
   $('#k-bulk').onclick = () => openBulkBooking();
   $('#k-late').onclick = () => openLateModal();
@@ -7023,7 +7035,7 @@ async function loadK() {
     $('#k-label').textContent = `Woche ${fmtShort(mon)}–${fmtShort(sat)}`;
     try {
       const ov = await api(`/api/instructor/overview?from=${mon}&to=${sat}`);
-      window.__instrBookings = ov.bookings;
+      window.__instrBookings = ov.bookings; updateSignBatchBtn();
       renderWeek($('#k-list'), mon, ov);
     } catch (e) { toast(e.message, 'err'); }
     return;
@@ -7035,7 +7047,7 @@ async function loadK() {
     $('#k-label').textContent = `${MON_LONG[parseD(first).getMonth()]} ${parseD(first).getFullYear()}`;
     try {
       const ov = await api(`/api/instructor/overview?from=${gridStart}&to=${gridEnd}`);
-      window.__instrBookings = ov.bookings;
+      window.__instrBookings = ov.bookings; updateSignBatchBtn();
       renderMonth($('#k-list'), first, gridStart, ov);
     } catch (e) { toast(e.message, 'err'); }
     return;
@@ -7043,7 +7055,7 @@ async function loadK() {
   $('#k-label').textContent = fmtDay(state.date);
   try {
     const ov = await api('/api/instructor/overview?from=' + state.date + '&to=' + state.date);
-    window.__instrBookings = ov.bookings;
+    window.__instrBookings = ov.bookings; updateSignBatchBtn();
     renderInstrDay($('#k-list'), state.date, ov.bookings, ov.blocks);
     const blocked = (ov.overrides || []).some((o) => o.date === state.date && o.closed);
     if (blocked) $('#k-list').insertAdjacentHTML('afterbegin',
@@ -7109,7 +7121,8 @@ function renderWeek(el, monday, ov) {
   for (const bl of ov.blocks) { lo = Math.min(lo, toM(bl.start_time)); hi = Math.max(hi, toM(bl.end_time)); }
   lo = Math.floor(lo / 60) * 60; hi = Math.ceil(hi / 60) * 60;
   const total = Math.max(60, hi - lo);
-  const HPH = 42; // px pro Stunde
+  // Auf dem Handy die Stunden hoeher zeichnen -> groessere Tippflaechen (Daumen).
+  const HPH = (window.innerWidth || 1024) < 760 ? 58 : 42; // px pro Stunde
   const bodyH = total / 60 * HPH;
   const y = (min) => (min - lo) / total * bodyH;
   const ovByDate = {}; for (const o of ov.overrides) ovByDate[o.date] = o;
@@ -7132,22 +7145,31 @@ function renderWeek(el, monday, ov) {
         <div class="t">${bl.start_time}</div>${esc(bl.title)}</div>`;
     }
     for (const b of ov.bookings.filter((x) => x.date === d)) {
-      const top = y(toM(b.start_time)), h = Math.max(20, b.duration_min / total * bodyH);
+      const top = y(toM(b.start_time)), h = Math.max(26, b.duration_min / total * bodyH);
+      // Eigener Termin = ohne Fahrschueler (Pruefung, Werkstatt, Sperrzeit ...).
+      // Der wird bewusst anders gezeichnet, damit man ihn nie mit einer
+      // Fahrstunde verwechselt: schraffiert, grau und mit Pinnnadel.
+      const own = !b.student_id;
+      // Eigene Termine bekommen ihre Schraffur komplett aus dem Stylesheet.
+      // (Ein Inline-`background` wuerde das Muster ueberschreiben.)
       const col = b.status === 'offered' ? '#e6b23a' : (TYPE_COLORS[b.lesson_type] || studentColor(b.student_id));
-      const who = b.student_name || b.title || 'Termin';
-      const tIco = TYPE_ICON[b.lesson_type] || '';
+      const who = b.student_name || b.title || 'Eigener Termin';
+      const tIco = own ? '📌' : (TYPE_ICON[b.lesson_type] || '');
       const badge = b.status === 'done' ? ' ✓' : b.status === 'offered' ? ' 🔄' : '';
+      // Fehlt nach einer gefahrenen Stunde noch die Unterschrift? -> ✍️
+      const needSign = !own && b.status === 'done' && !b.signed_at && b.attended !== 0;
       // Fahrlehrer: nur zeigen, wenn ein Kollege gefahren ist (leer = du selbst)
       const fl = (b.instructor_name || '').trim();
       const flLine = fl && h >= 44 ? `<div class="wk-fl">👨‍🏫 ${esc(fl)}</div>` : '';
       const end = addMinHHMM(b.start_time, b.duration_min);
-      inner += `<div class="wk-block" data-wk="${b.id}" style="top:${top}px;height:${h}px;background:${col}"
-        title="${b.start_time}–${end} · ${esc(who)}${fl ? ' · Fahrlehrer: ' + esc(fl) : ''}${b.status === 'done' ? ' · gefahren ✓' : ''}"><div class="t">${b.start_time}${badge} ${tIco}${fl && h < 44 ? ' 👨‍🏫' : ''}</div>${esc(who)}${flLine}</div>`;
+      inner += `<div class="wk-block${own ? ' own' : ''}${needSign ? ' needsign' : ''}" data-wk="${b.id}" style="top:${top}px;height:${h}px${own ? '' : ';background:' + col}"
+        title="${b.start_time}–${end} · ${own ? 'Eigener Termin: ' : ''}${esc(who)}${fl ? ' · Fahrlehrer: ' + esc(fl) : ''}${b.status === 'done' ? ' · gefahren ✓' : ''}${needSign ? ' · Unterschrift fehlt' : ''}
+— lange drücken für das Schnellmenü">${needSign ? '<span class="wk-sign">✍️</span>' : ''}<div class="t">${b.start_time}${badge} ${tIco}${fl && h < 44 ? ' 👨‍🏫' : ''}</div>${esc(who)}${flLine}</div>`;
     }
     return `<div class="wk-body ${isToday ? 'today' : ''}" data-date="${d}" style="height:${bodyH}px" title="Auf eine freie Stelle tippen: Termin anlegen">${hourLines}${inner}</div>`;
   };
 
-  el.innerHTML = `<div class="weekwrap"><div class="weekgrid">
+  el.innerHTML = `<div class="weekwrap"><div class="weekgrid" style="--wk-hph:${HPH}px">
     <div class="wk-corner"></div>
     ${days.map((d) => {
       const ovd = ovByDate[d];
@@ -7158,15 +7180,23 @@ function renderWeek(el, monday, ov) {
     <div class="wk-times">${hourLabels.join('')}</div>
     ${days.map(dayCol).join('')}
   </div></div>
-  <div class="hint" style="margin-top:.7rem">Tipp: auf einen <strong>Termin</strong> tippen zum Bearbeiten/Abschließen/Unterschreiben · auf eine <strong>freie Stelle</strong> tippen legt dort einen neuen Termin an. Farbe = Fahrschüler (bzw. Fahrt-Art), 🔄 = wird abgegeben, ✓ = gefahren, 👨‍🏫 = Kollege gefahren.</div>
+  <div class="hint" style="margin-top:.7rem">Tipp: auf einen <strong>Termin</strong> tippen zum Bearbeiten · <strong>lange drücken</strong> öffnet das Schnellmenü (abschließen, unterschreiben, verschieben, absagen) · auf eine <strong>freie Stelle</strong> tippen fragt, ob 🚗 Fahrstunde oder 📌 eigener Termin. Farbe = Fahrschüler (bzw. Fahrt-Art), 🔄 = wird abgegeben, ✓ = gefahren, ✍️ = Unterschrift fehlt, 📌 schraffiert = eigener Termin, 👨‍🏫 = Kollege gefahren.</div>
   <div class="legend"><span class="muted">Fahrt-Arten:</span>
     <span class="legend-chip"><span class="sw" style="background:${TYPE_COLORS.ueberland}"></span>🌄 Überland</span>
     <span class="legend-chip"><span class="sw" style="background:${TYPE_COLORS.autobahn}"></span>🛣️ Autobahn</span>
     <span class="legend-chip"><span class="sw" style="background:${TYPE_COLORS.nacht}"></span>🌙 Nachtfahrt</span>
     <span class="legend-chip"><span class="sw" style="background:${TYPE_COLORS.normal}"></span>🚗 Normale Stunde</span>
   </div>`;
-  el.querySelectorAll('[data-wk]').forEach((b) => b.onclick = (e) => { e.stopPropagation(); openMarkModal(b.dataset.wk); });
-  // Auf eine freie Stelle im Tag tippen -> neuer Termin, Tag + Uhrzeit schon ausgefüllt.
+  el.querySelectorAll('[data-wk]').forEach((b) => {
+    b.onclick = (e) => {
+      e.stopPropagation();
+      if (b._held) { b._held = false; return; }           // kam vom langen Drücken
+      openMarkModal(b.dataset.wk);
+    };
+    // Lange drücken -> Schnellmenü direkt am Daumen (ohne großen Dialog)
+    bindHold(b, (ev) => { b._held = true; openQuickMenu(b.dataset.wk, ev); });
+  });
+  // Auf eine freie Stelle im Tag tippen -> erst fragen, WAS dort hin soll.
   const hhmm = (m) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(Math.round(m % 60)).padStart(2, '0')}`;
   el.querySelectorAll('.wk-body[data-date]').forEach((body) => body.onclick = (e) => {
     if (e.target.closest('.wk-block')) return;            // Termine haben ihren eigenen Klick
@@ -7174,8 +7204,26 @@ function renderWeek(el, monday, ov) {
     if (!r.height) return;
     const min = lo + ((e.clientY - r.top) / r.height) * total;
     const snap = Math.max(lo, Math.min(hi - 15, Math.round(min / 15) * 15)); // auf 15 Min runden
-    openAddBooking(body.dataset.date, hhmm(snap));
+    openSlotChooser(body.dataset.date, hhmm(snap));
   });
+}
+
+// Langes Drücken erkennen (Handy: Daumen halten, PC: Maustaste halten).
+// Bewegt man den Finger, ist es ein Scrollen und kein Halten -> abbrechen.
+function bindHold(el, onHold) {
+  let timer = null, sx = 0, sy = 0;
+  const clear = () => { if (timer) clearTimeout(timer); timer = null; };
+  el.addEventListener('pointerdown', (e) => {
+    if (e.button != null && e.button > 0) return;
+    sx = e.clientX; sy = e.clientY;
+    clear();
+    timer = setTimeout(() => { timer = null; try { navigator.vibrate && navigator.vibrate(18); } catch {} onHold(e); }, 480);
+  });
+  el.addEventListener('pointermove', (e) => {
+    if (timer && (Math.abs(e.clientX - sx) > 10 || Math.abs(e.clientY - sy) > 10)) clear();
+  });
+  ['pointerup', 'pointercancel', 'pointerleave'].forEach((n) => el.addEventListener(n, clear));
+  el.addEventListener('contextmenu', (e) => e.preventDefault());
 }
 
 // ---- Monatsansicht ----
@@ -7198,10 +7246,13 @@ function renderMonth(el, firstDay, gridStart, ov) {
     const ovd = ovByDate[d];
     const dn = parseD(d).getDate();
     const isWorkday = workdays.includes(isoDow(d)) && !(ovd && ovd.closed);
-    const cnt = info.books.length;
+    // Zahl = echte Fahrstunden. Eigene Termine (ohne Fahrschueler) bekommen
+    // einen hohlen Punkt, damit sie im Monat nicht als Fahrstunde durchgehen.
+    const cnt = info.books.filter((b) => b.student_id).length;
     const dots = info.books.slice(0, 8).map((b) => {
+      if (!b.student_id) return `<span class="m-dot own" title="📌 ${b.start_time} ${esc(b.title || 'Eigener Termin')}"></span>`;
       const c = b.status === 'offered' ? '#e6b23a' : (TYPE_COLORS[b.lesson_type] || studentColor(b.student_id));
-      return `<span class="m-dot" style="background:${c}" title="${b.start_time} ${esc(b.student_name || b.title || '')}"></span>`;
+      return `<span class="m-dot" style="background:${c}" title="${b.start_time} ${esc(b.student_name || '')}"></span>`;
     }).join('');
     let tag = '', tagCls = '';
     if (ovd && ovd.type === 'vacation') { tag = '🌴 Urlaub'; tagCls = 'dt-vac'; }
@@ -7215,7 +7266,7 @@ function renderMonth(el, firstDay, gridStart, ov) {
     </div>`;
   }
   el.innerHTML = `<div class="monthgrid">${heads}${cells}</div>
-    <p class="hint" style="margin-top:.7rem">Tipp: auf einen Tag tippen öffnet die Tagesansicht. Zahl = Anzahl Fahrstunden, Punkte = Fahrschüler/Fahrt-Art.</p>`;
+    <p class="hint" style="margin-top:.7rem">Tipp: auf einen Tag tippen öffnet die Tagesansicht. Zahl = Anzahl Fahrstunden, volle Punkte = Fahrschüler/Fahrt-Art, hohler Punkt 📌 = eigener Termin.</p>`;
   el.querySelectorAll('[data-day]').forEach((c) => c.onclick = () => { state.date = c.dataset.day; state.calMode = 'tag'; tabKalender(); });
 }
 
@@ -7264,31 +7315,202 @@ async function openGapModal() {
   };
 }
 
-async function openAddBooking(preDate, preTime) {
+// ---- Schnellmenü (langes Drücken auf einen Termin) ----
+// Vier große Knöpfe im Daumenbereich – ohne den großen Abschluss-Dialog.
+function openQuickMenu(id) {
+  const b = (window.__instrBookings || []).find((x) => String(x.id) === String(id));
+  if (!b) return;
+  const own = !b.student_id;
+  const who = b.student_name || b.title || 'Eigener Termin';
+  const end = addMinHHMM(b.start_time, b.duration_min);
+  const needSign = !own && b.status === 'done' && !b.signed_at && b.attended !== 0;
+  modal(`<div class="qm">
+      <div class="qm-head ${own ? 'own' : ''}">
+        <div class="qm-who">${own ? '📌 ' : '🚗 '}${esc(who)}</div>
+        <div class="qm-when">${WD[isoDow(b.date) - 1]}, ${fmtShort(b.date)} · ${b.start_time}–${end} Uhr</div>
+        ${own ? '<div class="qm-tag">Eigener Termin – keine Fahrstunde</div>' : ''}
+      </div>
+      <div class="qm-grid">
+        ${own || b.status === 'done' ? '' : '<button type="button" class="qm-btn" data-q="done"><span>✅</span>Abschließen</button>'}
+        ${own ? '' : `<button type="button" class="qm-btn${needSign ? ' hot' : ''}" data-q="sign"><span>✍️</span>${b.signed_at ? 'Unterschrieben ✓' : 'Unterschreiben'}</button>`}
+        <button type="button" class="qm-btn" data-q="move"><span>🕒</span>Verschieben</button>
+        <button type="button" class="qm-btn" data-q="edit"><span>✏️</span>Bearbeiten</button>
+        <button type="button" class="qm-btn bad" data-q="del"><span>✖️</span>Absagen</button>
+      </div>
+    </div>
+    <div class="actions"><button class="sec" onclick="window.__closeModal()">Schließen</button></div>`, 'sheet');
+  document.querySelectorAll('[data-q]').forEach((btn) => btn.onclick = async () => {
+    const q = btn.dataset.q;
+    if (q === 'edit') { closeModal(); openMarkModal(b.id); return; }
+    if (q === 'sign') { closeModal(); openStudentSignModal(b); return; }
+    if (q === 'move') { closeModal(); openQuickMove(b); return; }
+    if (q === 'done') {
+      btn.disabled = true;
+      try {
+        await api('/api/bookings/' + b.id, { method: 'PATCH', body: { status: 'done', attended: 1 } });
+        closeModal(); toast('Als gefahren abgeschlossen ✓', 'ok'); loadK();
+      } catch (e) { toast(e.message, 'err'); btn.disabled = false; }
+      return;
+    }
+    if (q === 'del') {
+      if (!confirm(`Termin am ${fmtShort(b.date)} um ${b.start_time} Uhr wirklich absagen?`)) return;
+      btn.disabled = true;
+      try { await api('/api/bookings/' + b.id, { method: 'DELETE' }); closeModal(); toast('Termin abgesagt', 'ok'); loadK(); }
+      catch (e) { toast(e.message, 'err'); btn.disabled = false; }
+    }
+  });
+}
+
+// Schnelles Verschieben: nur Datum + Uhrzeit, sonst nichts.
+function openQuickMove(b) {
+  modal(`<h3>🕒 Termin verschieben</h3>
+    <p class="hint">${esc(b.student_name || b.title || 'Eigener Termin')} · bisher ${WD[isoDow(b.date) - 1]} ${fmtShort(b.date)}, ${b.start_time} Uhr</p>
+    <div class="field"><label>Neues Datum</label><input type="date" id="qmv-date" value="${b.date}"></div>
+    <div class="field" style="margin-bottom:0"><label>Neue Uhrzeit</label><input id="qmv-time" value="${b.start_time}" placeholder="HH:MM"></div>
+    <div class="actions"><button class="sec" onclick="window.__closeModal()">Abbrechen</button><button id="qmv-go">Verschieben</button></div>`, 'sheet');
+  $('#qmv-go').onclick = async () => {
+    const d = $('#qmv-date').value, tme = $('#qmv-time').value;
+    try {
+      await api('/api/bookings/' + b.id, { method: 'PATCH', body: { date: d, start_time: tme } });
+      closeModal(); toast('Verschoben ✓', 'ok'); state.date = d; loadK();
+    } catch (e) { toast(e.message, 'err'); }
+  };
+}
+
+// ---- Unterschrift auf dem Gerät des Fahrlehrers ----
+// Nach der Stunde reicht man das Tablet/Handy rüber und der Fahrschüler
+// unterschreibt sofort. Alternativ kann man ihn per Postfach darum bitten.
+// opts.onNext (Sammelmodus) wird nach Erfolg/Überspringen aufgerufen.
+function openStudentSignModal(b, opts) {
+  opts = opts || {};
+  if (!b.student_id) { toast('Eigene Termine werden nicht unterschrieben.', ''); return; }
+  if (b.signed_at) { toast('Diese Fahrstunde ist bereits unterschrieben ✓', 'ok'); if (opts.onNext) opts.onNext(); return; }
+  const art = (b.lesson_type && b.lesson_type !== 'normal') ? ' · ' + (TYPE_LABEL[b.lesson_type] || '') : '';
+  const end = addMinHHMM(b.start_time, b.duration_min);
+  modal(`<h3>✍️ Unterschrift ${esc(b.student_name || '')}</h3>
+    ${opts.pos ? `<div class="sb-pos">Nr. ${opts.pos} von ${opts.total}</div>` : ''}
+    <p class="hint">Gib das Gerät kurz an deinen Fahrschüler weiter – er bestätigt damit diese Fahrstunde.</p>
+    <div class="sign-lesson">📅 <strong>${WD[isoDow(b.date) - 1]}, ${fmtShort(b.date)}</strong> · ${b.start_time}–${end} Uhr · ${b.duration_min} Min${art}${b.feedback ? `<div class="sign-note">„${esc(b.feedback)}"</div>` : ''}</div>
+    <label class="sign-lb">Unterschrift des Fahrschülers <span class="muted">(mit dem Finger)</span></label>
+    <div class="sign-pad-wrap"><canvas id="ss-pad" class="sign-pad"></canvas>
+      <button type="button" class="ghost sm sign-clear" id="ss-clear">Löschen</button></div>
+    <button class="ghost sm" id="ss-ask" type="button" style="margin-top:.5rem">📬 Stattdessen per Postfach anfragen</button>
+    <div class="actions">
+      <button class="sec" id="ss-skip">${opts.onNext ? 'Überspringen' : 'Abbrechen'}</button>
+      <button id="ss-go">Unterschrift speichern</button>
+    </div>`, 'sheet');
+  const pad = attachSignPad($('#ss-pad'));
+  $('#ss-clear').onclick = () => pad.clear();
+  $('#ss-skip').onclick = () => { closeModal(); if (opts.onNext) opts.onNext(); };
+  $('#ss-ask').onclick = async () => {
+    try {
+      await api('/api/bookings/' + b.id, { method: 'PATCH', body: { request_sign: true } });
+      closeModal(); toast('Anfrage ins Postfach gelegt 📬', 'ok');
+      if (opts.onNext) opts.onNext(); else loadK();
+    } catch (e) { toast(e.message, 'err'); }
+  };
+  $('#ss-go').onclick = async () => {
+    if (!pad.drawn()) { toast('Bitte zuerst unterschreiben.', 'err'); return; }
+    const btn = $('#ss-go'); btn.disabled = true;
+    try {
+      await api('/api/bookings/' + b.id + '/student-sign', { method: 'POST', body: { signature: pad.url() } });
+      b.signed_at = new Date().toISOString();
+      closeModal(); toast('Unterschrieben ✓', 'ok');
+      if (opts.onNext) opts.onNext(); else loadK();
+    } catch (e) { toast(e.message, 'err'); btn.disabled = false; }
+  };
+}
+
+// ---- Sammelmodus: alle fehlenden Unterschriften nacheinander ----
+function unsignedBookings() {
+  return (window.__instrBookings || [])
+    .filter((b) => b.student_id && b.status === 'done' && !b.signed_at && b.attended !== 0)
+    .sort((a, c) => (a.date + a.start_time).localeCompare(c.date + c.start_time));
+}
+function openSignBatch() {
+  const list = unsignedBookings();
+  if (!list.length) { toast('Alles unterschrieben – nichts offen ✓', 'ok'); return; }
+  let i = 0;
+  const step = () => {
+    if (i >= list.length) { toast('Fertig – Sammelmodus beendet', 'ok'); loadK(); return; }
+    const b = list[i]; i++;
+    openStudentSignModal(b, { onNext: step, pos: i, total: list.length });
+  };
+  step();
+}
+// Knopf im Kalender mitzählen lassen (wird nach jedem Laden aufgefrischt).
+function updateSignBatchBtn() {
+  const btn = document.getElementById('k-sign');
+  if (!btn) return;
+  const n = unsignedBookings().length;
+  btn.style.display = n ? '' : 'none';
+  btn.textContent = `✍️ ${n} Unterschrift${n === 1 ? '' : 'en'} offen`;
+  btn.classList.toggle('hot', n > 0);
+}
+
+// Freie Stelle im Kalender angetippt: erst fragen, WAS dort hin soll.
+// Damit wird eine Fahrstunde nie versehentlich als eigener Termin angelegt
+// (und umgekehrt). Tag und Uhrzeit stehen gross oben – man sieht sofort,
+// wo man gerade hingetippt hat.
+function openSlotChooser(date, time) {
+  const dur = state.settings?.lesson_min || 80;
+  modal(`<div class="slotpick">
+      <div class="sp-when">
+        <div class="sp-day">${WD[isoDow(date) - 1]}, ${fmtShort(date)}</div>
+        <div class="sp-time">${time} Uhr</div>
+        <div class="sp-sub">Was soll hier eingetragen werden?</div>
+      </div>
+      <button type="button" class="sp-opt sp-lesson" id="sp-lesson">
+        <span class="sp-ic">🚗</span>
+        <span class="sp-tx"><b>Fahrstunde</b><small>Für einen Fahrschüler · ${dur} Min · zählt im Nachweis</small></span>
+      </button>
+      <button type="button" class="sp-opt sp-own" id="sp-own">
+        <span class="sp-ic">📌</span>
+        <span class="sp-tx"><b>Eigener Termin / Sperrzeit</b><small>Prüfung, Werkstatt, Pause – ohne Fahrschüler</small></span>
+      </button>
+    </div>
+    <div class="actions"><button class="sec" onclick="window.__closeModal()">Abbrechen</button></div>`, 'sheet');
+  $('#sp-lesson').onclick = () => openAddBooking(date, time, 'lesson');
+  $('#sp-own').onclick = () => openAddBooking(date, time, 'own');
+}
+
+// kind: 'lesson' = Fahrstunde für einen Fahrschüler · 'own' = eigener Termin
+// ohne Fahrschüler · undefined = beides möglich (Knopf oben im Kalender).
+async function openAddBooking(preDate, preTime, kind) {
   let students = [];
-  try { students = (await api('/api/students')).students; } catch {}
+  if (kind !== 'own') { try { students = (await api('/api/students')).students; } catch {} }
   const s = state.settings;
-  modal(`<h3>Eigenen Termin anlegen</h3>
-    <p class="hint">Frei buchen – für einen Fahrschüler oder als Sondertermin (z.B. Prüfung).</p>
+  const lesson = kind === 'lesson', own = kind === 'own';
+  const head = lesson ? '🚗 Fahrstunde eintragen' : own ? '📌 Eigener Termin / Sperrzeit' : 'Termin anlegen';
+  const sub = lesson
+    ? 'Für einen Fahrschüler – zählt im Ausbildungsnachweis.'
+    : own
+      ? 'Ohne Fahrschüler: Prüfung, Werkstatt, Pause. Blockt die Zeit für Buchungen.'
+      : 'Frei buchen – für einen Fahrschüler oder als Sondertermin (z.B. Prüfung).';
+  modal(`<h3>${head}</h3>
+    <p class="hint ${lesson ? 'ab-hint-lesson' : own ? 'ab-hint-own' : ''}">${sub}</p>
     <div class="field"><label>Datum</label><input type="date" id="a-date" value="${preDate || state.date}"></div>
     <div class="row">
       <div class="field"><label>Uhrzeit</label><input id="a-time" value="${preTime || s.start_time || '12:00'}" placeholder="HH:MM"></div>
       <div class="field"><label>Dauer (Min)</label><input id="a-dur" type="number" value="${s.lesson_min}" step="5" min="10"></div>
     </div>
-    <div class="field"><label>Fahrschüler <span class="muted" style="font-weight:400">(optional)</span></label>
-      ${studentPicker('a-student', students, { placeholder: '🔍 Namen tippen …' })}</div>
-    <div class="field" style="margin-bottom:0"><label>Titel <span class="muted" style="font-weight:400">(wenn kein Fahrschüler)</span></label><input id="a-title" placeholder="z.B. Prüfung, Sonderfahrt"></div>
+    ${own ? '' : `<div class="field"><label>Fahrschüler${lesson ? '' : ' <span class="muted" style="font-weight:400">(optional)</span>'}</label>
+      ${studentPicker('a-student', students, { placeholder: '🔍 Namen tippen …' })}</div>`}
+    ${lesson ? '' : `<div class="field" style="margin-bottom:0"><label>Titel${own ? '' : ' <span class="muted" style="font-weight:400">(wenn kein Fahrschüler)</span>'}</label><input id="a-title" placeholder="z.B. Prüfung, Werkstatt, Pause"></div>`}
     <div class="actions">
       <button class="sec" onclick="window.__closeModal()">Abbrechen</button>
-      <button id="a-save">Anlegen</button>
-    </div>`);
+      <button id="a-save">${lesson ? '🚗 Fahrstunde anlegen' : own ? '📌 Termin blocken' : 'Anlegen'}</button>
+    </div>`, 'sheet');
   $('#a-save').onclick = async () => {
     try {
+      const sid = own ? null : (resolveStudentId($('#a-student'), students) || null);
+      if (lesson && !sid) { toast('Bitte einen Fahrschüler auswählen – oder „Eigener Termin" nehmen.', 'err'); return; }
+      const dt = $('#a-date').value;   // vor dem Schliessen merken – danach ist das Feld weg
       await api('/api/bookings', { method: 'POST', body: {
-        date: $('#a-date').value, start_time: $('#a-time').value, duration_min: Number($('#a-dur').value),
-        student_id: resolveStudentId($('#a-student'), students) || null, title: $('#a-title').value } });
-      closeModal(); toast('Termin angelegt ✓', 'ok');
-      state.date = $('#a-date').value; if (state.instrTab === 'kalender') loadK(); else drawInstrTab();
+        date: dt, start_time: $('#a-time').value, duration_min: Number($('#a-dur').value),
+        student_id: sid, title: $('#a-title') ? $('#a-title').value : '' } });
+      closeModal(); toast(own ? 'Zeit geblockt 📌' : 'Termin angelegt ✓', 'ok');
+      state.date = dt; if (state.instrTab === 'kalender') loadK(); else drawInstrTab();
     } catch (e) { toast(e.message, 'err'); }
   };
 }

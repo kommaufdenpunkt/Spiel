@@ -909,7 +909,7 @@ th{color:var(--muted);font-weight:600;font-size:.78rem;text-transform:uppercase;
 .wk-body.today{background:rgba(77,141,255,.05)}
 /* Fahrlehrer im Termin (nur wenn ein Kollege gefahren ist) */
 .wk-fl{font-size:.62rem;opacity:.9;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.wk-hour{height:42px;border-bottom:1px dashed var(--line)}
+.wk-hour{height:var(--wk-hph,42px);border-bottom:1px dashed var(--line)}
 .wk-times .wk-hour{position:relative}
 .wk-times .wk-hour span{position:absolute;top:-7px;right:.3rem;font-size:.66rem;color:var(--muted)}
 .wk-block{position:absolute;left:3px;right:3px;border-radius:6px;padding:.15rem .35rem;font-size:.7rem;
@@ -1969,3 +1969,84 @@ header .brand .brandname{
 .pf-les-row .pll-x{color:var(--muted);font-size:.82rem;white-space:nowrap}
 .pf-lock{font-size:.95rem}
 .pf-open{color:var(--muted);font-size:1rem;line-height:1}
+
+
+/* ==========================================================================
+   Kalender mit dem Daumen bedienen (Bottom-Sheet, Schnellmenü, Unterschriften)
+   ========================================================================== */
+
+/* Eigener Termin (ohne Fahrschüler): schraffiert + Pinnnadel -> nie mit einer
+   Fahrstunde zu verwechseln. */
+.wk-block.own{
+  background:repeating-linear-gradient(45deg,#4a5468 0 5px,#39404f 5px 11px);
+  border:1px dashed rgba(226,234,245,.6);box-sizing:border-box;
+  box-shadow:0 1px 3px rgba(0,0,0,.35);color:#e6edf7}
+.wk-block.own .t{letter-spacing:.02em}
+/* Monatsansicht: hohler Punkt = eigener Termin */
+.m-dot.own{background:transparent;box-shadow:inset 0 0 0 1.5px rgba(226,234,245,.7)}
+/* Gefahren, aber Unterschrift fehlt noch */
+.wk-block.needsign{box-shadow:inset 0 0 0 2px #e6b23a,0 1px 3px rgba(0,0,0,.35)}
+.wk-sign{position:absolute;top:1px;inset-inline-end:2px;font-size:.72rem;line-height:1;
+  filter:drop-shadow(0 1px 1px rgba(0,0,0,.6))}
+
+/* „✍️ N Unterschriften offen" im Kalender-Kopf */
+#k-sign.hot{background:var(--warn-bg,rgba(230,178,58,.16));color:#f0d089;
+  border-color:rgba(230,178,58,.45)}
+
+/* ---- Bottom-Sheet: Dialoge fahren auf dem Handy von unten hoch ---- */
+@media (max-width:640px){
+  .modal-bg{padding:0;align-items:flex-end}
+  .modal{max-width:none;border-radius:20px 20px 0 0;border-bottom:0;
+    max-height:calc(100dvh - 3rem);animation:ginoco-sheet-in .26s var(--ease,cubic-bezier(.2,.7,.3,1)) both}
+  /* Griff oben – zeigt, dass das Fenster von unten kommt */
+  .modal::before{content:"";display:block;flex:0 0 auto;width:38px;height:4px;border-radius:99px;
+    background:var(--line);margin:.55rem auto .1rem}
+  .modal-body{padding:1rem 1.1rem}
+  /* Knöpfe ins untere Drittel + groß genug für den Daumen */
+  .modal .actions{flex-direction:column-reverse;gap:.5rem;
+    padding:.8rem 1.1rem calc(.9rem + env(safe-area-inset-bottom))}
+  .modal .actions button{width:100%;min-height:52px;font-size:1rem}
+}
+@keyframes ginoco-sheet-in{from{opacity:0;transform:translateY(28px)}to{opacity:1;transform:none}}
+/* Auf großen Schirmen bleibt das Sheet ein normales, mittiges Fenster. */
+
+/* ---- Auswahl: Fahrstunde oder eigener Termin? ---- */
+.slotpick{display:flex;flex-direction:column;gap:.6rem}
+.sp-when{text-align:center;padding:.2rem 0 .5rem}
+.sp-day{font-size:.9rem;color:var(--muted);font-weight:700}
+.sp-time{font-size:2rem;font-weight:800;line-height:1.1;font-variant-numeric:tabular-nums}
+.sp-sub{font-size:.85rem;color:var(--muted);margin-top:.25rem}
+.sp-opt{display:flex;align-items:center;gap:.8rem;width:100%;text-align:start;
+  min-height:74px;padding:.8rem .9rem;border-radius:14px;border:1px solid var(--line);
+  background:#141b25;color:var(--ink);cursor:pointer;transition:transform .12s ease,border-color .12s ease}
+.sp-opt:active{transform:scale(.985)}
+.sp-ic{font-size:1.7rem;line-height:1;flex:0 0 auto}
+.sp-tx{display:flex;flex-direction:column;gap:.15rem}
+.sp-tx b{font-size:1.02rem}
+.sp-tx small{color:var(--muted);font-size:.8rem;font-weight:500}
+.sp-lesson{border-color:rgba(77,141,255,.45);background:linear-gradient(180deg,rgba(77,141,255,.12),#141b25)}
+.sp-own{border-color:rgba(160,175,195,.35);
+  background-image:repeating-linear-gradient(45deg,rgba(255,255,255,.05) 0 6px,transparent 6px 12px)}
+.ab-hint-lesson{color:#8fb4ff}
+.ab-hint-own{color:#b8c4d4}
+
+/* ---- Schnellmenü (langes Drücken) ---- */
+.qm-head{padding:.1rem 0 .8rem;border-bottom:1px solid var(--line);margin-bottom:.8rem}
+.qm-who{font-size:1.1rem;font-weight:800}
+.qm-when{color:var(--muted);font-size:.88rem;margin-top:.15rem;font-variant-numeric:tabular-nums}
+.qm-head.own .qm-who{color:#c3cddb}
+.qm-tag{display:inline-block;margin-top:.4rem;font-size:.74rem;font-weight:700;padding:.15rem .5rem;
+  border-radius:99px;background:rgba(160,175,195,.16);color:#c3cddb}
+.qm-grid{display:grid;grid-template-columns:1fr 1fr;gap:.6rem}
+.qm-btn{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.3rem;
+  min-height:84px;border-radius:14px;border:1px solid var(--line);background:#141b25;color:var(--ink);
+  font-size:.92rem;font-weight:700;cursor:pointer;transition:transform .12s ease}
+.qm-btn span{font-size:1.5rem;line-height:1}
+.qm-btn:active{transform:scale(.97)}
+.qm-btn.hot{border-color:rgba(230,178,58,.55);background:rgba(230,178,58,.12);color:#f0d089}
+.qm-btn.bad{border-color:rgba(255,107,107,.4);color:#ff9b9b}
+.qm-btn:disabled{opacity:.5}
+
+/* Sammelmodus: Zähler im Unterschriften-Fenster */
+.sb-pos{display:inline-block;margin:-.4rem 0 .6rem;font-size:.78rem;font-weight:700;
+  padding:.15rem .55rem;border-radius:99px;background:rgba(77,141,255,.16);color:#8fb4ff}

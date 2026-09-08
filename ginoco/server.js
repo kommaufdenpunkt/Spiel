@@ -1514,6 +1514,28 @@ async function handleApi(req, res, url) {
     return bulkRoster(res, body);
   }
 
+  // Unterschrift des Fahrschuelers direkt auf dem Geraet des Fahrlehrers.
+  // Alltag: nach der Stunde reicht man das Tablet rueber und der Schueler
+  // unterschreibt sofort. Wird im Protokoll ausdruecklich so vermerkt.
+  const dsM = p.match(/^\/api\/bookings\/(\d+)\/student-sign$/);
+  if (dsM && method === 'POST') {
+    if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
+    const id = Number(dsM[1]);
+    const bk = db.prepare('SELECT id,student_id,status,date,start_time FROM bookings WHERE id = ?').get(id);
+    if (!bk) return bad(res, 'Fahrstunde nicht gefunden', 404);
+    if (!bk.student_id) return bad(res, 'Eigene Termine werden nicht unterschrieben');
+    const b = await readBody(req);
+    const sig = (typeof b.signature === 'string' && validPhoto(b.signature)) ? b.signature : null;
+    if (!sig) return bad(res, 'Bitte unterschreiben');
+    db.prepare('UPDATE bookings SET signed_at = ?, signature = ?, needs_sign = 0 WHERE id = ?')
+      .run(new Date().toISOString(), sig, id);
+    db.prepare("UPDATE notifications SET read = 1 WHERE student_id = ? AND kind = 'sign' AND ref_booking_id = ?").run(bk.student_id, id);
+    const st = db.prepare('SELECT name FROM students WHERE id = ?').get(bk.student_id);
+    logEvent('info', { actor: 'student', studentId: bk.student_id, bookingId: id, date: bk.date,
+      detail: `Fahrstunde vom ${wdShort(bk.date)} ${dmy(bk.date)} ${bk.start_time} Uhr${st ? ' von ' + st.name : ''} auf dem Geraet des Fahrlehrers unterschrieben` });
+    return ok(res, { signed: true });
+  }
+
   // /api/bookings/:id  (DELETE = stornieren, PATCH = aktualisieren)
   const bm = p.match(/^\/api\/bookings\/(\d+)$/);
   if (bm) {
