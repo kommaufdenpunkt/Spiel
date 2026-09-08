@@ -6721,8 +6721,11 @@ function openMarkModal(id) {
 
     <div class="actions">
       <button class="sec" onclick="window.__closeModal()">Abbrechen</button>
+      <button class="sec" id="m-edit">✏️ Termin bearbeiten</button>
       <button id="m-save">Speichern</button>
     </div>`);
+  // Kurzer Weg in den Bearbeiten-Dialog (Fahrschueler, Zeit, Dauer, Vorschlag).
+  $('#m-edit').onclick = () => { closeModal(); openEditBooking(b.id); };
   let meetLat = b.meet_lat, meetLng = b.meet_lng;
   const adkBtn = $('#m-adk');
   if (adkBtn) adkBtn.onclick = () => { closeModal(); openTrainingCard(b.student_id, b.student_name || ''); };
@@ -7271,13 +7274,16 @@ function renderWeek(el, monday, ov) {
       const badge = b.status === 'done' ? ' ✓' : b.status === 'offered' ? ' 🔄' : '';
       // Fehlt nach einer gefahrenen Stunde noch die Unterschrift? -> ✍️
       const needSign = !own && b.status === 'done' && !b.signed_at && b.attended !== 0;
+      // Vorschlag an den Fahrschueler, noch ohne Antwort -> ⏳ (verfaellt sonst
+      // irgendwann still; so sieht man sofort, worauf noch gewartet wird).
+      const wartet = !own && b.confirmed === 0 && b.status === 'booked';
       // Fahrlehrer: nur zeigen, wenn ein Kollege gefahren ist (leer = du selbst)
       const fl = (b.instructor_name || '').trim();
       const flLine = fl && h >= 44 ? `<div class="wk-fl">👨‍🏫 ${esc(fl)}</div>` : '';
       const end = addMinHHMM(b.start_time, b.duration_min);
-      inner += `<div class="wk-block${own ? ' own' : ''}${needSign ? ' needsign' : ''}" data-wk="${b.id}" style="top:${top}px;height:${h}px${own ? '' : ';background:' + col}"
-        title="${b.start_time}–${end} · ${own ? 'Eigener Termin: ' : ''}${esc(who)}${fl ? ' · Fahrlehrer: ' + esc(fl) : ''}${b.status === 'done' ? ' · gefahren ✓' : ''}${needSign ? ' · Unterschrift fehlt' : ''}
-— lange drücken für das Schnellmenü">${needSign ? '<span class="wk-sign">✍️</span>' : ''}<div class="t">${b.start_time}${badge} ${tIco}${fl && h < 44 ? ' 👨‍🏫' : ''}</div>${esc(who)}${flLine}</div>`;
+      inner += `<div class="wk-block${own ? ' own' : ''}${needSign ? ' needsign' : ''}${wartet ? ' wartet' : ''}" data-wk="${b.id}" style="top:${top}px;height:${h}px${own ? '' : ';background:' + col}"
+        title="${b.start_time}–${end} · ${own ? 'Eigener Termin: ' : ''}${esc(who)}${fl ? ' · Fahrlehrer: ' + esc(fl) : ''}${b.status === 'done' ? ' · gefahren ✓' : ''}${needSign ? ' · Unterschrift fehlt' : ''}${wartet ? ' · Vorschlag – wartet auf Antwort' : ''}
+— lange drücken für das Schnellmenü">${needSign ? '<span class="wk-sign">✍️</span>' : ''}${wartet ? '<span class="wk-sign">⏳</span>' : ''}<div class="t">${b.start_time}${badge} ${tIco}${fl && h < 44 ? ' 👨‍🏫' : ''}</div>${esc(who)}${flLine}</div>`;
     }
     return `<div class="wk-body ${isToday ? 'today' : ''}" data-date="${d}" style="height:${bodyH}px" title="Auf eine freie Stelle tippen: Termin anlegen">${hourLines}${inner}</div>`;
   };
@@ -7293,7 +7299,7 @@ function renderWeek(el, monday, ov) {
     <div class="wk-times">${hourLabels.join('')}</div>
     ${days.map(dayCol).join('')}
   </div></div>
-  <div class="hint" style="margin-top:.7rem">Tipp: auf einen <strong>Termin</strong> tippen zum Bearbeiten · <strong>lange drücken</strong> öffnet das Schnellmenü (abschließen, unterschreiben, verschieben, absagen) · auf eine <strong>freie Stelle</strong> tippen fragt, ob 🚗 Fahrstunde oder 📌 eigener Termin. Farbe = Fahrschüler (bzw. Fahrt-Art), 🔄 = wird abgegeben, ✓ = gefahren, ✍️ = Unterschrift fehlt, 📌 schraffiert = eigener Termin, 👨‍🏫 = Kollege gefahren.</div>
+  <div class="hint" style="margin-top:.7rem">Tipp: auf einen <strong>Termin</strong> tippen zum Bearbeiten · <strong>lange drücken</strong> öffnet das Schnellmenü (abschließen, unterschreiben, verschieben, absagen) · auf eine <strong>freie Stelle</strong> tippen fragt, ob 🚗 Fahrstunde oder 📌 eigener Termin. Farbe = Fahrschüler (bzw. Fahrt-Art), 🔄 = wird abgegeben, ✓ = gefahren, ✍️ = Unterschrift fehlt, ⏳ = Vorschlag ohne Antwort, 📌 schraffiert = eigener Termin, 👨‍🏫 = Kollege gefahren.</div>
   <div class="legend"><span class="muted">Fahrt-Arten:</span>
     <span class="legend-chip"><span class="sw" style="background:${TYPE_COLORS.ueberland}"></span>🌄 Überland</span>
     <span class="legend-chip"><span class="sw" style="background:${TYPE_COLORS.autobahn}"></span>🛣️ Autobahn</span>
@@ -7454,7 +7460,7 @@ function openQuickMenu(id) {
     <div class="actions"><button class="sec" onclick="window.__closeModal()">Schließen</button></div>`, 'sheet');
   document.querySelectorAll('[data-q]').forEach((btn) => btn.onclick = async () => {
     const q = btn.dataset.q;
-    if (q === 'edit') { closeModal(); openMarkModal(b.id); return; }
+    if (q === 'edit') { closeModal(); openEditBooking(b.id); return; }
     if (q === 'sign') { closeModal(); openStudentSignModal(b); return; }
     if (q === 'move') { closeModal(); openQuickMove(b); return; }
     if (q === 'done') {
@@ -7472,6 +7478,98 @@ function openQuickMenu(id) {
       catch (e) { toast(e.message, 'err'); btn.disabled = false; }
     }
   });
+}
+
+// ---- Termin bearbeiten (Fahrlehrer) ----
+// Alles an einem Ort: Fahrschueler zuordnen oder wechseln, Datum, Uhrzeit,
+// Dauer, Fahrt-Art, Titel, Notiz – und auf Wunsch beim Speichern gleich einen
+// Vorschlag an den Fahrschueler schicken. Loeschen geht von hier auch.
+async function openEditBooking(id) {
+  const b = (window.__instrBookings || []).find((x) => String(x.id) === String(id));
+  if (!b) { toast('Termin nicht gefunden – bitte neu laden.', 'err'); return; }
+  let students = [];
+  try { students = (await api('/api/students')).students; } catch {}
+  const gefahren = b.status === 'done' || !!b.signed_at;   // Nachweis nicht nachtraeglich umschreiben
+  const jetzt = new Date();
+  const hhmm = `${String(jetzt.getHours()).padStart(2, '0')}:${String(jetzt.getMinutes()).padStart(2, '0')}`;
+  const inZukunft = (b.date + 'T' + b.start_time) > (todayStr() + 'T' + hhmm);
+  const s = state.settings;
+  const wer = students.find((x) => String(x.id) === String(b.student_id));
+  const istVorschlag = !!b.student_id && b.confirmed === 0 && b.status === 'booked';
+
+  modal(`<h3>✏️ Termin bearbeiten</h3>
+    <p class="hint">${b.student_id ? '\u{1F697} Fahrstunde' : '\u{1F4CC} Eigener Termin'} · bisher ${WD[isoDow(b.date) - 1]} ${fmtShort(b.date)}, ${b.start_time} Uhr
+      ${istVorschlag ? '· <strong>wartet auf Antwort</strong>' : ''}</p>
+    ${gefahren ? '<div class="warnbox">Diese Fahrstunde ist bereits gefahren bzw. unterschrieben. Zeiten lassen sich noch korrigieren – der <strong>Fahrschüler</strong> nicht mehr, sonst stimmt der Ausbildungsnachweis nicht.</div>' : ''}
+    <div class="field"><label>Fahrschüler <span class="muted" style="font-weight:400">(leer lassen = eigener Termin)</span></label>
+      ${studentPicker('eb-student', students, { placeholder: '\u{1F50D} Namen tippen …' })}
+      ${gefahren ? '' : '<div class="hint" style="margin:.3rem 0 0">Name ändern = der Termin geht an den neuen Fahrschüler; der bisherige wird benachrichtigt.</div>'}</div>
+    <div class="ask-box" id="eb-ask-line">
+      <label class="ck-line" style="justify-content:flex-start">
+        <input type="checkbox" id="eb-ask" ${(!gefahren && inZukunft && b.student_id) ? 'checked' : ''}>
+        <span><strong>\u{1F4E8} Beim Speichern fragen</strong><br>
+          <span class="muted">„Dein Fahrlehrer hat dir einen Termin vorgeschlagen" – der Fahrschüler nimmt an oder lehnt ab.</span></span></label>
+      <div class="hint" style="margin:.35rem 0 0">Ohne Haken wird nur still gespeichert – gut, wenn der Termin schon telefonisch abgesprochen ist.</div>
+    </div>
+    <div class="field"><label>Datum</label><input type="date" id="eb-date" value="${b.date}"></div>
+    <div class="row">
+      <div class="field"><label>Uhrzeit</label><input id="eb-time" value="${b.start_time}" placeholder="HH:MM"></div>
+      <div class="field"><label>Dauer (Min)</label><input id="eb-dur" type="number" value="${b.duration_min}" step="5" min="10"></div>
+    </div>
+    <div class="field"><label>Fahrt-Art</label>
+      <select id="eb-type">
+        <option value="">\u{1F697} Normale Stunde</option>
+        <option value="ueberland" ${b.lesson_type === 'ueberland' ? 'selected' : ''}>\u{1F304} Überland</option>
+        <option value="autobahn" ${b.lesson_type === 'autobahn' ? 'selected' : ''}>\u{1F6E3}\uFE0F Autobahn</option>
+        <option value="nacht" ${b.lesson_type === 'nacht' ? 'selected' : ''}>\u{1F319} Nachtfahrt</option>
+      </select></div>
+    <div class="field"><label>Titel <span class="muted" style="font-weight:400">(bei eigenen Terminen)</span></label>
+      <input id="eb-title" value="${esc(b.title || '')}" placeholder="z.B. Prüfung, Werkstatt"></div>
+    <div class="field"><label>Interne Notiz <span class="muted" style="font-weight:400">(nur für dich)</span></label>
+      <input id="eb-note" value="${esc(b.note || '')}"></div>
+    <button type="button" class="ghost sm eb-del" id="eb-del">\u{1F5D1}\uFE0F Diesen Termin löschen</button>
+    <div class="actions">
+      <button class="sec" onclick="window.__closeModal()">Abbrechen</button>
+      <button id="eb-save">Speichern</button>
+    </div>`, 'sheet');
+
+  if (wer) $('#eb-student').value = wer.name;
+  if (gefahren) $('#eb-student').disabled = true;
+  // Ohne Fahrschueler gibt es nichts zu fragen -> Haken ausblenden.
+  const syncAsk = () => {
+    const hat = !!resolveStudentId($('#eb-student'), students);
+    $('#eb-ask-line').style.display = (hat && !gefahren) ? '' : 'none';
+  };
+  $('#eb-student').addEventListener('input', syncAsk);
+  syncAsk();
+
+  $('#eb-del').onclick = async () => {
+    if (!confirm(`Termin am ${fmtShort(b.date)} um ${b.start_time} Uhr wirklich löschen?`)) return;
+    try { await api('/api/bookings/' + b.id, { method: 'DELETE' }); closeModal(); toast('Termin gelöscht', 'ok'); loadK(); }
+    catch (e) { toast(e.message, 'err'); }
+  };
+
+  $('#eb-save').onclick = async () => {
+    const btn = $('#eb-save'); const label = btn.textContent;
+    const eingabe = $('#eb-student').value.trim();
+    const sid = resolveStudentId($('#eb-student'), students);
+    if (eingabe && !sid) { toast('Diesen Fahrschüler kenne ich nicht – bitte aus der Liste wählen.', 'err'); return; }
+    const neuesDatum = $('#eb-date').value;
+    const fragen = !gefahren && !!sid && $('#eb-ask').checked;
+    const body = {
+      date: neuesDatum, start_time: $('#eb-time').value, duration_min: Number($('#eb-dur').value),
+      lesson_type: $('#eb-type').value || 'normal',
+      title: $('#eb-title').value, note: $('#eb-note').value,
+    };
+    if (!gefahren) { body.student_id = sid ? Number(sid) : null; if (fragen) body.propose = true; }
+    btn.disabled = true; btn.textContent = 'Speichere …';
+    try {
+      await api('/api/bookings/' + b.id, { method: 'PATCH', body });
+      closeModal();
+      toast(fragen ? 'Gespeichert ✓ – Vorschlag ist raus \u{1F4E8}' : 'Gespeichert ✓', 'ok');
+      state.date = neuesDatum; loadK();
+    } catch (e) { toast(e.message, 'err'); btn.disabled = false; btn.textContent = label; }
+  };
 }
 
 // Schnelles Verschieben: nur Datum + Uhrzeit, sonst nichts.

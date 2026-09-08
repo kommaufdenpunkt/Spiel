@@ -1986,6 +1986,8 @@ header .brand .brandname{
 .m-dot.own{background:transparent;box-shadow:inset 0 0 0 1.5px rgba(226,234,245,.7)}
 /* Gefahren, aber Unterschrift fehlt noch */
 .wk-block.needsign{box-shadow:inset 0 0 0 2px #e6b23a,0 1px 3px rgba(0,0,0,.35)}
+/* Vorschlag an den Fahrschueler, noch ohne Antwort */
+.wk-block.wartet{box-shadow:inset 0 0 0 2px rgba(255,255,255,.5),0 1px 3px rgba(0,0,0,.35);opacity:.85}
 .wk-sign{position:absolute;top:1px;inset-inline-end:2px;font-size:.72rem;line-height:1;
   filter:drop-shadow(0 1px 1px rgba(0,0,0,.6))}
 
@@ -2059,3 +2061,13 @@ header .brand .brandname{
 .rc-n{flex:0 0 auto;width:20px;height:20px;border-radius:99px;background:rgba(230,178,58,.16);color:#f0d089;
   font-size:.68rem;font-weight:800;display:flex;align-items:center;justify-content:center}
 @media (max-width:520px){.rc-list{grid-template-columns:1fr}}
+
+/* Vorschlag-Haken im Bearbeiten-Dialog – soll auffallen, nicht untergehen */
+.ask-box{background:rgba(77,141,255,.09);border:1px solid var(--booked-b,rgba(77,141,255,.3));
+  border-radius:11px;padding:.6rem .7rem;margin:0 0 1rem}
+.ask-box .ck-line{align-items:flex-start;gap:.55rem;margin:0}
+.ask-box .ck-line input{margin-top:.15rem;flex:0 0 auto}
+/* Der erklaerende Satz soll ruhig bleiben und nicht wie eine Ueberschrift wirken */
+.ask-box .ck-line .muted{font-weight:500;color:var(--muted);font-size:.85rem;line-height:1.35}
+/* Löschen bewusst weg von der Daumenzone unten */
+.eb-del{display:block;width:100%;margin:.2rem 0 .4rem;color:var(--bad)}

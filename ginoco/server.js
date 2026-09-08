@@ -1595,7 +1595,7 @@ async function handleApi(req, res, url) {
       const newDate = b.date || bk.date;
       const newStart = b.start_time || bk.start_time;
       const newDur = ('duration_min' in b && Number(b.duration_min) > 0) ? Number(b.duration_min) : bk.duration_min;
-      if (b.date || b.start_time) {
+      if (b.date || b.start_time || newDur !== bk.duration_min) {
         const s = getSettings();
         const ns = toMin(newStart), ne = ns + newDur;
         const others = db.prepare("SELECT * FROM bookings WHERE date = ? AND id != ? AND status != 'cancelled'").all(newDate, id);
@@ -1609,8 +1609,31 @@ async function handleApi(req, res, url) {
             return bad(res, `Verschieben nicht moeglich: Zeit durch "${bl.title}" belegt.`);
         }
       }
+      // Fahrschueler zuordnen / wechseln / entfernen.
+      // WICHTIG: Bei bereits gefahrenen oder unterschriebenen Stunden nicht mehr –
+      // das waere eine nachtraegliche Umschreibung des Ausbildungsnachweises.
+      let newStudent = bk.student_id, studentChanged = false;
+      if ('student_id' in b) {
+        const wish = b.student_id ? Number(b.student_id) : null;
+        if (wish !== bk.student_id) {
+          if (bk.status === 'done' || bk.signed_at)
+            return bad(res, 'Bei einer bereits gefahrenen oder unterschriebenen Fahrstunde laesst sich der Fahrschueler nicht mehr aendern. Lege bei einem Fehleintrag einen neuen Termin an und sage diesen ab.');
+          if (wish && !db.prepare('SELECT 1 FROM students WHERE id=?').get(wish))
+            return bad(res, 'Fahrschueler nicht gefunden');
+          newStudent = wish; studentChanged = true;
+        }
+      }
+      // Vorschlag: der Termin wartet auf die Zusage des Fahrschuelers (confirmed=0).
+      // Bei einem Wechsel des Fahrschuelers immer, sonst nur auf Wunsch.
+      const wantPropose = !!b.propose && !!newStudent && bk.status !== 'done';
+      const propose = newStudent ? (wantPropose || studentChanged) : false;
+
       const fields = [];
       const vals = [];
+      if (studentChanged) { fields.push('student_id=?'); vals.push(newStudent); }
+      if ('title' in b) { fields.push('title=?'); vals.push(b.title ? String(b.title).trim().slice(0, 120) : null); }
+      if (propose) { fields.push('confirmed=?'); vals.push(0); }
+      else if (b.confirm === true) { fields.push('confirmed=?'); vals.push(1); }
       if (b.date) { fields.push('date=?'); vals.push(newDate); }
       if (b.start_time) { fields.push('start_time=?'); vals.push(newStart); }
       if (b.status && ['booked', 'done', 'cancelled', 'offered'].includes(b.status)) { fields.push('status=?'); vals.push(b.status); }
@@ -1639,6 +1662,23 @@ async function handleApi(req, res, url) {
       // curriculum/request_sign/Unterschrift duerfen auch allein kommen (ohne weitere Felder).
       if (!fields.length && !Array.isArray(b.curriculum) && !b.request_sign && !hasInstrSig) return bad(res, 'Nichts zu aendern');
       if (fields.length) { vals.push(id); db.prepare(`UPDATE bookings SET ${fields.join(',')} WHERE id = ?`).run(...vals); }
+
+      // Fahrschueler gewechselt: der bisherige erfaehrt, dass der Termin weg ist.
+      if (studentChanged && bk.student_id) {
+        notify(bk.student_id, 'info',
+          `Der Termin am ${wdShort(bk.date)} ${dmy(bk.date)} um ${bk.start_time} Uhr wurde vom Fahrlehrer anders vergeben.`, bk.date);
+        logEvent('cancel_instr', { actor: 'instructor', studentId: bk.student_id, bookingId: id, date: bk.date,
+          detail: `${wdShort(bk.date)} ${dmy(bk.date)} ${bk.start_time} Uhr – Termin einem anderen Fahrschueler zugeordnet` });
+      }
+      // Vorschlag verschicken: der Fahrschueler nimmt an oder lehnt ab.
+      if (propose) {
+        const stN = db.prepare('SELECT name FROM students WHERE id=?').get(newStudent);
+        notify(newStudent, 'info',
+          `\u{1F697} Dein Fahrlehrer hat dir einen Termin vorgeschlagen: ${wdShort(newDate)} ${dmy(newDate)} um ${newStart} Uhr (${newDur} Min). Bitte in der App annehmen oder ablehnen.`,
+          newDate, id, { pushTitle: '\u{1F697} Terminvorschlag', url: '/' });
+        logEvent('book', { actor: 'instructor', studentId: newStudent, bookingId: id, date: newDate,
+          detail: `Vorschlag an ${stN?.name || 'Fahrschueler'}: ${wdShort(newDate)} ${dmy(newDate)} ${newStart} Uhr (${newDur} Min)` });
+      }
 
       // Beim Abschließen die tatsächliche Endzeit festhalten (echter Zeitpunkt).
       // started_at kommt – falls genutzt – vom Timer; wir leiten hier NICHTS ab
@@ -4173,7 +4213,8 @@ function createBooking(res, sess, body) {
   logEvent('book', { actor: isInstructor ? 'instructor' : 'student', studentId, bookingId: bid, date,
     detail: `${sonderLbl}${wdShort(date)} ${dmy(date)} ${start} Uhr (${duration} Min)${isInstructor ? ' – vom Fahrlehrer eingetragen' + (studentId ? ' (reserviert)' : '') : ''}` });
   if (isInstructor && studentId) notify(studentId, 'info',
-    `Neuer Termin für dich reserviert: ${wdShort(date)} ${dmy(date)} um ${start} Uhr (${duration} Min). Bitte in der App bestätigen.`, date, bid);
+    `\u{1F697} Dein Fahrlehrer hat dir einen Termin vorgeschlagen: ${wdShort(date)} ${dmy(date)} um ${start} Uhr (${duration} Min). Bitte in der App annehmen oder ablehnen.`,
+    date, bid, { pushTitle: '\u{1F697} Terminvorschlag', url: '/' });
   // Bucht ein Schüler selbst, direkt beim Fahrlehrer aufploppen (Push + Protokoll).
   if (!isInstructor) {
     const stB = db.prepare('SELECT name FROM students WHERE id=?').get(studentId);
