@@ -885,6 +885,21 @@ async function handleApi(req, res, url) {
     logEvent('info', { actor: 'instructor', detail: 'Passkey entfernt' });
     return ok(res, { ok: true, count: list.length });
   }
+  // Notfall-Codes erzeugen (ersetzt vorhandene). Klartext kommt EINMAL zurueck –
+  // danach liegen nur noch Hashes in der Datenbank.
+  if (p === '/api/instructor/recovery/new' && method === 'POST') {
+    if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
+    const codes = genInstructorRecovery(8);
+    logEvent('info', { actor: 'instructor', detail: 'Notfall-Codes neu erzeugt (8 Stueck)' });
+    return ok(res, { codes, count: codes.length });
+  }
+  // Alle Notfall-Codes verwerfen.
+  if (p === '/api/instructor/recovery/clear' && method === 'POST') {
+    if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
+    setSettingRaw('instructor_recovery', '[]');
+    logEvent('info', { actor: 'instructor', detail: 'Notfall-Codes geloescht' });
+    return ok(res, { count: 0 });
+  }
   // Zugang wiederherstellen: mit einem Wiederherstellungs-Code ein neues Passwort setzen.
   if (p === '/api/auth/instructor/recover' && method === 'POST') {
     if (loginBlocked(req)) return bad(res, 'Zu viele Versuche. Bitte in ein paar Minuten erneut.', 429);

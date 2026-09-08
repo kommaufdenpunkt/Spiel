@@ -2580,7 +2580,22 @@ async function loadReviewMarquee() {
 }
 
 const errBox = () => `<div class="err hidden" id="autherr"></div>`;
-function showErr(msg) { const e = $('#autherr'); if (e) { e.textContent = msg; e.classList.remove('hidden'); } }
+// Fehlermeldung anzeigen. WICHTIG: Ist gerade ein Fenster offen, gehoert die
+// Meldung in DIESES Fenster. Sonst landet sie im Formular dahinter (z. B. auf
+// der Anmeldeseite) – der Nutzer sieht nichts und denkt, der Knopf sei kaputt.
+function showErr(msg) {
+  const m = document.querySelector('.modal-bg');
+  const e = (m && m.querySelector('#autherr')) || document.querySelector('#autherr');
+  if (!e) return;
+  e.textContent = msg; e.classList.remove('hidden');
+  try { e.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } catch {}
+}
+// Alte Meldung wegnehmen, bevor ein neuer Versuch startet.
+function clearErr() {
+  const m = document.querySelector('.modal-bg');
+  const e = (m && m.querySelector('#autherr')) || document.querySelector('#autherr');
+  if (e) { e.textContent = ''; e.classList.add('hidden'); }
+}
 
 function loginForm() {
   return `${errBox()}
@@ -2895,7 +2910,7 @@ function renderAuthSection() {
   const enabled = !!state.settings?.totp_enabled;
   const twofa = !!state.settings?.two_factor;
   if (!enabled) {
-    box.innerHTML = `<p class="hint">Richte einen Authenticator ein (z.&nbsp;B. Google/Microsoft Authenticator). Damit kannst du dein Passwort selbst zurücksetzen („Passwort vergessen") und optional bei jeder Anmeldung einen Code verlangen.</p>
+    box.innerHTML = `<p class="hint">Richte einen Authenticator ein (z.&nbsp;B. Google/Microsoft Authenticator). Damit kannst du dein Passwort selbst zurücksetzen („Passwort vergessen") und optional bei jeder Anmeldung einen Code verlangen. Unabhängig davon kannst du dir unten <strong>Notfall-Codes</strong> erzeugen.</p>
       <button class="sm" id="au-setup">🔐 Authenticator einrichten</button>`;
     $('#au-setup').onclick = openTotpSetup;
   } else {
@@ -2909,8 +2924,75 @@ function renderAuthSection() {
     };
     $('#au-disable').onclick = openTotpDisable;
   }
+  box.insertAdjacentHTML('beforeend', '<div id="e-recovery" style="border-top:1px solid var(--line);margin-top:.8rem;padding-top:.6rem"></div>');
+  renderRecoverySection();
   box.insertAdjacentHTML('beforeend', '<div id="e-passkey" style="border-top:1px solid var(--line);margin-top:.8rem;padding-top:.2rem"></div>');
   renderPasskeySection();
+}
+
+// ---- Notfall-Codes: der Rettungsanker, wenn der Authenticator weg ist ----
+// Acht Einmal-Codes. In der Datenbank liegen nur Hashes; den Klartext gibt es
+// genau einmal beim Erzeugen – deshalb sofort ausdrucken/sicher ablegen.
+function renderRecoverySection() {
+  const box = $('#e-recovery'); if (!box) return;
+  const left = Number(state.settings?.recovery_left || 0);
+  box.innerHTML = `<div class="sec-auth-h">🚨 Notfall-Codes <span class="muted" style="font-weight:400">(wenn der Authenticator weg ist)</span></div>
+    ${left
+      ? `<p class="hint" style="color:var(--good)">✓ <strong>${left}</strong> Notfall-Code${left === 1 ? '' : 's'} übrig. Jeder funktioniert genau einmal im Fenster „Passwort vergessen".</p>`
+      : '<p class="hint">Noch keine Notfall-Codes. Erzeuge acht Stück, druck sie aus und leg sie ins Portemonnaie oder in den Ordner – damit kommst du auch ohne Handy wieder rein.</p>'}
+    <button class="sm" id="rc-new">🚨 ${left ? 'Neue Codes erzeugen' : 'Notfall-Codes erzeugen'}</button>
+    ${left ? '<button class="ghost sm" id="rc-clear" style="margin-inline-start:.4rem;color:var(--bad)">Alle löschen</button>' : ''}
+    ${left ? '<div class="hint" style="margin:.4rem 0 0">Neu erzeugen macht die alten Codes ungültig.</div>' : ''}`;
+  $('#rc-new').onclick = async () => {
+    if (left && !confirm('Neue Codes erzeugen? Die bisherigen ' + left + ' Codes werden dabei ungültig.')) return;
+    const btn = $('#rc-new'); btn.disabled = true;
+    try {
+      const r = await api('/api/instructor/recovery/new', { method: 'POST' });
+      state.settings.recovery_left = r.count;
+      showRecoveryCodes(r.codes);
+      renderRecoverySection();
+    } catch (e) { toast(e.message, 'err'); btn.disabled = false; }
+  };
+  const clr = $('#rc-clear');
+  if (clr) clr.onclick = async () => {
+    if (!confirm('Alle Notfall-Codes löschen? Dann hilft nur noch der Authenticator.')) return;
+    try { await api('/api/instructor/recovery/clear', { method: 'POST' }); state.settings.recovery_left = 0; toast('Notfall-Codes gelöscht', 'ok'); renderRecoverySection(); }
+    catch (e) { toast(e.message, 'err'); }
+  };
+}
+// Die Codes einmalig zeigen – mit Kopieren und Drucken.
+function showRecoveryCodes(codes) {
+  const list = codes.map((c, i) => `<li><span class="rc-n">${i + 1}</span><code>${esc(c)}</code></li>`).join('');
+  modal(`<h3>🚨 Deine Notfall-Codes</h3>
+    <div class="warnbox">Diese Liste siehst du <strong>nur jetzt</strong>. Druck sie aus oder schreib sie ab – danach kann sie niemand mehr anzeigen, auch du nicht.</div>
+    <ol class="rc-list">${list}</ol>
+    <p class="hint">Jeder Code funktioniert <strong>einmal</strong>. Im Fenster „Passwort vergessen" gibst du ihn statt des 6-stelligen Authenticator-Codes ein.</p>
+    <div class="actions">
+      <button class="sec" id="rc-copy">📋 Kopieren</button>
+      <button class="sec" id="rc-print">🖨️ Drucken</button>
+      <button onclick="window.__closeModal()">Hab ich notiert</button>
+    </div>`, 'locked');
+  const plain = codes.join('\n');
+  $('#rc-copy').onclick = () => navigator.clipboard?.writeText(plain)
+    .then(() => toast('Codes kopiert ✓', 'ok')).catch(() => toast('Kopieren nicht möglich – bitte abschreiben.', 'err'));
+  $('#rc-print').onclick = () => printRecoveryCodes(codes);
+}
+function printRecoveryCodes(codes) {
+  const w = window.open('', '_blank');
+  if (!w) { toast('Bitte Pop-ups erlauben – oder die Codes abschreiben.', 'err'); return; }
+  const when = new Date().toLocaleDateString(LOCALE, { day: '2-digit', month: '2-digit', year: 'numeric' });
+  w.document.write(`<!doctype html><meta charset="utf-8"><title>Ginoco Notfall-Codes</title>
+    <style>body{font-family:system-ui,sans-serif;margin:2.5cm 2cm;color:#111}
+      h1{font-size:18pt;margin:0 0 .2cm}p{font-size:10pt;color:#444;margin:.1cm 0}
+      ol{margin:.8cm 0;padding:0 0 0 1.2cm}li{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:15pt;letter-spacing:.06em;margin:.28cm 0}
+      .box{border:1px solid #bbb;border-radius:6px;padding:.5cm .7cm;margin-top:.6cm;font-size:9.5pt;color:#444}</style>
+    <h1>Ginoco – Notfall-Codes für den Fahrlehrer-Zugang</h1>
+    <p>Erstellt am ${when}. Jeder Code funktioniert genau einmal.</p>
+    <ol>${codes.map((c) => `<li>${c}</li>`).join('')}</ol>
+    <div class="box">Anwendung: Anmeldeseite → „Passwort vergessen" → einen dieser Codes statt des Authenticator-Codes eingeben und ein neues Passwort wählen.
+      <br>Diesen Zettel sicher aufbewahren – wer ihn hat, kann den Zugang übernehmen.</div>`);
+  w.document.close();
+  w.focus(); setTimeout(() => { try { w.print(); } catch {} }, 250);
 }
 // QR-Code (dunkel auf weiß) als scharfes SVG in ein Element zeichnen.
 function renderQR(el, text) {
@@ -2960,24 +3042,55 @@ function openTotpDisable() {
 // Passwort vergessen (Fahrlehrer): mit dem Authenticator-Code ein neues Passwort setzen.
 function openInstrForgotModal() {
   modal(`<h3>🔑 Passwort vergessen</h3>
-    <p class="hint">Gib den aktuellen <strong>6-stelligen Code</strong> aus deiner Authenticator-App ein und wähle ein neues Passwort. (Funktioniert nur, wenn du vorher einen Authenticator eingerichtet hast.)</p>
+    <p class="hint">Gib den aktuellen <strong>6-stelligen Code</strong> aus deiner Authenticator-App ein –
+      oder einen deiner <strong>Notfall-Codes</strong> (z.&nbsp;B. <code>A7K3M-9QMZP</code>), falls du gerade nicht an die App kommst.
+      Dann wähle ein neues Passwort.</p>
     ${errBox()}
-    <div class="field"><label>Authenticator-Code</label><input id="fp-code" inputmode="numeric" autocomplete="one-time-code" placeholder="6-stelliger Code"></div>
+    <div class="field"><label>Authenticator-Code <span class="muted" style="font-weight:400">oder Notfall-Code</span></label>
+      <input id="fp-code" autocomplete="one-time-code" autocapitalize="characters" spellcheck="false" placeholder="123456  oder  A7K3M-9QMZP"></div>
     <div class="field"><label>Neues Passwort</label><input id="fp-pw" type="password" autocomplete="new-password"><div class="hint" style="margin:.3rem 0 0">Mind. 8 Zeichen, mit Buchstabe, Zahl und Sonderzeichen.</div></div>
-    <div class="actions"><button class="sec" onclick="window.__closeModal()">Abbrechen</button><button id="fp-go">Neu setzen & anmelden</button></div>`);
-  $('#fp-go').onclick = async () => {
-    const code = $('#fp-code').value.trim(), np = $('#fp-pw').value;
+    <div class="hint" style="margin:-.4rem 0 .2rem">Keins von beidem zur Hand? Dann kann das Passwort nur direkt auf dem Server neu gesetzt werden – siehe <code>ginoco/README.md</code>, Abschnitt „Passwort vergessen".</div>
+    <div class="actions"><button class="sec" onclick="window.__closeModal()">Abbrechen</button><button id="fp-go">Neu setzen & anmelden</button></div>`, 'sheet');
+  const go = $('#fp-go');
+  go.onclick = async () => {
+    clearErr();
+    const code = $('#fp-code').value.trim().replace(/\s/g, ''), np = $('#fp-pw').value;
+    if (!code) { showErr('Bitte den 6-stelligen Code aus der Authenticator-App eingeben – oder einen Notfall-Code.'); return; }
     const prob = pwProblem(np);
     if (prob) { showErr('Neues Passwort braucht ' + prob + '.'); return; }
+    const label = go.textContent;
+    go.disabled = true; go.textContent = 'Prüfe …';
+    // Sechs Ziffern = Authenticator. Alles andere = Notfall-Code. Klappt der
+    // Authenticator-Weg nicht (z. B. gar keiner eingerichtet), wird der
+    // Notfall-Weg trotzdem noch probiert – der Nutzer muss nicht wissen, welcher.
+    const isTotp = /^\d{6}$/.test(code);
+    const viaTotp = () => api('/api/auth/instructor/forgot', { method: 'POST', body: { code, new_password: np } });
+    const viaRecovery = () => api('/api/auth/instructor/recover', { method: 'POST', body: { code: code.toUpperCase(), new_password: np } });
+    // Schritt 1: Passwort neu setzen. Schlaegt das fehl, ist wirklich nichts passiert.
     try {
-      await api('/api/auth/instructor/forgot', { method: 'POST', body: { code, new_password: np } });
+      if (isTotp) { try { await viaTotp(); } catch (e1) { try { await viaRecovery(); } catch { throw e1; } } }
+      else await viaRecovery();
+    } catch (e) {
+      showErr(e.message);
+      go.disabled = false; go.textContent = label;
+      return;
+    }
+    // Schritt 2: direkt anmelden. Klappt das nicht (z. B. weil bei aktivem
+    // 2-Faktor ein FRISCHER Authenticator-Code noetig ist), ist das kein Drama –
+    // das neue Passwort steht bereits. Dann sagen wir das klar.
+    try {
       await api('/api/auth/instructor', { method: 'POST', body: { pin: np, remember: true, code } });
       closeModal();
       const [me, s] = await Promise.all([api('/api/auth/me'), api('/api/settings')]);
       state.user = me.user; state.settings = s.settings; render();
       toast('Passwort neu gesetzt ✓', 'ok');
-    } catch (e) { showErr(e.message); }
+    } catch {
+      closeModal();
+      toast('Passwort neu gesetzt ✓ – bitte jetzt damit anmelden.', 'ok', 6000);
+    }
   };
+  // Enter im Passwortfeld = auf den Knopf tippen
+  $('#fp-pw').addEventListener('keydown', (e) => { if (e.key === 'Enter') go.click(); });
 }
 
 // ---------- Passkeys / Face ID / Touch ID (WebAuthn) ----------

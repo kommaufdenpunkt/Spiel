@@ -193,6 +193,38 @@ neues Passwort (per Knopf zufällig erzeugbar). Das Portal zeigt danach eine
 fertige Weitergabe-Info (Login-Name + Passwort) mit Kopier-Knopf. Der
 Login-Name bleibt unverändert.
 
+**Und wenn der Fahrlehrer selbst nicht mehr reinkommt?** Dafür gibt es drei
+Wege — in dieser Reihenfolge:
+
+1. **Authenticator-Code.** Anmeldeseite → „Passwort vergessen" → den aktuellen
+   6-stelligen Code aus der Authenticator-App eingeben und ein neues Passwort
+   wählen.
+2. **Notfall-Code.** In dasselbe Feld passt auch einer der acht Notfall-Codes
+   (Form `A7K3M-9QMZP`). Erzeugen unter **Einstellungen → Zugang & Kontakt →
+   🚨 Notfall-Codes**; die Liste wird genau einmal angezeigt, also ausdrucken
+   und sicher ablegen. Jeder Code funktioniert einmal, danach ist er
+   verbraucht. Das klappt auch ohne Authenticator und ohne Handy.
+3. **Direkt auf dem Server** (letzter Ausweg, wenn beides weg ist). Auf dem
+   Server anmelden und das Passwort in der Datenbank neu setzen — das Passwort
+   dabei interaktiv eingeben, damit es **nicht** in der Shell-History landet:
+
+   ```bash
+   ssh root@<server>
+   DBP=$(systemctl show ginoco -p Environment --value | tr ' ' '\n' | sed -n 's/^FSP_DB=//p')
+   sudo -u ginoco env FSP_DB="$DBP" node --input-type=module -e '
+     import { createInterface } from "node:readline";
+     import { hashPassword, setSettingRaw } from "/home/ginoco/spiel/ginoco/db.js";
+     const rl = createInterface({ input: process.stdin, output: process.stdout, terminal: true });
+     rl.question("Neues Fahrlehrer-Passwort: ", (pw) => {
+       setSettingRaw("instructor_pin", hashPassword(pw.trim()));
+       console.log("Passwort gesetzt."); rl.close();
+     });
+   '
+   ```
+
+   Danach mit dem neuen Passwort anmelden und gleich neue Notfall-Codes
+   erzeugen.
+
 ---
 
 ## Voreinstellungen (alle im Menü änderbar)

@@ -2050,3 +2050,12 @@ header .brand .brandname{
 /* Sammelmodus: Zähler im Unterschriften-Fenster */
 .sb-pos{display:inline-block;margin:-.4rem 0 .6rem;font-size:.78rem;font-weight:700;
   padding:.15rem .55rem;border-radius:99px;background:rgba(77,141,255,.16);color:#8fb4ff}
+
+/* ---- Notfall-Codes (Fahrlehrer-Zugang wiederherstellen) ---- */
+.rc-list{list-style:none;margin:.9rem 0;padding:0;display:grid;grid-template-columns:1fr 1fr;gap:.45rem}
+.rc-list li{display:flex;align-items:center;gap:.5rem;background:#141b25;border:1px solid var(--line);
+  border-radius:9px;padding:.45rem .55rem}
+.rc-list code{font-size:.98rem;letter-spacing:.08em;font-weight:700;color:var(--ink)}
+.rc-n{flex:0 0 auto;width:20px;height:20px;border-radius:99px;background:rgba(230,178,58,.16);color:#f0d089;
+  font-size:.68rem;font-weight:800;display:flex;align-items:center;justify-content:center}
+@media (max-width:520px){.rc-list{grid-template-columns:1fr}}

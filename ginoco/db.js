@@ -501,6 +501,9 @@ export function getSettings() {
   // Passkeys: nur den Status (an/aus) ausliefern, nie die gespeicherten Schlüssel.
   let pkCount = 0; try { pkCount = (JSON.parse(out.instructor_passkeys || '[]') || []).length; } catch {}
   out.passkey_enabled = pkCount > 0;
+  // Notfall-Codes: nur die Anzahl der noch nicht verbrauchten ausliefern.
+  let recLeft = 0; try { recLeft = (JSON.parse(out.instructor_recovery || '[]') || []).length; } catch {}
+  out.recovery_left = recLeft;
   delete out.instructor_totp; delete out.instructor_totp_pending; delete out.instructor_recovery; delete out.instructor_passkeys;
   // SMTP-Passwort niemals ausliefern – nur Status (gesetzt? vollstaendig konfiguriert?).
   out.smtp_pass_set = !!out.smtp_pass;
