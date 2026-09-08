@@ -737,7 +737,8 @@ async function handleApi(req, res, url) {
     if (loginBlocked(req)) return bad(res, 'Zu viele Versuche. Bitte in ein paar Minuten erneut.', 429);
     const b = await readBody(req);
     const totp = getSettingRaw('instructor_totp');
-    if (!totp) return bad(res, 'Es ist noch kein Authenticator eingerichtet. Bitte richte ihn zuerst in den Einstellungen ein.', 400);
+    if (!totp) return bad(res, 'Hier ist kein Authenticator hinterlegt. Hast du Notfall-Codes? Dann gib stattdessen einen davon ein. '
+      + 'Sonst hilft nur das Neusetzen direkt auf dem Server (README, Abschnitt „Passwort vergessen") – und danach bitte gleich Notfall-Codes anlegen.', 400);
     if (!totpVerify(totp, b.code)) { noteLoginFail(req); return bad(res, 'Authenticator-Code stimmt nicht. Uhrzeit am Handy automatisch stellen lassen.', 401); }
     const np = String(b.new_password || '');
     const prob = passwordProblem(np);

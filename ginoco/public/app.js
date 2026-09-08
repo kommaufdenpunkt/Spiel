@@ -2229,6 +2229,10 @@ function modal(html, extra) {
   //  wide  = breiter · locked = kein Schliessen per Hintergrund · sheet = faehrt
   //  auf dem Handy von unten hoch (Knoepfe im Daumenbereich).
   const opt = String(extra || '');
+  // Alte Fehlermeldung auf der Seite dahinter wegnehmen. Sonst bleibt sie dort
+  // stehen, waehrend das neue Fenster oben liegt – und man raetselt spaeter,
+  // woher der rote Kasten kommt.
+  document.querySelectorAll('#autherr').forEach((e) => { e.textContent = ''; e.classList.add('hidden'); });
   const bg = document.createElement('div');
   bg.className = 'modal-bg' + (opt.includes('sheet') ? ' sheet-bg' : '');
   const m = document.createElement('div');
