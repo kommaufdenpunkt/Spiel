@@ -46,6 +46,13 @@ if (!existsSync(dbPfad)) {
   process.exit(1);
 }
 process.env.FSP_DB = dbPfad;
+// Node meldet "SQLite is an experimental feature" – das rutscht sonst mitten
+// in die Passwort-Eingabe. Hier ist es reines Rauschen, also weg damit.
+const warnenOriginal = process.emitWarning;
+process.emitWarning = (w, ...rest) => {
+  if (/SQLite is an experimental/i.test(String(w))) return;
+  return warnenOriginal.call(process, w, ...rest);
+};
 const { db, setSettingRaw, hashPassword, genInstructorRecovery, getSettingRaw } = await import('../db.js');
 
 // ---------------------------------------------------------------------------
