@@ -12,10 +12,10 @@
 // Den Datenbank-Pfad sucht sich das Skript selbst aus dem systemd-Dienst.
 // Mit FSP_DB=/pfad/zur.db davor lässt er sich auch vorgeben.
 //
-// Das Passwort wird verdeckt abgefragt und landet daher NICHT in der
-// Shell-History. Danach werden auf Wunsch gleich neue Notfall-Codes erzeugt.
+// Das Passwort wird zeichenweise im Rohmodus gelesen und nur als * angezeigt;
+// es steht also weder auf dem Schirm noch in der Shell-History.
+// Danach werden auf Wunsch gleich neue Notfall-Codes erzeugt.
 // ---------------------------------------------------------------------------
-import { createInterface } from 'node:readline/promises';
 import { execFileSync } from 'node:child_process';
 import { existsSync, statSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -48,36 +48,53 @@ if (!existsSync(dbPfad)) {
 process.env.FSP_DB = dbPfad;
 const { db, setSettingRaw, hashPassword, genInstructorRecovery, getSettingRaw } = await import('../db.js');
 
-// EIN Eingabekanal fuer das ganze Skript – ein zweiter wuerde stdin schliessen.
-const rl = createInterface({ input: process.stdin, output: process.stdout, terminal: !!process.stdin.isTTY });
-let verdeckt = false;
-const schreibOriginal = rl._writeToOutput ? rl._writeToOutput.bind(rl) : null;
-if (schreibOriginal) rl._writeToOutput = (t) => { if (verdeckt) { if (t.trim()) process.stdout.write('*'); return; } schreibOriginal(t); };
-
-// Wird das Skript nicht am Terminal ausgefuehrt (Pipe, z. B. im Test), liest
-// readline nur eine Zeile und schliesst dann – deshalb dort alles auf einmal
-// einlesen und die Antworten der Reihe nach abarbeiten.
-let stapel = null;
-async function stapelZeile() {
-  if (stapel === null) {
+// ---------------------------------------------------------------------------
+// Eingabe. Bewusst OHNE readline: dessen Maskierung haengt an internen
+// Methoden (_writeToOutput) und hat am echten Terminal nicht zuverlaessig
+// verdeckt. Hier lesen wir im Rohmodus Zeichen fuer Zeichen und entscheiden
+// selbst, was auf dem Schirm landet.
+// ---------------------------------------------------------------------------
+let restStapel = null;                    // fuer nicht-interaktive Aufrufe (Tests)
+async function zeileAusStapel() {
+  if (restStapel === null) {
     let roh = '';
-    for await (const chunk of process.stdin) roh += chunk;
-    stapel = roh.split('\n');
+    for await (const stueck of process.stdin) roh += stueck;
+    restStapel = roh.split('\n');
   }
-  return stapel.length ? stapel.shift() : '';
+  return restStapel.length ? restStapel.shift() : '';
 }
-const frage = async (text) => {
-  if (!process.stdin.isTTY) { process.stdout.write(text); const a = await stapelZeile(); process.stdout.write(a + '\n'); return a; }
-  return rl.question(text);
-};
-// Eingabe ohne Anzeige (wie bei sudo) – nur am echten Terminal, sonst normal.
-async function frageVerdeckt(text) {
-  if (!process.stdin.isTTY) { process.stdout.write(text); const a = await stapelZeile(); process.stdout.write('***\n'); return a; }
-  process.stdout.write(text);
-  verdeckt = true;
-  try { return await rl.question(''); }
-  finally { verdeckt = false; process.stdout.write('\n'); }
+
+function leseZeile(text, verdeckt) {
+  if (!process.stdin.isTTY) {
+    process.stdout.write(text);
+    return zeileAusStapel().then((a) => { process.stdout.write((verdeckt ? '***' : a) + '\n'); return a; });
+  }
+  return new Promise((fertig) => {
+    process.stdout.write(text);
+    const ein = process.stdin;
+    const vorher = ein.isRaw;
+    ein.setRawMode(true); ein.resume(); ein.setEncoding('utf8');
+    let puffer = '';
+    const aufhoeren = () => { ein.removeListener('data', beiZeichen); ein.setRawMode(vorher); ein.pause(); };
+    const beiZeichen = (stueck) => {
+      for (const z of stueck) {
+        if (z === '\r' || z === '\n') { aufhoeren(); process.stdout.write('\n'); fertig(puffer); return; }
+        if (z === '\u0003') { aufhoeren(); process.stdout.write('\n^C\n'); process.exit(130); }   // Strg+C
+        if (z === '\u0004') { aufhoeren(); process.stdout.write('\n');  fertig(puffer); return; }  // Strg+D
+        if (z === '\u007f' || z === '\b') {                                                    // Rueckschritt
+          if (puffer.length) { puffer = puffer.slice(0, -1); process.stdout.write('\b \b'); }
+          continue;
+        }
+        if (z < ' ') continue;                       // sonstige Steuerzeichen ignorieren
+        puffer += z;
+        process.stdout.write(verdeckt ? '*' : z);
+      }
+    };
+    ein.on('data', beiZeichen);
+  });
 }
+const frage = (text) => leseZeile(text, false);
+const frageVerdeckt = (text) => leseZeile(text, true);
 
 // Dieselbe Regel wie im Portal.
 function passwortProblem(pw) {
@@ -89,7 +106,7 @@ function passwortProblem(pw) {
   return null;
 }
 
-const beenden = (code) => { rl.close(); process.exit(code); };
+const beenden = (code) => process.exit(code);
 
 const kb = Math.round(statSync(dbPfad).size / 1024);
 // Ein leeres db.js legt beim ersten Oeffnen selbst ein Standard-Passwort an –
@@ -133,4 +150,3 @@ if (w === 'j' || w === 'ja' || w === 'y') {
 }
 console.log('\nFertig. Bitte gleich in der App unter Einstellungen → Zugang & Kontakt');
 console.log('einen Authenticator einrichten, damit dieser Weg nie wieder nötig ist.\n');
-rl.close();
