@@ -7,3 +7,11 @@ __pycache__/
 *.db
 *.db-wal
 *.db-shm
+
+# Screenshots und Zwischenstaende aus Test-/Browserlaeufen. Die gehoeren in den
+# Notizordner der Sitzung, nicht ins Projekt – landen sonst per "git add -A"
+# im Repository.
+/*.png
+/*.jpg
+/preview-*.html
+/*-test*.png
