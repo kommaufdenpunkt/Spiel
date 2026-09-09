@@ -39,6 +39,18 @@ db.exec(`
     created_at TEXT NOT NULL
   );
 
+  -- Dienstplan der Partnerin/des Partners (z. B. Schichtdienst im Pflegeheim).
+  -- Ein Eintrag je Tag. Aus "frei" macht die App automatisch einen freien Tag
+  -- beim Fahrlehrer; Urlaub bleibt bewusst Handarbeit.
+  CREATE TABLE IF NOT EXISTS partner_shifts (
+    date       TEXT PRIMARY KEY,     -- YYYY-MM-DD
+    kind       TEXT NOT NULL,        -- frueh | spaet | nacht | frei | urlaub | sonst
+    start_time TEXT,                 -- nur bei "sonst" bzw. abweichender Zeit
+    end_time   TEXT,
+    note       TEXT,
+    updated_at TEXT NOT NULL
+  );
+
   CREATE TABLE IF NOT EXISTS codes (
     code       TEXT PRIMARY KEY,
     note       TEXT,
@@ -443,6 +455,15 @@ const DEFAULTS = {
   notice_contract: '1',      // 📄 Fahrlehrer: Vertrags-Stundenmarke erreicht
   contract_min_h: '80',      // Marke für „Vertrags-Stunden erreicht"
   notice_weekly: '0',        // 🔔 Schüler: sanfter Wochen-Nudge (Mo, keine Buchung) – Standard aus
+  // ---- Zugang für die Partnerin/den Partner (Dienstplan) ----
+  partner_enabled: '0',      // 1 = eigener Zugang aktiv
+  partner_name: '',          // angezeigter Name (z. B. „Sandra")
+  partner_pin: '',           // Passwort (gehasht) – leer = noch keins gesetzt
+  partner_sees_names: '1',   // 1 = sie sieht die Namen der Fahrschüler, 0 = nur „belegt"
+  partner_autofrei: '1',     // 1 = ihr „frei" macht den Tag beim Fahrlehrer automatisch frei
+  shift_frueh: '06:00-14:30',// übliche Schichtzeiten im Heim – jederzeit änderbar
+  shift_spaet: '13:00-21:00',
+  shift_nacht: '21:00-06:30',
   reviews_display: 'marquee', // Bewertungen auf der Startseite: 'marquee' (Laufschrift) | 'slideshow' (Diashow) | 'off'
   registration_open: '0',    // '1' = neue Fahrschüler dürfen sich mit Code registrieren, '0' = geschlossen (privat)
   self_registration: '1',    // '1' = Schüler dürfen sich selbst anmelden (E-Mail bestätigen + Freischaltung), '0' = aus
@@ -502,6 +523,8 @@ export function getSettings() {
   const out = {};
   for (const r of rows) out[r.key] = r.value;
   delete out.instructor_pin; // niemals nach aussen geben
+  out.partner_set = !!out.partner_pin;   // nur den Status, nie das Passwort
+  delete out.partner_pin;
   // Authenticator-Geheimnis & Wiederherstellungs-Hashes nie ausliefern – nur Status.
   out.totp_enabled = !!out.instructor_totp;
   // Gescannt, aber nie bestaetigt -> zaehlt nicht. Nur den Status ausliefern.

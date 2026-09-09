@@ -2274,7 +2274,144 @@ function closeModal() {
 function render() {
   if (!state.user) return renderAuth();
   if (state.user.role === 'instructor') return renderInstructor();
+  if (state.user.role === 'partner') return renderPartner();
   return renderStudent();
+}
+
+// ====================== Ansicht für die Partnerin/den Partner ======================
+// Ein Monatsraster: auf einen Tag tippen, Schicht wählen, fertig. „frei" hält
+// den Arbeitstag des Fahrlehrers automatisch frei – Urlaub bewusst nicht.
+const SCHICHT_ART = {
+  frueh:  { ic: '\u{1F305}', txt: 'Frühdienst',  farbe: '#e6934d' },
+  spaet:  { ic: '\u{1F307}', txt: 'Spätdienst',  farbe: '#4d8dff' },
+  nacht:  { ic: '\u{1F319}', txt: 'Nachtdienst', farbe: '#6d4bb0' },
+  frei:   { ic: '\u{1F3E0}', txt: 'frei',        farbe: '#35c07d' },
+  urlaub: { ic: '\u{1F334}', txt: 'Urlaub',      farbe: '#2f9e57' },
+  sonst:  { ic: '\u{1F4CC}', txt: 'Sonstiges',   farbe: '#7c8cf0' },
+};
+function renderPartner() {
+  state.pmMonth = state.pmMonth || firstOfMonth(todayStr());
+  $('#app').innerHTML = `${header()}
+    <main>
+      <div class="card">
+        <h2>\u{1F3E0} Dein Dienstplan <span class="sub">${esc(state.user.name || '')}</span></h2>
+        <p class="hint">Trag hier ein, wann du arbeitest. An deinen <strong>freien Tagen</strong> hält
+          ${esc(state.user.instructor_name || 'dein Mann')} den Tag automatisch frei – dann steht kein Fahrschüler dazwischen.
+          <strong>Urlaub</strong> trägt er selbst ein, der bleibt hier nur als Notiz.</p>
+        <div class="pm-head">
+          <button class="sec sm" id="pm-prev">‹</button>
+          <span class="day" id="pm-label"></span>
+          <button class="sec sm" id="pm-next">›</button>
+          <button class="ghost sm" id="pm-today" style="margin-left:auto">Heute</button>
+        </div>
+        <div id="pm-grid">${gLoad('Lädt…')}</div>
+        <div class="pm-legend">${Object.entries(SCHICHT_ART).map(([k, v]) =>
+          `<span class="pm-lg"><span class="sw" style="background:${v.farbe}"></span>${v.ic} ${v.txt}</span>`).join('')}</div>
+      </div>
+      <div class="card" id="pm-plan"></div>
+    </main>
+    `;
+  $('#pm-prev').onclick = () => { state.pmMonth = addMonths(state.pmMonth, -1); ladePartner(); };
+  $('#pm-next').onclick = () => { state.pmMonth = addMonths(state.pmMonth, 1); ladePartner(); };
+  $('#pm-today').onclick = () => { state.pmMonth = firstOfMonth(todayStr()); ladePartner(); };
+  wireLogout();
+  ladePartner();
+}
+
+async function ladePartner() {
+  const erster = state.pmMonth;
+  const start = mondayOf(erster), ende = addDays(start, 41);
+  $('#pm-label').textContent = `${MON_LONG[parseD(erster).getMonth()]} ${parseD(erster).getFullYear()}`;
+  let plan = [], sicht = null;
+  try {
+    plan = (await api(`/api/partner/shifts?from=${start}&to=${ende}`)).shifts || [];
+    sicht = await api(`/api/partner/overview?from=${start}&to=${ende}`);
+  } catch (e) { toast(e.message, 'err'); }
+  state._pmShifts = {}; for (const x of plan) state._pmShifts[x.date] = x;
+  const terminProTag = {};
+  for (const t of (sicht?.termine || [])) (terminProTag[t.date] ||= []).push(t);
+
+  const monatIdx = parseD(erster).getMonth();
+  const heute = todayStr();
+  const kopf = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'].map((d) => `<div class="m-head">${d}</div>`).join('');
+  let zellen = '';
+  for (let i = 0; i < 42; i++) {
+    const d = addDays(start, i);
+    const drin = parseD(d).getMonth() === monatIdx;
+    const sft = state._pmShifts[d];
+    const art = sft ? SCHICHT_ART[sft.kind] : null;
+    const n = (terminProTag[d] || []).length;
+    zellen += `<div class="m-cell pm-cell ${drin ? '' : 'out'} ${d === heute ? 'today' : ''}" data-pm="${d}"
+      ${art ? `style="box-shadow:inset 0 0 0 2px ${art.farbe}55"` : ''}>
+      <div class="m-day"><span>${parseD(d).getDate()}</span>${n ? `<span class="cnt" title="${n} Termin(e) bei ${esc(sicht?.instructor_name || 'ihm')}">${n}</span>` : ''}</div>
+      ${art ? `<div class="pm-tag" style="background:${art.farbe}22;color:${art.farbe}">${art.ic} ${art.txt}</div>` : ''}
+      ${sft && sft.von ? `<div class="pm-zeit">${sft.von}${sft.bis ? '–' + sft.bis : ''}</div>` : ''}
+    </div>`;
+  }
+  $('#pm-grid').innerHTML = `<div class="monthgrid">${kopf}${zellen}</div>`;
+  $('#pm-grid').querySelectorAll('[data-pm]').forEach((c) => c.onclick = () => openSchichtWahl(c.dataset.pm));
+  zeigePartnerWoche(sicht, terminProTag);
+}
+
+// Was in den nächsten Tagen bei ihm ansteht – damit sie planen kann.
+function zeigePartnerWoche(sicht, terminProTag) {
+  const box = $('#pm-plan'); if (!box) return;
+  if (!sicht) { box.innerHTML = ''; return; }
+  const heute = todayStr();
+  const tage = [];
+  for (let i = 0; i < 10; i++) {
+    const d = addDays(heute, i);
+    const liste = (terminProTag[d] || []).slice().sort((a, b) => a.start_time.localeCompare(b.start_time));
+    const sft = state._pmShifts[d];
+    if (!liste.length && !sft) continue;
+    tage.push({ d, liste, sft });
+  }
+  box.innerHTML = `<h2>\u{1F4C5} Die nächsten Tage</h2>
+    <p class="hint">Links deine Schicht, rechts was bei ${esc(sicht.instructor_name || 'ihm')} ansteht.
+      ${sicht.sees_names ? '' : 'Namen werden nicht angezeigt.'}</p>
+    ${tage.length ? tage.map(({ d, liste, sft }) => {
+      const art = sft ? SCHICHT_ART[sft.kind] : null;
+      return `<div class="pm-row">
+        <div class="pm-row-d"><strong>${WD[isoDow(d) - 1]}</strong> ${fmtShort(d)}
+          ${art ? `<span class="pm-tag" style="background:${art.farbe}22;color:${art.farbe}">${art.ic} ${art.txt}</span>` : ''}</div>
+        <div class="pm-row-t">${liste.length
+          ? liste.map((t) => `<span class="pm-term">${t.start_time}–${addMinHHMM(t.start_time, t.duration_min)} ${esc(t.wer)}</span>`).join('')
+          : '<span class="muted">nichts eingetragen</span>'}</div>
+      </div>`;
+    }).join('') : '<p class="muted">Für die nächsten Tage ist nichts eingetragen.</p>'}`;
+}
+
+function openSchichtWahl(datum) {
+  const sft = state._pmShifts[datum];
+  modal(`<div class="slotpick">
+      <div class="sp-when">
+        <div class="sp-day">${WD[isoDow(datum) - 1]}, ${fmtShort(datum)}</div>
+        <div class="sp-sub">Was hast du an dem Tag?</div>
+      </div>
+      <div class="pm-wahl">
+        ${Object.entries(SCHICHT_ART).map(([k, v]) => `<button type="button" class="pm-opt${sft && sft.kind === k ? ' on' : ''}" data-sch="${k}"
+          style="--f:${v.farbe}"><span class="pm-opt-ic">${v.ic}</span>${v.txt}</button>`).join('')}
+      </div>
+      ${sft ? '<button type="button" class="ghost sm" id="pm-weg" style="width:100%;margin-top:.6rem">Eintrag entfernen</button>' : ''}
+      <div class="hint" style="margin-top:.7rem">\u{1F3E0} <strong>frei</strong> hält seinen Arbeitstag automatisch frei.
+        \u{1F334} <strong>Urlaub</strong> merkt sich die App nur – seinen Urlaub trägt er selbst ein.</div>
+    </div>
+    <div class="actions"><button class="sec" onclick="window.__closeModal()">Abbrechen</button></div>`, 'sheet');
+  document.querySelectorAll('[data-sch]').forEach((b) => b.onclick = async () => {
+    b.disabled = true;
+    try {
+      const r = await api('/api/partner/shifts', { method: 'POST', body: { date: datum, kind: b.dataset.sch } });
+      closeModal();
+      toast(r.tag && r.tag.gesperrt ? 'Gespeichert – sein Tag ist freigehalten \u{1F3E0}' : 'Gespeichert ✓', 'ok');
+      ladePartner();
+    } catch (e) { toast(e.message, 'err'); b.disabled = false; }
+  });
+  const weg = $('#pm-weg');
+  if (weg) weg.onclick = async () => {
+    try { await api('/api/partner/shifts', { method: 'POST', body: { date: datum, kind: 'loeschen' } });
+      closeModal(); toast('Eintrag entfernt', 'ok'); ladePartner(); }
+    catch (e) { toast(e.message, 'err'); }
+  };
 }
 
 // Das drehende „G" als Ladeanzeige (taucht zwischendurch beim Laden auf).
@@ -2293,7 +2430,7 @@ function header() {
   return `<header>
     <div class="brand"><img class="logo" src="/logo.svg?v=3630" alt="" width="24" height="24" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'logo',textContent:'🚗'}))"> <span class="brandname">ginoco</span></div>
     <div class="who">
-      <span class="role">${u.role === 'instructor' ? t('role_instructor') : t('role_student')}</span>
+      <span class="role">${u.role === 'instructor' ? t('role_instructor') : u.role === 'partner' ? '\u{1F3E0} Dienstplan' : t('role_student')}</span>
       ${u.role === 'instructor' ? '' : `<strong>${esc(u.name || '')}</strong>`}${u.username ? `<span class="pill">${esc(u.username)}</span>` : ''}
       ${state.liveSharing ? `<button class="ghost sm" onclick="window.__stopLive()" title="${t('tip_live_stop')}" style="color:var(--good)">${t('live_stop')}</button>` : ''}
       ${u.role === 'student' ? `<button class="ghost sm help-btn" onclick="window.__openHelp()" title="${t('tip_tour')}" aria-label="Hilfe">?</button>` : ''}
@@ -2906,7 +3043,30 @@ function instrForm() {
     <label class="ck-line" style="justify-content:flex-start;margin:.1rem 0 .3rem"><input type="checkbox" id="i-remember" checked> ${t('instr_remember')}</label>
     <div class="form-actions"><button id="i-go">${t('instr_go')}</button></div>
     ${state.settings?.passkey_enabled ? `<div class="or-sep">${t('or')}</div><button id="i-passkey" class="sec" type="button" style="width:100%">${t('instr_passkey')}</button>` : ''}
-    <p class="hint" style="margin-top:.6rem"><a href="#" id="i-recover" class="linklike">${t('instr_forgot')}</a></p>`;
+    <p class="hint" style="margin-top:.6rem"><a href="#" id="i-recover" class="linklike">${t('instr_forgot')}</a></p>
+    ${state.settings?.partner_enabled === '1' ? `<p class="hint" style="margin-top:.2rem"><a href="#" id="i-partner" class="linklike">\u{1F3E0} Dienstplan-Zugang</a></p>` : ''}`;
+}
+// Anmeldung für die Partnerin/den Partner – bewusst schlicht, nur ein Passwort.
+function openPartnerLogin() {
+  modal(`<h3>\u{1F3E0} Dienstplan</h3>
+    <p class="hint">Zugang für ${esc(state.settings?.partner_name || 'die Partnerin/den Partner')}.
+      Hier trägst du deine Schichten ein.</p>
+    ${errBox()}
+    <div class="field"><label>Passwort</label><input id="pl-pw" type="password" autocomplete="current-password"></div>
+    <label class="ck-line" style="justify-content:flex-start"><input type="checkbox" id="pl-rem" checked> Angemeldet bleiben</label>
+    <div class="actions"><button class="sec" onclick="window.__closeModal()">Abbrechen</button><button id="pl-go">Anmelden</button></div>`, 'sheet');
+  const los = async () => {
+    clearErr();
+    const btn = $('#pl-go'); btn.disabled = true;
+    try {
+      await api('/api/auth/partner', { method: 'POST', body: { password: $('#pl-pw').value, remember: $('#pl-rem').checked } });
+      closeModal();
+      const [me, st] = await Promise.all([api('/api/auth/me'), api('/api/settings')]);
+      state.user = me.user; state.settings = st.settings; render();
+    } catch (e) { showErr(e.message); btn.disabled = false; }
+  };
+  $('#pl-go').onclick = los;
+  $('#pl-pw').addEventListener('keydown', (e) => { if (e.key === 'Enter') los(); });
 }
 // Authenticator-Bereich in den Einstellungen (Status + Aktionen).
 function renderAuthSection() {
@@ -2934,6 +3094,51 @@ function renderAuthSection() {
   renderRecoverySection();
   box.insertAdjacentHTML('beforeend', '<div id="e-passkey" style="border-top:1px solid var(--line);margin-top:.8rem;padding-top:.2rem"></div>');
   renderPasskeySection();
+}
+
+// ---- Dienstplan-Zugang für die Partnerin/den Partner ----
+// Sie traegt ihre Schichten ein; ihre freien Tage halten deinen Tag frei.
+function renderPartnerSection() {
+  const box = $('#e-partner-body'); if (!box) return;
+  const s = state.settings || {};
+  const an = s.partner_enabled === '1', gesetzt = !!s.partner_set;
+  box.innerHTML = `<p class="hint">Ein eigener, schlanker Zugang: nur Dienstplan, keine Fahrschüler-Verwaltung.
+    Trägt sie einen Tag als <strong>frei</strong> ein, wird dein Arbeitstag automatisch freigehalten –
+    schon vereinbarte Fahrstunden bleiben stehen, du bekommst eine Nachricht.</p>
+    <div class="field"><label>Angezeigter Name</label><input id="pa-name" value="${esc(s.partner_name || '')}" placeholder="z.B. Sandra"></div>
+    <div class="field"><label>${gesetzt ? 'Neues Passwort (leer = unverändert)' : 'Passwort setzen'}</label>
+      <input id="pa-pw" type="password" autocomplete="new-password" placeholder="mind. 8 Zeichen, mit Zahl &amp; Sonderzeichen"></div>
+    <div class="row">
+      <div class="field"><label>Frühdienst</label><input id="pa-frueh" value="${esc(s.shift_frueh || '06:00-14:30')}"></div>
+      <div class="field"><label>Spätdienst</label><input id="pa-spaet" value="${esc(s.shift_spaet || '13:00-21:00')}"></div>
+      <div class="field"><label>Nachtdienst</label><input id="pa-nacht" value="${esc(s.shift_nacht || '21:00-06:30')}"></div>
+    </div>
+    <label class="ck-line" style="justify-content:flex-start"><input type="checkbox" id="pa-auto" ${s.partner_autofrei !== '0' ? 'checked' : ''}> \u{1F3E0} Ihre freien Tage halten meinen Tag automatisch frei</label>
+    <label class="ck-line" style="justify-content:flex-start"><input type="checkbox" id="pa-namen" ${s.partner_sees_names !== '0' ? 'checked' : ''}> Sie darf die Namen der Fahrschüler sehen</label>
+    <label class="ck-line" style="justify-content:flex-start"><input type="checkbox" id="pa-an" ${an ? 'checked' : ''}> Zugang aktiv</label>
+    <div class="inline" style="margin-top:.6rem">
+      <button class="sm" id="pa-save">\u{1F4BE} Zugang speichern</button>
+      ${gesetzt ? '<button class="ghost sm" id="pa-weg" style="color:var(--bad)">Zugang entfernen</button>' : ''}
+    </div>
+    ${gesetzt ? '<div class="hint" style="margin-top:.5rem">Sie meldet sich auf derselben Seite an – unter dem Fahrlehrer-Login über „\u{1F3E0} Dienstplan-Zugang".</div>' : ''}`;
+  $('#pa-save').onclick = async () => {
+    const btn = $('#pa-save'); btn.disabled = true;
+    try {
+      const r = await api('/api/instructor/partner', { method: 'POST', body: {
+        name: $('#pa-name').value, enabled: $('#pa-an').checked,
+        autofrei: $('#pa-auto').checked, sees_names: $('#pa-namen').checked,
+        frueh: $('#pa-frueh').value, spaet: $('#pa-spaet').value, nacht: $('#pa-nacht').value,
+        ...($('#pa-pw').value ? { password: $('#pa-pw').value } : {}) } });
+      state.settings = r.settings; toast('Gespeichert ✓', 'ok'); renderPartnerSection();
+    } catch (e) { toast(e.message, 'err'); btn.disabled = false; }
+  };
+  const weg = $('#pa-weg');
+  if (weg) weg.onclick = async () => {
+    if (!confirm('Zugang entfernen? Sie kann sich dann nicht mehr anmelden. Der Dienstplan bleibt erhalten.')) return;
+    try { const r = await api('/api/instructor/partner', { method: 'POST', body: { remove: true } });
+      state.settings = r.settings; toast('Zugang entfernt', 'ok'); renderPartnerSection(); }
+    catch (e) { toast(e.message, 'err'); }
+  };
 }
 
 // ---- Notfall-Codes: der Rettungsanker, wenn der Authenticator weg ist ----
@@ -3210,6 +3415,7 @@ function wireAuth(tab) {
       } catch (e) { showErr(e.message); }
     };
     const rc = $('#i-recover'); if (rc) rc.onclick = (ev) => { ev.preventDefault(); openInstrForgotModal(); };
+    const pp = $('#i-partner'); if (pp) pp.onclick = (ev) => { ev.preventDefault(); openPartnerLogin(); };
     const pk = $('#i-passkey'); if (pk) pk.onclick = passkeyLogin;
   }
   app.querySelectorAll('input').forEach((i) => i.addEventListener('keydown', (e) => {
@@ -7204,7 +7410,10 @@ async function loadK() {
     try {
       const ov = await api(`/api/instructor/overview?from=${mon}&to=${sat}`);
       window.__instrBookings = ov.bookings; updateSignBatchBtn();
+      // Dienstplan der Partnerin/des Partners dazuholen (still, wenn es keinen gibt)
+      try { ov.shifts = (await api(`/api/partner/shifts?from=${mon}&to=${sat}`)).shifts || []; } catch { ov.shifts = []; }
       renderWeek($('#k-list'), mon, ov);
+      zeigeWochenBilanz(mon);
     } catch (e) { toast(e.message, 'err'); }
     return;
   }
@@ -7317,6 +7526,28 @@ function ackText(b) {
   return t.length ? t.join(' · ') : '– noch nichts bestätigt';
 }
 
+// Was kostet ein freigehaltener Tag – und wo hole ich es wieder rein?
+// Zeigt nur an; die Slots legst du selbst an. Erscheint nur, wenn wirklich
+// ein Tag wegen des Dienstplans freigehalten ist.
+async function zeigeWochenBilanz(montag) {
+  const alt = document.getElementById('k-bilanz'); if (alt) alt.remove();
+  let b;
+  try { b = await api('/api/instructor/week-balance?date=' + montag); } catch { return; }
+  if (!b.geschlossenDurchPartner || !b.geschlossenDurchPartner.length) return;
+  const h = (m) => (m / 60).toFixed(1).replace('.0', '') + ' h';
+  const tage = b.geschlossenDurchPartner.map((d) => `${WD[isoDow(d) - 1]} ${fmtShort(d)}`).join(', ');
+  const box = document.createElement('div');
+  box.id = 'k-bilanz';
+  box.className = 'wkbal';
+  box.innerHTML = `<div class="wkbal-h">\u{1F3E0} ${esc(state.settings?.partner_name || 'Partner')} hat frei: <strong>${tage}</strong></div>
+    <div class="wkbal-z">Ausfall <strong>${h(b.verloren)}</strong> · Woche ${h(b.verplant)} von ${h(b.zielMin)}${b.fehlt ? ` · es fehlen <strong>${h(b.fehlt)}</strong>` : ' · <strong>Ziel erreicht ✓</strong>'}</div>
+    ${b.vorschlag && b.vorschlag.length ? `<div class="wkbal-v">Ausgleich möglich an: ${b.vorschlag.slice(0, 4).map((v) =>
+      `<span class="wkbal-t">${WD[isoDow(v.date) - 1]} ${fmtShort(v.date)} <b>+${v.slots}</b></span>`).join('')}</div>
+      <div class="hint" style="margin:.35rem 0 0">Die Zahl ist, wie viele Fahrstunden dort noch in den Tag passen.</div>` : ''}`;
+  const liste = document.getElementById('k-list');
+  if (liste && liste.parentNode) liste.parentNode.insertBefore(box, liste);
+}
+
 function renderWeek(el, monday, ov) {
   const s = state.settings;
   const toM = (t) => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
@@ -7385,9 +7616,17 @@ function renderWeek(el, monday, ov) {
     <div class="wk-corner"></div>
     ${days.map((d) => {
       const ovd = ovByDate[d];
-      const tag = ovd ? (ovd.type === 'vacation' ? '🌴 Urlaub' : ovd.closed ? '🏖️ frei' : `✂️ kurz bis ${ovd.last_start || ''}`) : '';
+      const sft = (ov.shifts || []).find((x) => x.date === d);
+      const sArt = sft && SCHICHT_ART[sft.kind];
+      // Ist der Tag wegen des Dienstplans freigehalten, sagt EIN Schild alles –
+      // sonst stuende zweimal „frei" untereinander.
+      const durchPartner = !!(ovd && ovd.closed && ovd.note === 'Partner hat frei');
+      const tag = durchPartner
+        ? `🏠 ${esc(state.settings?.partner_name || 'Partner')} frei`
+        : (ovd ? (ovd.type === 'vacation' ? '🌴 Urlaub' : ovd.closed ? '🏖️ frei' : `✂️ kurz bis ${ovd.last_start || ''}`) : '');
+      const zeigeSchicht = sArt && !durchPartner;
       const dtCls = ovd ? (ovd.type === 'vacation' ? 'dt-vac' : ovd.closed ? 'dt-free' : 'dt-short') : '';
-      return `<div class="wk-head ${d === today ? 'today' : ''}">${WD[isoDow(d) - 1]}<span class="sub">${fmtShort(d)}</span>${tag ? `<span class="daytag ${dtCls}">${tag}</span>` : ''}</div>`;
+      return `<div class="wk-head ${d === today ? 'today' : ''}">${WD[isoDow(d) - 1]}<span class="sub">${fmtShort(d)}</span>${tag ? `<span class="daytag ${dtCls}">${tag}</span>` : ''}${zeigeSchicht ? `<span class="wk-shift" style="background:${sArt.farbe}22;color:${sArt.farbe}" title="${esc(state.settings?.partner_name || 'Partner')}: ${sArt.txt}${sft.von ? ' ' + sft.von + '–' + sft.bis : ''}">${sArt.ic} ${sArt.txt}</span>` : ''}</div>`;
     }).join('')}
     <div class="wk-times">${hourLabels.join('')}</div>
     ${days.map(dayCol).join('')}
@@ -9578,6 +9817,7 @@ function tabEinstellungen() {
   ['e-start', 'e-last', 'e-lesson', 'e-break'].forEach((id) => $('#' + id).oninput = updatePreview);
   updatePreview();
   renderAuthSection();
+  renderPartnerSection();
   // Arbeitstage-Chips optisch mitschalten
   box.querySelectorAll('#e-days [data-day]').forEach((cb) => cb.onchange = () =>
     cb.closest('.dur-chip')?.classList.toggle('on', cb.checked));

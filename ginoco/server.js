@@ -24,7 +24,8 @@ const PUBLIC_SETTINGS = ['instructor_name', 'instructor_phone', 'policy_text',
   'cancel_hours', 'lock_hours', 'reserve_expire_min', 'booking_horizon_days', 'booking_horizon_days_rank2',
   'live_lead_min', 'lesson_min', 'break_min', 'start_time', 'last_start', 'max_per_week', 'release_time',
   'registration_open', 'self_registration', 'sonder_min_ueberland', 'sonder_min_autobahn', 'sonder_min_nacht',
-  'req_ueberland', 'req_autobahn', 'req_nacht', 'rank2_min_lessons', 'passkey_enabled'];
+  'req_ueberland', 'req_autobahn', 'req_nacht', 'rank2_min_lessons', 'passkey_enabled',
+  'partner_enabled', 'partner_name'];   // nur, damit der Dienstplan-Zugang auf der Anmeldeseite auftaucht
 
 // ---------- Passwort-Richtlinie (stark, mit Sonderzeichen) ----------
 // Gibt null zurueck, wenn ok, sonst die fehlende Anforderung.
@@ -695,12 +696,18 @@ async function handleApi(req, res, url) {
   const sess = getSession(req);
   const requireInstructor = () => sess && sess.kind === 'instructor';
   const requireStudent = () => sess && sess.kind === 'student';
+  const requirePartner = () => sess && sess.kind === 'partner';
 
   // ===== AUTH =====
   if (p === '/api/auth/me' && method === 'GET') {
     if (!sess) return ok(res, { user: null });
     if (sess.kind === 'instructor') {
       return ok(res, { user: { role: 'instructor', name: getSettingRaw('instructor_name') } });
+    }
+    if (sess.kind === 'partner') {
+      return ok(res, { user: { role: 'partner', name: getSettingRaw('partner_name') || 'Partner',
+        instructor_name: getSettingRaw('instructor_name'),
+        sees_names: getSettingRaw('partner_sees_names') === '1' } });
     }
     const st = db.prepare('SELECT id,name,email,phone,username,allowed_durations,pickup_onboarded,pickup_mode,home_label,home_lat,home_lng,approved,email_verified,registered_self,exam_date FROM students WHERE id = ?').get(sess.student_id);
     if (!st) return ok(res, { user: null });
@@ -713,6 +720,20 @@ async function handleApi(req, res, url) {
     if (token) db.prepare('DELETE FROM sessions WHERE token = ?').run(token);
     res.setHeader('Set-Cookie', 'fsp=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax');
     return ok(res);
+  }
+
+  // ---- Zugang für die Partnerin/den Partner (Dienstplan) ----
+  if (p === '/api/auth/partner' && method === 'POST') {
+    if (loginBlocked(req)) return bad(res, 'Zu viele Fehlversuche. Bitte in ein paar Minuten erneut.', 429);
+    if (getSettingRaw('partner_enabled') !== '1') return bad(res, 'Dieser Zugang ist nicht freigeschaltet.', 403);
+    const b = await readBody(req);
+    const pw = getSettingRaw('partner_pin');
+    if (!pw) return bad(res, 'Für diesen Zugang ist noch kein Passwort gesetzt.', 403);
+    if (!verifyPassword(String(b.password || b.pin || ''), pw)) { noteLoginFail(req); return bad(res, 'Falsches Passwort', 401); }
+    noteLoginOk(req);
+    const remember = !(b.remember === false || b.remember === 0 || b.remember === '0');
+    createSession(res, 'partner', null, isHttps(req), remember);
+    return ok(res, { role: 'partner', name: getSettingRaw('partner_name') || 'Partner' });
   }
 
   if (p === '/api/auth/instructor' && method === 'POST') {
@@ -2258,6 +2279,182 @@ async function handleApi(req, res, url) {
       days.push({ date: d, weekday: wdShort(d), closed: false, total, occ, free, freeLessons: Math.floor(free / unit), bookedCount });
     }
     return ok(res, { from, to, unit, lessonMin: s.lesson_min, days });
+  }
+
+  // ================= Dienstplan der Partnerin/des Partners =================
+  const SCHICHTEN = { frueh: 'Frühdienst', spaet: 'Spätdienst', nacht: 'Nachtdienst', frei: 'frei', urlaub: 'Urlaub', sonst: 'Sonstiges' };
+  // Zeitfenster einer Schicht aus den Einstellungen (z. B. "06:00-14:30").
+  function schichtZeiten(kind, row) {
+    if (row && row.start_time) return { von: row.start_time, bis: row.end_time || '' };
+    const roh = getSettingRaw(kind === 'frueh' ? 'shift_frueh' : kind === 'spaet' ? 'shift_spaet' : kind === 'nacht' ? 'shift_nacht' : '') || '';
+    const m = roh.match(/^(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})$/);
+    return m ? { von: m[1], bis: m[2] } : { von: '', bis: '' };
+  }
+  // Aus "sie hat frei" einen freien Tag beim Fahrlehrer machen – und wieder
+  // zuruecknehmen, wenn sich die Schicht aendert. Angefasst wird nur, was die
+  // Automatik selbst angelegt hat (erkennbar an der Notiz).
+  const AUTO_NOTIZ = 'Partner hat frei';
+  function freiAbgleichen(datum, kind) {
+    if (getSettingRaw('partner_autofrei') !== '1') return { geaendert: false };
+    const vorhanden = db.prepare('SELECT * FROM day_overrides WHERE date=?').get(datum);
+    if (kind === 'frei') {
+      if (vorhanden && vorhanden.closed === 1) return { geaendert: false };
+      if (vorhanden && vorhanden.note !== AUTO_NOTIZ) return { geaendert: false, fremd: true };
+      db.prepare(`INSERT INTO day_overrides(date,start_time,last_start,closed,note,created_at)
+        VALUES(?,NULL,NULL,1,?,?) ON CONFLICT(date) DO UPDATE SET closed=1, note=excluded.note`)
+        .run(datum, AUTO_NOTIZ, new Date().toISOString());
+      // Schon vereinbarte Fahrstunden bleiben bestehen – gesperrt wird nur fuer NEUE
+      // Buchungen. Was an dem Tag steht, muss der Fahrlehrer selbst entscheiden.
+      const offen = db.prepare("SELECT COUNT(*) AS n FROM bookings WHERE date=? AND status='booked'").get(datum).n;
+      return { geaendert: true, gesperrt: true, offeneTermine: offen };
+    }
+    if (vorhanden && vorhanden.note === AUTO_NOTIZ) {
+      db.prepare('DELETE FROM day_overrides WHERE date=?').run(datum);
+      return { geaendert: true, gesperrt: false };
+    }
+    return { geaendert: false };
+  }
+
+  if (p === '/api/partner/shifts' && method === 'GET') {
+    if (!requirePartner() && !requireInstructor()) return bad(res, 'Bitte anmelden', 401);
+    const von = url.searchParams.get('from') || todayStr();
+    const bis = url.searchParams.get('to') || addDays(von, 41);
+    const rows = db.prepare('SELECT * FROM partner_shifts WHERE date BETWEEN ? AND ? ORDER BY date').all(von, bis);
+    return ok(res, { from: von, to: bis, shifts: rows.map((r) => ({ ...r, label: SCHICHTEN[r.kind] || r.kind, ...schichtZeiten(r.kind, r) })) });
+  }
+
+  if (p === '/api/partner/shifts' && method === 'POST') {
+    if (!requirePartner() && !requireInstructor()) return bad(res, 'Bitte anmelden', 401);
+    const b = await readBody(req);
+    const datum = String(b.date || '');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(datum)) return bad(res, 'Datum fehlt oder ist ungültig');
+    const kind = String(b.kind || '');
+    const wer = getSettingRaw('partner_name') || 'Partner';
+
+    if (kind === 'loeschen' || kind === '') {
+      db.prepare('DELETE FROM partner_shifts WHERE date=?').run(datum);
+      const f = freiAbgleichen(datum, '');
+      logEvent('info', { actor: 'system', date: datum, detail: `Dienstplan ${wer}: Eintrag am ${dmy(datum)} entfernt` });
+      return ok(res, { removed: true, tag: f });
+    }
+    if (!SCHICHTEN[kind]) return bad(res, 'Unbekannte Schicht');
+    const eigenVon = /^\d{1,2}:\d{2}$/.test(b.start_time || '') ? b.start_time : null;
+    const eigenBis = /^\d{1,2}:\d{2}$/.test(b.end_time || '') ? b.end_time : null;
+    db.prepare(`INSERT INTO partner_shifts(date,kind,start_time,end_time,note,updated_at)
+      VALUES(?,?,?,?,?,?) ON CONFLICT(date) DO UPDATE SET
+      kind=excluded.kind, start_time=excluded.start_time, end_time=excluded.end_time,
+      note=excluded.note, updated_at=excluded.updated_at`)
+      .run(datum, kind, eigenVon, eigenBis, b.note ? String(b.note).trim().slice(0, 200) : null, new Date().toISOString());
+    const f = freiAbgleichen(datum, kind);
+    logEvent('info', { actor: 'system', date: datum,
+      detail: `Dienstplan ${wer}: ${dmy(datum)} → ${SCHICHTEN[kind]}${f.gesperrt ? ' – Tag automatisch freigehalten' : ''}` });
+    // Der Fahrlehrer soll es mitbekommen, wenn dadurch ein Arbeitstag wegfaellt.
+    if (f.gesperrt) {
+      pushToInstructor(f.offeneTermine
+        ? `🏠 ${wer} hat am ${wdShort(datum)} ${dmy(datum)} frei – der Tag ist jetzt freigehalten. Achtung: ${f.offeneTermine} Termin(e) stehen noch.`
+        : `🏠 ${wer} hat am ${wdShort(datum)} ${dmy(datum)} frei – der Tag ist jetzt freigehalten.`, '/');
+    }
+    return ok(res, { saved: true, tag: f });
+  }
+
+  // Was sie von seinem Kalender sieht. Ohne Freigabe ohne Namen.
+  if (p === '/api/partner/overview' && method === 'GET') {
+    if (!requirePartner()) return bad(res, 'Nur der Partner-Zugang', 403);
+    const von = url.searchParams.get('from') || todayStr();
+    const bis = url.searchParams.get('to') || addDays(von, 13);
+    const namen = getSettingRaw('partner_sees_names') === '1';
+    const rows = db.prepare(
+      `SELECT b.date,b.start_time,b.duration_min,b.status,b.lesson_type,b.title,s.name AS schueler
+       FROM bookings b LEFT JOIN students s ON s.id=b.student_id
+       WHERE b.date BETWEEN ? AND ? AND b.status!='cancelled' ORDER BY b.date,b.start_time`).all(von, bis);
+    const termine = rows.map((r) => ({
+      date: r.date, start_time: r.start_time, duration_min: r.duration_min, status: r.status,
+      lesson_type: r.lesson_type,
+      wer: namen ? (r.schueler || r.title || 'Eigener Termin') : (r.schueler ? 'Fahrstunde' : (r.title || 'Eigener Termin')),
+    }));
+    const shifts = db.prepare('SELECT * FROM partner_shifts WHERE date BETWEEN ? AND ?').all(von, bis);
+    const frei = db.prepare('SELECT * FROM day_overrides WHERE date BETWEEN ? AND ?').all(von, bis);
+    return ok(res, { from: von, to: bis, termine, shifts, overrides: frei, sees_names: namen,
+      instructor_name: getSettingRaw('instructor_name') });
+  }
+
+  // Was kostet die Woche durch freie Tage – und wo laesst sich das aufholen?
+  // Rein rechnerisch, es wird nichts veraendert; der Fahrlehrer entscheidet.
+  // Partner-Zugang einrichten/aendern (nur der Fahrlehrer).
+  if (p === '/api/instructor/partner' && method === 'POST') {
+    if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
+    const b = await readBody(req);
+    if ('name' in b) setSettingRaw('partner_name', String(b.name || '').trim().slice(0, 60));
+    if ('enabled' in b) setSettingRaw('partner_enabled', b.enabled ? '1' : '0');
+    if ('sees_names' in b) setSettingRaw('partner_sees_names', b.sees_names ? '1' : '0');
+    if ('autofrei' in b) setSettingRaw('partner_autofrei', b.autofrei ? '1' : '0');
+    for (const [k, feld] of [['shift_frueh', 'frueh'], ['shift_spaet', 'spaet'], ['shift_nacht', 'nacht']]) {
+      if (feld in b && /^\d{1,2}:\d{2}\s*-\s*\d{1,2}:\d{2}$/.test(String(b[feld] || '')))
+        setSettingRaw(k, String(b[feld]).replace(/\s/g, ''));
+    }
+    if (b.password) {
+      const prob = passwordProblem(String(b.password));
+      if (prob) return bad(res, 'Das Passwort braucht ' + prob + '.');
+      setSettingRaw('partner_pin', hashPassword(String(b.password)));
+      logEvent('info', { actor: 'instructor', detail: 'Passwort für den Partner-Zugang gesetzt' });
+    }
+    if (b.remove) {
+      setSettingRaw('partner_pin', ''); setSettingRaw('partner_enabled', '0');
+      db.prepare("DELETE FROM sessions WHERE kind='partner'").run();
+      logEvent('info', { actor: 'instructor', detail: 'Partner-Zugang entfernt' });
+    }
+    return ok(res, { settings: getSettings() });
+  }
+
+  if (p === '/api/instructor/week-balance' && method === 'GET') {
+    if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
+    const s = getSettings();
+    const ref = url.searchParams.get('date') || todayStr();
+    const { from, to } = weekStartEnd(ref);
+    const zielMin = Math.round((Number(s.weekly_target_h) || 0) * 60);
+    const arbeitstage = String(getSettingRaw('workdays') || '1,2,3,4,5,6').split(',').map(Number);
+    const schritt = (Number(s.lesson_min) || 80) + (Number(s.break_min) || 0);
+
+    const tage = [];
+    let verplant = 0;
+    for (let i = 0; i < 7; i++) {
+      const d = addDays(from, i);
+      if (d > to) break;
+      const ov = getOverride(d);
+      const shift = db.prepare('SELECT * FROM partner_shifts WHERE date=?').get(d);
+      const gebucht = db.prepare("SELECT COALESCE(SUM(duration_min),0) AS m FROM bookings WHERE date=? AND status!='cancelled'").get(d).m;
+      verplant += gebucht;
+      const istArbeitstag = arbeitstage.includes(isoDow(d));
+      const zu = !!(ov && ov.closed) || !istArbeitstag;
+      // Wie viel Platz waere an dem Tag theoretisch noch frei?
+      const rahmen = (toMin((ov && ov.last_start) || s.last_start) + (Number(s.lesson_min) || 80)) - toMin((ov && ov.start_time) || s.start_time);
+      tage.push({ date: d, closed: zu, grund: zu ? ((ov && ov.note) || (istArbeitstag ? 'gesperrt' : 'kein Arbeitstag')) : null,
+        shift: shift ? shift.kind : null, gebucht, luft: zu ? 0 : Math.max(0, rahmen - gebucht),
+        // Was der Tag gebracht haette, wenn er offen waere – nur fuer Tage, die
+        // wegen des Partners freigehalten sind (der eigentliche Ausfall).
+        kapazitaet: istArbeitstag ? Math.max(0, rahmen) : 0 });
+    }
+    const fehlt = Math.max(0, zielMin - verplant);
+    // Der Ausfall durch die freigehaltenen Tage – das ist die Zahl, die zaehlt,
+    // wenn man wissen will, was der freie Tag gekostet hat.
+    const verloren = tage.filter((t) => t.grund === 'Partner hat frei')
+      .reduce((n, t) => n + t.kapazitaet, 0);
+    // Vorschlag: die Fehlminuten auf die offenen Tage mit dem meisten Platz verteilen.
+    const vorschlag = [];
+    if (fehlt > 0) {
+      let rest = fehlt;
+      for (const t of [...tage].filter((x) => !x.closed && x.luft >= schritt).sort((a, b) => b.luft - a.luft)) {
+        if (rest <= 0) break;
+        const moeglich = Math.floor(t.luft / schritt);
+        const noetig = Math.ceil(rest / (Number(s.lesson_min) || 80));
+        const n = Math.min(moeglich, noetig);
+        if (n <= 0) continue;
+        vorschlag.push({ date: t.date, slots: n, minuten: n * (Number(s.lesson_min) || 80) });
+        rest -= n * (Number(s.lesson_min) || 80);
+      }
+    }
+    return ok(res, { from, to, zielMin, verplant, fehlt, verloren, tage, vorschlag,
+      geschlossenDurchPartner: tage.filter((t) => t.grund === 'Partner hat frei').map((t) => t.date) });
   }
 
   if (p === '/api/instructor/overview' && method === 'GET') {

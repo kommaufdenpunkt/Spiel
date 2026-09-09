@@ -2093,3 +2093,40 @@ header .brand .brandname{
   background:rgba(230,178,58,.14);color:#f0d089;border:1px solid rgba(230,178,58,.32)}
 /* Prüfungsfahrt: knallrot, damit sie im Kalender sofort auffällt */
 .wk-block.pruef{box-shadow:inset 0 0 0 2px #ff5a5f,0 1px 3px rgba(0,0,0,.35)}
+
+/* ---- Dienstplan der Partnerin/des Partners ---- */
+.pm-head{display:flex;align-items:center;gap:.5rem;margin:.2rem 0 .8rem;flex-wrap:wrap}
+.pm-cell{min-height:74px}
+.pm-tag{display:block;font-size:.66rem;font-weight:800;border-radius:6px;padding:.1rem .25rem;
+  margin-top:.2rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pm-zeit{font-size:.62rem;color:var(--muted);font-variant-numeric:tabular-nums}
+.pm-legend{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:.8rem;font-size:.76rem;color:var(--muted)}
+.pm-lg{display:inline-flex;align-items:center;gap:.3rem}
+.pm-lg .sw{width:10px;height:10px;border-radius:3px;display:inline-block}
+/* Schicht auswählen */
+.pm-wahl{display:grid;grid-template-columns:1fr 1fr;gap:.6rem}
+.pm-opt{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.3rem;
+  min-height:82px;border-radius:14px;border:1px solid var(--line);background:#141b25;color:var(--ink);
+  font-size:.9rem;font-weight:700;cursor:pointer;transition:transform .12s ease}
+.pm-opt:active{transform:scale(.97)}
+.pm-opt .pm-opt-ic{font-size:1.5rem;line-height:1}
+.pm-opt.on{border-color:var(--f);background:color-mix(in srgb,var(--f) 16%,#141b25);color:var(--f)}
+/* Die nächsten Tage */
+.pm-row{display:flex;gap:.7rem;padding:.55rem 0;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.pm-row:last-child{border-bottom:0}
+.pm-row-d{flex:0 0 150px;display:flex;align-items:center;gap:.4rem;flex-wrap:wrap}
+.pm-row-t{flex:1 1 200px;display:flex;flex-wrap:wrap;gap:.35rem}
+.pm-term{background:#141b25;border:1px solid var(--line);border-radius:8px;padding:.15rem .45rem;
+  font-size:.8rem;font-variant-numeric:tabular-nums}
+@media (max-width:520px){.pm-row-d{flex:1 1 100%}}
+
+/* Schicht-Fahne im Wochenkopf + Wochenbilanz bei freigehaltenen Tagen */
+.wk-shift{display:block;font-size:.62rem;font-weight:800;border-radius:5px;padding:.05rem .2rem;margin-top:.15rem;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wkbal{background:rgba(53,192,125,.09);border:1px solid rgba(53,192,125,.32);border-radius:12px;
+  padding:.7rem .85rem;margin:0 0 .8rem}
+.wkbal-h{font-size:.92rem;margin-bottom:.2rem}
+.wkbal-z{font-size:.86rem;color:var(--muted)}
+.wkbal-v{margin-top:.5rem;display:flex;flex-wrap:wrap;gap:.35rem;align-items:center;font-size:.84rem}
+.wkbal-t{background:#141b25;border:1px solid var(--line);border-radius:8px;padding:.15rem .45rem;
+  font-variant-numeric:tabular-nums}
