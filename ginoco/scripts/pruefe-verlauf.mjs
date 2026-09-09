@@ -423,8 +423,7 @@ for (const s of schueler) {
     if ((b.lesson_type || 'normal') !== f.typ) p.push(`Art "${b.lesson_type || 'normal'}" statt "${f.typ}"`);
     if (p.length) abweichung.push({ f, b, p });
     // Klasse getrennt sammeln – nur zur Ansicht, nicht als Fehler gewertet.
-    const sollK = f.klasse.replace(/^B197$/, 'B 197');
-    if ((b.license_class || 'B') !== sollK.replace(/\s/g, '') && sollK) klassen.push({ f, b, sollK });
+    if (f.klasse && (b.license_class || 'B') !== klasseZuDB(f.klasse)) klassen.push({ f, b, sollK: klasseZuDB(f.klasse) });
   }
   for (const b of ist) if (!sollMap.has(schl(b.date, b.start_time))) zuviel.push(b);
 
@@ -439,9 +438,18 @@ for (const s of schueler) {
         if (!nachtragen) { console.log('      ' + zeile(f)); continue; }
         // Kollision pruefen: nichts anlegen, was eine bestehende Buchung ueberlappt.
         const s0 = inMinuten(f.von), e0 = s0 + f.dauer;
-        const tag = db.prepare("SELECT id,start_time,duration_min,student_id FROM bookings WHERE date=? AND status!='cancelled'").all(f.datum);
+        const tag = db.prepare(
+          `SELECT b.id,b.start_time,b.duration_min,b.status,b.lesson_type,b.title,s.name AS schueler
+           FROM bookings b LEFT JOIN students s ON s.id=b.student_id
+           WHERE b.date=? AND b.status!='cancelled'`).all(f.datum);
         const stoss = tag.find((o) => { const os = inMinuten(o.start_time); return s0 < os + o.duration_min && os < e0; });
-        if (stoss) { console.log('      ⚠️  ' + zeile(f) + `  -> uebersprungen, ueberlappt Termin #${stoss.id}`); uebersprungen++; continue; }
+        if (stoss) {
+          const bis = (t, d) => { const m = inMinuten(t) + d; return String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0'); };
+          console.log('      ⚠️  ' + zeile(f) + '  -> uebersprungen');
+          console.log(`          im Weg: #${stoss.id} ${stoss.start_time}-${bis(stoss.start_time, stoss.duration_min)} `
+            + `${stoss.schueler || stoss.title || 'Eigener Termin'} [${stoss.status}]`);
+          uebersprungen++; continue;
+        }
         // Vergangen = gefahren, kuenftig = fest eingetragen (confirmed=1, damit
         // es nicht als unbeantworteter Vorschlag automatisch storniert wird).
         const vorbei = f.datum < heute || (f.datum === heute && inMinuten(f.von) + f.dauer <= inMinuten(jetztHM));
