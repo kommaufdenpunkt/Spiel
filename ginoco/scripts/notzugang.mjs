@@ -46,7 +46,7 @@ if (!existsSync(dbPfad)) {
   process.exit(1);
 }
 process.env.FSP_DB = dbPfad;
-const { setSettingRaw, hashPassword, genInstructorRecovery, getSettingRaw } = await import('../db.js');
+const { db, setSettingRaw, hashPassword, genInstructorRecovery, getSettingRaw } = await import('../db.js');
 
 // EIN Eingabekanal fuer das ganze Skript – ein zweiter wuerde stdin schliessen.
 const rl = createInterface({ input: process.stdin, output: process.stdout, terminal: !!process.stdin.isTTY });
@@ -92,16 +92,24 @@ function passwortProblem(pw) {
 const beenden = (code) => { rl.close(); process.exit(code); };
 
 const kb = Math.round(statSync(dbPfad).size / 1024);
-const hatKonto = !!getSettingRaw('instructor_pin');
+// Ein leeres db.js legt beim ersten Oeffnen selbst ein Standard-Passwort an –
+// "Passwort vorhanden" beweist also gar nichts. Echte Daten tun das:
+// eine benutzte Fahrschule hat Fahrschueler und Termine.
+const zahl = (t) => { try { return db.prepare(`SELECT COUNT(*) AS n FROM ${t}`).get().n; } catch { return 0; } };
+const schueler = zahl('students'), termine = zahl('bookings');
 console.log('\n🔐 ginoco – Notzugang: Fahrlehrer-Passwort neu setzen');
 console.log('   Datenbank: ' + dbPfad + `  (${kb} KB)`);
 console.log('   Ermittelt: ' + quelle);
-if (!hatKonto) {
-  console.error('\n❌ In dieser Datenbank gibt es noch gar kein Fahrlehrer-Passwort.');
-  console.error('   Das ist mit ziemlicher Sicherheit die falsche Datei – hier wird nichts geändert.\n');
+console.log(`   Inhalt:    ${schueler} Fahrschüler, ${termine} Termine`);
+if (!schueler && !termine) {
+  console.error('\n❌ Diese Datenbank ist leer – keine Fahrschüler, keine Termine.');
+  console.error('   Das ist fast sicher die falsche Datei (eine frisch angelegte legt sich still selbst an).');
+  console.error('   Hier wird nichts geändert.');
+  console.error('   Richtigen Pfad zeigen:  systemctl show ginoco -p Environment');
+  console.error('   Dann:  sudo -u ginoco env FSP_DB=/pfad/zur.db node ' + process.argv[1] + '\n');
   process.exit(1);
 }
-console.log('   Fahrlehrer-Konto gefunden ✓\n');
+console.log('   Sieht nach der echten Fahrschule aus ✓\n');
 
 const pw1 = await frageVerdeckt('Neues Passwort: ');
 const problem = passwortProblem(pw1.trim());

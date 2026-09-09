@@ -1,3 +1,9 @@
 # Python bytecode cache
 __pycache__/
 *.pyc
+
+# SQLite-Datenbanken: enthalten echte Fahrschueler-Daten und gehoeren
+# niemals ins Repository (auch nicht versehentlich per "git add -A").
+*.db
+*.db-wal
+*.db-shm
