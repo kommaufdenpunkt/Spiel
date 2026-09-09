@@ -369,6 +369,17 @@ for (const roh of LISTEN.split('\n')) {
 
 // --- Vergleichen ------------------------------------------------------------
 const args = process.argv.slice(2);
+// Unbekannte Schalter sofort melden. Sonst wuerde ein Tippfehler oder eine
+// alte Skript-Version den Zusatz als Namen lesen, niemanden finden und
+// treuherzig "alles sauber" melden, ohne irgendetwas getan zu haben.
+const ERLAUBT = new Set(['--nachtragen', '--korrigieren']);
+const unbekannt = args.filter((a) => a.startsWith('--') && !ERLAUBT.has(a));
+if (unbekannt.length) {
+  console.error(`\n❌ Unbekannt: ${unbekannt.join(' ')}`);
+  console.error('   Moeglich sind:  --nachtragen   --korrigieren   oder ein Name zum Filtern.');
+  console.error('   Ist das Skript auf dem neuesten Stand? Vorher "deploy" laufen lassen.\n');
+  process.exit(2);
+}
 const nachtragen = args.includes('--nachtragen');
 const korrigieren = args.includes('--korrigieren');
 const filter = (args.find((a) => !a.startsWith('--')) || '').toLowerCase();
@@ -381,8 +392,10 @@ let nachgetragen = 0, uebersprungen = 0, korrigiert = 0;
 const dmy = (iso) => iso.split('-').reverse().join('.');
 let problemeGesamt = 0;
 
+let geprueft = 0;
 for (const s of schueler) {
   if (filter && !s.name.toLowerCase().includes(filter)) continue;
+  geprueft++;
   const nach = s.name.split(',')[0].trim();
   const treffer = db.prepare('SELECT id,name FROM students WHERE name LIKE ?').all('%' + nach + '%');
   console.log('\n' + '='.repeat(66));
@@ -481,6 +494,11 @@ for (const s of schueler) {
   console.log('      Unterschrift steht aus: ' + gefahren.filter((b) => b.needs_sign === 1 && !b.signed_at).length);
 }
 console.log('\n' + '='.repeat(66));
+if (!geprueft) {
+  console.error(`❌ Kein Fahrschueler geprueft${filter ? ` – nichts passt zu "${filter}".` : '.'}`);
+  console.error('   Bekannt sind: ' + schueler.map((x) => x.name).join(' · ') + '\n');
+  process.exit(2);
+}
 if (nachtragen || korrigieren) {
   if (nachtragen) console.log(`Nachgetragen: ${nachgetragen} Fahrt(en)${uebersprungen ? `, uebersprungen (Ueberschneidung): ${uebersprungen}` : ''}.`);
   if (korrigieren) console.log(`Berichtigt: ${korrigiert} Fahrt(en).`);
