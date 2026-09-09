@@ -3,7 +3,10 @@
 // Abgleich: alte Software gegen ginoco-Datenbank. NUR LESEN – aendert nichts.
 //
 //   sudo -u ginoco node /home/ginoco/spiel/ginoco/scripts/pruefe-verlauf.mjs
-//   ... nur einen Schueler:  ... pruefe-verlauf.mjs Katscher
+//   ... nur einen Schueler:      ... pruefe-verlauf.mjs Katscher
+//   ... fehlende nachtragen:     ... pruefe-verlauf.mjs --nachtragen
+//   ... Abweichungen richten:    ... pruefe-verlauf.mjs --korrigieren
+//   (ohne diese Zusaetze wird NICHTS geaendert, es wird nur berichtet)
 //
 // Die Listen unten sind woertlich aus dem alten Programm kopiert – genau so,
 // wie sie dort untereinander stehen. Dadurch kann sich beim Uebertragen
@@ -332,7 +335,7 @@ Kl.B
 
 // --- Zerlegen ---------------------------------------------------------------
 const ARTEN = {
-  übungsfahrt: ['normal', 'Übungsfahrt'], prüfungsfahrt: ['normal', 'Prüfungsfahrt'],
+  übungsfahrt: ['normal', 'Übungsfahrt'], prüfungsfahrt: ['pruefung', 'Prüfungsfahrt'],
   nachtfahrt: ['nacht', 'Nachtfahrt'], autobahnfahrt: ['autobahn', 'Autobahnfahrt'],
   überlandfahrt: ['ueberland', 'Überlandfahrt'],
 };
@@ -365,7 +368,16 @@ for (const roh of LISTEN.split('\n')) {
 }
 
 // --- Vergleichen ------------------------------------------------------------
-const filter = (process.argv[2] || '').toLowerCase();
+const args = process.argv.slice(2);
+const nachtragen = args.includes('--nachtragen');
+const korrigieren = args.includes('--korrigieren');
+const filter = (args.find((a) => !a.startsWith('--')) || '').toLowerCase();
+// Kl.BA und Kl.B 197 sind Klasse B (mit Automatik-Ausbildung), keine eigenen Klassen.
+const klasseZuDB = (k) => (!k || /^BA$|^B197$|^B$/i.test(k)) ? 'B' : k.toUpperCase();
+const heute = new Date().toISOString().slice(0, 10);
+const jetztHM = new Date().toTimeString().slice(0, 5);
+const inMinuten = (t) => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
+let nachgetragen = 0, uebersprungen = 0, korrigiert = 0;
 const dmy = (iso) => iso.split('-').reverse().join('.');
 let problemeGesamt = 0;
 
@@ -408,9 +420,48 @@ for (const s of schueler) {
     console.log('\n   ✅ Datum, Uhrzeit, Dauer, Fahrlehrer und Fahrt-Art stimmen überein.');
   } else {
     problemeGesamt += fehlt.length + zuviel.length + abweichung.length;
-    if (fehlt.length) { console.log(`\n   ❌ FEHLEN in ginoco (${fehlt.length}):`); for (const f of fehlt) console.log('      ' + zeile(f)); }
+    if (fehlt.length) {
+      console.log(`\n   ❌ FEHLEN in ginoco (${fehlt.length}):`);
+      for (const f of fehlt) {
+        if (!nachtragen) { console.log('      ' + zeile(f)); continue; }
+        // Kollision pruefen: nichts anlegen, was eine bestehende Buchung ueberlappt.
+        const s0 = inMinuten(f.von), e0 = s0 + f.dauer;
+        const tag = db.prepare("SELECT id,start_time,duration_min,student_id FROM bookings WHERE date=? AND status!='cancelled'").all(f.datum);
+        const stoss = tag.find((o) => { const os = inMinuten(o.start_time); return s0 < os + o.duration_min && os < e0; });
+        if (stoss) { console.log('      ⚠️  ' + zeile(f) + `  -> uebersprungen, ueberlappt Termin #${stoss.id}`); uebersprungen++; continue; }
+        // Vergangen = gefahren, kuenftig = fest eingetragen (confirmed=1, damit
+        // es nicht als unbeantworteter Vorschlag automatisch storniert wird).
+        const vorbei = f.datum < heute || (f.datum === heute && inMinuten(f.von) + f.dauer <= inMinuten(jetztHM));
+        const status = vorbei ? 'done' : 'booked';
+        const info = db.prepare(
+          `INSERT INTO bookings(student_id,date,start_time,duration_min,status,confirmed,attended,lesson_type,
+             license_class,instructor_name,needs_sign,created_at)
+           VALUES(?,?,?,?,?,1,?,?,?,?,0,?)`
+        ).run(sid, f.datum, f.von, f.dauer, status, vorbei ? 1 : null, f.typ,
+          klasseZuDB(f.klasse), (/^Heidrich/i.test(f.lehrer) ? null : (f.lehrer || null)), new Date().toISOString());
+        console.log('      ✅ ' + zeile(f) + `  -> angelegt als #${info.lastInsertRowid} (${vorbei ? 'gefahren' : 'geplant'})`);
+        nachgetragen++;
+      }
+    }
     if (zuviel.length) { console.log(`\n   ⚠️  NUR in ginoco (${zuviel.length}):`); for (const b of zuviel) console.log(`      ${dmy(b.date)} ${b.start_time}  ${String(b.duration_min).padStart(3)} Min  ${b.instructor_name || 'du'}  [${b.status}]  #${b.id}`); }
-    if (abweichung.length) { console.log(`\n   🔎 ABWEICHUNGEN (${abweichung.length}):`); for (const a of abweichung) console.log(`      ${dmy(a.f.datum)} ${a.f.von}  #${a.b.id}\n         ${a.p.join('\n         ')}`); }
+    if (abweichung.length) {
+      console.log(`\n   🔎 ABWEICHUNGEN (${abweichung.length}):`);
+      for (const a of abweichung) {
+        console.log(`      ${dmy(a.f.datum)} ${a.f.von}  #${a.b.id}\n         ${a.p.join('\n         ')}`);
+        if (!korrigieren) continue;
+        // Die alte Software ist hier die massgebliche Quelle – ginoco wird
+        // daran angeglichen. Jede Aenderung landet im Protokoll.
+        const lehrerNeu = /^Heidrich/i.test(a.f.lehrer) ? null : (a.f.lehrer || null);
+        db.prepare('UPDATE bookings SET duration_min=?, instructor_name=?, lesson_type=? WHERE id=?')
+          .run(a.f.dauer, lehrerNeu, a.f.typ, a.b.id);
+        db.prepare(`INSERT INTO events(type,actor,student_id,student_name,booking_id,date,detail,seen,at)
+          VALUES('info','instructor',?,?,?,?,?,0,?)`)
+          .run(sid, treffer[0].name, a.b.id, a.f.datum,
+            `Abgleich mit dem alten Programm: ${a.p.join(' · ')} -> berichtigt`, new Date().toISOString());
+        console.log('         ✅ berichtigt');
+        korrigiert++;
+      }
+    }
   }
   if (klassen.length) {
     const zus = {};
@@ -430,4 +481,14 @@ for (const s of schueler) {
   console.log('      Unterschrift steht aus: ' + gefahren.filter((b) => b.needs_sign === 1 && !b.signed_at).length);
 }
 console.log('\n' + '='.repeat(66));
-console.log(problemeGesamt ? `Fertig – ${problemeGesamt} Punkt(e) zum Anschauen.\n` : 'Fertig – alles sauber.\n');
+if (nachtragen || korrigieren) {
+  if (nachtragen) console.log(`Nachgetragen: ${nachgetragen} Fahrt(en)${uebersprungen ? `, uebersprungen (Ueberschneidung): ${uebersprungen}` : ''}.`);
+  if (korrigieren) console.log(`Berichtigt: ${korrigiert} Fahrt(en).`);
+  console.log('Zum Pruefen einfach noch einmal ohne Zusatz laufen lassen.\n');
+} else {
+  console.log(problemeGesamt ? `Fertig – ${problemeGesamt} Punkt(e) zum Anschauen.` : 'Fertig – alles sauber.');
+  if (problemeGesamt) {
+    console.log('  Fehlende Fahrten eintragen:        ... pruefe-verlauf.mjs --nachtragen');
+    console.log('  Abweichungen richtigstellen:       ... pruefe-verlauf.mjs --korrigieren\n');
+  } else console.log('');
+}
