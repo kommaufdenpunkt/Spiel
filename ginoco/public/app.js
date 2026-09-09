@@ -7279,7 +7279,9 @@ function renderWeek(el, monday, ov) {
       const tIco = own ? '📌' : (TYPE_ICON[b.lesson_type] || '');
       const badge = b.status === 'done' ? ' ✓' : b.status === 'offered' ? ' 🔄' : '';
       // Fehlt nach einer gefahrenen Stunde noch die Unterschrift? -> ✍️
-      const needSign = !own && b.status === 'done' && !b.signed_at && b.attended !== 0;
+      // Maßgeblich ist needs_sign: bei importierten Altfahrten steht das auf 0,
+      // die sind längst auf Papier unterschrieben und sollen hier nicht leuchten.
+      const needSign = !own && b.status === 'done' && b.needs_sign === 1 && !b.signed_at && b.attended !== 0;
       // Vorschlag an den Fahrschueler, noch ohne Antwort -> ⏳ (verfaellt sonst
       // irgendwann still; so sieht man sofort, worauf noch gewartet wird).
       const wartet = !own && b.confirmed === 0 && b.status === 'booked';
@@ -7448,7 +7450,7 @@ function openQuickMenu(id) {
   const own = !b.student_id;
   const who = b.student_name || b.title || 'Eigener Termin';
   const end = addMinHHMM(b.start_time, b.duration_min);
-  const needSign = !own && b.status === 'done' && !b.signed_at && b.attended !== 0;
+  const needSign = !own && b.status === 'done' && b.needs_sign === 1 && !b.signed_at && b.attended !== 0;
   modal(`<div class="qm">
       <div class="qm-head ${own ? 'own' : ''}">
         <div class="qm-who">${own ? '📌 ' : '🚗 '}${esc(who)}</div>
@@ -7472,7 +7474,9 @@ function openQuickMenu(id) {
     if (q === 'done') {
       btn.disabled = true;
       try {
-        await api('/api/bookings/' + b.id, { method: 'PATCH', body: { status: 'done', attended: 1 } });
+        // request_sign: wie im großen Dialog – die Stunde wandert damit in die
+        // Unterschriften-Liste, sonst würde sie beim Abschließen still übergangen.
+        await api('/api/bookings/' + b.id, { method: 'PATCH', body: { status: 'done', attended: 1, request_sign: true } });
         closeModal(); toast('Als gefahren abgeschlossen ✓', 'ok'); loadK();
       } catch (e) { toast(e.message, 'err'); btn.disabled = false; }
       return;
@@ -7641,7 +7645,7 @@ function openStudentSignModal(b, opts) {
 // ---- Sammelmodus: alle fehlenden Unterschriften nacheinander ----
 function unsignedBookings() {
   return (window.__instrBookings || [])
-    .filter((b) => b.student_id && b.status === 'done' && !b.signed_at && b.attended !== 0)
+    .filter((b) => b.student_id && b.status === 'done' && b.needs_sign === 1 && !b.signed_at && b.attended !== 0)
     .sort((a, c) => (a.date + a.start_time).localeCompare(c.date + c.start_time));
 }
 function openSignBatch() {
