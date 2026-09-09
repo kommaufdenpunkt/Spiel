@@ -6,16 +6,47 @@
 // Notfall-Code zur Hand ist. Im Normalfall geht alles bequemer über
 // „Passwort vergessen" in der App.
 //
-// Aufruf auf dem Server:
-//   cd /home/ginoco/spiel
-//   DBP=$(systemctl show ginoco -p Environment --value | tr ' ' '\n' | sed -n 's/^FSP_DB=//p')
-//   sudo -u ginoco env FSP_DB="$DBP" node ginoco/scripts/notzugang.mjs
+// Aufruf auf dem Server – EINE Zeile, mehr nicht:
+//   sudo -u ginoco node /home/ginoco/spiel/ginoco/scripts/notzugang.mjs
+//
+// Den Datenbank-Pfad sucht sich das Skript selbst aus dem systemd-Dienst.
+// Mit FSP_DB=/pfad/zur.db davor lässt er sich auch vorgeben.
 //
 // Das Passwort wird verdeckt abgefragt und landet daher NICHT in der
 // Shell-History. Danach werden auf Wunsch gleich neue Notfall-Codes erzeugt.
 // ---------------------------------------------------------------------------
 import { createInterface } from 'node:readline/promises';
-import { setSettingRaw, hashPassword, genInstructorRecovery, getSettingRaw } from '../db.js';
+import { execFileSync } from 'node:child_process';
+import { existsSync, statSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join, resolve } from 'node:path';
+
+// Den Pfad zur echten Datenbank klaeren, BEVOR db.js geladen wird – db.js
+// liest FSP_DB beim Import. Vorher lief das Skript sonst still gegen eine
+// leere Datenbank neben db.js, und das Passwort aenderte sich nirgends.
+const hierher = dirname(fileURLToPath(import.meta.url));
+const standard = resolve(join(hierher, '..', 'fahrschule.db'));
+function ausDienst() {
+  try {
+    const roh = execFileSync('systemctl', ['show', 'ginoco', '-p', 'Environment', '--value'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+    const t = roh.split(/\s+/).find((x) => x.startsWith('FSP_DB='));
+    return t ? t.slice('FSP_DB='.length) : '';
+  } catch { return ''; }
+}
+const vomDienst = process.env.FSP_DB ? '' : ausDienst();
+const quelle = process.env.FSP_DB ? 'FSP_DB (von dir vorgegeben)'
+  : vomDienst ? 'aus dem systemd-Dienst ginoco' : 'Standardpfad neben db.js';
+let dbPfad = resolve(process.env.FSP_DB || vomDienst || standard);
+if (!existsSync(dbPfad)) {
+  console.error(`\n❌ Keine Datenbank unter: ${dbPfad}`);
+  console.error('   Das Skript legt hier bewusst nichts Neues an – sonst änderst du ein Passwort,');
+  console.error('   das der laufende Dienst gar nicht benutzt.');
+  console.error('   Richtigen Pfad herausfinden:  systemctl show ginoco -p Environment');
+  console.error('   und dann:  sudo -u ginoco env FSP_DB=/pfad/zur.db node ' + process.argv[1] + '\n');
+  process.exit(1);
+}
+process.env.FSP_DB = dbPfad;
+const { setSettingRaw, hashPassword, genInstructorRecovery, getSettingRaw } = await import('../db.js');
 
 // EIN Eingabekanal fuer das ganze Skript – ein zweiter wuerde stdin schliessen.
 const rl = createInterface({ input: process.stdin, output: process.stdout, terminal: !!process.stdin.isTTY });
@@ -60,9 +91,17 @@ function passwortProblem(pw) {
 
 const beenden = (code) => { rl.close(); process.exit(code); };
 
-const db_datei = process.env.FSP_DB || '(Standard neben db.js)';
+const kb = Math.round(statSync(dbPfad).size / 1024);
+const hatKonto = !!getSettingRaw('instructor_pin');
 console.log('\n🔐 ginoco – Notzugang: Fahrlehrer-Passwort neu setzen');
-console.log('   Datenbank: ' + db_datei + '\n');
+console.log('   Datenbank: ' + dbPfad + `  (${kb} KB)`);
+console.log('   Ermittelt: ' + quelle);
+if (!hatKonto) {
+  console.error('\n❌ In dieser Datenbank gibt es noch gar kein Fahrlehrer-Passwort.');
+  console.error('   Das ist mit ziemlicher Sicherheit die falsche Datei – hier wird nichts geändert.\n');
+  process.exit(1);
+}
+console.log('   Fahrlehrer-Konto gefunden ✓\n');
 
 const pw1 = await frageVerdeckt('Neues Passwort: ');
 const problem = passwortProblem(pw1.trim());

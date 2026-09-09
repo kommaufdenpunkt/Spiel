@@ -211,10 +211,13 @@ Wege — in dieser Reihenfolge:
 
    ```bash
    ssh root@<server>
-   cd /home/ginoco/spiel
-   DBP=$(systemctl show ginoco -p Environment --value | tr ' ' '\n' | sed -n 's/^FSP_DB=//p')
-   sudo -u ginoco env FSP_DB="$DBP" node ginoco/scripts/notzugang.mjs
+   sudo -u ginoco node /home/ginoco/spiel/ginoco/scripts/notzugang.mjs
    ```
+
+   Den Datenbank-Pfad sucht sich das Skript selbst aus dem systemd-Dienst und
+   zeigt ihn vor der Eingabe an. Findet es dort keine Datenbank oder kein
+   Fahrlehrer-Konto, bricht es ab, statt still an der falschen Datei zu
+   arbeiten.
 
    Danach mit dem neuen Passwort anmelden und gleich neue Notfall-Codes
    erzeugen.
