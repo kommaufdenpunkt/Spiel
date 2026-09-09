@@ -3457,6 +3457,7 @@ function renderMyLessons(bookings) {
       <td data-label="${t('ml_th_end')}">${noshow ? '—' : t('ml_until', { end: addMinHHMM(b.start_time, b.duration_min) })}</td>
       <td data-label="${t('ml_th_dur')}">${noshow ? t('ml_absent') : (b.duration_min + ' ' + t('min'))}</td>
       <td data-label="${t('ml_th_type')}">${noshow ? '' : typeBadge(b.lesson_type)}</td>
+      <td class="ml-ack" data-label="Stand">${ackChipHtml(b, { klein: true })}</td>
     </tr>`;
   }).join('');
   const banner = toSign.length
@@ -3481,7 +3482,7 @@ function renderMyLessons(bookings) {
       <button class="sm" id="ml-print" style="margin-left:auto" ${shown.length ? '' : 'disabled'}>${t('ml_print_btn')}</button>
     </div>
     <div class="ml-wrap"><table class="ml-table">
-      <thead><tr><th>${t('ml_th_when')}</th><th>${t('ml_th_fl')}</th><th>${t('ml_th_end')}</th><th>${t('ml_th_dur')}</th><th>${t('ml_th_type')}</th></tr></thead>
+      <thead><tr><th>${t('ml_th_when')}</th><th>${t('ml_th_fl')}</th><th>${t('ml_th_end')}</th><th>${t('ml_th_dur')}</th><th>${t('ml_th_type')}</th><th>Stand</th></tr></thead>
       <tbody>${rows || `<tr><td colspan="5" class="muted" style="text-align:center;padding:1rem">${t('ml_filter_none')}</td></tr>`}</tbody>
     </table></div>`;
   card.querySelectorAll('[data-cls]').forEach((btn) => btn.onclick = () => { state.mlClass = btn.dataset.cls; renderMyLessons(myBookingsCache); });
@@ -3527,14 +3528,59 @@ function openLessonDetail(b) {
     ${late ? row('⏱ ' + t('ml_dl_late'), t('ml_late', { late })) : ''}
     ${b.feedback ? row('📝 ' + t('ml_dl_note'), esc(b.feedback)) : ''}
     ${b.signed_at ? row('✍️ Unterschrift', signState) : (!noshow ? row('✍️ Unterschrift', '<span class="ld-open">○ noch nicht unterschrieben</span>') : '')}
+    ${noshow ? '' : `<div class="ld-ack">
+      <div class="ld-ack-h">So weit bist du mit dieser Fahrstunde</div>
+      ${ackChipHtml(b)}
+      ${b.objected_at ? `<div class="ld-obj">⚠️ Du hast widersprochen: „${esc(b.objection || '')}" – dein Fahrlehrer wurde benachrichtigt.</div>` : ''}
+      ${!b.agreed_at && !b.objected_at ? `<div class="ld-ack-ask">Stimmen Datum, Uhrzeit und Dauer so?</div>
+        <div class="ld-ack-btns">
+          <button class="sm" id="ld-agree">\u{1F7E2} Ja, stimmt so</button>
+          <button class="sm ghost" id="ld-object">⚠️ Nein, stimmt nicht</button>
+        </div>` : ''}
+    </div>`}
     <div class="ld-actions">
       ${(!noshow && !b.signed_at) ? `<button class="sm" id="ld-sign">✍️ Jetzt unterschreiben</button>` : ''}
       ${adkN ? `<button class="sm ghost" id="ld-adk">🗂️ ${t('ml_adk_card', { n: adkN })}</button>` : ''}
     </div>
     <div class="actions"><button onclick="window.__closeModal()">Schließen</button></div>
   </div>`);
+  // 🟠 „angesehen" setzt sich von selbst – dafür muss niemand tippen.
+  if (!noshow && b.status === 'done' && !b.seen_at) {
+    api('/api/my/bookings/' + b.id + '/seen', { method: 'POST' })
+      .then((r) => { b.seen_at = r.seen_at; }).catch(() => {});
+  }
+  const ag = $('#ld-agree');
+  if (ag) ag.onclick = async () => {
+    ag.disabled = true;
+    try { const r = await api('/api/my/bookings/' + b.id + '/agree', { method: 'POST' });
+      b.agreed_at = r.agreed_at; closeModal(); toast('Bestätigt \u{1F7E2}', 'ok'); syncStudent(); }
+    catch (e) { toast(e.message, 'err'); ag.disabled = false; }
+  };
+  const ob = $('#ld-object');
+  if (ob) ob.onclick = () => openObjectModal(b);
   const sg = $('#ld-sign'); if (sg) sg.onclick = () => openSignModal(b);
   const a = $('#ld-adk'); if (a) a.onclick = () => openLessonAdk(b, state.user?.name || 'Fahrschüler');
+}
+
+// Widerspruch: etwas an der eingetragenen Fahrstunde stimmt nicht. Das muss
+// VOR einer Unterschrift geklaert werden – deshalb ein eigener, klarer Weg.
+function openObjectModal(b) {
+  modal(`<h3>⚠️ Etwas stimmt nicht</h3>
+    <p class="hint">Sag kurz, was nicht passt – z. B. „Ich war nur bis 15:30 da" oder „Das war der 12., nicht der 13.".
+      Dein Fahrlehrer bekommt es sofort und kann es richtigstellen. Unterschreiben brauchst du erst danach.</p>
+    <div class="sign-lesson">\u{1F4C5} <strong>${fmtDT(b.date, b.start_time)}</strong> · ${b.duration_min} ${t('min')}</div>
+    <div class="field"><label>Was stimmt nicht?</label>
+      <textarea id="ob-grund" rows="3" placeholder="z. B. Die Stunde ging nur bis 15:30." style="resize:vertical"></textarea></div>
+    <div class="actions"><button class="sec" onclick="window.__closeModal()">Abbrechen</button><button id="ob-go">Absenden</button></div>`, 'sheet');
+  $('#ob-go').onclick = async () => {
+    const grund = $('#ob-grund').value.trim();
+    if (grund.length < 3) { toast('Bitte kurz beschreiben, was nicht stimmt.', 'err'); return; }
+    const btn = $('#ob-go'); btn.disabled = true;
+    try {
+      await api('/api/my/bookings/' + b.id + '/object', { method: 'POST', body: { grund } });
+      closeModal(); toast('Dein Fahrlehrer wurde benachrichtigt ⚠️', 'ok'); syncStudent();
+    } catch (e) { toast(e.message, 'err'); btn.disabled = false; }
+  };
 }
 
 // Unterschrift-Fenster: der Fahrschüler bestätigt & unterschreibt eine nachgetragene Fahrstunde.
@@ -3909,7 +3955,6 @@ function printLessonProof(name, done, adk, stats, cls) {
   const sMin = { ueberland: 0, autobahn: 0, nacht: 0 };
   driven.forEach((b) => { if (sMin[b.lesson_type] != null) sMin[b.lesson_type] += (b.duration_min || 0); });
   const sUE = (t) => Math.round(sMin[t] / 45);
-  const gearBadge = (g) => g === 'schalt' ? '<span class="gb gb-s">Schalt</span>' : g === 'automatik' ? '<span class="gb gb-a">Automatik</span>' : '<span class="wg">—</span>';
   const flDefault = state.settings?.instructor_name || 'Fahrlehrer';
   const rows = list.map((b, i) => {
     const noshow = b.attended === 0;
@@ -6680,6 +6725,7 @@ function openMarkModal(id) {
             <option value="ueberland" ${b.lesson_type === 'ueberland' ? 'selected' : ''}>🌄 Überland</option>
             <option value="autobahn" ${b.lesson_type === 'autobahn' ? 'selected' : ''}>🛣️ Autobahn</option>
             <option value="nacht" ${b.lesson_type === 'nacht' ? 'selected' : ''}>🌙 Nachtfahrt</option>
+            <option value="pruefung" ${b.lesson_type === 'pruefung' ? 'selected' : ''}>🎓 Prüfung</option>
           </select></div>
       </div>
       <div class="hint" id="m-hint"></div>
@@ -7214,9 +7260,10 @@ function setDayBlockBtn(blocked) {
 const WK_COLORS = ['#4d8dff', '#35c07d', '#b079f0', '#e6934d', '#e06b9a', '#3fb6c4', '#c9a13b', '#7c8cf0'];
 function studentColor(id) { return id ? WK_COLORS[id % WK_COLORS.length] : '#5a6b80'; }
 // Standardfarben je Fahrt-Art (Sonderfahrten + normale Stunde)
-const TYPE_COLORS = { ueberland: '#2f9e57', autobahn: '#2f6fd0', nacht: '#6d4bb0', normal: '#5b6b7d' };
-const TYPE_ICON = { ueberland: '🌄', autobahn: '🛣️', nacht: '🌙', normal: '🚗' };
-const TYPE_LABEL = { ueberland: 'Überland', autobahn: 'Autobahn', nacht: 'Nachtfahrt', normal: 'Normale Stunde' };
+// Prüfungsfahrt bewusst in knalligem Rot – die muss man im Kalender sofort sehen.
+const TYPE_COLORS = { ueberland: '#2f9e57', autobahn: '#2f6fd0', nacht: '#6d4bb0', pruefung: '#e01b24', normal: '#5b6b7d' };
+const TYPE_ICON = { ueberland: '🌄', autobahn: '🛣️', nacht: '🌙', pruefung: '🎓', normal: '🚗' };
+const TYPE_LABEL = { ueberland: 'Überland', autobahn: 'Autobahn', nacht: 'Nachtfahrt', pruefung: 'Prüfung', normal: 'Normale Stunde' };
 // Freundliche Farben je Fahrt-Art (heller Hintergrund + passende Schriftfarbe)
 // Übungsstunde hellblau · Überland hellgrün · Autobahn hellorange · Nachtfahrt weinrot
 const TYPE_TINT = {
@@ -7224,13 +7271,50 @@ const TYPE_TINT = {
   ueberland: { bg: '#ddf2e1', fg: '#1f6b39', bd: '#bfe2c8' },
   autobahn:  { bg: '#ffe7cf', fg: '#9c4a06', bd: '#f6cfa8' },
   nacht:     { bg: '#f2dbe1', fg: '#7a1f3d', bd: '#e3bcc7' },
+  pruefung:  { bg: '#ffd9da', fg: '#a80f16', bd: '#f2a8ab' },
 };
 function typeTint(type) { return TYPE_TINT[type] || TYPE_TINT.normal; }
+// Getriebe-Abzeichen. Stand frueher nur lokal im Nachweis-Ausdruck – dadurch
+// ist das Detail-Fenster des Fahrschuelers beim Oeffnen abgestuerzt.
+function gearBadge(g) {
+  return g === 'schalt' ? '<span class="gb gb-s">Schalt</span>'
+    : g === 'automatik' ? '<span class="gb gb-a">Automatik</span>'
+    : '<span class="wg">—</span>';
+}
 // Einheitliches, farbiges Abzeichen für die Fahrt-Art
 function typeBadge(type) {
   const t = TYPE_LABEL[type] ? type : 'normal';
   const c = typeTint(t);
   return `<span class="type-badge" style="background:${c.bg};color:${c.fg};border-color:${c.bd}">${TYPE_ICON[t]} ${TYPE_LABEL[t]}</span>`;
+}
+
+// ---- Bestaetigungs-Kette einer Fahrstunde ----
+// Vier Zustaende, jeder mit eigenem Zeitstempel im Protokoll:
+//   ❌ Fehlstunde  ·  🟠 angesehen  ·  🟢 bestaetigt  ·  ✍️ unterschrieben
+//   ⚠️ Widerspruch tritt an die Stelle von 🟢, wenn etwas nicht stimmt.
+function ackSteps(b) {
+  if (b.attended === 0) return [{ k: 'fehl', ic: '❌', txt: 'Fehlstunde', on: true, wann: null }];
+  return [
+    { k: 'seen',  ic: '\u{1F7E0}', txt: 'angesehen',     on: !!b.seen_at,   wann: b.seen_at },
+    b.objected_at
+      ? { k: 'obj', ic: '⚠️', txt: 'Widerspruch', on: true, wann: b.objected_at, warn: true, note: b.objection }
+      : { k: 'agree', ic: '\u{1F7E2}', txt: 'bestätigt', on: !!b.agreed_at, wann: b.agreed_at },
+    { k: 'sign',  ic: '✍️', txt: 'unterschrieben', on: !!b.signed_at, wann: b.signed_at },
+  ];
+}
+function ackChipHtml(b, { klein = false } = {}) {
+  const zeit = (w) => w ? new Date(w).toLocaleString(LOCALE, { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
+  return `<span class="ackrow${klein ? ' mini' : ''}">${ackSteps(b).map((st) =>
+    `<span class="ack ${st.k}${st.on ? ' on' : ''}${st.warn ? ' warn' : ''}" title="${st.txt}${st.wann ? ' – ' + zeit(st.wann) : ' – steht noch aus'}${st.note ? ': ' + esc(st.note) : ''}">${st.ic}</span>`).join('')}</span>`;
+}
+// Kurzer Klartext fuer Listen und den Ausdruck.
+function ackText(b) {
+  if (b.attended === 0) return '❌ Fehlstunde';
+  const t = [];
+  if (b.seen_at) t.push('\u{1F7E0} angesehen');
+  if (b.objected_at) t.push('⚠️ Widerspruch'); else if (b.agreed_at) t.push('\u{1F7E2} bestätigt');
+  if (b.signed_at) t.push('✍️ unterschrieben');
+  return t.length ? t.join(' · ') : '– noch nichts bestätigt';
 }
 
 function renderWeek(el, monday, ov) {
@@ -7285,11 +7369,12 @@ function renderWeek(el, monday, ov) {
       // Vorschlag an den Fahrschueler, noch ohne Antwort -> ⏳ (verfaellt sonst
       // irgendwann still; so sieht man sofort, worauf noch gewartet wird).
       const wartet = !own && b.confirmed === 0 && b.status === 'booked';
+      const pruef = b.lesson_type === 'pruefung';
       // Fahrlehrer: nur zeigen, wenn ein Kollege gefahren ist (leer = du selbst)
       const fl = (b.instructor_name || '').trim();
       const flLine = fl && h >= 44 ? `<div class="wk-fl">👨‍🏫 ${esc(fl)}</div>` : '';
       const end = addMinHHMM(b.start_time, b.duration_min);
-      inner += `<div class="wk-block${own ? ' own' : ''}${needSign ? ' needsign' : ''}${wartet ? ' wartet' : ''}" data-wk="${b.id}" style="top:${top}px;height:${h}px${own ? '' : ';background:' + col}"
+      inner += `<div class="wk-block${own ? ' own' : ''}${pruef ? ' pruef' : ''}${needSign ? ' needsign' : ''}${wartet ? ' wartet' : ''}" data-wk="${b.id}" style="top:${top}px;height:${h}px${own ? '' : ';background:' + col}"
         title="${b.start_time}–${end} · ${own ? 'Eigener Termin: ' : ''}${esc(who)}${fl ? ' · Fahrlehrer: ' + esc(fl) : ''}${b.status === 'done' ? ' · gefahren ✓' : ''}${needSign ? ' · Unterschrift fehlt' : ''}${wartet ? ' · Vorschlag – wartet auf Antwort' : ''}
 — lange drücken für das Schnellmenü">${needSign ? '<span class="wk-sign">✍️</span>' : ''}${wartet ? '<span class="wk-sign">⏳</span>' : ''}<div class="t">${b.start_time}${badge} ${tIco}${fl && h < 44 ? ' 👨‍🏫' : ''}</div>${esc(who)}${flLine}</div>`;
     }
@@ -7312,6 +7397,7 @@ function renderWeek(el, monday, ov) {
     <span class="legend-chip"><span class="sw" style="background:${TYPE_COLORS.ueberland}"></span>🌄 Überland</span>
     <span class="legend-chip"><span class="sw" style="background:${TYPE_COLORS.autobahn}"></span>🛣️ Autobahn</span>
     <span class="legend-chip"><span class="sw" style="background:${TYPE_COLORS.nacht}"></span>🌙 Nachtfahrt</span>
+    <span class="legend-chip"><span class="sw" style="background:${TYPE_COLORS.pruefung}"></span>🎓 Prüfung</span>
     <span class="legend-chip"><span class="sw" style="background:${TYPE_COLORS.normal}"></span>🚗 Normale Stunde</span>
   </div>`;
   el.querySelectorAll('[data-wk]').forEach((b) => {
@@ -7456,6 +7542,7 @@ function openQuickMenu(id) {
         <div class="qm-who">${own ? '📌 ' : '🚗 '}${esc(who)}</div>
         <div class="qm-when">${WD[isoDow(b.date) - 1]}, ${fmtShort(b.date)} · ${b.start_time}–${end} Uhr</div>
         ${own ? '<div class="qm-tag">Eigener Termin – keine Fahrstunde</div>' : ''}
+        ${!own && b.status === 'done' ? ackChipHtml(b, { klein: true }) : ''}
       </div>
       <div class="qm-grid">
         ${own || b.status === 'done' ? '' : '<button type="button" class="qm-btn" data-q="done"><span>✅</span>Abschließen</button>'}
@@ -7532,6 +7619,7 @@ async function openEditBooking(id) {
         <option value="ueberland" ${b.lesson_type === 'ueberland' ? 'selected' : ''}>\u{1F304} Überland</option>
         <option value="autobahn" ${b.lesson_type === 'autobahn' ? 'selected' : ''}>\u{1F6E3}\uFE0F Autobahn</option>
         <option value="nacht" ${b.lesson_type === 'nacht' ? 'selected' : ''}>\u{1F319} Nachtfahrt</option>
+        <option value="pruefung" ${b.lesson_type === 'pruefung' ? 'selected' : ''}>\u{1F393} Prüfung</option>
       </select></div>
     <div class="field"><label>Titel <span class="muted" style="font-weight:400">(bei eigenen Terminen)</span></label>
       <input id="eb-title" value="${esc(b.title || '')}" placeholder="z.B. Prüfung, Werkstatt"></div>

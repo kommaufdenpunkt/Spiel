@@ -235,6 +235,13 @@ db.exec(`CREATE TABLE IF NOT EXISTS messages (
 );`);
 db.exec('CREATE INDEX IF NOT EXISTS idx_messages_student ON messages(student_id, id)');
 ensureColumn('bookings', 'attended', 'attended INTEGER');            // 1 = da, 0 = nicht erschienen, NULL = offen
+// Kette der Bestaetigungen durch den Fahrschueler – jeder Schritt einzeln und
+// mit Zeitstempel, damit im Protokoll nachvollziehbar bleibt, wer wann was
+// zur Kenntnis genommen und bestaetigt hat.
+ensureColumn('bookings', 'seen_at', 'seen_at TEXT');                 // 🟠 Fahrstunde angesehen (automatisch beim Oeffnen)
+ensureColumn('bookings', 'agreed_at', 'agreed_at TEXT');             // 🟢 "stimmt so" bestaetigt
+ensureColumn('bookings', 'objected_at', 'objected_at TEXT');         // ⚠️ widersprochen
+ensureColumn('bookings', 'objection', 'objection TEXT');             // Begruendung des Widerspruchs
 ensureColumn('bookings', 'late_minutes', 'late_minutes INTEGER NOT NULL DEFAULT 0');
 ensureColumn('bookings', 'reason', 'reason TEXT');
 ensureColumn('bookings', 'reminded_1d', 'reminded_1d INTEGER NOT NULL DEFAULT 0');

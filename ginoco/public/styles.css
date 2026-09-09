@@ -2071,3 +2071,25 @@ header .brand .brandname{
 .ask-box .ck-line .muted{font-weight:500;color:var(--muted);font-size:.85rem;line-height:1.35}
 /* Löschen bewusst weg von der Daumenzone unten */
 .eb-del{display:block;width:100%;margin:.2rem 0 .4rem;color:var(--bad)}
+
+/* ---- Bestätigungs-Kette einer Fahrstunde (🟠 🟢 ✍️ / ❌ / ⚠️) ---- */
+.ackrow{display:inline-flex;gap:.25rem;align-items:center;flex-wrap:nowrap}
+.ack{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;
+  border-radius:99px;background:#161d27;border:1px solid var(--line);font-size:.86rem;
+  filter:grayscale(1);opacity:.38;transition:filter .15s ease,opacity .15s ease}
+.ack.on{filter:none;opacity:1;border-color:color-mix(in srgb,var(--good) 45%,transparent)}
+.ack.on.warn{border-color:color-mix(in srgb,#e6b23a 60%,transparent);background:rgba(230,178,58,.14)}
+.ack.fehl.on{border-color:color-mix(in srgb,var(--bad) 55%,transparent);background:var(--bad-bg)}
+.ackrow.mini .ack{width:20px;height:20px;font-size:.7rem}
+/* Im Schnellmenü etwas Luft nach oben */
+.qm-head .ackrow{margin-top:.5rem}
+/* Schüler: Kette im Detail-Fenster */
+.ld-ack{margin:.7rem 0 .2rem;padding:.7rem .8rem;border:1px solid var(--line);border-radius:12px;background:#141b25}
+.ld-ack-h{font-size:.78rem;color:var(--muted);font-weight:700;margin-bottom:.45rem}
+.ld-ack-ask{margin:.7rem 0 .5rem;font-weight:700}
+.ld-ack-btns{display:flex;gap:.5rem;flex-wrap:wrap}
+.ld-ack-btns button{flex:1 1 46%;min-height:46px}
+.ld-obj{margin-top:.55rem;padding:.5rem .6rem;border-radius:9px;font-size:.86rem;
+  background:rgba(230,178,58,.14);color:#f0d089;border:1px solid rgba(230,178,58,.32)}
+/* Prüfungsfahrt: knallrot, damit sie im Kalender sofort auffällt */
+.wk-block.pruef{box-shadow:inset 0 0 0 2px #ff5a5f,0 1px 3px rgba(0,0,0,.35)}

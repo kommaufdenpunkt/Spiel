@@ -1292,7 +1292,7 @@ async function handleApi(req, res, url) {
   if (p === '/api/my/bookings' && method === 'GET') {
     if (!requireStudent()) return bad(res, 'Bitte anmelden', 401);
     const rows = db.prepare(
-      `SELECT id,date,start_time,duration_min,status,gearbox,plate,note,started_at,ended_at,confirmed,feedback,lesson_type,license_class,late_minutes,attended,needs_sign,signed_at,signature,instr_signature,instr_signed_at,curriculum,invoice_date,invoice_time,instructor_name,reschedule_req,reschedule_note,created_at
+      `SELECT id,date,start_time,duration_min,status,gearbox,plate,note,started_at,ended_at,confirmed,feedback,lesson_type,license_class,late_minutes,attended,needs_sign,signed_at,signature,instr_signature,instr_signed_at,curriculum,invoice_date,invoice_time,instructor_name,reschedule_req,reschedule_note,seen_at,agreed_at,objected_at,objection,created_at
        FROM bookings WHERE student_id = ? AND status != 'cancelled' ORDER BY date, start_time`
     ).all(sess.student_id);
     return ok(res, { bookings: rows, weekInfo: weekInfoForStudent(sess.student_id),
@@ -1300,6 +1300,49 @@ async function handleApi(req, res, url) {
       progress: { ...studentRank(sess.student_id), sonder: sonderCounts(sess.student_id), req: sonderReq() } });
   }
   // Fahrschüler unterschreibt/bestätigt eine nachgetragene Fahrstunde.
+  // ---- Bestaetigungs-Kette des Fahrschuelers (jeder Schritt einzeln) ----
+  // 🟠 gesehen -> 🟢 stimmt so -> ✍️ unterschrieben.  Oder ⚠️ Widerspruch.
+  // Jeder Schritt bekommt einen Zeitstempel und einen Protokoll-Eintrag.
+  const kettenM = p.match(/^\/api\/my\/bookings\/(\d+)\/(seen|agree|object)$/);
+  if (kettenM && method === 'POST') {
+    if (!requireStudent()) return bad(res, 'Bitte anmelden', 401);
+    const id = Number(kettenM[1]), schritt = kettenM[2];
+    const bk = db.prepare('SELECT id,student_id,date,start_time,duration_min,status,seen_at,agreed_at,objected_at,signed_at FROM bookings WHERE id = ?').get(id);
+    if (!bk || bk.student_id !== sess.student_id) return bad(res, 'Fahrstunde nicht gefunden', 404);
+    if (bk.status !== 'done') return bad(res, 'Das geht erst, wenn die Fahrstunde abgeschlossen ist.');
+    const jetzt = new Date().toISOString();
+    const st = db.prepare('SELECT name FROM students WHERE id = ?').get(sess.student_id);
+    const wann = `${wdShort(bk.date)} ${dmy(bk.date)} ${bk.start_time} Uhr`;
+
+    if (schritt === 'seen') {
+      // Rein beobachtend: wird beim Oeffnen gesetzt, nur einmal, ohne Push.
+      if (bk.seen_at) return ok(res, { seen_at: bk.seen_at, neu: false });
+      db.prepare('UPDATE bookings SET seen_at=? WHERE id=?').run(jetzt, id);
+      logEvent('info', { actor: 'student', studentId: sess.student_id, bookingId: id, date: bk.date,
+        detail: `\u{1F7E0} Fahrstunde ${wann} angesehen${st ? ' von ' + st.name : ''}` });
+      return ok(res, { seen_at: jetzt, neu: true });
+    }
+
+    if (schritt === 'agree') {
+      if (bk.agreed_at) return ok(res, { agreed_at: bk.agreed_at, neu: false });
+      db.prepare('UPDATE bookings SET agreed_at=?, seen_at=COALESCE(seen_at,?), objected_at=NULL, objection=NULL WHERE id=?').run(jetzt, jetzt, id);
+      logEvent('info', { actor: 'student', studentId: sess.student_id, bookingId: id, date: bk.date,
+        detail: `\u{1F7E2} Fahrstunde ${wann} als richtig bestaetigt${st ? ' von ' + st.name : ''}` });
+      return ok(res, { agreed_at: jetzt, neu: true });
+    }
+
+    // Widerspruch: der Fahrschueler sagt, etwas stimmt nicht. Der Fahrlehrer
+    // erfaehrt es sofort – das muss VOR einer Unterschrift geklaert werden.
+    const b = await readBody(req);
+    const grund = String(b.grund || b.reason || '').trim().slice(0, 500);
+    if (grund.length < 3) return bad(res, 'Bitte schreib kurz, was nicht stimmt.');
+    db.prepare('UPDATE bookings SET objected_at=?, objection=?, agreed_at=NULL, seen_at=COALESCE(seen_at,?) WHERE id=?').run(jetzt, grund, jetzt, id);
+    logEvent('reschedule', { actor: 'student', studentId: sess.student_id, bookingId: id, date: bk.date,
+      detail: `\u{26A0}\u{FE0F} Widerspruch zur Fahrstunde ${wann}${st ? ' von ' + st.name : ''}: ${grund}` });
+    pushToInstructor(`\u{26A0}\u{FE0F} ${st?.name || 'Ein Fahrschueler'} widerspricht der Fahrstunde ${wann}: ${grund}`, '/');
+    return ok(res, { objected_at: jetzt, objection: grund });
+  }
+
   const signM = p.match(/^\/api\/my\/bookings\/(\d+)\/sign$/);
   if (signM && method === 'POST') {
     if (!requireStudent()) return bad(res, 'Bitte anmelden', 401);
@@ -1308,8 +1351,12 @@ async function handleApi(req, res, url) {
     if (!bk || bk.student_id !== sess.student_id) return bad(res, 'Fahrstunde nicht gefunden', 404);
     const b = await readBody(req);
     const sig = (typeof b.signature === 'string' && validPhoto(b.signature)) ? b.signature : null;
-    db.prepare('UPDATE bookings SET signed_at = ?, signature = ?, needs_sign = 0 WHERE id = ?')
-      .run(new Date().toISOString(), sig, id);
+    // Wer unterschreibt, ist damit auch einverstanden – die Kette wird also
+    // vervollstaendigt, statt den Fahrschueler zweimal dasselbe tippen zu lassen.
+    const jetztSig = new Date().toISOString();
+    db.prepare(`UPDATE bookings SET signed_at = ?, signature = ?, needs_sign = 0,
+      seen_at = COALESCE(seen_at, ?), agreed_at = COALESCE(agreed_at, ?) WHERE id = ?`)
+      .run(jetztSig, sig, jetztSig, jetztSig, id);
     // zugehörige „bitte unterschreiben"-Benachrichtigung als gelesen markieren
     db.prepare("UPDATE notifications SET read = 1 WHERE student_id = ? AND kind = 'sign' AND ref_booking_id = ?").run(sess.student_id, id);
     const st = db.prepare('SELECT name FROM students WHERE id = ?').get(sess.student_id);
@@ -1484,7 +1531,7 @@ async function handleApi(req, res, url) {
     if (!db.prepare('SELECT 1 FROM students WHERE id=?').get(sid)) return bad(res, 'Fahrschüler nicht gefunden');
     const dur = Math.max(1, Number(b.duration_min) || getSettings().lesson_min);
     const late = Math.max(0, Number(b.late_minutes) || 0);
-    const type = ['ueberland', 'autobahn', 'nacht'].includes(b.lesson_type) ? b.lesson_type : 'normal';
+    const type = ['ueberland', 'autobahn', 'nacht', 'pruefung'].includes(b.lesson_type) ? b.lesson_type : 'normal';
     const attended = (b.attended === false || b.attended === 0 || b.attended === '0') ? 0 : 1;
     const gear = ['schalt', 'automatik'].includes(b.gearbox) ? b.gearbox : null;
     const vermerk = b.feedback ? String(b.feedback).trim() : null;
@@ -1543,8 +1590,10 @@ async function handleApi(req, res, url) {
     const b = await readBody(req);
     const sig = (typeof b.signature === 'string' && validPhoto(b.signature)) ? b.signature : null;
     if (!sig) return bad(res, 'Bitte unterschreiben');
-    db.prepare('UPDATE bookings SET signed_at = ?, signature = ?, needs_sign = 0 WHERE id = ?')
-      .run(new Date().toISOString(), sig, id);
+    const jetztDS = new Date().toISOString();
+    db.prepare(`UPDATE bookings SET signed_at = ?, signature = ?, needs_sign = 0,
+      seen_at = COALESCE(seen_at, ?), agreed_at = COALESCE(agreed_at, ?) WHERE id = ?`)
+      .run(jetztDS, sig, jetztDS, jetztDS, id);
     db.prepare("UPDATE notifications SET read = 1 WHERE student_id = ? AND kind = 'sign' AND ref_booking_id = ?").run(bk.student_id, id);
     const st = db.prepare('SELECT name FROM students WHERE id = ?').get(bk.student_id);
     logEvent('info', { actor: 'student', studentId: bk.student_id, bookingId: id, date: bk.date,
@@ -1654,7 +1703,7 @@ async function handleApi(req, res, url) {
       if ('reason' in b) { fields.push('reason=?'); vals.push(b.reason ? String(b.reason).trim() : null); }
       if ('feedback' in b) { fields.push('feedback=?'); vals.push(b.feedback ? String(b.feedback).trim() : null); }
       if ('instructor_name' in b) { fields.push('instructor_name=?'); vals.push(b.instructor_name ? String(b.instructor_name).trim().slice(0, 80) : null); }
-      if ('lesson_type' in b) { fields.push('lesson_type=?'); vals.push(['ueberland', 'autobahn', 'nacht', 'normal'].includes(b.lesson_type) ? b.lesson_type : null); }
+      if ('lesson_type' in b) { fields.push('lesson_type=?'); vals.push(['ueberland', 'autobahn', 'nacht', 'pruefung', 'normal'].includes(b.lesson_type) ? b.lesson_type : null); }
       if ('meet_label' in b) { fields.push('meet_label=?'); vals.push(b.meet_label ? String(b.meet_label).trim() : null); }
       if ('meet_lat' in b) { fields.push('meet_lat=?'); vals.push(b.meet_lat == null || b.meet_lat === '' ? null : Number(b.meet_lat)); }
       if ('meet_lng' in b) { fields.push('meet_lng=?'); vals.push(b.meet_lng == null || b.meet_lng === '' ? null : Number(b.meet_lng)); }
@@ -3037,7 +3086,7 @@ async function handleApi(req, res, url) {
     const st = db.prepare('SELECT name FROM students WHERE id=?').get(sid);
     if (!st) return bad(res, 'Schüler nicht gefunden', 404);
     const lessons = db.prepare(
-      `SELECT id,date,start_time,duration_min,status,gearbox,plate,lesson_type,license_class,late_minutes,attended,feedback,needs_sign,signed_at,signature,instr_signature,instr_signed_at,curriculum,invoice_date,invoice_time,instructor_name,created_at
+      `SELECT id,date,start_time,duration_min,status,gearbox,plate,lesson_type,license_class,late_minutes,attended,feedback,needs_sign,signed_at,signature,instr_signature,instr_signed_at,curriculum,invoice_date,invoice_time,instructor_name,seen_at,agreed_at,objected_at,objection,created_at
        FROM bookings WHERE student_id=? AND status='done' ORDER BY date,start_time`).all(sid);
     return ok(res, { lessons, name: st.name, stats: lessonStats(sid), adk: adkSummary(sid) });
   }
@@ -3836,7 +3885,8 @@ function parseRosterLesson(line) {
     // Führerschein-Klasse: „A1", „B", auch „Kl.A1" / „KlasseA1"
     const cm = lw.replace(/^(kl\.?|klasse)/, '');
     if (!cls && CLASSES[cm]) { cls = CLASSES[cm]; continue; }
-    if (/^(prüfungsfahrt|pruefungsfahrt|prüfung|pruefung)$/.test(lw)) { note.push('Prüfungsfahrt'); continue; }
+    // Pruefungsfahrt ist eine eigene Fahrt-Art (im Kalender knallrot), keine Notiz.
+    if (/^(prüfungsfahrt|pruefungsfahrt|prüfung|pruefung)$/.test(lw)) { art = 'pruefung'; continue; }
     // Rechnungsdatum (optional): ein Feld, das ein Datum enthält – z. B. „05.09.2026 06:00"
     // oder „Rechnung 05.09.2026". Steuert, wann die Fahrt AUF DER RECHNUNG erscheint.
     if (!invDate) {
