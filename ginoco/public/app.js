@@ -2913,9 +2913,11 @@ function renderAuthSection() {
   const box = $('#e-auth-body'); if (!box) return;
   const enabled = !!state.settings?.totp_enabled;
   const twofa = !!state.settings?.two_factor;
+  const halbfertig = !!state.settings?.totp_pending;   // gescannt, nie bestaetigt
   if (!enabled) {
-    box.innerHTML = `<p class="hint">Richte einen Authenticator ein (z.&nbsp;B. Google/Microsoft Authenticator). Damit kannst du dein Passwort selbst zurücksetzen („Passwort vergessen") und optional bei jeder Anmeldung einen Code verlangen. Unabhängig davon kannst du dir unten <strong>Notfall-Codes</strong> erzeugen.</p>
-      <button class="sm" id="au-setup">🔐 Authenticator einrichten</button>`;
+    box.innerHTML = `${halbfertig ? '<div class="warnbox" style="margin-bottom:.6rem">\u26A0\uFE0F Du hast einen Authenticator <strong>gescannt, aber nie bestätigt</strong>. Deine App zeigt zwar Codes an – sie gelten hier nicht. Richte ihn einmal komplett ein und gib zum Schluss den 6-stelligen Code ein.</div>' : ''}
+      <p class="hint">Richte einen Authenticator ein (z.&nbsp;B. Google/Microsoft Authenticator). Damit kannst du dein Passwort selbst zurücksetzen („Passwort vergessen") und optional bei jeder Anmeldung einen Code verlangen. Unabhängig davon kannst du dir unten <strong>Notfall-Codes</strong> erzeugen.</p>
+      <button class="sm" id="au-setup">🔐 Authenticator ${halbfertig ? 'jetzt fertig einrichten' : 'einrichten'}</button>`;
     $('#au-setup').onclick = openTotpSetup;
   } else {
     box.innerHTML = `<p class="hint" style="color:var(--good)">✓ Authenticator ist eingerichtet – „Passwort vergessen" läuft darüber.</p>

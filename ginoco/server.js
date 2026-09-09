@@ -737,8 +737,18 @@ async function handleApi(req, res, url) {
     if (loginBlocked(req)) return bad(res, 'Zu viele Versuche. Bitte in ein paar Minuten erneut.', 429);
     const b = await readBody(req);
     const totp = getSettingRaw('instructor_totp');
-    if (!totp) return bad(res, 'Hier ist kein Authenticator hinterlegt. Hast du Notfall-Codes? Dann gib stattdessen einen davon ein. '
-      + 'Sonst hilft nur das Neusetzen direkt auf dem Server (README, Abschnitt „Passwort vergessen") – und danach bitte gleich Notfall-Codes anlegen.', 400);
+    if (!totp) {
+      // Haeufige Falle: QR gescannt, aber die Einrichtung nie mit einem Code
+      // bestaetigt. Dann rechnet die App schon, der Server kennt den
+      // Authenticator aber nicht. Das sagen wir ausdruecklich.
+      const pending = getSettingRaw('instructor_totp_pending');
+      if (pending) return bad(res, 'Du hast einen Authenticator gescannt, die Einrichtung aber nie mit einem Code bestaetigt – '
+        + 'deshalb zaehlt er nicht, auch wenn deine App Codes anzeigt. Melde dich mit deinem Passwort an und schliesse die Einrichtung ab '
+        + '(Einstellungen -> Zugang & Kontakt). Kommst du nicht mehr rein: Notfall-Code eingeben, sonst das Neusetzen auf dem Server '
+        + '(README, Abschnitt „Passwort vergessen").', 400);
+      return bad(res, 'Hier ist kein Authenticator hinterlegt. Hast du Notfall-Codes? Dann gib stattdessen einen davon ein. '
+        + 'Sonst hilft nur das Neusetzen direkt auf dem Server (README, Abschnitt „Passwort vergessen") – und danach bitte gleich Notfall-Codes anlegen.', 400);
+    }
     if (!totpVerify(totp, b.code)) { noteLoginFail(req); return bad(res, 'Authenticator-Code stimmt nicht. Uhrzeit am Handy automatisch stellen lassen.', 401); }
     const np = String(b.new_password || '');
     const prob = passwordProblem(np);

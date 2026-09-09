@@ -497,6 +497,8 @@ export function getSettings() {
   delete out.instructor_pin; // niemals nach aussen geben
   // Authenticator-Geheimnis & Wiederherstellungs-Hashes nie ausliefern – nur Status.
   out.totp_enabled = !!out.instructor_totp;
+  // Gescannt, aber nie bestaetigt -> zaehlt nicht. Nur den Status ausliefern.
+  out.totp_pending = !out.instructor_totp && !!out.instructor_totp_pending;
   out.two_factor = out.instructor_2fa === '1';
   // Passkeys: nur den Status (an/aus) ausliefern, nie die gespeicherten Schlüssel.
   let pkCount = 0; try { pkCount = (JSON.parse(out.instructor_passkeys || '[]') || []).length; } catch {}
