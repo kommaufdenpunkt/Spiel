@@ -388,6 +388,19 @@ const klasseZuDB = (k) => (!k || /^BA$|^B197$|^B$/i.test(k)) ? 'B' : k.toUpperCa
 const heute = new Date().toISOString().slice(0, 10);
 const jetztHM = new Date().toTimeString().slice(0, 5);
 const inMinuten = (t) => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
+const bisUhr = (t, d) => { const m = inMinuten(t) + d; return String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0'); };
+// Liegt zur selben Zeit schon ein Termin? Dann kann die Fahrt nicht angelegt
+// werden – und im Bericht soll stehen, WER da liegt.
+function findeStoss(f) {
+  const s0 = inMinuten(f.von), e0 = s0 + f.dauer;
+  return db.prepare(
+    `SELECT b.id,b.start_time,b.duration_min,b.status,b.title,s.name AS schueler
+     FROM bookings b LEFT JOIN students s ON s.id=b.student_id
+     WHERE b.date=? AND b.status!='cancelled'`).all(f.datum)
+    .find((o) => { const os = inMinuten(o.start_time); return s0 < os + o.duration_min && os < e0; });
+}
+const stossText = (o) => `im Weg: #${o.id} ${o.start_time}-${bisUhr(o.start_time, o.duration_min)} `
+  + `${o.schueler || o.title || 'Eigener Termin'} [${o.status}]`;
 let nachgetragen = 0, uebersprungen = 0, korrigiert = 0;
 const dmy = (iso) => iso.split('-').reverse().join('.');
 let problemeGesamt = 0;
@@ -435,19 +448,17 @@ for (const s of schueler) {
     if (fehlt.length) {
       console.log(`\n   ❌ FEHLEN in ginoco (${fehlt.length}):`);
       for (const f of fehlt) {
-        if (!nachtragen) { console.log('      ' + zeile(f)); continue; }
+        if (!nachtragen) {
+          console.log('      ' + zeile(f));
+          const st = findeStoss(f);
+          if (st) console.log('          ⚠️  ' + stossText(st) + '  – deshalb nicht anlegbar');
+          continue;
+        }
         // Kollision pruefen: nichts anlegen, was eine bestehende Buchung ueberlappt.
-        const s0 = inMinuten(f.von), e0 = s0 + f.dauer;
-        const tag = db.prepare(
-          `SELECT b.id,b.start_time,b.duration_min,b.status,b.lesson_type,b.title,s.name AS schueler
-           FROM bookings b LEFT JOIN students s ON s.id=b.student_id
-           WHERE b.date=? AND b.status!='cancelled'`).all(f.datum);
-        const stoss = tag.find((o) => { const os = inMinuten(o.start_time); return s0 < os + o.duration_min && os < e0; });
+        const stoss = findeStoss(f);
         if (stoss) {
-          const bis = (t, d) => { const m = inMinuten(t) + d; return String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0'); };
           console.log('      ⚠️  ' + zeile(f) + '  -> uebersprungen');
-          console.log(`          im Weg: #${stoss.id} ${stoss.start_time}-${bis(stoss.start_time, stoss.duration_min)} `
-            + `${stoss.schueler || stoss.title || 'Eigener Termin'} [${stoss.status}]`);
+          console.log('          ' + stossText(stoss));
           uebersprungen++; continue;
         }
         // Vergangen = gefahren, kuenftig = fest eingetragen (confirmed=1, damit
