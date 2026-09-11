@@ -2359,14 +2359,14 @@ function zeigePartnerWoche(sicht, terminProTag) {
   if (!sicht) { box.innerHTML = ''; return; }
   const heute = todayStr();
   const tage = [];
-  for (let i = 0; i < 10; i++) {
+  for (let i = 0; i < 14; i++) {
     const d = addDays(heute, i);
     const liste = (terminProTag[d] || []).slice().sort((a, b) => a.start_time.localeCompare(b.start_time));
     const sft = state._pmShifts[d];
     if (!liste.length && !sft) continue;
     tage.push({ d, liste, sft });
   }
-  box.innerHTML = `<h2>\u{1F4C5} Die nächsten Tage</h2>
+  box.innerHTML = `<h2>\u{1F4C5} Die nächsten zwei Wochen</h2>
     <p class="hint">Links deine Schicht, rechts was bei ${esc(sicht.instructor_name || 'ihm')} ansteht.
       ${sicht.sees_names ? '' : 'Namen werden nicht angezeigt.'}</p>
     ${tage.length ? tage.map(({ d, liste, sft }) => {
@@ -2374,9 +2374,11 @@ function zeigePartnerWoche(sicht, terminProTag) {
       return `<div class="pm-row">
         <div class="pm-row-d"><strong>${WD[isoDow(d) - 1]}</strong> ${fmtShort(d)}
           ${art ? `<span class="pm-tag" style="background:${art.farbe}22;color:${art.farbe}">${art.ic} ${art.txt}</span>` : ''}</div>
-        <div class="pm-row-t">${liste.length
+        <div class="pm-row-t">${sft && sft.kind === 'frei'
+          ? '<span class="pm-frei">\u{1F3E0} er hält sich frei</span>'
+          : ''}${sft && sft.fenster ? `<span class="pm-win">\u{1F551} er fährt ${sft.fenster.von}–${sft.fenster.bis}</span>` : ''}${liste.length
           ? liste.map((t) => `<span class="pm-term">${t.start_time}–${addMinHHMM(t.start_time, t.duration_min)} ${esc(t.wer)}</span>`).join('')
-          : '<span class="muted">nichts eingetragen</span>'}</div>
+          : (sft && sft.kind === 'frei' ? '' : '<span class="muted">nichts eingetragen</span>')}</div>
       </div>`;
     }).join('') : '<p class="muted">Für die nächsten Tage ist nichts eingetragen.</p>'}`;
 }
@@ -3108,11 +3110,19 @@ function renderPartnerSection() {
     <div class="field"><label>Angezeigter Name</label><input id="pa-name" value="${esc(s.partner_name || '')}" placeholder="z.B. Sandra"></div>
     <div class="field"><label>${gesetzt ? 'Neues Passwort (leer = unverändert)' : 'Passwort setzen'}</label>
       <input id="pa-pw" type="password" autocomplete="new-password" placeholder="mind. 8 Zeichen, mit Zahl &amp; Sonderzeichen"></div>
-    <div class="row">
-      <div class="field"><label>Frühdienst</label><input id="pa-frueh" value="${esc(s.shift_frueh || '06:00-14:30')}"></div>
-      <div class="field"><label>Spätdienst</label><input id="pa-spaet" value="${esc(s.shift_spaet || '13:00-21:00')}"></div>
-      <div class="field"><label>Nachtdienst</label><input id="pa-nacht" value="${esc(s.shift_nacht || '21:00-06:30')}"></div>
+    <div class="pa-tab">
+      <div class="pa-th">Schicht</div><div class="pa-th">Ihre Zeit</div><div class="pa-th">Mein Arbeitsfenster</div>
+      ${[['frueh', '\u{1F305} Früh', s.shift_frueh || '06:00-14:30', '08:00-14:00'],
+         ['spaet', '\u{1F307} Spät', s.shift_spaet || '13:00-21:00', '10:00-19:00'],
+         ['nacht', '\u{1F319} Nacht', s.shift_nacht || '21:00-06:30', '09:00-17:00']].map(([k, lbl, zeit, tip]) =>
+        `<div class="pa-tr">${lbl}</div>
+         <div class="pa-tr"><input id="pa-${k}" value="${esc(zeit)}"></div>
+         <div class="pa-tr"><input id="pa-win-${k}" value="${esc(s['shiftwin_' + k] || '')}" placeholder="${tip}"></div>`).join('')}
     </div>
+    <div class="hint" style="margin:.1rem 0 .6rem">Links, wann <strong>sie</strong> arbeitet – rechts, wann <strong>du</strong> an so einem Tag
+      fahren willst (Beginn – spätester Start). Leer lassen = an dem Tag nichts verändern.<br>
+      Beispiel: sie Frühdienst bis 14:30 → du <code>08:00-14:00</code>, dann seid ihr nachmittags zusammen.
+      Sie Spätdienst → du <code>10:00-19:00</code>, da ist sie ohnehin weg.</div>
     <label class="ck-line" style="justify-content:flex-start"><input type="checkbox" id="pa-auto" ${s.partner_autofrei !== '0' ? 'checked' : ''}> \u{1F3E0} Ihre freien Tage halten meinen Tag automatisch frei</label>
     <label class="ck-line" style="justify-content:flex-start"><input type="checkbox" id="pa-namen" ${s.partner_sees_names !== '0' ? 'checked' : ''}> Sie darf die Namen der Fahrschüler sehen</label>
     <label class="ck-line" style="justify-content:flex-start"><input type="checkbox" id="pa-an" ${an ? 'checked' : ''}> Zugang aktiv</label>
@@ -3128,8 +3138,12 @@ function renderPartnerSection() {
         name: $('#pa-name').value, enabled: $('#pa-an').checked,
         autofrei: $('#pa-auto').checked, sees_names: $('#pa-namen').checked,
         frueh: $('#pa-frueh').value, spaet: $('#pa-spaet').value, nacht: $('#pa-nacht').value,
+        win_frueh: $('#pa-win-frueh').value, win_spaet: $('#pa-win-spaet').value, win_nacht: $('#pa-win-nacht').value,
+        nachziehen: true,
         ...($('#pa-pw').value ? { password: $('#pa-pw').value } : {}) } });
-      state.settings = r.settings; toast('Gespeichert ✓', 'ok'); renderPartnerSection();
+      state.settings = r.settings;
+      toast(r.nachgezogen ? `Gespeichert ✓ – auf ${r.nachgezogen} Tag(e) angewendet` : 'Gespeichert ✓', 'ok');
+      renderPartnerSection();
     } catch (e) { toast(e.message, 'err'); btn.disabled = false; }
   };
   const weg = $('#pa-weg');
@@ -7626,7 +7640,7 @@ function renderWeek(el, monday, ov) {
         : (ovd ? (ovd.type === 'vacation' ? '🌴 Urlaub' : ovd.closed ? '🏖️ frei' : `✂️ kurz bis ${ovd.last_start || ''}`) : '');
       const zeigeSchicht = sArt && !durchPartner;
       const dtCls = ovd ? (ovd.type === 'vacation' ? 'dt-vac' : ovd.closed ? 'dt-free' : 'dt-short') : '';
-      return `<div class="wk-head ${d === today ? 'today' : ''}">${WD[isoDow(d) - 1]}<span class="sub">${fmtShort(d)}</span>${tag ? `<span class="daytag ${dtCls}">${tag}</span>` : ''}${zeigeSchicht ? `<span class="wk-shift" style="background:${sArt.farbe}22;color:${sArt.farbe}" title="${esc(state.settings?.partner_name || 'Partner')}: ${sArt.txt}${sft.von ? ' ' + sft.von + '–' + sft.bis : ''}">${sArt.ic} ${sArt.txt}</span>` : ''}</div>`;
+      return `<div class="wk-head ${d === today ? 'today' : ''}">${WD[isoDow(d) - 1]}<span class="sub">${fmtShort(d)}</span>${tag ? `<span class="daytag ${dtCls}">${tag}</span>` : ''}${zeigeSchicht ? `<span class="wk-shift" style="background:${sArt.farbe}22;color:${sArt.farbe}" title="${esc(state.settings?.partner_name || 'Partner')}: ${sArt.txt}${sft.von ? ' ' + sft.von + '–' + sft.bis : ''}${sft.fenster ? ' → du fährst ' + sft.fenster.von + '–' + sft.fenster.bis : ''}">${sArt.ic} ${sArt.txt}</span>${sft.fenster ? `<span class="wk-win">\u{1F551} ${sft.fenster.von}–${sft.fenster.bis}</span>` : ''}` : ''}</div>`;
     }).join('')}
     <div class="wk-times">${hourLabels.join('')}</div>
     ${days.map(dayCol).join('')}
@@ -9800,7 +9814,9 @@ function tabEinstellungen() {
       <div class="field"><label>Deine Handynummer (Schüler können anrufen/schreiben)</label><input id="e-phone" value="${esc(s.instructor_phone || '')}" placeholder="z.B. 0151 23456789"></div>
       <div class="field"><label>Neues Fahrlehrer-Passwort (leer = unverändert)</label><input id="e-pin" type="password" autocomplete="new-password" placeholder="mind. 8 Zeichen, mit Zahl & Sonderzeichen"></div>
       <div class="sec-auth" id="e-auth"><div class="sec-auth-h">🔐 Authenticator (2-Faktor & „Passwort vergessen")</div>
-        <div id="e-auth-body"><span class="hint">Lädt…</span></div></div>`)}
+        <div id="e-auth-body"><span class="hint">Lädt…</span></div></div>
+      <div class="sec-auth" id="e-partner"><div class="sec-auth-h">🏠 Dienstplan-Zugang <span class="muted" style="font-weight:400">(Partnerin/Partner)</span></div>
+        <div id="e-partner-body"><span class="hint">Lädt…</span></div></div>`)}
 
     <div class="actions" style="justify-content:flex-start"><button id="e-save">💾 Alles speichern</button><span id="e-msg" class="muted"></span></div>
   </div>`;

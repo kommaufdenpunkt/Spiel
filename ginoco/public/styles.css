@@ -2130,3 +2130,20 @@ header .brand .brandname{
 .wkbal-v{margin-top:.5rem;display:flex;flex-wrap:wrap;gap:.35rem;align-items:center;font-size:.84rem}
 .wkbal-t{background:#141b25;border:1px solid var(--line);border-radius:8px;padding:.15rem .45rem;
   font-variant-numeric:tabular-nums}
+
+/* Schicht → mein Arbeitsfenster (Einstellungen) */
+.pa-tab{display:grid;grid-template-columns:auto 1fr 1fr;gap:.4rem .6rem;align-items:center;margin:.4rem 0}
+.pa-th{font-size:.74rem;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.03em}
+.pa-tr{display:flex;align-items:center;font-size:.88rem;font-weight:600}
+.pa-tr input{width:100%;font-variant-numeric:tabular-nums}
+@media (max-width:560px){
+  .pa-tab{grid-template-columns:1fr 1fr}
+  .pa-th:first-child{grid-column:1/-1}
+  .pa-tr:first-of-type{grid-column:1/-1}
+}
+.wk-win{display:block;font-size:.6rem;font-weight:700;color:var(--muted);margin-top:.1rem;
+  font-variant-numeric:tabular-nums}
+.pm-frei{background:rgba(53,192,125,.14);color:#35c07d;border:1px solid rgba(53,192,125,.3);
+  border-radius:8px;padding:.15rem .45rem;font-size:.8rem;font-weight:700}
+.pm-win{background:rgba(77,141,255,.12);color:#8fb4ff;border:1px solid rgba(77,141,255,.28);
+  border-radius:8px;padding:.15rem .45rem;font-size:.8rem;font-weight:700;font-variant-numeric:tabular-nums}

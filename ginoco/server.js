@@ -2293,25 +2293,50 @@ async function handleApi(req, res, url) {
   // Aus "sie hat frei" einen freien Tag beim Fahrlehrer machen – und wieder
   // zuruecknehmen, wenn sich die Schicht aendert. Angefasst wird nur, was die
   // Automatik selbst angelegt hat (erkennbar an der Notiz).
+  // Die Automatik traegt sich mit dieser Notiz ein. Nur was so markiert ist,
+  // wird spaeter auch wieder angefasst – eigene Sperren bleiben unberuehrt.
   const AUTO_NOTIZ = 'Partner hat frei';
-  function freiAbgleichen(datum, kind) {
+  const AUTO_FENSTER = 'nach Dienstplan';
+  // Welches Arbeitsfenster gehoert zu welcher Schicht? Leer = nichts aendern.
+  // Form "08:00-14:00": Beginn und spaetester Start des Fahrlehrer-Tages.
+  function fensterFuer(kind) {
+    const roh = getSettingRaw('shiftwin_' + kind) || '';
+    const m = roh.match(/^(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})$/);
+    return m ? { von: m[1], bis: m[2] } : null;
+  }
+  function tagAbgleichen(datum, kind) {
     if (getSettingRaw('partner_autofrei') !== '1') return { geaendert: false };
     const vorhanden = db.prepare('SELECT * FROM day_overrides WHERE date=?').get(datum);
+    const fremd = vorhanden && vorhanden.note !== AUTO_NOTIZ && vorhanden.note !== AUTO_FENSTER;
+    // Hat der Fahrlehrer den Tag selbst eingestellt, mischt sich die Automatik nicht ein.
+    if (fremd) return { geaendert: false, fremd: true };
+    const jetzt = new Date().toISOString();
+
     if (kind === 'frei') {
-      if (vorhanden && vorhanden.closed === 1) return { geaendert: false };
-      if (vorhanden && vorhanden.note !== AUTO_NOTIZ) return { geaendert: false, fremd: true };
       db.prepare(`INSERT INTO day_overrides(date,start_time,last_start,closed,note,created_at)
-        VALUES(?,NULL,NULL,1,?,?) ON CONFLICT(date) DO UPDATE SET closed=1, note=excluded.note`)
-        .run(datum, AUTO_NOTIZ, new Date().toISOString());
+        VALUES(?,NULL,NULL,1,?,?) ON CONFLICT(date) DO UPDATE SET
+        start_time=NULL, last_start=NULL, closed=1, note=excluded.note`).run(datum, AUTO_NOTIZ, jetzt);
       // Schon vereinbarte Fahrstunden bleiben bestehen – gesperrt wird nur fuer NEUE
       // Buchungen. Was an dem Tag steht, muss der Fahrlehrer selbst entscheiden.
       const offen = db.prepare("SELECT COUNT(*) AS n FROM bookings WHERE date=? AND status='booked'").get(datum).n;
       return { geaendert: true, gesperrt: true, offeneTermine: offen };
     }
-    if (vorhanden && vorhanden.note === AUTO_NOTIZ) {
-      db.prepare('DELETE FROM day_overrides WHERE date=?').run(datum);
-      return { geaendert: true, gesperrt: false };
+
+    const f = fensterFuer(kind);
+    if (f) {
+      db.prepare(`INSERT INTO day_overrides(date,start_time,last_start,closed,note,created_at)
+        VALUES(?,?,?,0,?,?) ON CONFLICT(date) DO UPDATE SET
+        start_time=excluded.start_time, last_start=excluded.last_start, closed=0, note=excluded.note`)
+        .run(datum, f.von, f.bis, AUTO_FENSTER, jetzt);
+      // Liegt etwas ausserhalb des neuen Fensters? Abgesagt wird nichts, aber
+      // der Fahrlehrer soll es wissen.
+      const drausen = db.prepare(
+        "SELECT start_time,duration_min FROM bookings WHERE date=? AND status!='cancelled'").all(datum)
+        .filter((b) => toMin(b.start_time) < toMin(f.von) || toMin(b.start_time) > toMin(f.bis)).length;
+      return { geaendert: true, fenster: f, ausserhalb: drausen };
     }
+
+    if (vorhanden) { db.prepare('DELETE FROM day_overrides WHERE date=?').run(datum); return { geaendert: true, gesperrt: false }; }
     return { geaendert: false };
   }
 
@@ -2320,7 +2345,7 @@ async function handleApi(req, res, url) {
     const von = url.searchParams.get('from') || todayStr();
     const bis = url.searchParams.get('to') || addDays(von, 41);
     const rows = db.prepare('SELECT * FROM partner_shifts WHERE date BETWEEN ? AND ? ORDER BY date').all(von, bis);
-    return ok(res, { from: von, to: bis, shifts: rows.map((r) => ({ ...r, label: SCHICHTEN[r.kind] || r.kind, ...schichtZeiten(r.kind, r) })) });
+    return ok(res, { from: von, to: bis, shifts: rows.map((r) => ({ ...r, label: SCHICHTEN[r.kind] || r.kind, ...schichtZeiten(r.kind, r), fenster: fensterFuer(r.kind) })) });
   }
 
   if (p === '/api/partner/shifts' && method === 'POST') {
@@ -2333,7 +2358,7 @@ async function handleApi(req, res, url) {
 
     if (kind === 'loeschen' || kind === '') {
       db.prepare('DELETE FROM partner_shifts WHERE date=?').run(datum);
-      const f = freiAbgleichen(datum, '');
+      const f = tagAbgleichen(datum, '');
       logEvent('info', { actor: 'system', date: datum, detail: `Dienstplan ${wer}: Eintrag am ${dmy(datum)} entfernt` });
       return ok(res, { removed: true, tag: f });
     }
@@ -2345,7 +2370,7 @@ async function handleApi(req, res, url) {
       kind=excluded.kind, start_time=excluded.start_time, end_time=excluded.end_time,
       note=excluded.note, updated_at=excluded.updated_at`)
       .run(datum, kind, eigenVon, eigenBis, b.note ? String(b.note).trim().slice(0, 200) : null, new Date().toISOString());
-    const f = freiAbgleichen(datum, kind);
+    const f = tagAbgleichen(datum, kind);
     logEvent('info', { actor: 'system', date: datum,
       detail: `Dienstplan ${wer}: ${dmy(datum)} → ${SCHICHTEN[kind]}${f.gesperrt ? ' – Tag automatisch freigehalten' : ''}` });
     // Der Fahrlehrer soll es mitbekommen, wenn dadurch ein Arbeitstag wegfaellt.
@@ -2353,6 +2378,9 @@ async function handleApi(req, res, url) {
       pushToInstructor(f.offeneTermine
         ? `🏠 ${wer} hat am ${wdShort(datum)} ${dmy(datum)} frei – der Tag ist jetzt freigehalten. Achtung: ${f.offeneTermine} Termin(e) stehen noch.`
         : `🏠 ${wer} hat am ${wdShort(datum)} ${dmy(datum)} frei – der Tag ist jetzt freigehalten.`, '/');
+    } else if (f.fenster) {
+      pushToInstructor(`\u{1F551} ${wer}: ${SCHICHTEN[kind]} am ${wdShort(datum)} ${dmy(datum)} – deine Zeit steht jetzt auf ${f.fenster.von}–${f.fenster.bis}`
+        + (f.ausserhalb ? ` (${f.ausserhalb} Termin(e) liegen außerhalb).` : '.'), '/');
     }
     return ok(res, { saved: true, tag: f });
   }
@@ -2392,6 +2420,14 @@ async function handleApi(req, res, url) {
       if (feld in b && /^\d{1,2}:\d{2}\s*-\s*\d{1,2}:\d{2}$/.test(String(b[feld] || '')))
         setSettingRaw(k, String(b[feld]).replace(/\s/g, ''));
     }
+    // Mein Arbeitsfenster je Schicht – leer heisst "an dem Tag nichts aendern".
+    for (const feld of ['frueh', 'spaet', 'nacht', 'sonst']) {
+      const key = 'win_' + feld;
+      if (!(key in b)) continue;
+      const wert = String(b[key] || '').replace(/\s/g, '');
+      if (wert === '') { setSettingRaw('shiftwin_' + feld, ''); continue; }
+      if (/^\d{1,2}:\d{2}-\d{1,2}:\d{2}$/.test(wert)) setSettingRaw('shiftwin_' + feld, wert);
+    }
     if (b.password) {
       const prob = passwordProblem(String(b.password));
       if (prob) return bad(res, 'Das Passwort braucht ' + prob + '.');
@@ -2403,7 +2439,15 @@ async function handleApi(req, res, url) {
       db.prepare("DELETE FROM sessions WHERE kind='partner'").run();
       logEvent('info', { actor: 'instructor', detail: 'Partner-Zugang entfernt' });
     }
-    return ok(res, { settings: getSettings() });
+    // Geaenderte Fenster auf Wunsch gleich auf alle kuenftigen Tage anwenden –
+    // sonst wirkten sie erst, wenn sie den jeweiligen Tag noch einmal antippt.
+    let nachgezogen = 0;
+    if (b.nachziehen) {
+      for (const r of db.prepare('SELECT date,kind FROM partner_shifts WHERE date >= ? ORDER BY date').all(todayStr()))
+        if (tagAbgleichen(r.date, r.kind).geaendert) nachgezogen++;
+      logEvent('info', { actor: 'instructor', detail: `Arbeitszeiten nach Dienstplan auf ${nachgezogen} Tag(e) angewendet` });
+    }
+    return ok(res, { settings: getSettings(), nachgezogen });
   }
 
   if (p === '/api/instructor/week-balance' && method === 'GET') {
