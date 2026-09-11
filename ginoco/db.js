@@ -9,6 +9,8 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const DB_PATH = process.env.FSP_DB || join(__dirname, 'fahrschule.db');
 
 export const db = new DatabaseSync(DB_PATH);
+// Wo die Datenbank liegt – daneben legen wir den Medienordner an.
+export const dbPath = DB_PATH;
 
 db.exec(`
   PRAGMA journal_mode = WAL;
@@ -341,6 +343,40 @@ ensureColumn('learnpoints', 'resolved_at', 'resolved_at TEXT');
 ensureColumn('learnpoints', 'place', 'place TEXT');
 // Kategorie/Thema (z. B. vorfahrt, einparken, autobahn) – zum Filtern/Farbe im Fehlerbuch.
 ensureColumn('learnpoints', 'category', 'category TEXT');
+// ---- Übungshistorie: wann wurde wo welche Aufgabe geübt? ----
+// Der Nachweis gegen „das haben wir nie geübt": Aufgabe + Ort + Datum +
+// Stand, auf Wunsch mit Bild oder kurzem Video.
+db.exec(`CREATE TABLE IF NOT EXISTS practice_log (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  student_id INTEGER NOT NULL,
+  booking_id INTEGER,
+  date       TEXT NOT NULL,          -- YYYY-MM-DD (Übungstag)
+  time       TEXT,                   -- HH:MM
+  task       TEXT NOT NULL,          -- z. B. „Einparken längs rückwärts"
+  task_key   TEXT,                   -- Verknüpfung zur Ausbildungskarte, z. B. grundfahr:4
+  district   TEXT,                   -- Ortsteil: Westend, Nordend, Finow …
+  street     TEXT,
+  lat        REAL,
+  lng        REAL,
+  status     TEXT,                   -- geuebt | ok | mehr
+  note       TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT
+);`);
+db.exec('CREATE INDEX IF NOT EXISTS idx_practice_student ON practice_log(student_id, date)');
+// Bilder/Videos liegen als DATEI neben der Datenbank – sonst waere die
+// Datenbank (und jedes Backup davon) nach ein paar Videos riesig.
+db.exec(`CREATE TABLE IF NOT EXISTS practice_media (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  log_id     INTEGER NOT NULL,
+  kind       TEXT NOT NULL,          -- foto | video
+  file       TEXT NOT NULL,          -- Dateiname im Medienordner
+  mime       TEXT,
+  bytes      INTEGER,
+  created_at TEXT NOT NULL
+);`);
+db.exec('CREATE INDEX IF NOT EXISTS idx_practice_media_log ON practice_media(log_id)');
+
 db.exec(`CREATE TABLE IF NOT EXISTS learnpoint_photos (
   id         INTEGER PRIMARY KEY AUTOINCREMENT,
   point_id   INTEGER NOT NULL,

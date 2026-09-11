@@ -120,7 +120,7 @@ const I18N = {
     help_news: 'Was ist neu?', help_news_sub: 'Die neuesten Verbesserungen',
     tip_live_stop: 'Standort-Teilen beenden', live_stop: '🛰️ Live · Stopp',
     nav_grp_overview: 'Übersicht', nav_grp_more: 'Mehr',
-    nav_week: 'Meine Woche', nav_book: 'Termin buchen', nav_lessons: 'Meine Fahrstunden',
+    nav_week: 'Meine Woche', nav_book: 'Termin buchen', nav_lessons: 'Meine Fahrstunden', nav_practice: 'Geübte Aufgaben',
     nav_messages: 'Nachrichten', nav_notif: 'Mitteilungen', nav_offers: 'Angebote', nav_review: 'Bewertung',
     menu: 'Menü', actions: 'Aktionen', menu_open: 'Menü öffnen', menu_close: 'Menü schließen',
     ml_title: '📖 Meine Fahrstunden',
@@ -334,7 +334,7 @@ const I18N = {
     help_news: 'What’s new?', help_news_sub: 'The latest improvements',
     tip_live_stop: 'Stop sharing location', live_stop: '🛰️ Live · Stop',
     nav_grp_overview: 'Overview', nav_grp_more: 'More',
-    nav_week: 'My week', nav_book: 'Book a lesson', nav_lessons: 'My lessons',
+    nav_week: 'My week', nav_book: 'Book a lesson', nav_lessons: 'My lessons', nav_practice: 'Practised tasks',
     nav_messages: 'Messages', nav_notif: 'Notifications', nav_offers: 'Offers', nav_review: 'Review',
     menu: 'Menu', actions: 'Actions', menu_open: 'Open menu', menu_close: 'Close menu',
     ml_title: '📖 My lessons',
@@ -547,7 +547,7 @@ const I18N = {
     help_news: 'Yenilikler', help_news_sub: 'En son iyileştirmeler',
     tip_live_stop: 'Konum paylaşımını durdur', live_stop: '🛰️ Canlı · Durdur',
     nav_grp_overview: 'Genel bakış', nav_grp_more: 'Daha fazla',
-    nav_week: 'Haftam', nav_book: 'Randevu al', nav_lessons: 'Derslerim',
+    nav_week: 'Haftam', nav_book: 'Randevu al', nav_lessons: 'Derslerim', nav_practice: 'Çalışılan görevler',
     nav_messages: 'Mesajlar', nav_notif: 'Bildirimler', nav_offers: 'Teklifler', nav_review: 'Değerlendirme',
     menu: 'Menü', actions: 'İşlemler', menu_open: 'Menüyü aç', menu_close: 'Menüyü kapat',
     ml_title: '📖 Derslerim',
@@ -760,7 +760,7 @@ const I18N = {
     help_news: 'ما الجديد؟', help_news_sub: 'أحدث التحسينات',
     tip_live_stop: 'إيقاف مشاركة الموقع', live_stop: '🛰️ مباشر · إيقاف',
     nav_grp_overview: 'نظرة عامة', nav_grp_more: 'المزيد',
-    nav_week: 'أسبوعي', nav_book: 'حجز موعد', nav_lessons: 'دروسي',
+    nav_week: 'أسبوعي', nav_book: 'حجز موعد', nav_lessons: 'دروسي', nav_practice: 'المهام المتدرَّب عليها',
     nav_messages: 'الرسائل', nav_notif: 'الإشعارات', nav_offers: 'العروض', nav_review: 'التقييم',
     menu: 'القائمة', actions: 'الإجراءات', menu_open: 'فتح القائمة', menu_close: 'إغلاق القائمة',
     ml_title: '📖 دروسي',
@@ -973,7 +973,7 @@ const I18N = {
     help_news: 'چه خبر؟', help_news_sub: 'تازه‌ترین بهبودها',
     tip_live_stop: 'توقف اشتراک موقعیت', live_stop: '🛰️ زنده · توقف',
     nav_grp_overview: 'نمای کلی', nav_grp_more: 'بیشتر',
-    nav_week: 'هفتهٔ من', nav_book: 'رزرو نوبت', nav_lessons: 'جلسات من',
+    nav_week: 'هفتهٔ من', nav_book: 'رزرو نوبت', nav_lessons: 'جلسات من', nav_practice: 'تمرین‌های انجام‌شده',
     nav_messages: 'پیام‌ها', nav_notif: 'اعلان‌ها', nav_offers: 'پیشنهادها', nav_review: 'نظر',
     menu: 'منو', actions: 'اقدامات', menu_open: 'باز کردن منو', menu_close: 'بستن منو',
     ml_title: '📖 جلسات من',
@@ -2140,6 +2140,10 @@ async function geocodeAddressParts(lat, lng) {
       house_no: a.house_number || '',
       zip: a.postcode || '',
       city: a.city || a.town || a.village || a.suburb || a.municipality || '',
+      // Ortsteil/Stadtteil – für die Übungshistorie (Westend, Finow …).
+      suburb: a.suburb || '',
+      quarter: a.quarter || a.neighbourhood || '',
+      city_district: a.city_district || a.borough || '',
     };
   } catch { return null; }
 }
@@ -2467,6 +2471,7 @@ const STUDENT_NAV = [
   ['__group', 'nav_grp_overview'],
   ['week-card', '📅', 'nav_week'], ['slots', '🚗', 'nav_book'],
   ['lessons-card', '📖', 'nav_lessons'],
+  ['practice-card', '📍', 'nav_practice'],
   ['__group', 'nav_grp_more'],
   ['messages-card', '✉️', 'nav_messages'],
   ['notif-card', '🔔', 'nav_notif'], ['offers-card', '🎁', 'nav_offers'],
@@ -3098,6 +3103,349 @@ function renderAuthSection() {
   renderPasskeySection();
 }
 
+// ====================== Übungshistorie ======================
+// Der Nachweis gegen „das haben wir nie geübt": Aufgabe + Ort + Datum +
+// Stand, auf Wunsch mit Bild oder kurzem Video.
+// Die Ortsteile sind Vorschläge zum Antippen – tippen kann man alles.
+const ORTSTEILE = ['Westend', 'Nordend', 'Ostend', 'Südend', 'Stadtmitte', 'Brandenburgisches Viertel',
+  'Finow', 'Messingwerk', 'Kupferhammer', 'Heegermühle', 'Eisenspalterei', 'Clara-Zetkin-Siedlung',
+  'Sommerfelde', 'Tornow', 'Lichterfelde', 'Spechthausen'];
+// Die fünf Grundfahraufgaben der Klasse B – die stehen oben, weil genau
+// darum in der Prüfung gestritten wird. Darunter alles aus der Ausbildungskarte.
+const GRUNDAUFGABEN = [
+  ['Rückwärtsfahren um eine Ecke', 'grundfahr:0'],
+  ['Umkehren (Wenden)', 'grundfahr:1'],
+  ['Gefahrbremsung', 'grundfahr:2'],
+  ['Einparken längs (rückwärts)', 'grundfahr:4'],
+  ['Einparken quer (rückwärts)', 'grundfahr:6'],
+];
+const UB_STAND = {
+  geuebt: { ic: '\u{1F7E1}', txt: 'geübt', farbe: '#e6b23a' },
+  ok:     { ic: '\u{1F7E2}', txt: 'sitzt', farbe: '#35c07d' },
+  mehr:   { ic: '\u{1F534}', txt: 'muss noch', farbe: '#ff6b6b' },
+};
+
+async function openUebungshistorie(sid, name) {
+  modal(`<h3>\u{1F4CD} Übungshistorie <span class="sub">${esc(name)}</span></h3>
+    <p class="hint">Wann habt ihr wo welche Aufgabe geübt? Mit Ort, Datum und auf Wunsch Bild oder
+      kurzem Video – damit später niemand sagen kann, das sei nie dran gewesen.</p>
+    <div class="inline" style="margin-bottom:.7rem">
+      <button class="sm" id="ub-neu">\u{1F4CD} Übung festhalten</button>
+      <button class="ghost sm" id="ub-druck">\u{1F5A8}\uFE0F Drucken</button>
+    </div>
+    <div id="ub-filter"></div>
+    <div id="ub-liste">${gLoad('Lädt…')}</div>
+    <div class="actions"><button onclick="window.__closeModal()">Schließen</button></div>`, 'wide');
+  $('#ub-neu').onclick = () => openUebungNeu(sid, name);
+  $('#ub-druck').onclick = () => druckeUebungshistorie(sid, name);
+  ladeUebungen(sid, name);
+}
+
+async function ladeUebungen(sid, name) {
+  let liste = [];
+  try { liste = (await api(`/api/students/${sid}/practice`)).entries || []; }
+  catch (e) { const b = $('#ub-liste'); if (b) b.innerHTML = `<p class="hint" style="color:var(--bad)">${esc(e.message)}</p>`; return; }
+  state._ub = liste; state._ubName = name;
+  malUebungen(sid);
+}
+
+function malUebungen(sid) {
+  const box = $('#ub-liste'); if (!box) return;
+  const alle = state._ub || [];
+  const f = state._ubFilter || '';
+  const liste = f ? alle.filter((e) => (e.task || '') === f) : alle;
+
+  // Filterleiste: welche Aufgaben kommen vor, und wie oft?
+  const zaehl = {};
+  for (const e of alle) zaehl[e.task] = (zaehl[e.task] || 0) + 1;
+  const fb = $('#ub-filter');
+  if (fb) fb.innerHTML = Object.keys(zaehl).length > 1
+    ? `<div class="ub-filters"><button class="ub-fl${f ? '' : ' on'}" data-ubf="">Alle (${alle.length})</button>${
+      Object.entries(zaehl).sort((a, b) => b[1] - a[1]).map(([k, n]) =>
+        `<button class="ub-fl${f === k ? ' on' : ''}" data-ubf="${esc(k)}">${esc(k)} (${n})</button>`).join('')}</div>`
+    : '';
+  if (fb) fb.querySelectorAll('[data-ubf]').forEach((b) => b.onclick = () => { state._ubFilter = b.dataset.ubf; malUebungen(sid); });
+
+  if (!liste.length) {
+    box.innerHTML = `<p class="muted">${alle.length ? 'Nichts zu diesem Filter.' : 'Noch nichts festgehalten. Tipp auf „Übung festhalten", direkt nach der Fahrstunde.'}</p>`;
+    return;
+  }
+  // Nach Tag gruppieren – wie ein Tagebuch.
+  const tage = {};
+  for (const e of liste) (tage[e.date] ||= []).push(e);
+  box.innerHTML = Object.keys(tage).sort().reverse().map((d) => `<div class="ub-day">
+      <div class="ub-day-h">${WD[isoDow(d) - 1]}, ${fmtShort(d)}</div>
+      ${tage[d].map((e) => {
+        const st = UB_STAND[e.status] || UB_STAND.geuebt;
+        const wo = [e.street, e.district].filter(Boolean).join(', ');
+        return `<div class="ub-e" data-ube="${e.id}">
+          <div class="ub-e-top">
+            <span class="ub-task">${esc(e.task)}</span>
+            <span class="ub-stand" style="background:${st.farbe}22;color:${st.farbe}">${st.ic} ${st.txt}</span>
+          </div>
+          ${wo ? `<div class="ub-wo">\u{1F4CD} ${esc(wo)}${e.time ? ` · ${e.time} Uhr` : ''}</div>` : (e.time ? `<div class="ub-wo">\u{1F550} ${e.time} Uhr</div>` : '')}
+          ${e.note ? `<div class="ub-note">${esc(e.note)}</div>` : ''}
+          ${e.medien && e.medien.length ? `<div class="ub-med">${e.medien.map((m) => m.kind === 'video'
+            ? `<video class="ub-v" src="/api/practice/media/${m.id}" controls preload="metadata" playsinline></video>`
+            : `<img class="ub-i" src="/api/practice/media/${m.id}" alt="Foto zur Übung" loading="lazy">`).join('')}</div>` : ''}
+          <div class="ub-e-act">
+            <button class="linklike" data-ubstatus="${e.id}">Stand ändern</button>
+            <button class="linklike" data-ubmedia="${e.id}">\u{1F4F7} Bild/Video</button>
+            <button class="linklike" data-ubdel="${e.id}" style="color:var(--bad)">Löschen</button>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>`).join('');
+
+  box.querySelectorAll('[data-ubdel]').forEach((b) => b.onclick = async () => {
+    if (!confirm('Diesen Eintrag samt Bildern löschen?')) return;
+    try { await api('/api/practice/' + b.dataset.ubdel, { method: 'DELETE' }); toast('Gelöscht', 'ok'); ladeUebungen(sid, state._ubName); }
+    catch (e) { toast(e.message, 'err'); }
+  });
+  box.querySelectorAll('[data-ubstatus]').forEach((b) => b.onclick = () => openUebungStand(b.dataset.ubstatus, sid));
+  box.querySelectorAll('[data-ubmedia]').forEach((b) => b.onclick = () => openUebungMedien(b.dataset.ubmedia, sid));
+}
+
+// Eigene Karte in der Schüler-Ansicht – sonst käme er nur über die
+// Fahrstunden-Liste dran, und die ist ausgeblendet, solange er noch keine
+// gefahrene Stunde hat.
+async function renderPracticeCard() {
+  const card = $('#practice-card'); if (!card) return;
+  let liste = [];
+  try { liste = (await api('/api/my/practice')).entries || []; } catch { return; }
+  if (!liste.length) { card.classList.add('hidden'); return; }
+  card.classList.remove('hidden');
+  const letzte = liste[0];
+  const offen = liste.filter((e) => e.status === 'mehr').length;
+  card.innerHTML = `<h2>\u{1F4CD} Geübte Aufgaben <span class="sub">${liste.length}</span></h2>
+    <p class="hint">Was ihr wann und wo geübt habt – mit Bildern, falls welche aufgenommen wurden.</p>
+    <div class="pc-last">Zuletzt: <strong>${esc(letzte.task)}</strong>
+      ${letzte.street || letzte.district ? `· ${esc([letzte.street, letzte.district].filter(Boolean).join(', '))}` : ''}
+      · ${fmtShort(letzte.date)}</div>
+    ${offen ? `<div class="pc-open">\u{1F534} ${offen} Aufgabe${offen === 1 ? '' : 'n'} müsst ihr noch üben</div>` : ''}
+    <button class="sm" id="pc-open">Alles ansehen</button>`;
+  $('#pc-open').onclick = () => openMeineUebungen();
+}
+
+// Der Fahrschüler sieht seine eigene Übungshistorie – nur lesen.
+async function openMeineUebungen() {
+  modal(`<h3>\u{1F4CD} Was wir schon geübt haben</h3>
+    <p class="hint">Hier steht, wann ihr wo welche Aufgabe geübt habt – mit Bildern, falls welche
+      aufgenommen wurden. Praktisch zum Nachschauen vor der Prüfung.</p>
+    <div id="mu-liste">${gLoad('Lädt…')}</div>
+    <div class="actions"><button onclick="window.__closeModal()">Schließen</button></div>`, 'wide');
+  let liste = [];
+  try { liste = (await api('/api/my/practice')).entries || []; }
+  catch (e) { $('#mu-liste').innerHTML = `<p class="hint" style="color:var(--bad)">${esc(e.message)}</p>`; return; }
+  if (!liste.length) { $('#mu-liste').innerHTML = '<p class="muted">Noch nichts eingetragen.</p>'; return; }
+  const tage = {};
+  for (const e of liste) (tage[e.date] ||= []).push(e);
+  $('#mu-liste').innerHTML = Object.keys(tage).sort().reverse().map((d) => `<div class="ub-day">
+      <div class="ub-day-h">${WD[isoDow(d) - 1]}, ${fmtShort(d)}</div>
+      ${tage[d].map((e) => {
+        const st = UB_STAND[e.status] || UB_STAND.geuebt;
+        const wo = [e.street, e.district].filter(Boolean).join(', ');
+        return `<div class="ub-e">
+          <div class="ub-e-top"><span class="ub-task">${esc(e.task)}</span>
+            <span class="ub-stand" style="background:${st.farbe}22;color:${st.farbe}">${st.ic} ${st.txt}</span></div>
+          ${wo ? `<div class="ub-wo">\u{1F4CD} ${esc(wo)}${e.time ? ` · ${e.time} Uhr` : ''}</div>` : ''}
+          ${e.note ? `<div class="ub-note">${esc(e.note)}</div>` : ''}
+          ${e.medien && e.medien.length ? `<div class="ub-med">${e.medien.map((m) => m.kind === 'video'
+            ? `<video class="ub-v" src="/api/practice/media/${m.id}" controls preload="metadata" playsinline></video>`
+            : `<img class="ub-i" src="/api/practice/media/${m.id}" alt="Foto zur Übung" loading="lazy">`).join('')}</div>` : ''}
+        </div>`;
+      }).join('')}
+    </div>`).join('');
+}
+window.__openMeineUebungen = openMeineUebungen;
+
+// Ausdruck als Beleg – ein Blatt, auf dem alles steht.
+function druckeUebungshistorie(sid, name) {
+  const liste = state._ub || [];
+  if (!liste.length) { toast('Noch nichts festgehalten.', 'err'); return; }
+  const w = window.open('', '_blank');
+  if (!w) { toast('Bitte Pop-ups erlauben.', 'err'); return; }
+  const tage = {};
+  for (const e of liste) (tage[e.date] ||= []).push(e);
+  const heute = new Date().toLocaleDateString(LOCALE, { day: '2-digit', month: '2-digit', year: 'numeric' });
+  w.document.write(`<!doctype html><meta charset="utf-8"><title>Übungshistorie ${esc(name)}</title>
+    <style>body{font-family:system-ui,sans-serif;margin:2cm 1.6cm;color:#111}
+      h1{font-size:17pt;margin:0 0 .1cm}p.sub{color:#555;font-size:10pt;margin:0 0 .8cm}
+      h2{font-size:11pt;margin:.7cm 0 .2cm;border-bottom:1px solid #bbb;padding-bottom:.1cm}
+      table{width:100%;border-collapse:collapse;font-size:10pt}
+      td{padding:.16cm .2cm;border-bottom:1px solid #e3e3e3;vertical-align:top}
+      td.t{font-weight:600;width:40%}td.o{color:#444;width:35%}td.s{width:25%}
+      .foot{margin-top:1cm;font-size:9pt;color:#555;border-top:1px solid #bbb;padding-top:.3cm}</style>
+    <h1>Übungshistorie – ${esc(name)}</h1>
+    <p class="sub">Geübte Aufgaben mit Ort und Datum · Stand ${heute} · ${liste.length} Einträge</p>
+    ${Object.keys(tage).sort().reverse().map((d) => `<h2>${WD[isoDow(d) - 1]}, ${fmtShort(d)}</h2><table>${
+      tage[d].map((e) => {
+        const st = UB_STAND[e.status] || UB_STAND.geuebt;
+        const wo = [e.street, e.district].filter(Boolean).join(', ');
+        const med = (e.medien || []).length;
+        return `<tr><td class="t">${esc(e.task)}</td><td class="o">${esc(wo || '–')}${e.time ? ' · ' + e.time : ''}</td>
+          <td class="s">${st.txt}${med ? ` · ${med} Aufnahme${med === 1 ? '' : 'n'}` : ''}</td></tr>
+          ${e.note ? `<tr><td colspan="3" style="color:#444;font-size:9.5pt;padding-top:0">${esc(e.note)}</td></tr>` : ''}`;
+      }).join('')}</table>`).join('')}
+    <div class="foot">Fahrschule ${esc(state.settings?.instructor_name || '')} · Dieser Ausdruck belegt, welche Aufgaben
+      wann und wo geübt wurden. Bilder und Videos liegen im Portal beim jeweiligen Eintrag.</div>`);
+  w.document.close();
+  w.focus(); setTimeout(() => { try { w.print(); } catch {} }, 250);
+}
+
+// Neue Übung festhalten. Der schnellste Weg direkt nach der Fahrstunde:
+// Aufgabe antippen, Standort holen, Stand wählen, fertig.
+async function openUebungNeu(sid, name) {
+  const jetzt = new Date();
+  const hhmm = `${String(jetzt.getHours()).padStart(2, '0')}:${String(jetzt.getMinutes()).padStart(2, '0')}`;
+  modal(`<h3>\u{1F4CD} Übung festhalten <span class="sub">${esc(name)}</span></h3>
+    <div class="field"><label>Was habt ihr geübt?</label>
+      <div class="ub-tasks">${GRUNDAUFGABEN.map(([txt, key]) =>
+        `<button type="button" class="ub-task-b" data-ubt="${esc(txt)}" data-ubk="${key}">${esc(txt)}</button>`).join('')}</div>
+      <input id="ub-task" placeholder="… oder frei eintippen (z. B. Kreisverkehr Marktplatz)" style="margin-top:.5rem"></div>
+    <div class="row">
+      <div class="field"><label>Datum</label><input type="date" id="ub-date" value="${todayStr()}"></div>
+      <div class="field"><label>Uhrzeit</label><input id="ub-time" value="${hhmm}" placeholder="HH:MM"></div>
+    </div>
+    <div class="field"><label>Wo? <span class="muted" style="font-weight:400">Ortsteil</span></label>
+      <div class="ub-orte">${ORTSTEILE.map((o) => `<button type="button" class="ub-ort" data-ubo="${esc(o)}">${esc(o)}</button>`).join('')}</div>
+      <input id="ub-district" placeholder="Ortsteil" style="margin-top:.5rem"></div>
+    <div class="field"><label>Straße</label>
+      <div class="inline"><input id="ub-street" placeholder="z. B. Eisenbahnstraße" style="flex:1">
+        <button class="sec sm" id="ub-gps" type="button">\u{1F4CD} Standort</button></div>
+      <div class="hint" id="ub-gps-info" style="margin:.3rem 0 0">Tipp auf „Standort" holt Straße und Ortsteil automatisch.</div></div>
+    <div class="field"><label>Wie lief es?</label>
+      <div class="pm-wahl">${Object.entries(UB_STAND).map(([k, v]) =>
+        `<button type="button" class="pm-opt${k === 'geuebt' ? ' on' : ''}" data-ubst="${k}" style="--f:${v.farbe}">
+          <span class="pm-opt-ic">${v.ic}</span>${v.txt}</button>`).join('')}</div></div>
+    <div class="field" style="margin-bottom:.3rem"><label>Notiz <span class="muted" style="font-weight:400">(optional)</span></label>
+      <textarea id="ub-note" rows="2" placeholder="z. B. Beim zweiten Versuch sauber, Schulterblick fehlte noch." style="resize:vertical"></textarea></div>
+    <div class="actions">
+      <button class="sec" onclick="window.__closeModal()">Abbrechen</button>
+      <button id="ub-save">Festhalten</button>
+    </div>`, 'sheet');
+
+  let stand = 'geuebt', key = null, lat = null, lng = null;
+  document.querySelectorAll('[data-ubt]').forEach((b) => b.onclick = () => {
+    document.querySelectorAll('[data-ubt]').forEach((x) => x.classList.remove('on'));
+    b.classList.add('on'); $('#ub-task').value = b.dataset.ubt; key = b.dataset.ubk;
+  });
+  document.querySelectorAll('[data-ubo]').forEach((b) => b.onclick = () => {
+    document.querySelectorAll('[data-ubo]').forEach((x) => x.classList.remove('on'));
+    b.classList.add('on'); $('#ub-district').value = b.dataset.ubo;
+  });
+  document.querySelectorAll('[data-ubst]').forEach((b) => b.onclick = () => {
+    document.querySelectorAll('[data-ubst]').forEach((x) => x.classList.remove('on'));
+    b.classList.add('on'); stand = b.dataset.ubst;
+  });
+  $('#ub-gps').onclick = async () => {
+    const info = $('#ub-gps-info'); info.textContent = 'Suche Standort …';
+    try {
+      const c = await getPosOnce();
+      lat = c.latitude; lng = c.longitude;
+      const teile = await geocodeAddressParts(lat, lng);
+      if (teile) {
+        if (teile.street) $('#ub-street').value = teile.street;
+        // Nominatim liefert den Ortsteil als suburb/quarter/city_district.
+        const ot = teile.suburb || teile.quarter || teile.city_district || '';
+        if (ot && !$('#ub-district').value) $('#ub-district').value = ot;
+      }
+      info.innerHTML = `✓ Standort übernommen (${lat.toFixed(4)}, ${lng.toFixed(4)})`;
+    } catch (e) { info.textContent = e.message || 'Standort nicht verfügbar'; }
+  };
+  $('#ub-save').onclick = async () => {
+    const aufgabe = $('#ub-task').value.trim();
+    if (!aufgabe) { toast('Bitte angeben, was geübt wurde.', 'err'); return; }
+    const btn = $('#ub-save'); btn.disabled = true; btn.textContent = 'Speichere …';
+    try {
+      const r = await api(`/api/students/${sid}/practice`, { method: 'POST', body: {
+        task: aufgabe, task_key: key, date: $('#ub-date').value, time: $('#ub-time').value,
+        district: $('#ub-district').value, street: $('#ub-street').value,
+        lat, lng, status: stand, note: $('#ub-note').value } });
+      closeModal();
+      toast('Festgehalten ✓', 'ok');
+      // Direkt weiter zu Bild/Video – das ist der Moment, in dem man es hat.
+      openUebungMedien(r.entry.id, sid, true);
+    } catch (e) { toast(e.message, 'err'); btn.disabled = false; btn.textContent = 'Festhalten'; }
+  };
+}
+
+// Bilder und Videos zu einem Eintrag. Bilder werden vorher verkleinert,
+// Videos gehen unverändert hoch – deshalb der Hinweis auf kurze Ausschnitte.
+function openUebungMedien(id, sid, frisch) {
+  const e = (state._ub || []).find((x) => String(x.id) === String(id));
+  modal(`<h3>\u{1F4F7} Bild oder Video</h3>
+    <p class="hint">${frisch ? 'Gleich noch festhalten, wie es aussah – das hilft später beim Erklären.' : esc(e?.task || '')}
+      Videos bitte kurz halten (bis 30 MB, etwa 15–20 Sekunden).</p>
+    <div class="ub-upl">
+      <button class="sm" id="ub-foto">\u{1F4F7} Foto aufnehmen</button>
+      <button class="sm sec" id="ub-video">\u{1F3A5} Video aufnehmen</button>
+    </div>
+    <input type="file" id="ub-f-foto" accept="image/*" capture="environment" style="display:none">
+    <input type="file" id="ub-f-video" accept="video/*" capture="environment" style="display:none">
+    <div id="ub-upl-info" class="hint" style="margin-top:.6rem"></div>
+    <div id="ub-upl-liste" style="margin-top:.6rem"></div>
+    <div class="actions"><button onclick="window.__closeModal()">${frisch ? 'Ohne Bild fertig' : 'Fertig'}</button></div>`, 'sheet');
+
+  const info = $('#ub-upl-info');
+  const zeigen = () => {
+    const akt = (state._ub || []).find((x) => String(x.id) === String(id));
+    const box = $('#ub-upl-liste'); if (!box) return;
+    box.innerHTML = (akt?.medien || []).map((m) => `<div class="ub-upl-row">
+      <span>${m.kind === 'video' ? '\u{1F3A5} Video' : '\u{1F4F7} Foto'} · ${Math.round((m.bytes || 0) / 1024)} KB</span>
+      <button class="linklike" data-ubmdel="${m.id}" style="color:var(--bad)">entfernen</button></div>`).join('');
+    box.querySelectorAll('[data-ubmdel]').forEach((b) => b.onclick = async () => {
+      try { await api('/api/practice/media/' + b.dataset.ubmdel, { method: 'DELETE' });
+        await ladeUebungen(sid, state._ubName); zeigen(); } catch (err) { toast(err.message, 'err'); }
+    });
+  };
+  zeigen();
+
+  const hoch = async (blob, mime, wieviel) => {
+    info.textContent = `Lädt hoch (${wieviel}) …`;
+    try {
+      const r = await fetch(`/api/practice/${id}/media`, { method: 'POST', headers: { 'Content-Type': mime }, body: blob });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.error || 'Hochladen fehlgeschlagen');
+      info.innerHTML = '✓ Gespeichert';
+      await ladeUebungen(sid, state._ubName); zeigen();
+    } catch (err) { info.innerHTML = `<span style="color:var(--bad)">${esc(err.message)}</span>`; }
+  };
+  $('#ub-foto').onclick = () => $('#ub-f-foto').click();
+  $('#ub-video').onclick = () => $('#ub-f-video').click();
+  $('#ub-f-foto').onchange = async (ev) => {
+    const f = ev.target.files && ev.target.files[0]; if (!f) return;
+    try {
+      // Verkleinern spart Platz und Datenvolumen – 1280 px reichen fuer einen Beleg.
+      const url = await fileToResizedDataUrl(f, 1280, 0.82);
+      const bin = await (await fetch(url)).blob();
+      await hoch(bin, 'image/jpeg', `${Math.round(bin.size / 1024)} KB`);
+    } catch (err) { info.textContent = err.message; }
+  };
+  $('#ub-f-video').onchange = async (ev) => {
+    const f = ev.target.files && ev.target.files[0]; if (!f) return;
+    const mb = f.size / 1024 / 1024;
+    if (mb > 30) { info.innerHTML = `<span style="color:var(--bad)">Das Video ist ${mb.toFixed(1)} MB groß – höchstens 30 MB. Nimm einen kürzeren Ausschnitt auf.</span>`; return; }
+    const typ = ['video/mp4', 'video/quicktime', 'video/webm'].includes(f.type) ? f.type : 'video/mp4';
+    await hoch(f, typ, `${mb.toFixed(1)} MB`);
+  };
+}
+
+function openUebungStand(id, sid) {
+  const e = (state._ub || []).find((x) => String(x.id) === String(id));
+  modal(`<h3>Wie gut sitzt es?</h3>
+    <p class="hint">${esc(e?.task || '')}</p>
+    <div class="pm-wahl">${Object.entries(UB_STAND).map(([k, v]) =>
+      `<button type="button" class="pm-opt${e && e.status === k ? ' on' : ''}" data-ubs="${k}" style="--f:${v.farbe}">
+        <span class="pm-opt-ic">${v.ic}</span>${v.txt}</button>`).join('')}</div>
+    <div class="actions"><button class="sec" onclick="window.__closeModal()">Abbrechen</button></div>`, 'sheet');
+  document.querySelectorAll('[data-ubs]').forEach((b) => b.onclick = async () => {
+    try { await api('/api/practice/' + id, { method: 'PATCH', body: { status: b.dataset.ubs } });
+      closeModal(); toast('Gespeichert ✓', 'ok'); ladeUebungen(sid, state._ubName); }
+    catch (err) { toast(err.message, 'err'); }
+  });
+}
+
 // ---- Dienstplan-Zugang für die Partnerin/den Partner ----
 // Sie traegt ihre Schichten ein; ihre freien Tage halten deinen Tag frei.
 function renderPartnerSection() {
@@ -3450,6 +3798,7 @@ async function renderStudent() {
     <div id="daystatus-banner"></div>
     <div class="card" id="week-card"></div>
     <div class="card hidden" id="lessons-card"></div>
+    <div class="card hidden" id="practice-card"></div>
     <div class="card hidden" id="fehlerbuch-card"></div>
     <div class="card" id="messages-card"></div>
     <div class="card hidden" id="review-card"></div>
@@ -3563,6 +3912,7 @@ async function syncStudent() {
     refreshStudentLive();
     renderWeekCard(mine.weekInfo, mine.bookings, mine.progress);
     renderMyLessons(mine.bookings);
+    renderPracticeCard();
     renderFehlerbuch();
     renderReviewCard(mine.progress);
     renderStudentMessages();
@@ -8279,6 +8629,7 @@ async function tabSchueler(scope) {
           <button class="iconbtn" id="pf-invoice"><span class="ib-ic">🧾</span><span class="ib-lb">Rechnung</span></button>
           <button class="iconbtn" id="pf-proof"><span class="ib-ic">📄</span><span class="ib-lb">Nachweis</span></button>
           <button class="iconbtn" id="pf-card"><span class="ib-ic">📋</span><span class="ib-lb">Karte</span></button>
+          <button class="iconbtn" id="pf-uebung"><span class="ib-ic">📍</span><span class="ib-lb">Übungshistorie</span></button>
           <button class="iconbtn" id="pf-reset"><span class="ib-ic">🔑</span><span class="ib-lb">Zugang</span></button>
           ${isArch ? '<button class="iconbtn ok" id="pf-react"><span class="ib-ic">↩︎</span><span class="ib-lb">Zurück</span></button>' : '<button class="iconbtn ok" id="pf-arch"><span class="ib-ic">✅</span><span class="ib-lb">Bestanden</span></button>'}
           <button class="iconbtn danger" id="pf-del"><span class="ib-ic">🗑️</span><span class="ib-lb">Löschen</span></button>
@@ -8289,6 +8640,7 @@ async function tabSchueler(scope) {
       $('#pf-invoice').onclick = () => openInvoiceModal(Number(s.id), s.name);
       $('#pf-proof').onclick = async () => { try { const r = await api('/api/students/' + s.id + '/lessons'); if (!r.lessons.length) { toast('Noch keine gefahrenen Stunden für den Nachweis.', 'err'); return; } printLessonProof(r.name || s.name, r.lessons, r.adk, r.stats); } catch (e) { toast(e.message, 'err'); } };
       $('#pf-card').onclick = () => openTrainingCard(s.id, s.name);
+      $('#pf-uebung').onclick = () => openUebungshistorie(s.id, s.name);
       $('#pf-reset').onclick = () => openResetModal(s.id, s.name, s.username || '');
       const ph = $('#pf-home'); if (ph) ph.onclick = () => openStandortModal(s.id, s.name, s.home_label || '', s.home_lat != null ? s.home_lat : '', s.home_lng != null ? s.home_lng : '');
       document.querySelectorAll('[data-pdur]').forEach((cb) => cb.onchange = () => cb.closest('.dur-chip')?.classList.toggle('on', cb.checked));

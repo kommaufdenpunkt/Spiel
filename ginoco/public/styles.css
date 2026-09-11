@@ -2147,3 +2147,33 @@ header .brand .brandname{
   border-radius:8px;padding:.15rem .45rem;font-size:.8rem;font-weight:700}
 .pm-win{background:rgba(77,141,255,.12);color:#8fb4ff;border:1px solid rgba(77,141,255,.28);
   border-radius:8px;padding:.15rem .45rem;font-size:.8rem;font-weight:700;font-variant-numeric:tabular-nums}
+
+/* ---- Übungshistorie ---- */
+.ub-tasks,.ub-orte{display:flex;flex-wrap:wrap;gap:.4rem}
+.ub-task-b,.ub-ort{border:1px solid var(--line);background:#141b25;color:var(--ink);border-radius:99px;
+  padding:.35rem .7rem;font-size:.84rem;font-weight:700;cursor:pointer}
+.ub-task-b.on,.ub-ort.on{border-color:var(--brand);background:color-mix(in srgb,var(--brand) 16%,#141b25);color:var(--brand)}
+.ub-filters{display:flex;flex-wrap:wrap;gap:.35rem;margin-bottom:.7rem}
+.ub-fl{border:1px solid var(--line);background:#141b25;color:var(--muted);border-radius:99px;
+  padding:.2rem .6rem;font-size:.78rem;font-weight:700;cursor:pointer}
+.ub-fl.on{border-color:var(--brand);color:var(--brand)}
+.ub-day{margin-bottom:1rem}
+.ub-day-h{font-size:.8rem;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;
+  padding-bottom:.3rem;border-bottom:1px solid var(--line);margin-bottom:.5rem}
+.ub-e{background:#141b25;border:1px solid var(--line);border-radius:12px;padding:.7rem .8rem;margin-bottom:.5rem}
+.ub-e-top{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;justify-content:space-between}
+.ub-task{font-weight:800}
+.ub-stand{border-radius:99px;padding:.1rem .5rem;font-size:.76rem;font-weight:800;white-space:nowrap}
+.ub-wo{font-size:.84rem;color:var(--muted);margin-top:.2rem}
+.ub-note{font-size:.88rem;margin-top:.35rem;padding-left:.6rem;border-left:2px solid var(--line)}
+.ub-med{display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.5rem}
+.ub-i,.ub-v{width:150px;height:110px;object-fit:cover;border-radius:9px;border:1px solid var(--line);background:#0f151d}
+.ub-e-act{display:flex;gap:.8rem;flex-wrap:wrap;margin-top:.5rem;font-size:.82rem}
+.ub-upl{display:flex;gap:.5rem;flex-wrap:wrap}
+.ub-upl button{flex:1 1 46%;min-height:48px}
+.ub-upl-row{display:flex;justify-content:space-between;align-items:center;gap:.6rem;padding:.35rem 0;
+  border-bottom:1px solid var(--line);font-size:.86rem}
+.ub-upl-row:last-child{border-bottom:0}
+.pc-last{font-size:.9rem;margin:.2rem 0 .4rem}
+.pc-open{display:inline-block;background:var(--bad-bg);color:var(--bad);border-radius:8px;
+  padding:.2rem .55rem;font-size:.84rem;font-weight:700;margin-bottom:.5rem}

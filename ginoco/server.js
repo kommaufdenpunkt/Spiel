@@ -3,12 +3,13 @@
 import { createServer } from 'node:http';
 import { request as httpsRequest } from 'node:https';
 import { randomBytes, createECDH, hkdfSync, createCipheriv, createPrivateKey, createPublicKey, sign as cryptoSign, verify as cryptoVerify, createHash, createHmac } from 'node:crypto';
-import { readFile, stat } from 'node:fs/promises';
+import { readFile, stat, mkdir, unlink } from 'node:fs/promises';
+import { createWriteStream, createReadStream } from 'node:fs';
 import { gzipSync, brotliCompressSync, constants as zlibConstants } from 'node:zlib';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, extname, normalize } from 'node:path';
 import {
-  db, getSettings, getSettingRaw, setSettingRaw,
+  db, dbPath, getSettings, getSettingRaw, setSettingRaw,
   hashPassword, verifyPassword, genInstructorRecovery,
 } from './db.js';
 import { sendMail } from './mail.js';
@@ -98,6 +99,42 @@ function sendDataUrl(res, dataUrl) {
   const buf = Buffer.from(m[2], 'base64');
   res.writeHead(200, { 'Content-Type': m[1], 'Cache-Control': 'private, max-age=30' });
   res.end(buf);
+}
+
+// ---- Medien der Übungshistorie ----
+// Bilder und Videos liegen als Dateien neben der Datenbank, nicht darin.
+// So bleibt die Datenbank klein und das taegliche Backup schnell.
+const MEDIA_DIR = process.env.FSP_MEDIA || join(dirname(dbPath), 'media');
+const MEDIA_MAX = { foto: 4 * 1024 * 1024, video: 30 * 1024 * 1024 };
+const MEDIA_TYP = {
+  'image/jpeg': ['foto', '.jpg'], 'image/png': ['foto', '.png'], 'image/webp': ['foto', '.webp'],
+  'video/mp4': ['video', '.mp4'], 'video/quicktime': ['video', '.mov'], 'video/webm': ['video', '.webm'],
+};
+// Den Hochladestrom direkt in eine Datei schreiben – nichts landet komplett
+// im Arbeitsspeicher, und bei Ueberschreitung wird sauber abgebrochen.
+function speichereUpload(req, ziel, maxBytes) {
+  return new Promise((fertig, fehler) => {
+    let n = 0, zuGross = false, hart = false;
+    const aus = createWriteStream(ziel);
+    req.on('data', (c) => {
+      n += c.length;
+      if (n > maxBytes && !zuGross) {
+        // Nicht die Verbindung kappen – sonst sieht der Nutzer nur „Abbruch"
+        // statt der Erklaerung. Rest verwerfen und danach sauber antworten.
+        zuGross = true;
+        aus.end();
+      }
+      // Notbremse gegen Unsinn: bei einem Vielfachen wird doch abgebrochen.
+      if (n > maxBytes * 3 && !hart) { hart = true; req.destroy(); }
+    });
+    req.on('aborted', () => fertig({ n, zuGross: true }));
+    req.on('error', () => fertig({ n, zuGross: true }));
+    req.on('end', () => { if (zuGross) fertig({ n, zuGross: true }); });
+    aus.on('error', (e) => fehler(e));
+    aus.on('finish', () => { if (!zuGross) fertig({ n, zuGross: false }); });
+    req.pipe(aus, { end: false });
+    req.on('end', () => { if (!zuGross) aus.end(); });
+  });
 }
 
 function readBody(req) {
@@ -2279,6 +2316,145 @@ async function handleApi(req, res, url) {
       days.push({ date: d, weekday: wdShort(d), closed: false, total, occ, free, freeLessons: Math.floor(free / unit), bookedCount });
     }
     return ok(res, { from, to, unit, lessonMin: s.lesson_min, days });
+  }
+
+  // ====================== Übungshistorie ======================
+  // Wann wurde wo welche Aufgabe geübt – der Nachweis mit Ort, Datum und Bild.
+  const STAND = { geuebt: 'geübt', ok: 'sitzt', mehr: 'muss noch' };
+  const uebungRow = (r) => ({
+    ...r,
+    standLabel: STAND[r.status] || '',
+    medien: db.prepare('SELECT id,kind,mime,bytes,created_at FROM practice_media WHERE log_id=? ORDER BY id').all(r.id),
+  });
+  const uebungDarfSehen = (row) => requireInstructor() || (requireStudent() && row.student_id === sess.student_id);
+
+  // Liste für einen Fahrschüler (Fahrlehrer) …
+  const upListM = p.match(/^\/api\/students\/(\d+)\/practice$/);
+  if (upListM && method === 'GET') {
+    if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
+    const sid = Number(upListM[1]);
+    const rows = db.prepare('SELECT * FROM practice_log WHERE student_id=? ORDER BY date DESC, COALESCE(time,\'\') DESC, id DESC').all(sid);
+    return ok(res, { entries: rows.map(uebungRow) });
+  }
+  // … und für ihn selbst.
+  if (p === '/api/my/practice' && method === 'GET') {
+    if (!requireStudent()) return bad(res, 'Bitte anmelden', 401);
+    const rows = db.prepare('SELECT * FROM practice_log WHERE student_id=? ORDER BY date DESC, COALESCE(time,\'\') DESC, id DESC').all(sess.student_id);
+    return ok(res, { entries: rows.map(uebungRow) });
+  }
+
+  if (upListM && method === 'POST') {
+    if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
+    const sid = Number(upListM[1]);
+    if (!db.prepare('SELECT 1 FROM students WHERE id=?').get(sid)) return bad(res, 'Fahrschüler nicht gefunden', 404);
+    const b = await readBody(req);
+    const aufgabe = String(b.task || '').trim().slice(0, 120);
+    if (!aufgabe) return bad(res, 'Bitte die geübte Aufgabe angeben');
+    const datum = /^\d{4}-\d{2}-\d{2}$/.test(b.date || '') ? b.date : todayStr();
+    const zeit = /^([01]?\d|2[0-3]):[0-5]\d$/.test(b.time || '') ? b.time : null;
+    const stand = ['geuebt', 'ok', 'mehr'].includes(b.status) ? b.status : 'geuebt';
+    const info = db.prepare(
+      `INSERT INTO practice_log(student_id,booking_id,date,time,task,task_key,district,street,lat,lng,status,note,created_at)
+       VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`
+    ).run(sid, b.booking_id ? Number(b.booking_id) : null, datum, zeit, aufgabe,
+      b.task_key ? String(b.task_key).slice(0, 40) : null,
+      b.district ? String(b.district).trim().slice(0, 60) : null,
+      b.street ? String(b.street).trim().slice(0, 120) : null,
+      b.lat == null || b.lat === '' ? null : Number(b.lat),
+      b.lng == null || b.lng === '' ? null : Number(b.lng),
+      stand, b.note ? String(b.note).trim().slice(0, 600) : null, new Date().toISOString());
+    const id = Number(info.lastInsertRowid);
+    const wo = [b.street, b.district].filter(Boolean).join(', ');
+    logEvent('info', { actor: 'instructor', studentId: sid, bookingId: b.booking_id || null, date: datum,
+      detail: `\u{1F4CD} Geübt: ${aufgabe}${wo ? ' – ' + wo : ''} (${STAND[stand]})` });
+    return ok(res, { entry: uebungRow(db.prepare('SELECT * FROM practice_log WHERE id=?').get(id)) });
+  }
+
+  const upOneM = p.match(/^\/api\/practice\/(\d+)$/);
+  if (upOneM) {
+    const id = Number(upOneM[1]);
+    const row = db.prepare('SELECT * FROM practice_log WHERE id=?').get(id);
+    if (!row) return bad(res, 'Eintrag nicht gefunden', 404);
+    if (method === 'PATCH') {
+      if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
+      const b = await readBody(req);
+      const felder = [], werte = [];
+      for (const [k, pruef] of [['task', (v) => String(v).trim().slice(0, 120)],
+        ['district', (v) => v ? String(v).trim().slice(0, 60) : null],
+        ['street', (v) => v ? String(v).trim().slice(0, 120) : null],
+        ['note', (v) => v ? String(v).trim().slice(0, 600) : null]]) {
+        if (k in b) { felder.push(k + '=?'); werte.push(pruef(b[k])); }
+      }
+      if ('status' in b && ['geuebt', 'ok', 'mehr'].includes(b.status)) { felder.push('status=?'); werte.push(b.status); }
+      if ('date' in b && /^\d{4}-\d{2}-\d{2}$/.test(b.date)) { felder.push('date=?'); werte.push(b.date); }
+      if (!felder.length) return bad(res, 'Nichts zu ändern');
+      felder.push('updated_at=?'); werte.push(new Date().toISOString(), id);
+      db.prepare(`UPDATE practice_log SET ${felder.join(',')} WHERE id=?`).run(...werte);
+      return ok(res, { entry: uebungRow(db.prepare('SELECT * FROM practice_log WHERE id=?').get(id)) });
+    }
+    if (method === 'DELETE') {
+      if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
+      for (const m of db.prepare('SELECT file FROM practice_media WHERE log_id=?').all(id)) {
+        try { await unlink(join(MEDIA_DIR, m.file)); } catch {}
+      }
+      db.prepare('DELETE FROM practice_media WHERE log_id=?').run(id);
+      db.prepare('DELETE FROM practice_log WHERE id=?').run(id);
+      logEvent('info', { actor: 'instructor', studentId: row.student_id, date: row.date,
+        detail: `Übungs-Eintrag gelöscht: ${row.task}` });
+      return ok(res, { deleted: true });
+    }
+  }
+
+  // Bild oder Video hochladen – der Strom geht direkt in eine Datei.
+  const upMediaM = p.match(/^\/api\/practice\/(\d+)\/media$/);
+  if (upMediaM && method === 'POST') {
+    if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
+    const id = Number(upMediaM[1]);
+    if (!db.prepare('SELECT 1 FROM practice_log WHERE id=?').get(id)) return bad(res, 'Eintrag nicht gefunden', 404);
+    const mime = String(req.headers['content-type'] || '').split(';')[0].trim().toLowerCase();
+    const typ = MEDIA_TYP[mime];
+    if (!typ) return bad(res, 'Nur Bilder (JPEG/PNG/WebP) oder Videos (MP4/MOV/WebM)');
+    const [kind, endung] = typ;
+    const name = `${id}-${b64url(randomBytes(8))}${endung}`;
+    try { await mkdir(MEDIA_DIR, { recursive: true }); } catch {}
+    const ziel = join(MEDIA_DIR, name);
+    let erg;
+    try { erg = await speichereUpload(req, ziel, MEDIA_MAX[kind]); }
+    catch { erg = { zuGross: true }; }
+    if (erg.zuGross) {
+      try { await unlink(ziel); } catch {}
+      // Der Rest des Uploads ist noch unterwegs – diese Verbindung ist danach
+      // nicht mehr brauchbar, also ausdruecklich schliessen.
+      res.setHeader('Connection', 'close');
+      return bad(res, kind === 'video'
+        ? 'Das Video ist zu groß (höchstens 30 MB). Nimm einen kürzeren Ausschnitt auf.'
+        : 'Das Bild ist zu groß (höchstens 4 MB).', 413);
+    }
+    const bytes = erg.n;
+    const info = db.prepare('INSERT INTO practice_media(log_id,kind,file,mime,bytes,created_at) VALUES(?,?,?,?,?,?)')
+      .run(id, kind, name, mime, bytes, new Date().toISOString());
+    return ok(res, { id: Number(info.lastInsertRowid), kind, bytes });
+  }
+
+  // Datei ausliefern – der Fahrlehrer und der betroffene Fahrschüler duerfen.
+  const upFileM = p.match(/^\/api\/practice\/media\/(\d+)$/);
+  if (upFileM && method === 'GET') {
+    const m = db.prepare('SELECT m.*, l.student_id FROM practice_media m JOIN practice_log l ON l.id=m.log_id WHERE m.id=?').get(Number(upFileM[1]));
+    if (!m || !uebungDarfSehen(m)) return bad(res, 'Nicht gefunden', 404);
+    const datei = join(MEDIA_DIR, m.file);
+    try { await stat(datei); } catch { return bad(res, 'Datei fehlt', 404); }
+    res.writeHead(200, { 'Content-Type': m.mime || 'application/octet-stream',
+      'Cache-Control': 'private, max-age=86400', 'Content-Length': m.bytes || undefined });
+    return createReadStream(datei).pipe(res);
+  }
+  const upMediaDelM = p.match(/^\/api\/practice\/media\/(\d+)$/);
+  if (upMediaDelM && method === 'DELETE') {
+    if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
+    const m = db.prepare('SELECT * FROM practice_media WHERE id=?').get(Number(upMediaDelM[1]));
+    if (!m) return bad(res, 'Nicht gefunden', 404);
+    try { await unlink(join(MEDIA_DIR, m.file)); } catch {}
+    db.prepare('DELETE FROM practice_media WHERE id=?').run(m.id);
+    return ok(res, { deleted: true });
   }
 
   // ================= Dienstplan der Partnerin/des Partners =================
