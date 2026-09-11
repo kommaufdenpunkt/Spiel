@@ -2177,3 +2177,5 @@ header .brand .brandname{
 .pc-last{font-size:.9rem;margin:.2rem 0 .4rem}
 .pc-open{display:inline-block;background:var(--bad-bg);color:var(--bad);border-radius:8px;
   padding:.2rem .55rem;font-size:.84rem;font-weight:700;margin-bottom:.5rem}
+.pk-quick{display:flex;gap:.5rem;flex-wrap:wrap}
+.pk-quick button{flex:1 1 auto;min-height:44px}

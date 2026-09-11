@@ -2109,10 +2109,26 @@ function contactButtons(phone, waText) {
   return `<a class="pill" href="${telLink(phone)}" style="text-decoration:none">📞 Anrufen</a>
     <a class="pill" href="${waLink(phone)}${t}" target="_blank" rel="noopener" style="text-decoration:none">💬 WhatsApp</a>`;
 }
+// Standort-Fehler in verständliches Deutsch übersetzen. Der Browser meldet
+// „User denied Geolocation" – das liest sich wie ein Programmfehler, ist aber
+// meist nur eine bewusste Entscheidung des Nutzers.
+function gpsKlartext(e) {
+  const c = e && typeof e.code === 'number' ? e.code : null;
+  if (c === 1) return 'Du hast den Standort nicht freigegeben – das ist völlig in Ordnung. Tipp die Adresse einfach ein.';
+  if (c === 2) return 'Der Standort ist gerade nicht zu bekommen (drinnen klappt es oft nicht). Tipp die Adresse ein.';
+  if (c === 3) return 'Der Standort dauert zu lange. Probier es draußen noch einmal – oder tipp die Adresse ein.';
+  return 'Dein Gerät liefert gerade keinen Standort. Tipp die Adresse einfach ein.';
+}
 function getPosOnce() {
   return new Promise((resolve, reject) => {
-    if (!navigator.geolocation) return reject(new Error('Kein GPS verfügbar'));
-    navigator.geolocation.getCurrentPosition((p) => resolve(p.coords), (e) => reject(new Error(e.message)), { enableHighAccuracy: true, timeout: 12000 });
+    if (!navigator.geolocation) {
+      const e = new Error('Dein Gerät liefert keinen Standort. Tipp die Adresse einfach ein.');
+      e.code = 0; return reject(e);
+    }
+    navigator.geolocation.getCurrentPosition(
+      (p) => resolve(p.coords),
+      (err) => { const e = new Error(gpsKlartext(err)); e.code = err && err.code; reject(e); },
+      { enableHighAccuracy: true, timeout: 12000 });
   });
 }
 // Adresse aus Koordinaten (OpenStreetMap/Nominatim). Fehler werden still verschluckt.
@@ -5161,6 +5177,8 @@ function openPickupOnboarding() {
   const u = state.user || {};
   const curLabel = u.home_label || '';
   const curMode = u.pickup_mode || 'fixed';
+  // Viele treffen sich einfach an der Fahrschule – dafür ein Knopf statt Tipparbeit.
+  const schule = state.settings?.school_label || '';
   modal(`<h3>📍 Wo sollen wir dich abholen?</h3>
     <p class="hint">Damit dein Fahrlehrer dich sicher findet, richte einmal deine Abholung ein. Du kannst das später jederzeit ändern.</p>
     <div class="pk-modes">
@@ -5173,12 +5191,20 @@ function openPickupOnboarding() {
         <div><strong>📡 Flexibel – ich fixiere je Fahrstunde</strong><div class="hint">Du bist viel unterwegs? Fixiere deinen Live-Standort bis <strong>${lead} Min</strong> vor Beginn. Machst du nichts, gilt dein fester Ort bzw. die Fahrschule.</div></div>
       </label>
     </div>
-    <div class="field" style="margin-top:.6rem"><label>Fester Abholort (Adresse/Ort)</label>
+    <div class="field" style="margin-top:.6rem"><label id="pko-lbl">Fester Abholort (Adresse/Ort)</label>
       <input id="pko-label" value="${esc(curLabel)}" placeholder="z. B. Eberswalde, Musterstr. 1"></div>
-    <button class="sec sm" id="pko-here" type="button">📍 Aktuellen Standort übernehmen</button>
-    <div class="hint" id="pko-info" style="margin:.4rem 0 0"></div>
-    <div class="hint" id="pko-flexnote" style="margin:.4rem 0 0;${curMode === 'flex' ? '' : 'display:none'}">Beim flexiblen Modus ist die Adresse optional – sie dient nur als Rückfall.</div>
-    <div class="actions"><button id="pko-save">Speichern & los 🚗</button></div>`, 'locked');
+    <div class="pk-quick">
+      <button class="sec sm" id="pko-here" type="button">📍 Standort übernehmen</button>
+      ${schule ? `<button class="sec sm" id="pko-schule" type="button">🏫 Ich komme zur Fahrschule</button>` : ''}
+    </div>
+    <div class="hint" id="pko-info" style="margin:.5rem 0 0"></div>
+    <div class="hint" id="pko-flexnote" style="margin:.4rem 0 0;${curMode === 'flex' ? '' : 'display:none'}">
+      📡 Beim flexiblen Weg brauchst du hier nichts einzutragen. Eine Adresse hilft nur als Rückfall,
+      falls du vor der Fahrstunde nichts fixierst.</div>
+    <div class="actions">
+      <button class="sec" id="pko-spaeter">Später</button>
+      <button id="pko-save">Speichern & los 🚗</button>
+    </div>`, 'locked');
   let lat = (u.home_lat != null ? Number(u.home_lat) : null);
   let lng = (u.home_lng != null ? Number(u.home_lng) : null);
   const modeEls = Array.from(document.querySelectorAll('input[name="pkmode"]'));
@@ -5186,6 +5212,14 @@ function openPickupOnboarding() {
     const mode = (modeEls.find((e) => e.checked) || {}).value || 'fixed';
     document.querySelectorAll('.pk-mode').forEach((el) => el.classList.toggle('sel', el.querySelector('input').checked));
     const fn = $('#pko-flexnote'); if (fn) fn.style.display = mode === 'flex' ? '' : 'none';
+    // Bei „flexibel" darf hier nichts mehr nach Pflicht aussehen – sonst
+    // widerspricht sich das Fenster mit der eigenen Auswahl.
+    const lb = $('#pko-lbl'), inp = $('#pko-label');
+    if (lb) lb.innerHTML = mode === 'flex'
+      ? 'Rückfall-Adresse <span class="muted" style="font-weight:400">(optional)</span>'
+      : 'Fester Abholort (Adresse/Ort)';
+    if (inp) inp.placeholder = mode === 'flex' ? 'kann leer bleiben' : 'z. B. Eberswalde, Musterstr. 1';
+    const sp = $('#pko-save'); if (sp) sp.textContent = mode === 'flex' ? 'Flexibel bleiben \u{1F4E1}' : 'Speichern & los \u{1F697}';
   };
   modeEls.forEach((e) => e.addEventListener('change', syncMode));
   $('#pko-here').onclick = async () => {
@@ -5193,13 +5227,32 @@ function openPickupOnboarding() {
       const c = await getPosOnce(); lat = c.latitude; lng = c.longitude;
       const addr = await reverseGeocode(lat, lng);
       if (addr && !$('#pko-label').value.trim()) $('#pko-label').value = addr;
-      $('#pko-info').innerHTML = `✅ Standort übernommen (${lat.toFixed(4)}, ${lng.toFixed(4)}).`;
-    } catch (e) { toast(e.message, 'err'); }
+      $('#pko-info').innerHTML = `✅ Standort übernommen${addr ? ': ' + esc(addr) : ` (${lat.toFixed(4)}, ${lng.toFixed(4)})`}`;
+    } catch (e) {
+      // Kein roter Fehler – das ist keiner. Nur ein Hinweis, wie es auch geht.
+      $('#pko-info').innerHTML = `\u{2139}\uFE0F ${esc(e.message)}`;
+    }
+  };
+  const ps = $('#pko-schule');
+  if (ps) ps.onclick = () => {
+    $('#pko-label').value = schule;
+    const fest = modeEls.find((e) => e.value === 'fixed'); if (fest) { fest.checked = true; syncMode(); }
+    $('#pko-info').innerHTML = '\u{1F3EB} Treffpunkt ist die Fahrschule.';
+  };
+  // Ausweg: niemand soll in diesem Fenster festsitzen.
+  $('#pko-spaeter').onclick = () => {
+    closeModal();
+    toast('Alles klar – du kannst das jederzeit über \u{1F464} Profil nachholen.', '', 5000);
   };
   $('#pko-save').onclick = async () => {
     const mode = (modeEls.find((e) => e.checked) || {}).value || 'fixed';
     const label = $('#pko-label').value.trim();
-    if (mode === 'fixed' && !label) { toast('Bitte gib deinen festen Abholort an (oder wähle „Flexibel").', 'err'); return; }
+    if (mode === 'fixed' && !label) {
+      $('#pko-info').innerHTML = schule
+        ? '\u{2139}\uFE0F Trag einen Abholort ein, tipp auf \u{1F3EB} Fahrschule \u2013 oder w\u00e4hle oben \u{1F4E1} <strong>Flexibel</strong>.'
+        : '\u{2139}\uFE0F Trag einen Abholort ein \u2013 oder w\u00e4hle oben \u{1F4E1} <strong>Flexibel</strong>.';
+      return;
+    }
     try {
       const r = await api('/api/my/pickup-setup', { method: 'POST', body: { mode, label, lat, lng } });
       state.user.pickup_onboarded = true; state.user.pickup_mode = r.mode;

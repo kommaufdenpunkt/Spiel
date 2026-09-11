@@ -26,7 +26,8 @@ const PUBLIC_SETTINGS = ['instructor_name', 'instructor_phone', 'policy_text',
   'live_lead_min', 'lesson_min', 'break_min', 'start_time', 'last_start', 'max_per_week', 'release_time',
   'registration_open', 'self_registration', 'sonder_min_ueberland', 'sonder_min_autobahn', 'sonder_min_nacht',
   'req_ueberland', 'req_autobahn', 'req_nacht', 'rank2_min_lessons', 'passkey_enabled',
-  'partner_enabled', 'partner_name'];   // nur, damit der Dienstplan-Zugang auf der Anmeldeseite auftaucht
+  'partner_enabled', 'partner_name',   // nur, damit der Dienstplan-Zugang auf der Anmeldeseite auftaucht
+  'school_label'];                     // Anschrift der Fahrschule – steht ohnehin oeffentlich
 
 // ---------- Passwort-Richtlinie (stark, mit Sonderzeichen) ----------
 // Gibt null zurueck, wenn ok, sonst die fehlende Anforderung.
