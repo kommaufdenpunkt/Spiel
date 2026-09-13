@@ -2293,6 +2293,11 @@ function closeModal() {
 
 function render() {
   if (!state.user) return renderAuth();
+  // Fahrlehrer- und Partneransicht gibt es nur auf Deutsch. Steht das Handy
+  // auf Englisch, kamen sonst englische Wochentage in deutschem Text heraus
+  // („Mon, 31.8." über „Was hast du an dem Tag?"). Datumsnamen mitziehen.
+  const nurDeutsch = state.user.role === 'instructor' || state.user.role === 'partner';
+  if (nurDeutsch && LANG !== 'de') { LANG = 'de'; applyLangDir(); applyDateNames(); }
   if (state.user.role === 'instructor') return renderInstructor();
   if (state.user.role === 'partner') return renderPartner();
   return renderStudent();
@@ -3128,18 +3133,118 @@ const ORTSTEILE = ['Westend', 'Nordend', 'Ostend', 'Südend', 'Stadtmitte', 'Bra
   'Sommerfelde', 'Tornow', 'Lichterfelde', 'Spechthausen'];
 // Die fünf Grundfahraufgaben der Klasse B – die stehen oben, weil genau
 // darum in der Prüfung gestritten wird. Darunter alles aus der Ausbildungskarte.
+// [voller Name, Schluessel der Ausbildungskarte, kurzer Name fuer die Kacheln]
+// Der kurze Name ist der, den man im Auto sagt – so passen fuenf Kacheln
+// nebeneinander aufs Handy, ohne Woerter mitten durchzuschneiden.
 const GRUNDAUFGABEN = [
-  ['Rückwärtsfahren um eine Ecke', 'grundfahr:0'],
-  ['Umkehren (Wenden)', 'grundfahr:1'],
-  ['Gefahrbremsung', 'grundfahr:2'],
-  ['Einparken längs (rückwärts)', 'grundfahr:4'],
-  ['Einparken quer (rückwärts)', 'grundfahr:6'],
+  ['Rückwärtsfahren um eine Ecke', 'grundfahr:0', 'Um die Ecke'],
+  ['Umkehren (Wenden)', 'grundfahr:1', 'Wenden'],
+  ['Gefahrbremsung', 'grundfahr:2', 'Bremsung'],
+  ['Einparken längs (rückwärts)', 'grundfahr:4', 'Längs parken'],
+  ['Einparken quer (rückwärts)', 'grundfahr:6', 'Quer parken'],
 ];
 const UB_STAND = {
   geuebt: { ic: '\u{1F7E1}', txt: 'geübt', farbe: '#e6b23a' },
   ok:     { ic: '\u{1F7E2}', txt: 'sitzt', farbe: '#35c07d' },
   mehr:   { ic: '\u{1F534}', txt: 'muss noch', farbe: '#ff6b6b' },
 };
+
+// ---- Strassen-Vorschlaege ----------------------------------------------
+// Zwei Quellen, bewusst in dieser Reihenfolge:
+//  1. was die Fahrschule schon gefahren ist (eigene Datenbank, sofort da,
+//     geht auch ohne Netz) – samt gemerktem Ortsteil,
+//  2. das amtliche Strassenverzeichnis zur PLZ des Fahrgebiets (OpenPLZ,
+//     ueber den eigenen Server, dort zwischengespeichert).
+// Frei tippen geht immer. So steht hier keine erfundene Strassenliste.
+async function ladeStrassen(frisch) {
+  if (state._strassen && !frisch) return state._strassen;
+  try { state._strassen = (await api('/api/geo/known-streets')).streets || []; }
+  catch { state._strassen = state._strassen || []; }
+  return state._strassen;
+}
+const ORT_FUER_STRASSE = {};          // Strasse (klein) -> Ortsteil, aus beiden Quellen
+function merkeOrt(str, ort) { if (str && ort) ORT_FUER_STRASSE[str.trim().toLowerCase()] = ort; }
+
+// Haengt die Vorschlagsliste an ein Strassenfeld. Waehlt man einen Eintrag,
+// wird der Ortsteil gleich mitgesetzt – das spart den zweiten Handgriff.
+function strassenHilfe(strFeld, ortFeld, box) {
+  if (!strFeld || !box) return;
+  let timer = null, laufend = 0;
+  const ortSetzen = (ort) => {
+    if (!ortFeld || !ort) return;
+    ortFeld.value = ort;
+    document.querySelectorAll('[data-ubo]').forEach((x) => x.classList.toggle('on', x.dataset.ubo === ort));
+  };
+  const zeichne = (liste) => {
+    if (!liste.length) { box.innerHTML = ''; box.classList.add('hidden'); return; }
+    box.classList.remove('hidden');
+    box.innerHTML = liste.slice(0, 8).map((v) => `<button type="button" class="ub-sug" data-str="${esc(v.street)}" data-ort="${esc(v.district || '')}">
+      <span class="ub-sug-s">${esc(v.street)}</span>${v.district ? `<span class="ub-sug-o">${esc(v.district)}</span>` : ''}
+      <span class="ub-sug-q">${v.amt ? 'Verzeichnis' : `${v.n || 1}\u00d7 gefahren`}</span></button>`).join('');
+    box.querySelectorAll('[data-str]').forEach((b) => b.onclick = () => {
+      strFeld.value = b.dataset.str;
+      merkeOrt(b.dataset.str, b.dataset.ort);
+      ortSetzen(b.dataset.ort);
+      box.innerHTML = ''; box.classList.add('hidden');
+    });
+  };
+  const suchen = async () => {
+    const t = strFeld.value.trim();
+    if (t.length < 2) { zeichne([]); return; }
+    const lauf = ++laufend;
+    const eigene = (await ladeStrassen()).filter((v) => v.street.toLowerCase().includes(t.toLowerCase()));
+    for (const v of eigene) merkeOrt(v.street, v.district);
+    if (lauf !== laufend) return;
+    zeichne(eigene);
+    // Ortsteil ergaenzen, wenn genau diese Strasse schon einmal vorkam
+    const gemerkt = ORT_FUER_STRASSE[t.toLowerCase()];
+    if (gemerkt && ortFeld && !ortFeld.value) ortSetzen(gemerkt);
+    clearTimeout(timer);
+    timer = setTimeout(async () => {
+      let amtlich = [];
+      try {
+        const r = await api('/api/geo/streets?q=' + encodeURIComponent(t));
+        amtlich = (r.details || (r.streets || []).map((n) => ({ name: n })))
+          .map((x) => ({ street: x.name, district: x.locality || '', amt: true }))
+          .filter((v) => !eigene.some((e) => e.street.toLowerCase() === v.street.toLowerCase()));
+      } catch { /* ohne Netz bleibt es bei den eigenen – kein Fehler noetig */ }
+      if (lauf !== laufend || strFeld.value.trim() !== t) return;
+      if (amtlich.length) zeichne([...eigene, ...amtlich]);
+    }, 380);
+  };
+  strFeld.oninput = suchen;
+  strFeld.onfocus = suchen;
+  strFeld.onblur = () => setTimeout(() => { box.innerHTML = ''; box.classList.add('hidden'); }, 220);
+}
+
+// ---- Prüfungsreife: die fünf Grundfahraufgaben auf einen Blick -----------
+// Genau das ist der Grund für die ganze Historie: sehen, was noch fehlt,
+// bevor es in der Prüfung heißt „das hatten wir nie".
+function grundStand(liste) {
+  return GRUNDAUFGABEN.map(([txt, key, kurz]) => {
+    const treffer = (liste || []).filter((e) => e.task_key === key || (e.task || '').toLowerCase() === txt.toLowerCase());
+    const rang = { mehr: 0, geuebt: 1, ok: 2 };
+    let best = null;
+    for (const e of treffer) if (!best || (rang[e.status] ?? 1) > (rang[best.status] ?? 1)) best = e;
+    const zuletzt = treffer.map((e) => e.date).sort().pop() || '';
+    return { txt, key, kurz: kurz || txt, n: treffer.length, status: treffer.length ? (best?.status || 'geuebt') : null, zuletzt };
+  });
+}
+function grundStreifenHtml(liste, knapp) {
+  const st = grundStand(liste);
+  const fehlt = st.filter((x) => !x.n).length;
+  return `<div class="gf-strip">${st.map((x) => {
+    const s = x.status ? UB_STAND[x.status] : null;
+    return `<div class="gf-t${x.n ? '' : ' leer'}" ${s ? `style="--f:${s.farbe}"` : ''} title="${esc(x.txt)}${x.zuletzt ? ' – zuletzt ' + fmtShort(x.zuletzt) : ''}">
+      <span class="gf-ic">${s ? s.ic : '\u2B55'}</span>
+      <span class="gf-lb">${esc(x.kurz)}</span>
+      <span class="gf-n">${x.n ? x.n + '\u00d7' : 'nie'}</span></div>`;
+  }).join('')}</div>${knapp ? '' : `<p class="hint gf-hint">${fehlt === 5
+    ? '\u26A0\uFE0F Noch keine der f\u00fcnf Grundfahraufgaben festgehalten.'
+    : fehlt
+      ? `\u26A0\uFE0F Noch offen: ${st.filter((x) => !x.n).map((x) => x.txt).join(', ')}.`
+      : '\u2705 Alle f\u00fcnf Grundfahraufgaben sind belegt \u2013 mit Datum und Ort.'}</p>`}`;
+}
 
 async function openUebungshistorie(sid, name) {
   modal(`<h3>\u{1F4CD} Übungshistorie <span class="sub">${esc(name)}</span></h3>
@@ -3149,6 +3254,7 @@ async function openUebungshistorie(sid, name) {
       <button class="sm" id="ub-neu">\u{1F4CD} Übung festhalten</button>
       <button class="ghost sm" id="ub-druck">\u{1F5A8}\uFE0F Drucken</button>
     </div>
+    <div id="ub-gf"></div>
     <div id="ub-filter"></div>
     <div id="ub-liste">${gLoad('Lädt…')}</div>
     <div class="actions"><button onclick="window.__closeModal()">Schließen</button></div>`, 'wide');
@@ -3168,6 +3274,7 @@ async function ladeUebungen(sid, name) {
 function malUebungen(sid) {
   const box = $('#ub-liste'); if (!box) return;
   const alle = state._ub || [];
+  const gf = $('#ub-gf'); if (gf) gf.innerHTML = grundStreifenHtml(alle);
   const f = state._ubFilter || '';
   const liste = f ? alle.filter((e) => (e.task || '') === f) : alle;
 
@@ -3248,11 +3355,14 @@ async function openMeineUebungen() {
   modal(`<h3>\u{1F4CD} Was wir schon geübt haben</h3>
     <p class="hint">Hier steht, wann ihr wo welche Aufgabe geübt habt – mit Bildern, falls welche
       aufgenommen wurden. Praktisch zum Nachschauen vor der Prüfung.</p>
+    <div id="mu-gf"></div>
     <div id="mu-liste">${gLoad('Lädt…')}</div>
     <div class="actions"><button onclick="window.__closeModal()">Schließen</button></div>`, 'wide');
   let liste = [];
   try { liste = (await api('/api/my/practice')).entries || []; }
   catch (e) { $('#mu-liste').innerHTML = `<p class="hint" style="color:var(--bad)">${esc(e.message)}</p>`; return; }
+  const gfBox = $('#mu-gf');
+  if (gfBox) gfBox.innerHTML = `<div class="mu-gf-t">Die fünf Grundfahraufgaben</div>${grundStreifenHtml(liste)}`;
   if (!liste.length) { $('#mu-liste').innerHTML = '<p class="muted">Noch nichts eingetragen.</p>'; return; }
   const tage = {};
   for (const e of liste) (tage[e.date] ||= []).push(e);
@@ -3291,9 +3401,15 @@ function druckeUebungshistorie(sid, name) {
       table{width:100%;border-collapse:collapse;font-size:10pt}
       td{padding:.16cm .2cm;border-bottom:1px solid #e3e3e3;vertical-align:top}
       td.t{font-weight:600;width:40%}td.o{color:#444;width:35%}td.s{width:25%}
+      table.gf td{border-bottom:1px solid #d8d8d8}table.gf td.o{width:42%}table.gf td.s{width:18%}
       .foot{margin-top:1cm;font-size:9pt;color:#555;border-top:1px solid #bbb;padding-top:.3cm}</style>
     <h1>Übungshistorie – ${esc(name)}</h1>
     <p class="sub">Geübte Aufgaben mit Ort und Datum · Stand ${heute} · ${liste.length} Einträge</p>
+    <h2>Die fünf Grundfahraufgaben</h2>
+    <table class="gf">${grundStand(liste).map((g) => `<tr>
+      <td class="t">${esc(g.txt)}</td>
+      <td class="o">${g.n ? `${g.n}× geübt · zuletzt ${fmtShort(g.zuletzt)}` : '<b>noch nicht festgehalten</b>'}</td>
+      <td class="s">${g.status ? UB_STAND[g.status].txt : '–'}</td></tr>`).join('')}</table>
     ${Object.keys(tage).sort().reverse().map((d) => `<h2>${WD[isoDow(d) - 1]}, ${fmtShort(d)}</h2><table>${
       tage[d].map((e) => {
         const st = UB_STAND[e.status] || UB_STAND.geuebt;
@@ -3319,29 +3435,39 @@ async function openUebungNeu(sid, name) {
       <div class="ub-tasks">${GRUNDAUFGABEN.map(([txt, key]) =>
         `<button type="button" class="ub-task-b" data-ubt="${esc(txt)}" data-ubk="${key}">${esc(txt)}</button>`).join('')}</div>
       <input id="ub-task" placeholder="… oder frei eintippen (z. B. Kreisverkehr Marktplatz)" style="margin-top:.5rem"></div>
-    <div class="row">
-      <div class="field"><label>Datum</label><input type="date" id="ub-date" value="${todayStr()}"></div>
-      <div class="field"><label>Uhrzeit</label><input id="ub-time" value="${hhmm}" placeholder="HH:MM"></div>
-    </div>
-    <div class="field"><label>Wo? <span class="muted" style="font-weight:400">Ortsteil</span></label>
-      <div class="ub-orte">${ORTSTEILE.map((o) => `<button type="button" class="ub-ort" data-ubo="${esc(o)}">${esc(o)}</button>`).join('')}</div>
-      <input id="ub-district" placeholder="Ortsteil" style="margin-top:.5rem"></div>
-    <div class="field"><label>Straße</label>
-      <div class="inline"><input id="ub-street" placeholder="z. B. Eisenbahnstraße" style="flex:1">
+    <div class="field"><label>Wo wart ihr?</label>
+      <div class="inline"><input id="ub-street" placeholder="Straße tippen – Vorschläge kommen von selbst" autocomplete="off" style="flex:1">
         <button class="sec sm" id="ub-gps" type="button">\u{1F4CD} Standort</button></div>
-      <div class="hint" id="ub-gps-info" style="margin:.3rem 0 0">Tipp auf „Standort" holt Straße und Ortsteil automatisch.</div></div>
+      <div class="ub-sugbox hidden" id="ub-sug"></div>
+      <div class="inline" style="margin-top:.45rem">
+        <input id="ub-district" placeholder="Ortsteil" style="flex:1">
+        <button class="ghost sm" id="ub-ot-auf" type="button">Liste</button></div>
+      <div class="ub-orte hidden" id="ub-ot-liste" style="margin-top:.45rem">${ORTSTEILE.map((o) =>
+        `<button type="button" class="ub-ort" data-ubo="${esc(o)}">${esc(o)}</button>`).join('')}</div>
+      <div class="hint" id="ub-gps-info" style="margin:.35rem 0 0">Der Ortsteil kommt meist automatisch mit der Straße.</div></div>
     <div class="field"><label>Wie lief es?</label>
       <div class="pm-wahl">${Object.entries(UB_STAND).map(([k, v]) =>
         `<button type="button" class="pm-opt${k === 'geuebt' ? ' on' : ''}" data-ubst="${k}" style="--f:${v.farbe}">
           <span class="pm-opt-ic">${v.ic}</span>${v.txt}</button>`).join('')}</div></div>
     <div class="field" style="margin-bottom:.3rem"><label>Notiz <span class="muted" style="font-weight:400">(optional)</span></label>
       <textarea id="ub-note" rows="2" placeholder="z. B. Beim zweiten Versuch sauber, Schulterblick fehlte noch." style="resize:vertical"></textarea></div>
+    <details class="ub-wann"><summary>Anderes Datum oder Uhrzeit <span class="muted">(jetzt: heute ${hhmm})</span></summary>
+      <div class="row" style="margin-top:.5rem">
+        <div class="field"><label>Datum</label><input type="date" id="ub-date" value="${todayStr()}"></div>
+        <div class="field"><label>Uhrzeit</label><input id="ub-time" value="${hhmm}" placeholder="HH:MM"></div>
+      </div></details>
     <div class="actions">
       <button class="sec" onclick="window.__closeModal()">Abbrechen</button>
       <button id="ub-save">Festhalten</button>
     </div>`, 'sheet');
 
   let stand = 'geuebt', key = null, lat = null, lng = null;
+  strassenHilfe($('#ub-street'), $('#ub-district'), $('#ub-sug'));
+  // Die 16 Ortsteile nehmen das halbe Handy ein – erst auf Wunsch zeigen.
+  $('#ub-ot-auf').onclick = () => {
+    const l = $('#ub-ot-liste'); const auf = l.classList.toggle('hidden');
+    $('#ub-ot-auf').textContent = auf ? 'Liste' : 'zu';
+  };
   document.querySelectorAll('[data-ubt]').forEach((b) => b.onclick = () => {
     document.querySelectorAll('[data-ubt]').forEach((x) => x.classList.remove('on'));
     b.classList.add('on'); $('#ub-task').value = b.dataset.ubt; key = b.dataset.ubk;
@@ -3388,6 +3514,67 @@ async function openUebungNeu(sid, name) {
 
 // Bilder und Videos zu einem Eintrag. Bilder werden vorher verkleinert,
 // Videos gehen unverändert hoch – deshalb der Hinweis auf kurze Ausschnitte.
+// Direkt nach der Fahrstunde: wo war das? Ein Dialog fuer alle eben
+// angetippten Aufgaben – Ort einmal eintragen, nicht fuenfmal.
+function openUebungOrt(ids, sid, name) {
+  const mehrere = ids.length > 1;
+  modal(`<h3>\u{1F4CD} Wo habt ihr das geübt?</h3>
+    <p class="hint">${mehrere ? `${ids.length} Aufgaben festgehalten.` : 'Festgehalten.'}
+      Trag den Ort ein – dann steht später schwarz auf weiß, wo das dran war.
+      Überspringen geht auch, nachtragen kannst du es jederzeit.</p>
+    <div class="field"><label>Straße</label>
+      <div class="inline"><input id="uo-street" placeholder="Tippen – Vorschläge kommen von selbst" autocomplete="off" style="flex:1">
+        <button class="sec sm" id="uo-gps" type="button">\u{1F4CD} Standort</button></div>
+      <div class="ub-sugbox hidden" id="uo-sug"></div>
+      <div class="hint" id="uo-info" style="margin:.3rem 0 0">Standort holt Straße und Ortsteil automatisch.</div></div>
+    <div class="field"><label>Ortsteil</label>
+      <div class="inline"><input id="uo-district" placeholder="kommt meist mit der Straße" style="flex:1">
+        <button class="ghost sm" id="uo-ot-auf" type="button">Liste</button></div>
+      <div class="ub-orte hidden" id="uo-ot-liste" style="margin-top:.45rem">${ORTSTEILE.map((o) =>
+        `<button type="button" class="ub-ort" data-ubo="${esc(o)}">${esc(o)}</button>`).join('')}</div></div>
+    <div class="field" style="margin-bottom:.3rem"><label>Notiz <span class="muted" style="font-weight:400">(optional, gilt für alle)</span></label>
+      <textarea id="uo-note" rows="2" placeholder="z. B. Beim zweiten Versuch sauber, Schulterblick fehlte noch." style="resize:vertical"></textarea></div>
+    <div class="actions">
+      <button class="sec" onclick="window.__closeModal()">Überspringen</button>
+      <button id="uo-save">Ort speichern</button>
+    </div>`, 'sheet');
+  strassenHilfe($('#uo-street'), $('#uo-district'), $('#uo-sug'));
+  $('#uo-ot-auf').onclick = () => {
+    const l = $('#uo-ot-liste'); const auf = l.classList.toggle('hidden');
+    $('#uo-ot-auf').textContent = auf ? 'Liste' : 'zu';
+  };
+  document.querySelectorAll('[data-ubo]').forEach((b) => b.onclick = () => {
+    document.querySelectorAll('[data-ubo]').forEach((x) => x.classList.remove('on'));
+    b.classList.add('on'); $('#uo-district').value = b.dataset.ubo;
+  });
+  $('#uo-gps').onclick = async () => {
+    const info = $('#uo-info'); info.textContent = 'Suche Standort …';
+    try {
+      const c = await getPosOnce();
+      const teile = await geocodeAddressParts(c.latitude, c.longitude);
+      if (teile) {
+        if (teile.street) $('#uo-street').value = teile.street;
+        const ot = teile.suburb || teile.quarter || teile.city_district || '';
+        if (ot) { $('#uo-district').value = ot;
+          document.querySelectorAll('[data-ubo]').forEach((x) => x.classList.toggle('on', x.dataset.ubo === ot)); }
+      }
+      info.innerHTML = '✓ Standort übernommen';
+    } catch (e) { info.textContent = e.message || 'Standort nicht verfügbar'; }
+  };
+  $('#uo-save').onclick = async () => {
+    const btn = $('#uo-save'); btn.disabled = true; btn.textContent = 'Speichere …';
+    const body = { street: $('#uo-street').value.trim(), district: $('#uo-district').value.trim() };
+    const notiz = $('#uo-note').value.trim(); if (notiz) body.note = notiz;
+    try {
+      for (const id of ids) await api('/api/practice/' + id, { method: 'PATCH', body });
+      ladeStrassen(true);            // neue Straße gleich in die Vorschläge
+      closeModal(); toast('Ort gespeichert ✓', 'ok');
+      // Bild/Video ist der Moment danach – aber nur anbieten, nicht aufdrängen.
+      openUebungshistorie(sid, name);
+    } catch (e) { toast(e.message, 'err'); btn.disabled = false; btn.textContent = 'Ort speichern'; }
+  };
+}
+
 function openUebungMedien(id, sid, frisch) {
   const e = (state._ub || []).find((x) => String(x.id) === String(id));
   modal(`<h3>\u{1F4F7} Bild oder Video</h3>
@@ -7374,6 +7561,11 @@ function openMarkModal(id) {
         <textarea id="m-feedback" rows="2" placeholder="z.B. Kreisverkehr &amp; Vorfahrt geübt – nächstes Mal Einparken." style="resize:vertical">${esc(b.feedback || '')}</textarea>
         <button class="sec sm" id="m-fb-suggest" type="button" style="margin-top:.4rem">✨ Vorschlag aus heute</button>
         <span class="hint" style="margin-inline-start:.5rem">aus abgehakten Punkten + Fehlerbuch</span></div>
+      <div class="mk-gfwrap">
+        <label>📍 Grundfahraufgabe geübt? <span class="muted">(antippen – wird mit Datum festgehalten)</span></label>
+        <div id="m-gf" class="mk-gf">${gLoad('')}</div>
+        <div class="hint" id="m-gf-hint">Genau darum geht es später in der Prüfung: wann und wo war das dran.</div>
+      </div>
       <details class="mk-curr" id="m-curr-wrap" ${b.status !== 'done' ? 'open' : ''}><summary>📋 Ausbildungskarte Klasse B – jeden Punkt abhaken</summary>
         <input id="m-curr-search" placeholder="🔎 suchen (z. B. Kreisverkehr)" autocomplete="off" style="margin:.5rem 0">
         <div id="m-curr-list" class="mk-curr-list">${gLoad('Lädt…')}</div>
@@ -7404,6 +7596,45 @@ function openMarkModal(id) {
   let meetLat = b.meet_lat, meetLng = b.meet_lng;
   const adkBtn = $('#m-adk');
   if (adkBtn) adkBtn.onclick = () => { closeModal(); openTrainingCard(b.student_id, b.student_name || ''); };
+  // Grundfahraufgaben: was heute dran war, gleich hier antippen. Gespeichert
+  // wird erst beim Speichern der Stunde – so geht nichts Getipptes verloren.
+  const gfGewaehlt = new Set();
+  if (b.student_id) (async () => {
+    let bisher = [];
+    try { bisher = (await api(`/api/students/${b.student_id}/practice`)).entries || []; } catch {}
+    const box = $('#m-gf'); if (!box) return;
+    const stand = grundStand(bisher);
+    // Was zu genau DIESER Stunde schon steht, ist erledigt – nicht noch
+    // einmal anbieten, sondern als „heute schon drin" zeigen.
+    const heuteSchon = new Set(bisher.filter((e) => String(e.booking_id) === String(b.id))
+      .map((e) => e.task_key || (GRUNDAUFGABEN.find(([txt]) => txt.toLowerCase() === (e.task || '').toLowerCase()) || [])[1])
+      .filter(Boolean));
+    box.innerHTML = stand.map((g) => {
+      const st = g.status ? UB_STAND[g.status] : null;
+      const drin = heuteSchon.has(g.key);
+      return `<button type="button" class="mk-gf-b${g.n ? '' : ' leer'}${drin ? ' fix' : ''}" data-mkgf="${g.key}" data-mkgt="${esc(g.txt)}"
+        ${drin ? 'disabled' : ''} title="${drin ? 'zu dieser Stunde schon festgehalten'
+          : g.n ? `${g.n}\u00d7 – zuletzt ${fmtShort(g.zuletzt)}` : 'noch nie festgehalten'}">
+        <span>${drin ? '\u2713' : (st ? st.ic : '\u2B55')}</span><span class="mk-gf-t">${esc(g.kurz)}</span>
+        <span class="mk-gf-n">${drin ? 'heute' : g.n ? g.n + '\u00d7' : 'nie'}</span></button>`;
+    }).join('');
+    const hinweisSetzen = () => {
+      const h = $('#m-gf-hint'); if (!h) return;
+      h.textContent = gfGewaehlt.size
+        ? `${gfGewaehlt.size} Aufgabe${gfGewaehlt.size === 1 ? '' : 'n'} wird beim Speichern festgehalten – den Ort fragt ginoco gleich danach.`
+        : heuteSchon.size
+          ? `${heuteSchon.size} Aufgabe${heuteSchon.size === 1 ? ' ist' : 'n sind'} zu dieser Stunde schon festgehalten (\u2713).`
+          : 'Genau darum geht es später in der Prüfung: wann und wo war das dran.';
+    };
+    hinweisSetzen();
+    box.querySelectorAll('[data-mkgf]').forEach((btn) => btn.onclick = () => {
+      if (btn.disabled) return;
+      const k = btn.dataset.mkgf;
+      if (gfGewaehlt.has(k)) gfGewaehlt.delete(k); else gfGewaehlt.add(k);
+      btn.classList.toggle('on', gfGewaehlt.has(k));
+      hinweisSetzen();
+    });
+  })();
   // Fahrlehrer-Unterschrift: gespeicherte verwenden oder neu zeichnen.
   let isigPad = null;
   const isigStored = state.settings?.instructor_signature || '';
@@ -7557,7 +7788,21 @@ function openMarkModal(id) {
         }
       }
       await api('/api/bookings/' + id, { method: 'PATCH', body });
+      // Angetippte Grundfahraufgaben als Übung festhalten – mit Datum und
+      // Uhrzeit der Stunde, damit später niemand rätseln muss.
+      const neueUb = [];
+      for (const k of gfGewaehlt) {
+        const treffer = GRUNDAUFGABEN.find(([, key]) => key === k);
+        if (!treffer) continue;
+        try {
+          const r = await api(`/api/students/${b.student_id}/practice`, { method: 'POST', body: {
+            task: treffer[0], task_key: k, booking_id: b.id,
+            date: body.date || b.date, time: body.start_time || b.start_time, status: 'geuebt' } });
+          if (!r.schonDa) neueUb.push(r.entry.id);
+        } catch (err) { toast('Übung „' + treffer[0] + '“ nicht gespeichert: ' + err.message, 'err'); }
+      }
       closeModal(); toast(body.request_sign ? 'Abgeschlossen ✓ – Unterschrift angefordert' : 'Gespeichert ✓', 'ok'); refreshEventBadge(); drawInstrTab();
+      if (neueUb.length) setTimeout(() => openUebungOrt(neueUb, b.student_id, b.student_name || ''), 260);
     } catch (e) { toast(e.message, 'err'); }
   };
 }

@@ -1214,19 +1214,26 @@ async function handleApi(req, res, url) {
     return ok(res, { localities });
   }
   if (p === '/api/geo/streets' && method === 'GET') {
-    const zip = String(url.searchParams.get('zip') || '').replace(/\s/g, '');
     const q = String(url.searchParams.get('q') || '').trim();
-    if (!/^\d{5}$/.test(zip) || q.length < 2) return ok(res, { streets: [] });
-    const rows = await openplz(`/de/Streets?postalCode=${zip}&name=${encodeURIComponent(q)}`);
+    // Ohne PLZ gilt die der Fahrschule – so muss die Uebungshistorie sie nicht
+    // jedes Mal mitschicken. Mehrere PLZ (Kernstadt + Finow) durch Komma.
+    const roh = String(url.searchParams.get('zip') || getSettingRaw('school_zip') || '');
+    const zips = roh.split(/[,;\s]+/).map((z) => z.replace(/\D/g, '')).filter((z) => /^\d{5}$/.test(z)).slice(0, 4);
+    if (!zips.length || q.length < 2) return ok(res, { streets: [] });
     // Entdoppeln nach Strassennamen (keine dreifach gleiche Strasse) und begrenzen.
     const seen = new Set(), streets = [];
-    for (const r of (rows || [])) {
-      const nm = r && r.name;
-      if (!nm || seen.has(nm)) continue;
-      seen.add(nm); streets.push(nm);
-      if (streets.length >= 8) break;
+    for (const zip of zips) {
+      const rows = await openplz(`/de/Streets?postalCode=${zip}&name=${encodeURIComponent(q)}`);
+      for (const r of (rows || [])) {
+        const nm = r && r.name;
+        if (!nm || seen.has(nm)) continue;
+        seen.add(nm);
+        // Ortsteil, falls die API ihn kennt – spart den zweiten Handgriff.
+        streets.push({ name: nm, locality: (r.locality || r.borough || '') || '', zip });
+      }
+      if (streets.length >= 12) break;
     }
-    return ok(res, { streets });
+    return ok(res, { streets: streets.slice(0, 12).map((x) => x.name), details: streets.slice(0, 12) });
   }
 
   // ===== Einstellungen: Fahrlehrer sieht alles, andere nur eine unbedenkliche Teilmenge =====
@@ -2354,6 +2361,15 @@ async function handleApi(req, res, url) {
     const datum = /^\d{4}-\d{2}-\d{2}$/.test(b.date || '') ? b.date : todayStr();
     const zeit = /^([01]?\d|2[0-3]):[0-5]\d$/.test(b.time || '') ? b.time : null;
     const stand = ['geuebt', 'ok', 'mehr'].includes(b.status) ? b.status : 'geuebt';
+    // Zweimal auf „Speichern" bei derselben Stunde darf nicht zwei gleiche
+    // Eintraege ergeben – sonst steht dieselbe Uebung doppelt in der Historie.
+    if (b.booking_id) {
+      const doppelt = db.prepare(
+        `SELECT * FROM practice_log WHERE student_id=? AND booking_id=?
+           AND (task_key IS NOT NULL AND task_key=? OR LOWER(task)=LOWER(?))`
+      ).get(sid, Number(b.booking_id), b.task_key || null, aufgabe);
+      if (doppelt) return ok(res, { entry: uebungRow(doppelt), schonDa: true });
+    }
     const info = db.prepare(
       `INSERT INTO practice_log(student_id,booking_id,date,time,task,task_key,district,street,lat,lng,status,note,created_at)
        VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`
@@ -2456,6 +2472,36 @@ async function handleApi(req, res, url) {
     try { await unlink(join(MEDIA_DIR, m.file)); } catch {}
     db.prepare('DELETE FROM practice_media WHERE id=?').run(m.id);
     return ok(res, { deleted: true });
+  }
+
+  // Strassen, die die Fahrschule schon benutzt hat – samt Ortsteil. Daraus
+  // baut die Eingabe ihre Vorschlaege: keine erfundene Strassenliste, sondern
+  // das, was hier tatsaechlich gefahren wird. Wird mit jeder Uebung besser.
+  if (p === '/api/geo/known-streets' && method === 'GET') {
+    if (!requireInstructor()) return bad(res, 'Nur der Fahrlehrer', 403);
+    const treffer = new Map();          // strasse(klein) -> { street, orte:Map, n, zuletzt }
+    const merken = (street, district, datum) => {
+      const name = String(street || '').trim();
+      if (name.length < 3) return;
+      const k = name.toLowerCase();
+      let e = treffer.get(k);
+      if (!e) { e = { street: name, orte: new Map(), n: 0, zuletzt: '' }; treffer.set(k, e); }
+      e.n++;
+      if (datum && datum > e.zuletzt) { e.zuletzt = datum; e.street = name; }
+      const ot = String(district || '').trim();
+      if (ot) e.orte.set(ot, (e.orte.get(ot) || 0) + 1);
+    };
+    for (const r of db.prepare("SELECT street, district, date FROM practice_log WHERE street IS NOT NULL AND TRIM(street) <> ''").all())
+      merken(r.street, r.district, r.date);
+    // Wohnadressen zaehlen mit: die Strassen kennt er ohnehin, und beim
+    // Abholen faehrt er sie sowieso an.
+    for (const r of db.prepare("SELECT street FROM students WHERE deleted_at IS NULL AND street IS NOT NULL AND TRIM(street) <> ''").all())
+      merken(r.street, null, null);
+    const streets = [...treffer.values()].map((e) => {
+      const best = [...e.orte.entries()].sort((a, b) => b[1] - a[1])[0];
+      return { street: e.street, district: best ? best[0] : '', n: e.n };
+    }).sort((a, b) => b.n - a.n || a.street.localeCompare(b.street, 'de'));
+    return ok(res, { streets });
   }
 
   // ================= Dienstplan der Partnerin/des Partners =================

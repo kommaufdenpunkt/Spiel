@@ -451,6 +451,9 @@ const DEFAULTS = {
   school_lat: '52.8300',
   school_lng: '13.8160',
   school_label: 'Eberswalde (Eisenbahnstr. 31)',
+  // PLZ des Fahrgebiets – daraus kommen die Strassenvorschlaege in der
+  // Uebungshistorie. Mehrere durch Komma (z.B. Kernstadt und Finow).
+  school_zip: '16225,16227',
   // Zweiter Standort (Finow) – die Abholzeit wird automatisch vom naeheren Standort gerechnet
   school2_label: 'Finow',
   school2_lat: '52.8360',

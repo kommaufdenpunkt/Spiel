@@ -2153,6 +2153,10 @@ header .brand .brandname{
 .ub-task-b,.ub-ort{border:1px solid var(--line);background:#141b25;color:var(--ink);border-radius:99px;
   padding:.35rem .7rem;font-size:.84rem;font-weight:700;cursor:pointer}
 .ub-task-b.on,.ub-ort.on{border-color:var(--brand);background:color-mix(in srgb,var(--brand) 16%,#141b25);color:var(--brand)}
+.ub-wann{border:1px solid var(--line);border-radius:10px;padding:.45rem .7rem;margin:.2rem 0 .4rem}
+.ub-wann>summary{cursor:pointer;font-size:.86rem;font-weight:700;list-style:none}
+.ub-wann>summary::-webkit-details-marker{display:none}
+.ub-wann>summary::before{content:'\1F552 ';font-weight:400}
 .ub-filters{display:flex;flex-wrap:wrap;gap:.35rem;margin-bottom:.7rem}
 .ub-fl{border:1px solid var(--line);background:#141b25;color:var(--muted);border-radius:99px;
   padding:.2rem .6rem;font-size:.78rem;font-weight:700;cursor:pointer}
@@ -2174,6 +2178,46 @@ header .brand .brandname{
 .ub-upl-row{display:flex;justify-content:space-between;align-items:center;gap:.6rem;padding:.35rem 0;
   border-bottom:1px solid var(--line);font-size:.86rem}
 .ub-upl-row:last-child{border-bottom:0}
+/* Strassen-Vorschlaege unter dem Eingabefeld */
+.ub-sugbox{margin-top:.35rem;border:1px solid var(--line);border-radius:10px;background:#0f151d;
+  overflow:hidden;max-height:15rem;overflow-y:auto}
+.ub-sug{display:flex;align-items:center;gap:.5rem;width:100%;text-align:left;background:none;border:0;
+  border-bottom:1px solid var(--line);color:var(--ink);padding:.55rem .7rem;font-size:.88rem;cursor:pointer;min-height:44px}
+.ub-sug:last-child{border-bottom:0}
+.ub-sug:hover,.ub-sug:focus{background:#141b25}
+.ub-sug-s{font-weight:700;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ub-sug-o{color:var(--brand);font-size:.78rem;font-weight:700;white-space:nowrap}
+.ub-sug-q{color:var(--muted);font-size:.72rem;white-space:nowrap}
+/* Die fuenf Grundfahraufgaben auf einen Blick */
+/* minmax(0,1fr): ohne das erzwingen die langen deutschen Namen eine
+   Mindestbreite und die fuenfte Kachel rutscht aus dem Handy-Rand. */
+.gf-strip{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:.35rem;margin:.2rem 0 .5rem}
+.gf-t{--f:var(--muted);background:color-mix(in srgb,var(--f) 14%,#141b25);border:1px solid color-mix(in srgb,var(--f) 40%,transparent);
+  border-radius:11px;padding:.45rem .25rem;text-align:center;display:flex;flex-direction:column;gap:.15rem;align-items:center;
+  min-width:0}
+.gf-t.leer{background:#141b25;border-style:dashed;border-color:var(--bad);opacity:.85}
+.gf-ic{font-size:1.05rem;line-height:1}
+.gf-lb{font-size:.66rem;font-weight:700;line-height:1.18;color:var(--ink)}
+.gf-n{font-size:.68rem;font-weight:800;color:var(--muted);font-variant-numeric:tabular-nums}
+.gf-t.leer .gf-n{color:var(--bad)}
+.gf-hint{margin:.1rem 0 .7rem}
+.mk-gfwrap{margin:.6rem 0 .2rem}
+.mk-gf{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:.3rem;margin:.35rem 0}
+.mk-gf-b{--f:var(--muted);display:flex;flex-direction:column;align-items:center;gap:.1rem;min-height:58px;
+  border:1px solid var(--line);background:#141b25;color:var(--ink);border-radius:11px;padding:.4rem .18rem;cursor:pointer;
+  min-width:0}
+.mk-gf-b.leer{border-style:dashed;border-color:var(--bad)}
+.mk-gf-b.on{border-color:var(--brand);background:color-mix(in srgb,var(--brand) 20%,#141b25);box-shadow:0 0 0 1px var(--brand) inset}
+.mk-gf-t{font-size:.62rem;font-weight:700;line-height:1.15;text-align:center}
+.mk-gf-n{font-size:.64rem;font-weight:800;color:var(--muted);font-variant-numeric:tabular-nums}
+.mk-gf-b.leer .mk-gf-n{color:var(--bad)}
+.mk-gf-b.on .mk-gf-n{color:var(--brand)}
+.mk-gf-b.fix{border-style:solid;border-color:var(--ok,#35c07d);background:color-mix(in srgb,#35c07d 14%,#141b25);
+  opacity:1;cursor:default}
+.mk-gf-b.fix .mk-gf-n{color:#35c07d}
+.mu-gf-t{font-size:.8rem;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;margin:.3rem 0 .35rem}
+@media (max-width:460px){.gf-strip,.mk-gf{gap:.22rem}.gf-lb{font-size:.56rem}.mk-gf-t{font-size:.56rem}
+  .gf-t,.mk-gf-b{padding-inline:.12rem}.gf-n,.mk-gf-n{font-size:.6rem}}
 .pc-last{font-size:.9rem;margin:.2rem 0 .4rem}
 .pc-open{display:inline-block;background:var(--bad-bg);color:var(--bad);border-radius:8px;
   padding:.2rem .55rem;font-size:.84rem;font-weight:700;margin-bottom:.5rem}
